@@ -23,8 +23,10 @@ bin/rails s
 ## Market data subscriber
 - Enqueue ticker subscription (GoodJob):
 ```bash
-bin/rake market_data:subscribe[BTC-USD-PERP]
-bin/rake market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]
+bin/rake "market_data:subscribe[BTC-USD-PERP]"
+bin/rake "market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]"
+# or use env var (no quoting needed):
+PRODUCT_IDS=BTC-USD-PERP bin/rake market_data:subscribe
 ```
 
 Logs will show ticker messages at debug level.
