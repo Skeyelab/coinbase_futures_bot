@@ -25,6 +25,15 @@
 
 ### Session log
 
+#### 2025-08-09 05:06 UTC
+- Context: MCP GitHub identity switched successfully to `Skeyelab`.
+- Changes:
+  - Updated local `.cursor/mcp.json` with Skeyelab PAT (file is gitignored)
+- Verification:
+  - Authenticated user now reports as `Skeyelab`
+- Next steps:
+  - Use MCP GitHub actions under `Skeyelab` for PRs/issues as needed
+
 #### 2025-08-09 05:00 UTC
 - Context: Re-verified MCP GitHub auth after `.env` update.
 - Outcome: Authenticated user is still `edahl_UND` (MCP reads process env, not `.env`).
@@ -119,4 +128,5 @@
   - Set `config.active_job.queue_adapter = :good_job`
   - Create GoodJob initializer for concurrency/queues
   - `bin/rails db:migrate`
+
 
