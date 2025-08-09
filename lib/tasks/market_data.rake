@@ -12,6 +12,7 @@ namespace :market_data do
       MarketData::CoinbaseFuturesSubscriber.new(product_ids: products, logger: stdout_logger).start
     else
       MarketDataSubscribeJob.perform_later(products)
-      puts "Enqueued MarketDataSubscribeJob for: #{products.join(",")}"
+      puts "Enqueued MarketDataSubscribeJob for: #{products.join(",") }"
+    end
   end
 end
