@@ -1,24 +1,44 @@
-# README
+# Coinbase Futures Bot (Rails API + GoodJob)
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Rails 8 API-only service for a Coinbase futures trading bot. Uses PostgreSQL for state and GoodJob for background processing.
 
-Things you may want to cover:
+## Prerequisites
+- Ruby 3.2.x (RVM recommended; repo uses `.ruby-version`)
+- PostgreSQL (DATABASE_URL)
+- Bundler
 
-* Ruby version
+## Setup
+```bash
+rvm use ruby-3.2.2@coinbase_futures_bot --create
+bundle install
+bin/rails db:prepare
+```
 
-* System dependencies
+## Run (development)
+```bash
+bin/rails s
+# GoodJob runs async in-process by default
+```
 
-* Configuration
+## Market data subscriber
+- Enqueue ticker subscription (GoodJob):
+```bash
+bin/rake market_data:subscribe[BTC-USD-PERP]
+bin/rake market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]
+```
 
-* Database creation
+Logs will show ticker messages at debug level.
 
-* Database initialization
+## Admin UI
+- GoodJob dashboard (development): http://localhost:3000/good_job
 
-* How to run the test suite
+## Production notes
+- Run a dedicated worker instead of in-process:
+```bash
+bundle exec good_job start
+```
+- Consider mounting `/good_job` behind auth if exposed.
 
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+## Contributing workflow
+- All substantive changes go through PRs. CI (RuboCop, Brakeman) must pass.
+- Update `SESSION_NOTES.md` for notable changes.
