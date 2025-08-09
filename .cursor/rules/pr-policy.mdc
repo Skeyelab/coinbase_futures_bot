@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+description: Require feature work to be done via pull requests with CI passing and session notes updated.
+---
+
+# Pull Request policy
+
+- All substantive changes (features, refactors, deps, config) should be done in branches and merged via PRs.
+- PRs must pass CI (RuboCop, Brakeman) and follow the PR template.
+- Update [SESSION_NOTES.md](mdc:SESSION_NOTES.md) for notable changes.
+- Prefer small, focused PRs.
+
