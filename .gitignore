@@ -31,3 +31,11 @@
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+
+# Cursor MCP local credentials should not be tracked
+/.cursor/mcp.json
+
+# Keep rules tracked but ignore other local Cursor artifacts
+/.cursor/*
+!/.cursor/rules/
+!/.cursor/rules/*.mdc
