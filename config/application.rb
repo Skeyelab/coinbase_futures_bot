@@ -43,5 +43,10 @@ module CoinbaseFuturesBot
 
     # Use GoodJob for Active Job processing
     config.active_job.queue_adapter = :good_job
+
+    # Enable cookies, session, and flash for GoodJob UI in API-only app
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_coinbase_futures_bot_session"
+    config.middleware.use ActionDispatch::Flash
   end
 end
