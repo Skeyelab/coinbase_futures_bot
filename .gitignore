@@ -39,3 +39,4 @@
 /.cursor/*
 !/.cursor/rules/
 !/.cursor/rules/*.mdc
+.DS_Store
