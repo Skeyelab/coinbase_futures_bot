@@ -1,0 +1,24 @@
+---
+alwaysApply: true
+description: High-level overview of the Coinbase futures trading bot project to align future sessions.
+---
+
+# Project overview
+
+This is a Rails 7 API-only app that implements a Coinbase futures trading bot. It uses PostgreSQL for state and GoodJob for background processing.
+
+- Rails: 7.2.x (API-only)
+- Ruby: 3.2.4
+- DB: PostgreSQL via `ENV['DATABASE_URL']`
+- Jobs: Active Job with `:good_job` adapter, dashboard mounted at `/good_job` in development
+
+Core services to implement:
+- Market data subscriber (ingest and normalize Coinbase futures feeds)
+- Signal generation (strategy logic)
+- Execution (order placement, risk controls, kill switch)
+- Reconciliation (positions, PnL, drift correction)
+
+Operational concerns:
+- Health checks at `/up`
+- Metrics and observability (to be added)
+- Safe rollout with branch protection and CI (RuboCop, Brakeman)
