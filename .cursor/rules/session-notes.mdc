@@ -1,0 +1,48 @@
+---
+alwaysApply: true
+description: Ensure every meaningful LLM session appends a structured log entry to SESSION_NOTES.md so future sessions can seamlessly continue.
+---
+
+# Session logging policy
+
+Always record meaningful actions and session outcomes in [SESSION_NOTES.md](mdc:SESSION_NOTES.md) so future sessions can quickly resume with full context.
+
+## When to log
+- After you perform any non-trivial action (editing code, running commands, adding deps, creating migrations), and at the end of a working session.
+
+## At session start
+- Read the top-level "Setup summary" and the most recent entry in `### Session log` in [SESSION_NOTES.md](mdc:SESSION_NOTES.md) to rehydrate context.
+
+## Where and how to log
+- Maintain a `### Session log` section in [SESSION_NOTES.md](mdc:SESSION_NOTES.md).
+- Prepend new entries at the top of the session log so the most recent appears first.
+- Do not expose secrets. Reference env vars by name only (e.g., `ENV['DATABASE_URL']`).
+
+## Entry template
+Copy and fill this template for each entry (times should be UTC):
+
+```
+#### YYYY-MM-DD HH:mm UTC
+- Context: one line summarizing current project state (e.g., job runner installed; DB prepared; API skeleton).
+- Changes:
+  - Short bullets of what changed (files created/updated, features added)
+- Commands run:
+  - `exact command`
+- Files touched:
+  - `path/to/file.ext`, `another/file`
+- Migrations:
+  - `db/migrate/<timestamp>_<name>.rb` (state: created|migrated)
+- Next steps:
+  - Actionable short bullets
+```
+
+## Setup summary guidance
+- Keep a concise authoritative "Setup summary" section at the top of [SESSION_NOTES.md](mdc:SESSION_NOTES.md) with current versions and key configuration (Ruby, Rails, DB driver/URL strategy, queue adapter, external services).
+- Update the summary when reality changes; avoid duplicating information across multiple sections.
+
+## Conventions
+- Be concise; prefer bullets over prose.
+- Use backticks for file paths and commands.
+- If the `Session log` section is missing, create it.
+- If you generated migrations, also note whether `db:migrate` has been run.
+

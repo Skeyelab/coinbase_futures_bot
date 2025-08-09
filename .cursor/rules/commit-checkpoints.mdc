@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+description: When relevant, pause and create a clean git checkpoint using the MCP Git tooling; include concise, high-signal messages and avoid secrets.
+---
+
+# Commit checkpoints with MCP
+
+Create frequent, safe checkpoints using the MCP commit/push tooling whenever relevant. This helps recover easily, supports collaboration, and preserves a reproducible trail of changes.
+
+## When to commit (triggers)
+- After adding/updating dependencies (e.g., `Gemfile`, `Gemfile.lock`).
+- After generating or running migrations.
+- After creating/updating important files (configs, initializers, routes, jobs, services).
+- Before risky refactors or major changes.
+- After fixing failing builds/tests or completing a vertical slice.
+- Before switching tasks or ending the session.
+
+## Preconditions
+- Build/tests are green when available.
+- Update [SESSION_NOTES.md](mdc:SESSION_NOTES.md): add a new entry to `### Session log` describing what changed and commands run.
+
+## How to commit (MCP-first)
+1. Stage changes via MCP Git tool.
+2. Commit with a concise message (see template below).
+3. Push the branch.
+
+If MCP Git is unavailable, fallback to terminal:
+```
+git add -A && git commit -m "<message>" && git push
+```
+
+## Commit message template
+Prefer Conventional Commits style where helpful.
+
+```
+feat(scope): short summary
+
+- what changed at a high level
+- why it matters (optional)
+Refs: <issue/PR> (optional)
+```
+
+## Guardrails
+- Never commit secrets; `.env` stays untracked. Reference env vars by name only.
+- Keep commits logically scoped; split large changes when reasonable.
+

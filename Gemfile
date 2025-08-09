@@ -39,3 +39,5 @@ group :development, :test do
 end
 
 
+
+gem "good_job", "~> 4.11"
