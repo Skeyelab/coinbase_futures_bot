@@ -1,3 +1,7 @@
+# See https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# Require review from code owners (enable in branch protection) to enforce review.
+
+* @Skeyelab
 # Default code owners
 * @Skeyelab
 

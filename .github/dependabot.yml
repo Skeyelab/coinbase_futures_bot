@@ -4,6 +4,32 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    reviewers:
+      - "Skeyelab"
+    rebase-strategy: auto
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "ci"
+      - "dependencies"
+    reviewers:
+      - "Skeyelab"
+version: 2
+updates:
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "weekly"
     open-pull-requests-limit: 5
     versioning-strategy: increase
   - package-ecosystem: "github-actions"
