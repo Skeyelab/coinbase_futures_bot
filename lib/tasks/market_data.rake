@@ -13,6 +13,5 @@ namespace :market_data do
     else
       MarketDataSubscribeJob.perform_later(products)
       puts "Enqueued MarketDataSubscribeJob for: #{products.join(",")}"
-    end
   end
 end
