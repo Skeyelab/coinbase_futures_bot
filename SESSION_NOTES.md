@@ -25,6 +25,33 @@
 
 ### Session log
 
+#### 2025-08-09 04:52 UTC
+- Context: Validated MCP GitHub connectivity and sanitized token usage.
+- Changes:
+  - Updated `.cursor/mcp.json` to use `${GITHUB_TOKEN}` instead of hardcoded PAT
+  - Verified current authenticated user via MCP
+- Commands run:
+  - `mcp github get_me` (via tool) → user `edahl_UND`
+- Files touched:
+  - `.cursor/mcp.json`, `SESSION_NOTES.md`
+- Next steps:
+  - To use `Skeyelab`, set `GITHUB_TOKEN` to a PAT from that account, then reload MCP and re-check
+
+#### 2025-08-09 04:34 UTC
+- Context: Added commit checkpoint rule; sanitized MCP token; created local checkpoint commit.
+- Changes:
+  - Created `.cursor/rules/commit-checkpoints.mdc`
+  - Sanitized `.cursor/mcp.json` to use `${GITHUB_TOKEN}`
+  - Committed GoodJob setup, rules, and `TestJob`
+- Commands run:
+  - `git add -A`
+  - `git commit -m "feat(jobs): add GoodJob and configure adapter/dashboard; verify with TestJob ..."`
+  - `git push` (skipped: no remote configured)
+- Files touched:
+  - `.cursor/rules/commit-checkpoints.mdc`, `.cursor/mcp.json`
+- Next steps:
+  - Configure git remote and push (`git remote add origin <url>`; `git push -u origin main`)
+
 #### 2025-08-09 04:30 UTC
 - Context: GoodJob configured and migrated; dashboard available in development.
 - Changes:
@@ -83,3 +110,4 @@
   - Set `config.active_job.queue_adapter = :good_job`
   - Create GoodJob initializer for concurrency/queues
   - `bin/rails db:migrate`
+
