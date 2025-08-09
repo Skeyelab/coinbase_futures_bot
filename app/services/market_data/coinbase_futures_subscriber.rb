@@ -17,9 +17,10 @@ module MarketData
       @ws.on(:open) { subscribe }
       @ws.on(:message) { |msg| handle_message(msg) }
       @ws.on(:error) { |e| @logger.error("[MD] error: #{e}") }
-      @ws.on(:close) { @logger.info("[MD] closed") }
+      @ws.on(:close) { @logger.info("[MD] closed"); @ws = nil }
 
-      sleep 0.1 while @ws&.open?
+      # Keep the job alive until the websocket closes
+      sleep 0.1 while @ws
     end
 
     private

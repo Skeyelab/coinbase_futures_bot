@@ -27,6 +27,11 @@ bin/rake market_data:subscribe[BTC-USD-PERP]
 bin/rake market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]
 ```
 
+- Run inline (foreground) to print ticks to STDOUT:
+```bash
+INLINE=1 bin/rake "market_data:subscribe[BTC-USD-PERP]"
+```
+
 Logs will show ticker messages at debug level.
 
 ## Admin UI
