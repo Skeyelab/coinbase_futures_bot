@@ -1,7 +1,7 @@
 ### Setup summary
 
 - **Project path**: `/Users/edahl/Documents/Github/coinbase_futures_bot`
-- **Ruby/RVM**: `ruby-3.2.4` with gemset `coinbase_futures_bot`
+- **Ruby/RVM**: `ruby-3.2.2` with gemset `coinbase_futures_bot` (Rails 8 requires >= 3.2; 3.2.4 compile failed locally)
 - **Rails**: `7.2.2.1` (API-only)
 - **DB**: PostgreSQL via `ENV['DATABASE_URL']` (dev/test respect `PGDATABASE`)
 - **Env**: `.env` (gitignored) holds `DATABASE_URL`
@@ -26,7 +26,7 @@
 
 ### Session log
 
-#### 2025-08-09 05:11 UTC
+#### 2025-08-09 05:12 UTC
 - Context: CI stabilized; automation and ownership set; notes updated for project purpose and Ruby 3.2.4.
 - Changes:
   - Consolidated CI (RuboCop + Brakeman); fixed migration style; bumped Ruby to 3.2.4
@@ -40,6 +40,19 @@
   - `.ruby-version`, `db/migrate/20250809042439_create_good_jobs.rb`, `SESSION_NOTES.md`
 - Next steps:
   - Enable branch protection in repo settings; proceed to implement market data service
+
+#### 2025-08-09 05:14 UTC
+- Context: Rails upgrade to 8.0.2; local Ruby aligned to 3.2.x.
+- Changes:
+  - Switched to Ruby 3.2.2 via RVM (3.2.4 failed to compile on this host)
+  - Upgraded Rails gems to 8.0.2; updated `config.load_defaults` to 8.0
+- Commands run:
+  - `rvm use 3.2.2@coinbase_futures_bot --create`
+  - `bundle update rails && bundle install`
+- Files touched:
+  - `Gemfile`, `Gemfile.lock`, `config/application.rb`, `.ruby-version`
+- Next steps:
+  - Optionally retry Ruby 3.2.4 later; proceed with service scaffolding on Rails 8
 
 #### 2025-08-09 05:06 UTC
 - Context: MCP GitHub identity switched successfully to `Skeyelab`.
