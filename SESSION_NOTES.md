@@ -25,6 +25,15 @@
 
 ### Session log
 
+#### 2025-08-09 05:00 UTC
+- Context: Re-verified MCP GitHub auth after `.env` update.
+- Outcome: Authenticated user is still `edahl_UND` (MCP reads process env, not `.env`).
+- Next steps:
+  - Ensure `GITHUB_TOKEN` for Skeyelab is in the Cursor app process environment.
+  - Easiest: start Cursor from a terminal session with the var set:
+    - `export GITHUB_TOKEN="<Skeyelab_PAT>" && open -a Cursor`
+  - Or set a system/user environment var so GUI apps inherit it, then restart Cursor.
+
 #### 2025-08-09 04:52 UTC
 - Context: Validated MCP GitHub connectivity and sanitized token usage.
 - Changes:
