@@ -35,7 +35,11 @@ module MarketData
     end
 
     def handle_message(message)
-      data = JSON.parse(message.data) rescue nil
+      data = begin
+        JSON.parse(message.data)
+      rescue JSON::ParserError
+        nil
+      end
       return unless data
       return unless data["type"] == "ticker"
 
