@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ -x "./bin/rubocop" ]; then
+  echo "Running RuboCop before push..."
+  ./bin/rubocop -f github
+else
+  echo "Warning: ./bin/rubocop not found or not executable; skipping RuboCop pre-push check." >&2
+fi
