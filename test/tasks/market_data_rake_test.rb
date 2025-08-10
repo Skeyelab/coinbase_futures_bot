@@ -9,7 +9,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
   end
 
   def test_subscribe_task_enqueues_job_with_args
-    assert_enqueued_with(job: MarketDataSubscribeJob, args: [["BTC-USD-PERP", "ETH-USD-PERP"]]) do
+    assert_enqueued_with(job: MarketDataSubscribeJob, args: [ [ "BTC-USD-PERP", "ETH-USD-PERP" ] ]) do
       Rake::Task["market_data:subscribe"].reenable
       Rake::Task["market_data:subscribe"].invoke("BTC-USD-PERP,ETH-USD-PERP")
     end
@@ -18,7 +18,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
   def test_subscribe_task_uses_env_product_ids
     ENV["PRODUCT_IDS"] = "BTC-USD-PERP"
     begin
-      assert_enqueued_with(job: MarketDataSubscribeJob, args: [["BTC-USD-PERP"]]) do
+      assert_enqueued_with(job: MarketDataSubscribeJob, args: [ [ "BTC-USD-PERP" ] ]) do
         Rake::Task["market_data:subscribe"].reenable
         Rake::Task["market_data:subscribe"].invoke(nil)
       end
