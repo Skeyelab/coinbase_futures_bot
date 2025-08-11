@@ -44,7 +44,6 @@ class MarketDataRakeTest < ActiveJob::TestCase
     end
   end
 
-<<<<<<< HEAD
   def test_subscribe_task_uses_default_product_ids
     assert_enqueued_with(job: MarketDataSubscribeJob, args: [ [ "BTC-USD-PERP" ] ]) do
       Rake::Task["market_data:subscribe"].reenable
