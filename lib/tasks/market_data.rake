@@ -203,16 +203,20 @@ namespace :market_data do
     stdout_logger.level = Logger::INFO
 
     on_ticker = lambda do |tick|
+      price_str = tick["price"]
+      time_str = tick["time"]
+      next if price_str.nil? || time_str.nil?
+
       Tick.create!(
         product_id: spot,
-        price: tick["price"].to_d,
-        observed_at: Time.parse(tick["time"]) 
+        price: price_str.to_d,
+        observed_at: Time.parse(time_str)
       )
     rescue => e
       stdout_logger.error("[INGEST] failed to persist tick: #{e}")
     end
 
-    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
+    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
   end
 
   desc "Backtest spot-driven strategy from DB ticks"

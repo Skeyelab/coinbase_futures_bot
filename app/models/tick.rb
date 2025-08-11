@@ -8,5 +8,3 @@ class Tick < ApplicationRecord
   scope :for_product, ->(pid) { where(product_id: pid) }
   scope :between, ->(start_time, end_time) { where(observed_at: start_time..end_time) }
 end
-
-

@@ -61,12 +61,14 @@ module MarketData
       if data["channel"] == "ticker" && data["events"].is_a?(Array)
         data["events"].each do |event|
           Array(event["tickers"]).each do |t|
-            @logger.debug("[MD] ticker: #{t.slice("product_id", "price", "time")}")
-            @on_ticker&.call({
+            tick_time = t["time"] || t["ts"] || t["timestamp"]
+            normalized = {
               "product_id" => t["product_id"],
               "price" => t["price"],
-              "time" => t["time"]
-            })
+              "time" => tick_time
+            }
+            @logger.debug("[MD] ticker: #{normalized.slice("product_id", "price", "time")}")
+            @on_ticker&.call(normalized)
           end
         end
         return
@@ -74,12 +76,13 @@ module MarketData
 
       # Legacy schema (flat type)
       if data["type"] == "ticker"
-        @logger.debug("[MD] ticker: #{data.slice("product_id", "price", "time")}")
-        @on_ticker&.call({
+        normalized = {
           "product_id" => data["product_id"],
           "price" => data["price"],
-          "time" => data["time"]
-        })
+          "time" => data["time"] || data["ts"] || data["timestamp"]
+        }
+        @logger.debug("[MD] ticker: #{normalized.slice("product_id", "price", "time")}")
+        @on_ticker&.call(normalized)
       end
     end
   end
