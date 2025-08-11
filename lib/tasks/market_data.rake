@@ -151,4 +151,46 @@ namespace :market_data do
       puts "Futures subscription currently supports INLINE=1 only (no job enqueuing yet)"
     end
   end
+
+  desc "Run spot-driven strategy: consume BTC-USD ticks and drive BTC-USD-PERP executor"
+  task :run_spot_driven_strategy, [ :spot_product, :futures_product ] => :environment do |_t, args|
+    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
+    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
+
+    puts "Running spot-driven strategy: spot=#{spot} -> futures=#{perp}"
+    stdout_logger = Logger.new($stdout)
+    stdout_logger.level = Logger::DEBUG
+
+    executor = Execution::FuturesExecutor.new(logger: stdout_logger)
+    strategy = Strategy::SpotDrivenStrategy.new(
+      spot_product_id: spot,
+      futures_product_id: perp,
+      executor: executor,
+      logger: stdout_logger
+    )
+
+    on_ticker = ->(tick) { strategy.on_ticker(tick) }
+    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
+  end
+
+  desc "Backtest spot-driven strategy by replaying a CSV of spot ticks"
+  task :backtest_spot_csv, [ :csv_path, :spot_product, :futures_product ] => :environment do |_t, args|
+    csv = args[:csv_path] || ENV["CSV_PATH"]
+    raise ArgumentError, "csv_path required" if csv.to_s.strip.empty?
+    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
+    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
+
+    stdout_logger = Logger.new($stdout)
+    stdout_logger.level = Logger::INFO
+
+    executor = Execution::FuturesExecutor.new(logger: stdout_logger)
+    strategy = Strategy::SpotDrivenStrategy.new(
+      spot_product_id: spot,
+      futures_product_id: perp,
+      executor: executor,
+      logger: stdout_logger
+    )
+
+    Backtest::SpotCsvReplay.new(csv_path: csv, product_id: spot, strategy: strategy, logger: stdout_logger).run
+  end
 end

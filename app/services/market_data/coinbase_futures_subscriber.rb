@@ -4,9 +4,10 @@ require "websocket-client-simple"
 
 module MarketData
   class CoinbaseFuturesSubscriber
-    def initialize(product_ids:, logger: Rails.logger)
+    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil)
       @product_ids = Array(product_ids)
       @logger = logger
+      @on_ticker = on_ticker
       @ws = nil
     end
 
@@ -61,6 +62,11 @@ module MarketData
         data["events"].each do |event|
           Array(event["tickers"]).each do |t|
             @logger.debug("[MD] ticker: #{t.slice("product_id", "price", "time")}")
+            @on_ticker&.call({
+              "product_id" => t["product_id"],
+              "price" => t["price"],
+              "time" => t["time"]
+            })
           end
         end
         return
@@ -69,6 +75,11 @@ module MarketData
       # Legacy schema (flat type)
       if data["type"] == "ticker"
         @logger.debug("[MD] ticker: #{data.slice("product_id", "price", "time")}")
+        @on_ticker&.call({
+          "product_id" => data["product_id"],
+          "price" => data["price"],
+          "time" => data["time"]
+        })
       end
     end
   end
