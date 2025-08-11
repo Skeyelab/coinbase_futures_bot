@@ -12,18 +12,31 @@ module MarketData
 
     def start
       url = ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com")
-      @ws = WebSocket::Client::Simple.connect(url)
+      socket = WebSocket::Client::Simple.connect(url)
+      @ws = socket
 
-      @ws.on(:open) { subscribe }
-      @ws.on(:message) { |msg| handle_message(msg) }
-      @ws.on(:error) { |e| @logger.error("[MD] error: #{e}") }
-      @ws.on(:close) { @logger.info("[MD] closed"); @ws = nil }
+      # Capture external references because the event_emitter uses instance_exec
+      # which changes self inside the blocks to the socket instance.
+      subscriber = self
+      log = @logger
+
+      socket.on(:open) { subscriber.__send__(:subscribe) }
+      socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
+      socket.on(:error) { |e| log.error("[MD] error: #{e}") }
+      socket.on(:close) do
+        log.info("[MD] closed")
+        subscriber.__send__(:mark_ws_as_closed)
+      end
 
       # Keep the job alive until the websocket closes
       sleep 0.1 while @ws
     end
 
     private
+
+    def mark_ws_as_closed
+      @ws = nil
+    end
 
     def subscribe
       msg = {
