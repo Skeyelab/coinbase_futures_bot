@@ -1,6 +1,6 @@
 # Coinbase Futures Bot (Rails API + GoodJob)
 
-Rails 8 API-only service for a Coinbase futures trading bot. Uses PostgreSQL for state and GoodJob for background processing.
+Rails 8 API-only service for a Coinbase trading bot (futures and spot). Uses PostgreSQL for state and GoodJob for background processing.
 
 ## Prerequisites
 - Ruby 3.2.x (RVM recommended; repo uses `.ruby-version`)
@@ -26,13 +26,20 @@ bin/rails s
 bin/rake market_data:subscribe[BTC-USD-PERP]
 bin/rake market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]
 ```
-
-- Run inline (foreground) to print ticks to STDOUT:
+- Spot ticker (BTC-USD):
 ```bash
-INLINE=1 bin/rake "market_data:subscribe[BTC-USD-PERP]"
+bin/rake market_data:subscribe_spot[BTC-USD]
+INLINE=1 bin/rake "market_data:subscribe_spot[BTC-USD]"
 ```
 
-Logs will show ticker messages at debug level.
+## Paper trading (automated)
+- One-off step:
+```bash
+bin/rake paper:step
+```
+- Scheduled via GoodJob cron (defaults):
+  - PaperTradingJob: every 15 minutes (set `PAPER_CRON` to override)
+  - CalibrationJob: daily 02:00 UTC (set `CALIBRATE_CRON` to override)
 
 ## Admin UI
 - GoodJob dashboard (development): http://localhost:3000/good_job
