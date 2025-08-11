@@ -16,7 +16,7 @@ namespace :market_data do
   end
 
   desc "Fetch and upsert futures products from Advanced Trade API"
-  task :upsert_futures_products => :environment do
+  task upsert_futures_products: :environment do
     rest = MarketData::CoinbaseRest.new
     puts "Fetching futures products from Advanced Trade API..."
     rest.upsert_products
@@ -97,7 +97,7 @@ namespace :market_data do
   end
 
   desc "Test different candle granularities to see what the API supports"
-  task :test_granularities => :environment do
+  task test_granularities: :environment do
     rest = MarketData::CoinbaseRest.new
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
 

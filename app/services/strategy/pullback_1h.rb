@@ -120,7 +120,7 @@ module Strategy
       pullback_quality = (ema_short - candles.last.low.to_f).abs / ema_short
 
       confidence = (trend_strength * 0.6 + pullback_quality * 0.4) * 100
-      [confidence, 100].min.round(1)
+      [ confidence, 100 ].min.round(1)
     end
 
     def simulate_trade(signal, entry_candle, equity)

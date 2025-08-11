@@ -40,7 +40,7 @@ module MarketData
       end
 
       # Ensure products is an array
-      products = [products] unless products.is_a?(Array)
+      products = [ products ] unless products.is_a?(Array)
 
       # Debug logging to see what we get
       Rails.logger.info("Fetched #{products.count} products from Exchange API")
@@ -161,7 +161,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [ current_start + chunk_days.days, end_time ].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -275,7 +275,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [ current_start + chunk_days.days, end_time ].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,

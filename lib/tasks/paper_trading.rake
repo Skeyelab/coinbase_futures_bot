@@ -2,12 +2,12 @@
 
 namespace :paper do
   desc "Run one paper trading step for all enabled USD pairs (1h)"
-  task :step => :environment do
+  task step: :environment do
     PaperTradingJob.perform_now
   end
 
   desc "Run calibration over recent history for all enabled pairs"
-  task :calibrate => :environment do
+  task calibrate: :environment do
     CalibrationJob.perform_now
   end
 end

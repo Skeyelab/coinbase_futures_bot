@@ -88,9 +88,9 @@ module PaperTrading
       exit_value = exit_price.to_f * order.filled_qty
       fee = exit_price.to_f * order.filled_qty * @maker_fee
       pnl = case order.side
-            when :buy then exit_value - entry_value - fee
-            when :sell then entry_value - exit_value - fee
-            end
+      when :buy then exit_value - entry_value - fee
+      when :sell then entry_value - exit_value - fee
+      end
       @equity_usd += pnl
       @fills << { order_id: order.id, side: (order.side == :buy ? :sell : :buy), price: exit_price, qty: order.filled_qty, fee: fee, time: Time.now.utc }
     end
