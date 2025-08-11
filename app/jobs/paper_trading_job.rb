@@ -23,7 +23,7 @@ class PaperTradingJob < ApplicationJob
 
     order = strategy.signal(candles: candles, symbol: pair.product_id, equity_usd: simulator.equity_usd)
     if order && order[:quantity].to_f > 0
-      simulator.place_limit(symbol: pair.product_id, side: order[:side], price: order[:price], quantity: order[:quantity], tp: order[:tp], sl: order[:sl])
+      simulator.place_limit(symbol: pair.product_id, side: order[:side], price: order[:price], quantity: order[:quantity], tp: order[:tp], sl: order[:sl], trailing: order[:trailing])
     end
 
     next_candle = next_hour_candle_stub(candles.last)

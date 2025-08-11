@@ -7,14 +7,16 @@ module Strategy
       slippage: 0.0002,
       tp_margin: 0.001,
       tp_target: 0.006,
-      sl_target: 0.004
+      sl_target: 0.004,
+      trail_pct: 0.003, # 30 bps trailing stop
+      trail_activate_margin: 0.001 # activate trailing after break-even + this margin
     }.freeze
 
     def initialize(config = {})
       @config = DEFAULTS.merge(config)
     end
 
-    # Given recent candles, return a potential order: { side:, price:, quantity:, tp:, sl: }
+    # Given recent candles, return a potential order: { side:, price:, quantity:, tp:, sl:, trailing: {...} }
     def signal(candles:, symbol:, equity_usd: 1000.0)
       return nil if candles.size < 200
 
@@ -34,12 +36,19 @@ module Strategy
 
       qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: 0.005)
 
+      trailing = {
+        type: :percent,
+        pct: @config[:trail_pct],
+        activate_at: be * (1.0 + @config[:trail_activate_margin])
+      }
+
       {
         side: :buy,
         price: entry,
         quantity: qty,
         tp: tp,
-        sl: sl
+        sl: sl,
+        trailing: trailing
       }
     end
 
