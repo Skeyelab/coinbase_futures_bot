@@ -26,6 +26,66 @@
 
 ### Session log
 
+#### 2025-08-11 19:10 UTC
+- Context: Add Sentry error reporting with Rails integration and a smoke-test route.
+- Changes:
+  - Added `sentry-rails` gem and created `config/initializers/sentry.rb`
+  - Removed inline `Sentry.init` from `config/application.rb`
+  - Added dev-only `GET /boom` route to raise an exception for Sentry verification
+- Commands run:
+  - `bundle install`
+  - `bin/rails test`
+- Files touched:
+  - `Gemfile`, `config/initializers/sentry.rb`, `config/application.rb`, `config/routes.rb`
+- Migrations:
+  - none
+- Next steps:
+  - Set `SENTRY_DSN` and visit `/boom` locally to verify event ingestion
+  - Optionally enable performance tracing via `SENTRY_TRACES_SAMPLE_RATE`
+
+#### 2025-08-11 18:26 UTC
+- Context: CI failures in rake task tests due to mock signatures and early returns; adjusted tasks and tests; suite green.
+- Changes:
+  - Updated `test/tasks/market_data_rake_test.rb` to allow keyword args in mocks and added output assertion for products task
+  - Switched `market_data:backfill_candles` to enqueue `FetchCandlesJob` with `perform_later`
+  - Replaced `return` with `next` in rake tasks to avoid `LocalJumpError` when early-exiting within task blocks
+- Commands run:
+  - `bin/rails test test/tasks/market_data_rake_test.rb`
+  - `rubocop -a -f github`
+  - `bin/rails test`
+- Files touched:
+  - `lib/tasks/market_data.rake`, `test/tasks/market_data_rake_test.rb`
+- Migrations:
+  - none
+- Next steps:
+  - Keep tests strict about enqueuing vs performing jobs
+  - Expand assertions for "test is missing assertions" notices where valuable
+
+#### 2025-08-11 16:58 UTC
+- Context: Fixed market data backfill task that was failing with 400 errors from Coinbase API.
+- Changes:
+  - Fixed Coinbase REST API integration for candle data fetching
+  - Updated Candle model to support multiple timeframes (15m, 1h, 6h, 1d)
+  - Implemented chunked fetching for large date ranges to avoid API limits
+  - Replaced 30m candles with 15m candles due to API limitation (30m not supported)
+  - Successfully fetched 672 15-minute candles for BTC-USD over 7 days
+  - Fixed validation errors and database constraints
+  - **COMPLETED**: Added comprehensive 1-hour candle backfilling system
+- Commands run:
+  - `rake market_data:test_granularities` (discovered supported timeframes)
+  - `rake market_data:backfill_30m_candles[1]` and `[7]` (successful)
+  - `rake market_data:backfill_1h_candles[1]` and `[7]` (successful)
+  - `rails runner` commands for debugging and testing
+- Files touched:
+  - `app/services/market_data/coinbase_rest.rb` (fixed API endpoints, added chunking)
+  - `app/models/candle.rb` (added timeframe validation)
+  - `lib/tasks/market_data.rake` (added granularity testing and 1h backfill tasks)
+- **Current Status**: Market data system fully operational with 840 total candles
+- Next steps:
+  - Research correct futures API endpoints for BTC-USD-PERP
+  - Implement signal generation service using the candle data
+  - Add paper trading simulation with the market data
+
 #### 2025-08-09 05:12 UTC
 - Context: CI stabilized; automation and ownership set; notes updated for project purpose and Ruby 3.2.4.
 - Changes:

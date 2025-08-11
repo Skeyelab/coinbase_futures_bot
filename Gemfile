@@ -24,6 +24,9 @@ gem "bootsnap", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 
+# HTTP client for Coinbase REST
+gem "faraday", "~> 2.11"
+
 # WebSocket client for market data subscriptions
 gem "websocket-client-simple", "~> 0.8"
 
@@ -44,3 +47,5 @@ end
 
 
 gem "good_job", "~> 4.11"
+gem "sentry-ruby"
+gem "sentry-rails"

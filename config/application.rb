@@ -43,5 +43,12 @@ module CoinbaseFuturesBot
 
     # Use GoodJob for Active Job processing
     config.active_job.queue_adapter = :good_job
+
+    # Add middleware needed for GoodJob dashboard
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore
+    config.middleware.use ActionDispatch::Flash
   end
+
+  # Sentry is initialized via config/initializers/sentry.rb
 end
