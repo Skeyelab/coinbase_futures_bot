@@ -184,6 +184,12 @@ module MarketData
 
     # Upsert candles into DB as `Candle` records (1h)
     def upsert_1h_candles(product_id:, start_time:, end_time: Time.now.utc)
+      # For larger date ranges, use chunked fetching to avoid API limits
+      if (end_time - start_time) > 3.days
+        upsert_1h_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
+        return
+      end
+
       data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 3600)
 
       # Debug logging
@@ -226,26 +232,26 @@ module MarketData
         upsert_30m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
-      
+
       # Use 15m granularity since 30m is not supported by the API
       data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 900)
-      
+
       # Debug logging
       Rails.logger.info("Processing #{data.class} data with #{data.count} items for 15m candles (requested as 30m)")
-      
+
       # Ensure data is an array
       unless data.is_a?(Array)
         Rails.logger.error("Expected array data, got #{data.class}: #{data.inspect[0..200]}")
         return
       end
-      
+
       # API returns most recent first; normalize oldest→newest
       data.sort_by { |arr| arr[0].to_i }.each do |arr|
         next unless arr.is_a?(Array) && arr.length >= 6
-        
+
         ts = Time.at(arr[0]).utc
         low, high, open, close, volume = arr[1..5]
-        
+
         # Use create_or_find_by instead of upsert for debugging
         Candle.create_or_find_by(
           symbol: product_id,
@@ -259,10 +265,10 @@ module MarketData
           candle.volume = volume
         end
       end
-      
+
       Rails.logger.info("Completed upserting 15m candles for #{product_id}")
     end
-    
+
     # Upsert 15-minute candles using chunked fetching for large date ranges
     def upsert_30m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 3)
       all_data = []
@@ -289,13 +295,13 @@ module MarketData
 
       # Process all the collected data
       Rails.logger.info("Processing #{all_data.count} total 15m candles in chunks")
-      
+
       all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
         next unless arr.is_a?(Array) && arr.length >= 6
-        
+
         ts = Time.at(arr[0]).utc
         low, high, open, close, volume = arr[1..5]
-        
+
         Candle.create_or_find_by(
           symbol: product_id,
           timeframe: "15m",
@@ -308,7 +314,7 @@ module MarketData
           candle.volume = volume
         end
       end
-      
+
       Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
     end
 

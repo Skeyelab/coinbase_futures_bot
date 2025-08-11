@@ -29,6 +29,31 @@ namespace :market_data do
     FetchCandlesJob.perform_now(backfill_days: days)
   end
 
+  desc "Backfill BTC-USD 1h candles (direct API)"
+  task :backfill_1h_candles, [ :days ] => :environment do |_t, args|
+    days = (args[:days] || 30).to_i
+    rest = MarketData::CoinbaseRest.new
+
+    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+
+    unless btc_pair
+      puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
+      return
+    end
+
+    start_time = days.days.ago
+    end_time = Time.now.utc
+
+    puts "Backfilling 1h candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
+    puts "This will fetch approximately #{days * 24} candles..."
+
+    rest.upsert_1h_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
+
+    # Count what we got
+    count = Candle.where(symbol: btc_pair.product_id, timeframe: "1h").count
+    puts "Completed! Total 1h candles in database: #{count}"
+  end
+
   desc "Backfill BTC-USD 30m candles"
   task :backfill_30m_candles, [ :days ] => :environment do |_t, args|
     days = (args[:days] || 7).to_i
@@ -57,7 +82,7 @@ namespace :market_data do
     rest = MarketData::CoinbaseRest.new
 
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
-    
+
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
       return
@@ -75,7 +100,7 @@ namespace :market_data do
   task :test_granularities => :environment do
     rest = MarketData::CoinbaseRest.new
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
-    
+
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
       return
@@ -96,7 +121,7 @@ namespace :market_data do
     end_time = Time.now.utc
 
     puts "Testing different granularities for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    
+
     granularities.each do |name, seconds|
       puts "Testing #{name} (#{seconds}s)..."
       begin
