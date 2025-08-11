@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "faraday"
+require "net/http"
+require "uri"
 require "json"
 
 module MarketData
@@ -8,16 +9,11 @@ module MarketData
     DEFAULT_BASE = "https://api.exchange.coinbase.com"
 
     def initialize(base_url: ENV.fetch("COINBASE_REST_URL", DEFAULT_BASE))
-      @conn = Faraday.new(base_url) do |f|
-        f.request :url_encoded
-        f.response :raise_error
-        f.adapter Faraday.default_adapter
-      end
+      @base_uri = URI(base_url)
     end
 
     def list_products
-      resp = @conn.get("/products")
-      JSON.parse(resp.body)
+      get_json("/products")
     end
 
     def upsert_products
@@ -39,20 +35,15 @@ module MarketData
       end
     end
 
-    # Returns array of arrays: [ time, low, high, open, close, volume ] per Coinbase public API
-    # granularity in seconds: 3600 for 1h
     def fetch_candles(product_id:, start_iso8601: nil, end_iso8601: nil, granularity: 3600)
       params = { granularity: granularity }
       params[:start] = start_iso8601 if start_iso8601
       params[:end] = end_iso8601 if end_iso8601
-      resp = @conn.get("/products/#{product_id}/candles", params)
-      JSON.parse(resp.body)
+      get_json("/products/#{product_id}/candles", params)
     end
 
-    # Upsert candles into DB as `Candle` records (1h)
     def upsert_1h_candles(product_id:, start_time:, end_time: Time.now.utc)
       data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 3600)
-      # API returns most recent first; normalize oldest→newest
       data.sort_by { |arr| arr[0].to_i }.each do |arr|
         ts = Time.at(arr[0]).utc
         low, high, open, close, volume = arr[1..5]
@@ -68,6 +59,20 @@ module MarketData
           created_at: Time.now.utc,
           updated_at: Time.now.utc
         }, unique_by: :index_candles_on_symbol_timeframe_timestamp)
+      end
+    end
+
+    private
+
+    def get_json(path, params = nil)
+      uri = @base_uri.dup
+      uri.path = File.join(uri.path, path)
+      uri.query = URI.encode_www_form(params) if params && !params.empty?
+      req = Net::HTTP::Get.new(uri)
+      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https") do |http|
+        res = http.request(req)
+        raise "HTTP #{res.code}: #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+        JSON.parse(res.body)
       end
     end
   end
