@@ -57,7 +57,9 @@ class MarketDataRakeTest < ActiveJob::TestCase
     mock_rest.expect :upsert_products, nil
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:upsert_futures_products"].reenable
-      Rake::Task["market_data:upsert_futures_products"].invoke
+      assert_output(/Completed upserting futures products/) do
+        Rake::Task["market_data:upsert_futures_products"].invoke
+      end
     end
     mock_rest.verify
   end
@@ -79,7 +81,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
   def test_backfill_1h_candles_task_success
     # Mock the CoinbaseRest service
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_1h_candles, nil
+    mock_rest.expect(:upsert_1h_candles, nil) { |*args, **kwargs| true }
 
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:backfill_1h_candles"].reenable
@@ -106,7 +108,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
   def test_backfill_30m_candles_task_success
     # Mock the CoinbaseRest service
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_30m_candles, nil
+    mock_rest.expect(:upsert_30m_candles, nil) { |*args, **kwargs| true }
 
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:backfill_30m_candles"].reenable
@@ -133,7 +135,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
   def test_test_1h_candles_task
     # Mock the CoinbaseRest service
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_1h_candles, nil
+    mock_rest.expect(:upsert_1h_candles, nil) { |*args, **kwargs| true }
 
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:test_1h_candles"].reenable
@@ -146,7 +148,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
     # Mock the CoinbaseRest service
     mock_rest = Minitest::Mock.new
     # Expect multiple calls to fetch_candles with different granularities
-    7.times { mock_rest.expect :fetch_candles, [] }
+    7.times { mock_rest.expect(:fetch_candles, []) { |*args, **kwargs| true } }
 
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:test_granularities"].reenable
@@ -170,7 +172,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
 
     # Mock the CoinbaseRest service
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_1h_candles, nil
+    mock_rest.expect(:upsert_1h_candles, nil) { |*args, **kwargs| true }
 
     MarketData::CoinbaseRest.stub :new, mock_rest do
       Rake::Task["market_data:backfill_1h_candles"].reenable

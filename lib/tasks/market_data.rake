@@ -26,7 +26,7 @@ namespace :market_data do
   desc "Backfill BTC-USD 1h candles"
   task :backfill_candles, [ :days ] => :environment do |_t, args|
     days = (args[:days] || 30).to_i
-    FetchCandlesJob.perform_now(backfill_days: days)
+    FetchCandlesJob.perform_later(backfill_days: days)
   end
 
   desc "Backfill BTC-USD 1h candles (direct API)"
@@ -38,7 +38,7 @@ namespace :market_data do
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      return
+      next
     end
 
     start_time = days.days.ago
@@ -65,7 +65,7 @@ namespace :market_data do
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      return
+      next
     end
 
     start_time = days.days.ago
@@ -85,7 +85,7 @@ namespace :market_data do
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      return
+      next
     end
 
     start_time = days.days.ago
@@ -103,7 +103,7 @@ namespace :market_data do
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      return
+      next
     end
 
     # Test common granularities (in seconds)
