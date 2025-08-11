@@ -15,6 +15,30 @@ module MarketData
       end
     end
 
+    def list_products
+      resp = @conn.get("/products")
+      JSON.parse(resp.body)
+    end
+
+    def upsert_products
+      products = list_products
+      products.each do |p|
+        next unless p["status"] == "online" && p["quote_currency"] == "USD"
+        TradingPair.upsert({
+          product_id: p["id"],
+          base_currency: p["base_currency"],
+          quote_currency: p["quote_currency"],
+          status: p["status"],
+          min_size: p.dig("base_increment"),
+          price_increment: p.dig("quote_increment"),
+          size_increment: p.dig("base_increment"),
+          enabled: true,
+          created_at: Time.now.utc,
+          updated_at: Time.now.utc
+        }, unique_by: :index_trading_pairs_on_product_id)
+      end
+    end
+
     # Returns array of arrays: [ time, low, high, open, close, volume ] per Coinbase public API
     # granularity in seconds: 3600 for 1h
     def fetch_candles(product_id:, start_iso8601: nil, end_iso8601: nil, granularity: 3600)
