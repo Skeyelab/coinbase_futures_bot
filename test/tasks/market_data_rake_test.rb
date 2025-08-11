@@ -44,6 +44,7 @@ class MarketDataRakeTest < ActiveJob::TestCase
     end
   end
 
+<<<<<<< HEAD
   def test_subscribe_task_uses_default_product_ids
     assert_enqueued_with(job: MarketDataSubscribeJob, args: [ [ "BTC-USD-PERP" ] ]) do
       Rake::Task["market_data:subscribe"].reenable
@@ -182,5 +183,27 @@ class MarketDataRakeTest < ActiveJob::TestCase
     # The task should report the existing candle count
     assert_equal 1, Candle.where(symbol: "BTC-USD", timeframe: "1h").count
     mock_rest.verify
+  end
+  def test_subscribe_futures_inline_invokes_derivatives_subscriber
+    ENV["INLINE"] = "1"
+    io = StringIO.new
+    logger = Logger.new(io)
+    logger.level = Logger::DEBUG
+
+    begin
+      stub_new = ->(**kwargs) do
+        assert_equal [ "BTC-USD-PERP" ], kwargs[:product_ids]
+        fake = Minitest::Mock.new
+        fake.expect :start, nil
+        fake
+      end
+
+      MarketData::CoinbaseDerivativesSubscriber.stub :new, stub_new do
+        Rake::Task["market_data:subscribe_futures"].reenable
+        Rake::Task["market_data:subscribe_futures"].invoke("BTC-USD-PERP")
+      end
+    ensure
+      ENV.delete("INLINE")
+    end
   end
 end

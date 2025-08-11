@@ -41,6 +41,17 @@ bin/rake paper:step
   - PaperTradingJob: every 15 minutes (set `PAPER_CRON` to override)
   - CalibrationJob: daily 02:00 UTC (set `CALIBRATE_CRON` to override)
 
+### Futures (Derivatives) WebSocket
+- Requires a futures WS URL via env:
+```bash
+export COINBASE_FUTURES_WS_URL=wss://<futures-ws-endpoint>
+```
+- Run inline (foreground):
+```bash
+INLINE=1 bin/rake "market_data:subscribe_futures[BTC-USD-PERP]"
+```
+Note: Endpoint and schema may differ from Advanced Trade; handler logs raw fields if schema is unknown.
+
 ## Admin UI
 - GoodJob dashboard (development): http://localhost:3000/good_job
 

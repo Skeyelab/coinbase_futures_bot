@@ -137,4 +137,18 @@ namespace :market_data do
       end
     end
   end
+
+  desc "Subscribe to Coinbase futures (derivatives) ticker via futures WS"
+  task :subscribe_futures, [ :products ] => :environment do |_t, args|
+    products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD-PERP").split(",")
+
+    if ENV["INLINE"].to_s == "1"
+      puts "Running inline futures subscription for: #{products.join(",")}"
+      stdout_logger = Logger.new($stdout)
+      stdout_logger.level = Logger::DEBUG
+      MarketData::CoinbaseDerivativesSubscriber.new(product_ids: products, logger: stdout_logger).start
+    else
+      puts "Futures subscription currently supports INLINE=1 only (no job enqueuing yet)"
+    end
+  end
 end
