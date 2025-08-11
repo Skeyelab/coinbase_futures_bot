@@ -55,10 +55,21 @@ module MarketData
         nil
       end
       return unless data
-      return unless data["type"] == "ticker"
 
-      # TODO: normalize and enqueue for strategy engine
-      @logger.debug("[MD] ticker: #{data.slice("product_id", "price", "time")}")
+      # Advanced Trade schema (channel/events)
+      if data["channel"] == "ticker" && data["events"].is_a?(Array)
+        data["events"].each do |event|
+          Array(event["tickers"]).each do |t|
+            @logger.debug("[MD] ticker: #{t.slice("product_id", "price", "time")}")
+          end
+        end
+        return
+      end
+
+      # Legacy schema (flat type)
+      if data["type"] == "ticker"
+        @logger.debug("[MD] ticker: #{data.slice("product_id", "price", "time")}")
+      end
     end
   end
 end

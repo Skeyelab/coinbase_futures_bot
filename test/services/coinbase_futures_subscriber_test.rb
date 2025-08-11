@@ -24,6 +24,29 @@ class CoinbaseFuturesSubscriberTest < ActiveSupport::TestCase
     assert_includes io.read, "[MD] ticker:"
   end
 
+  def test_handle_message_logs_advanced_trade_ticker_schema
+    io = StringIO.new
+    logger = build_logger(io)
+    service = MarketData::CoinbaseFuturesSubscriber.new(product_ids: "BTC-USD", logger: logger)
+
+    payload = {
+      channel: "ticker",
+      events: [
+        {
+          type: "snapshot",
+          tickers: [
+            { product_id: "BTC-USD", price: "65000.00", time: "2024-01-01T00:00:00Z" }
+          ]
+        }
+      ]
+    }
+    message = OpenStruct.new(data: payload.to_json)
+    service.send(:handle_message, message)
+
+    io.rewind
+    assert_includes io.read, "[MD] ticker:"
+  end
+
   def test_handle_message_ignores_non_json
     io = StringIO.new
     logger = build_logger(io)
