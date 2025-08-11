@@ -50,7 +50,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
   def test_list_products_handles_array_response
     mock_response = Minitest::Mock.new
-    mock_response.expect :body, [{"id" => "BTC-USD", "status" => "online"}].to_json
+    mock_response.expect :body, [ { "id" => "BTC-USD", "status" => "online" } ].to_json
 
     @rest.instance_variable_get(:@conn).stub :get, mock_response do
       products = @rest.list_products
@@ -61,7 +61,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
   def test_list_products_handles_hash_response
     mock_response = Minitest::Mock.new
-    mock_response.expect :body, {"products" => [{"id" => "BTC-USD", "status" => "online"}]}.to_json
+    mock_response.expect :body, { "products" => [ { "id" => "BTC-USD", "status" => "online" } ] }.to_json
 
     @rest.instance_variable_get(:@conn).stub :get, mock_response do
       products = @rest.list_products
@@ -73,7 +73,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
   def test_fetch_candles_handles_array_response
     mock_response = Minitest::Mock.new
     mock_response.expect :body, [
-      [1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858]
+      [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ]
     ].to_json
 
     @rest.instance_variable_get(:@conn).stub :get, mock_response do
@@ -93,14 +93,14 @@ class CoinbaseRestTest < ActiveSupport::TestCase
   def test_fetch_candles_handles_hash_response
     mock_response = Minitest::Mock.new
     mock_response.expect :body, {
-      "candles" => [{
+      "candles" => [ {
         "start" => "1754930700",
         "low" => 119911.55,
         "high" => 120177.23,
         "open" => 119968.18,
         "close" => 120069.34,
         "volume" => 23.20361858
-      }]
+      } ]
     }.to_json
 
     @rest.instance_variable_get(:@conn).stub :get, mock_response do
@@ -119,7 +119,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
   def test_fetch_candles_handles_error_response
     mock_response = Minitest::Mock.new
-    mock_response.expect :body, {"error" => "Invalid product"}.to_json
+    mock_response.expect :body, { "error" => "Invalid product" }.to_json
 
     @rest.instance_variable_get(:@conn).stub :get, mock_response do
       assert_raises(RuntimeError, "API Error: Invalid product") do
@@ -153,8 +153,8 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
   def test_upsert_1h_candles_creates_candles
     mock_candles = [
-      [1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858],
-      [1754934300, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678]
+      [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ],
+      [ 1754934300, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678 ]
     ]
 
     @rest.stub :fetch_candles, mock_candles do
@@ -180,7 +180,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
   def test_upsert_30m_candles_creates_15m_candles
     mock_candles = [
-      [1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858]
+      [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ]
     ]
 
     @rest.stub :fetch_candles, mock_candles do
@@ -204,7 +204,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
     # Test that the chunked method is called for large date ranges
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_30m_candles_chunked, nil, [product_id: @product_id, start_time: large_start, end_time: large_end]
+    mock_rest.expect :upsert_30m_candles_chunked, nil, [ product_id: @product_id, start_time: large_start, end_time: large_end ]
 
     @rest.stub :upsert_30m_candles_chunked, nil do
       @rest.upsert_30m_candles(
@@ -221,7 +221,7 @@ class CoinbaseRestTest < ActiveSupport::TestCase
 
     # Test that the chunked method is called for large date ranges
     mock_rest = Minitest::Mock.new
-    mock_rest.expect :upsert_1h_candles_chunked, nil, [product_id: @product_id, start_time: large_start, end_time: large_end]
+    mock_rest.expect :upsert_1h_candles_chunked, nil, [ product_id: @product_id, start_time: large_start, end_time: large_end ]
 
     @rest.stub :upsert_1h_candles_chunked, nil do
       @rest.upsert_1h_candles(

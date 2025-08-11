@@ -63,14 +63,14 @@ class MarketDataRakeTest < ActiveJob::TestCase
   end
 
   def test_backfill_candles_task_enqueues_job
-    assert_enqueued_with(job: FetchCandlesJob, args: [{backfill_days: 7}]) do
+    assert_enqueued_with(job: FetchCandlesJob, args: [ { backfill_days: 7 } ]) do
       Rake::Task["market_data:backfill_candles"].reenable
       Rake::Task["market_data:backfill_candles"].invoke(7)
     end
   end
 
   def test_backfill_candles_task_uses_default_days
-    assert_enqueued_with(job: FetchCandlesJob, args: [{backfill_days: 30}]) do
+    assert_enqueued_with(job: FetchCandlesJob, args: [ { backfill_days: 30 } ]) do
       Rake::Task["market_data:backfill_candles"].reenable
       Rake::Task["market_data:backfill_candles"].invoke(nil)
     end
