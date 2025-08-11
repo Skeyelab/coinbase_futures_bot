@@ -35,14 +35,17 @@
   - Replaced 30m candles with 15m candles due to API limitation (30m not supported)
   - Successfully fetched 672 15-minute candles for BTC-USD over 7 days
   - Fixed validation errors and database constraints
+  - **COMPLETED**: Added comprehensive 1-hour candle backfilling system
 - Commands run:
   - `rake market_data:test_granularities` (discovered supported timeframes)
   - `rake market_data:backfill_30m_candles[1]` and `[7]` (successful)
+  - `rake market_data:backfill_1h_candles[1]` and `[7]` (successful)
   - `rails runner` commands for debugging and testing
 - Files touched:
   - `app/services/market_data/coinbase_rest.rb` (fixed API endpoints, added chunking)
   - `app/models/candle.rb` (added timeframe validation)
-  - `lib/tasks/market_data.rake` (added granularity testing task)
+  - `lib/tasks/market_data.rake` (added granularity testing and 1h backfill tasks)
+- **Current Status**: Market data system fully operational with 840 total candles
 - Next steps:
   - Research correct futures API endpoints for BTC-USD-PERP
   - Implement signal generation service using the candle data
