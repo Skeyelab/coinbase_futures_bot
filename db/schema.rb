@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_11_000002) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_11_162000) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -131,6 +131,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_11_000002) do
     t.index ["priority", "scheduled_at"], name: "index_good_jobs_on_priority_scheduled_at_unfinished_unlocked", where: "((finished_at IS NULL) AND (locked_by_id IS NULL))"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
+  end
+
+  create_table "ticks", force: :cascade do |t|
+    t.string "product_id", null: false
+    t.decimal "price", precision: 15, scale: 5, null: false
+    t.datetime "observed_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id", "observed_at"], name: "index_ticks_on_product_id_and_observed_at"
   end
 
   create_table "trading_pairs", force: :cascade do |t|
