@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   if Rails.env.development?
     # Mount GoodJob dashboard in development only
     mount GoodJob::Engine => "/good_job"
+
+    # Simple Sentry smoke test route
+    get "/boom", to: ->(_env) { raise "Sentry smoke test" }
   end
 
   # Defines the root path route ("/")

@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-08-11 19:10 UTC
+- Context: Add Sentry error reporting with Rails integration and a smoke-test route.
+- Changes:
+  - Added `sentry-rails` gem and created `config/initializers/sentry.rb`
+  - Removed inline `Sentry.init` from `config/application.rb`
+  - Added dev-only `GET /boom` route to raise an exception for Sentry verification
+- Commands run:
+  - `bundle install`
+  - `bin/rails test`
+- Files touched:
+  - `Gemfile`, `config/initializers/sentry.rb`, `config/application.rb`, `config/routes.rb`
+- Migrations:
+  - none
+- Next steps:
+  - Set `SENTRY_DSN` and visit `/boom` locally to verify event ingestion
+  - Optionally enable performance tracing via `SENTRY_TRACES_SAMPLE_RATE`
+
 #### 2025-08-11 18:26 UTC
 - Context: CI failures in rake task tests due to mock signatures and early returns; adjusted tasks and tests; suite green.
 - Changes:

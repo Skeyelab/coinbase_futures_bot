@@ -47,3 +47,5 @@ end
 
 
 gem "good_job", "~> 4.11"
+gem "sentry-ruby"
+gem "sentry-rails"

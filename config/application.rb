@@ -49,4 +49,6 @@ module CoinbaseFuturesBot
     config.middleware.use ActionDispatch::Session::CookieStore
     config.middleware.use ActionDispatch::Flash
   end
+
+  # Sentry is initialized via config/initializers/sentry.rb
 end
