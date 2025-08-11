@@ -28,4 +28,3 @@ module Backtest
     end
   end
 end
-

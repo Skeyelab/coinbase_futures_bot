@@ -71,6 +71,19 @@ CSV_PATH=/absolute/path/to/btc_usd_ticks.csv SPOT_PRODUCT=BTC-USD FUTURES_PRODUC
 
 - Output prints execution decisions; no orders are placed.
 
+### DB-backed backtesting
+- Persist live ticks:
+```bash
+INLINE=1 bin/rake "market_data:ingest_spot_to_db[BTC-USD]"
+```
+
+- Backtest over an interval:
+```bash
+bin/rake market_data:backtest_spot_db[2025-08-11T00:00:00Z,2025-08-11T01:00:00Z,BTC-USD,BTC-USD-PERP]
+# Or with env vars
+START_ISO=2025-08-11T00:00:00Z END_ISO=2025-08-11T01:00:00Z bin/rake market_data:backtest_spot_db
+```
+
 ## Admin UI
 - GoodJob dashboard (development): http://localhost:3000/good_job
 

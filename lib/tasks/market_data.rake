@@ -193,4 +193,47 @@ namespace :market_data do
 
     Backtest::SpotCsvReplay.new(csv_path: csv, product_id: spot, strategy: strategy, logger: stdout_logger).run
   end
+
+  desc "Persist live spot ticks to DB (Tick) for backtesting"
+  task :ingest_spot_to_db, [ :spot_product ] => :environment do |_t, args|
+    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
+
+    puts "Ingesting live ticks into DB for: #{spot}"
+    stdout_logger = Logger.new($stdout)
+    stdout_logger.level = Logger::INFO
+
+    on_ticker = lambda do |tick|
+      Tick.create!(
+        product_id: spot,
+        price: tick["price"].to_d,
+        observed_at: Time.parse(tick["time"]) 
+      )
+    rescue => e
+      stdout_logger.error("[INGEST] failed to persist tick: #{e}")
+    end
+
+    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
+  end
+
+  desc "Backtest spot-driven strategy from DB ticks"
+  task :backtest_spot_db, [ :start_iso, :end_iso, :spot_product, :futures_product ] => :environment do |_t, args|
+    start_iso = args[:start_iso] || ENV["START_ISO"]
+    end_iso = args[:end_iso] || ENV["END_ISO"]
+    raise ArgumentError, "start_iso and end_iso required" if start_iso.to_s.strip.empty? || end_iso.to_s.strip.empty?
+    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
+    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
+
+    stdout_logger = Logger.new($stdout)
+    stdout_logger.level = Logger::INFO
+
+    executor = Execution::FuturesExecutor.new(logger: stdout_logger)
+    strategy = Strategy::SpotDrivenStrategy.new(
+      spot_product_id: spot,
+      futures_product_id: perp,
+      executor: executor,
+      logger: stdout_logger
+    )
+
+    Backtest::SpotDbReplay.new(product_id: spot, strategy: strategy, start_time: start_iso, end_time: end_iso, logger: stdout_logger).run
+  end
 end
