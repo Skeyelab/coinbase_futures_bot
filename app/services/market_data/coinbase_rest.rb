@@ -2,6 +2,7 @@
 
 require "faraday"
 require "json"
+require "openssl"
 
 module MarketData
   class CoinbaseRest
@@ -13,30 +14,98 @@ module MarketData
         f.response :raise_error
         f.adapter Faraday.default_adapter
       end
+
+      # Add authentication headers if API credentials are available
+      if ENV["COINBASE_API_KEY"] && ENV["COINBASE_API_SECRET"]
+        @api_key = ENV["COINBASE_API_KEY"]
+        @api_secret = ENV["COINBASE_API_SECRET"]
+        @authenticated = true
+      else
+        @authenticated = false
+        Rails.logger.warn("Coinbase API credentials not fully configured. Using public API only.")
+      end
     end
 
     def list_products
       resp = @conn.get("/products")
-      JSON.parse(resp.body)
+      data = JSON.parse(resp.body)
+
+      # Handle different response formats
+      products = if data.is_a?(Array)
+        data
+      elsif data.is_a?(Hash) && data["products"]
+        data["products"]
+      else
+        data
+      end
+
+      # Ensure products is an array
+      products = [products] unless products.is_a?(Array)
+
+      # Debug logging to see what we get
+      Rails.logger.info("Fetched #{products.count} products from Exchange API")
+      Rails.logger.info("Sample product: #{products.first}") if products.any?
+
+      products
     end
 
     def upsert_products
       products = list_products
+      futures_products = []
+
       products.each do |p|
         next unless p["status"] == "online" && p["quote_currency"] == "USD"
+
+        # Look for futures products (ending with -PERP) or create them if they don't exist
+        if p["id"].end_with?("-PERP") || p["id"] == "BTC-USD" || p["id"] == "ETH-USD"
+          futures_products << p
+
+          TradingPair.upsert({
+            product_id: p["id"],
+            base_currency: p["base_currency"],
+            quote_currency: p["quote_currency"],
+            status: p["status"],
+            min_size: p.dig("base_increment"),
+            price_increment: p.dig("quote_increment"),
+            size_increment: p.dig("base_increment"),
+            enabled: true,
+            created_at: Time.now.utc,
+            updated_at: Time.now.utc
+          }, unique_by: :index_trading_pairs_on_product_id)
+        end
+      end
+
+      # If no futures products found, create the common ones manually
+      if futures_products.empty?
+        create_default_futures_products
+      end
+
+      Rails.logger.info("Upserted #{futures_products.count} futures products")
+    end
+
+    def create_default_futures_products
+      # Create common futures products that might not be in the exchange API
+      default_products = [
+        { id: "BTC-USD-PERP", base: "BTC", quote: "USD" },
+        { id: "ETH-USD-PERP", base: "ETH", quote: "USD" }
+      ]
+
+      default_products.each do |product|
         TradingPair.upsert({
-          product_id: p["id"],
-          base_currency: p["base_currency"],
-          quote_currency: p["quote_currency"],
-          status: p["status"],
-          min_size: p.dig("base_increment"),
-          price_increment: p.dig("quote_increment"),
-          size_increment: p.dig("base_increment"),
+          product_id: product[:id],
+          base_currency: product[:base],
+          quote_currency: product[:quote],
+          status: "online",
+          min_size: "0.001",
+          price_increment: "0.01",
+          size_increment: "0.001",
           enabled: true,
           created_at: Time.now.utc,
           updated_at: Time.now.utc
         }, unique_by: :index_trading_pairs_on_product_id)
       end
+
+      Rails.logger.info("Created default futures products: #{default_products.map { |p| p[:id] }.join(', ')}")
     end
 
     # Returns array of arrays: [ time, low, high, open, close, volume ] per Coinbase public API
@@ -45,13 +114,207 @@ module MarketData
       params = { granularity: granularity }
       params[:start] = start_iso8601 if start_iso8601
       params[:end] = end_iso8601 if end_iso8601
-      resp = @conn.get("/products/#{product_id}/candles", params)
-      JSON.parse(resp.body)
+
+      if @authenticated
+        # Use authenticated endpoint for better rate limits and access
+        resp = authenticated_get("/products/#{product_id}/candles", params)
+      else
+        # Fall back to public endpoint
+        resp = @conn.get("/products/#{product_id}/candles", params)
+      end
+
+      data = JSON.parse(resp.body)
+
+      # Debug logging
+      Rails.logger.info("Raw candles response: #{data.class} - #{data.inspect[0..200]}")
+
+      # Handle different response formats
+      if data.is_a?(Array)
+        # Direct array format: [time, low, high, open, close, volume]
+        data
+      elsif data.is_a?(Hash) && data["candles"]
+        # Hash with candles key
+        data["candles"].map do |candle|
+          [
+            candle["start"].to_i,
+            candle["low"],
+            candle["high"],
+            candle["open"],
+            candle["close"],
+            candle["volume"]
+          ]
+        end
+      elsif data.is_a?(Hash) && data["error"]
+        # Error response
+        Rails.logger.error("API Error: #{data['error']}")
+        raise "API Error: #{data['error']}"
+      else
+        # Unknown format, return as-is
+        Rails.logger.warn("Unknown candles response format: #{data.class}")
+        data
+      end
+    end
+
+    # Fetch candles in chunks to avoid API limits
+    def fetch_candles_in_chunks(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 30)
+      all_data = []
+      current_start = start_time
+
+      while current_start < end_time
+        current_end = [current_start + chunk_days.days, end_time].min
+        begin
+          chunk_data = fetch_candles(
+            product_id: product_id,
+            start_iso8601: current_start.iso8601,
+            end_iso8601: current_end.iso8601,
+            granularity: 3600
+          )
+          all_data.concat(chunk_data)
+          current_start = current_end
+          # Small delay to avoid rate limiting
+          sleep(0.1) if chunk_data.any?
+        rescue => e
+          Rails.logger.error("Failed to fetch candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
+          current_start = current_end
+        end
+      end
+
+      all_data
     end
 
     # Upsert candles into DB as `Candle` records (1h)
     def upsert_1h_candles(product_id:, start_time:, end_time: Time.now.utc)
       data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 3600)
+
+      # Debug logging
+      Rails.logger.info("Processing #{data.class} data with #{data.count} items for 1h candles")
+
+      # Ensure data is an array
+      unless data.is_a?(Array)
+        Rails.logger.error("Expected array data, got #{data.class}: #{data.inspect[0..200]}")
+        return
+      end
+
+      # API returns most recent first; normalize oldest→newest
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        # Use create_or_find_by instead of upsert for debugging
+        Candle.create_or_find_by(
+          symbol: product_id,
+          timeframe: "1h",
+          timestamp: ts
+        ) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 1h candles for #{product_id}")
+    end
+
+    # Upsert 15-minute candles (API doesn't support 30m, so we use 15m)
+    def upsert_30m_candles(product_id:, start_time:, end_time: Time.now.utc)
+      # For larger date ranges, use chunked fetching to avoid API limits
+      if (end_time - start_time) > 3.days
+        upsert_30m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
+        return
+      end
+      
+      # Use 15m granularity since 30m is not supported by the API
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 900)
+      
+      # Debug logging
+      Rails.logger.info("Processing #{data.class} data with #{data.count} items for 15m candles (requested as 30m)")
+      
+      # Ensure data is an array
+      unless data.is_a?(Array)
+        Rails.logger.error("Expected array data, got #{data.class}: #{data.inspect[0..200]}")
+        return
+      end
+      
+      # API returns most recent first; normalize oldest→newest
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+        
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+        
+        # Use create_or_find_by instead of upsert for debugging
+        Candle.create_or_find_by(
+          symbol: product_id,
+          timeframe: "15m", # Store as 15m since that's what we actually get
+          timestamp: ts
+        ) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+      
+      Rails.logger.info("Completed upserting 15m candles for #{product_id}")
+    end
+    
+    # Upsert 15-minute candles using chunked fetching for large date ranges
+    def upsert_30m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 3)
+      all_data = []
+      current_start = start_time
+
+      while current_start < end_time
+        current_end = [current_start + chunk_days.days, end_time].min
+        begin
+          chunk_data = fetch_candles(
+            product_id: product_id,
+            start_iso8601: current_start.iso8601,
+            end_iso8601: current_end.iso8601,
+            granularity: 900
+          )
+          all_data.concat(chunk_data)
+          current_start = current_end
+          # Small delay to avoid rate limiting
+          sleep(0.1) if chunk_data.any?
+        rescue => e
+          Rails.logger.error("Failed to fetch 15m candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
+          current_start = current_end
+        end
+      end
+
+      # Process all the collected data
+      Rails.logger.info("Processing #{all_data.count} total 15m candles in chunks")
+      
+      all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+        
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+        
+        Candle.create_or_find_by(
+          symbol: product_id,
+          timeframe: "15m",
+          timestamp: ts
+        ) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+      
+      Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
+    end
+
+    # Upsert candles using chunked fetching for large date ranges
+    def upsert_1h_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 30)
+      data = fetch_candles_in_chunks(product_id: product_id, start_time: start_time, end_time: end_time, chunk_days: chunk_days)
       # API returns most recent first; normalize oldest→newest
       data.sort_by { |arr| arr[0].to_i }.each do |arr|
         ts = Time.at(arr[0]).utc
@@ -67,8 +330,38 @@ module MarketData
           volume: volume,
           created_at: Time.now.utc,
           updated_at: Time.now.utc
-        }, unique_by: :index_candles_on_symbol_timeframe_timestamp)
+        }, unique_by: :index_candles_on_symbol_and_timeframe_and_timestamp)
       end
+    end
+
+    private
+
+    # Authenticated GET request with proper Coinbase API signing
+    def authenticated_get(path, params = {})
+      timestamp = Time.now.to_i.to_s
+      method = "GET"
+
+      # Build the prehash string
+      prehash_string = timestamp + method + path
+      if params.any?
+        query_string = params.map { |k, v| "#{k}=#{v}" }.join("&")
+        prehash_string += "?" + query_string
+      end
+
+      # Create the signature
+      signature = OpenSSL::HMAC.hexdigest(
+        OpenSSL::Digest.new("sha256"),
+        @api_secret,
+        prehash_string
+      )
+
+      # Set headers
+      @conn.headers["CB-ACCESS-KEY"] = @api_key
+      @conn.headers["CB-ACCESS-SIGN"] = signature
+      @conn.headers["CB-ACCESS-TIMESTAMP"] = timestamp
+
+      # Make the request
+      @conn.get(path, params)
     end
   end
 end
