@@ -13,7 +13,8 @@ class FetchCandlesJob < ApplicationJob
     return unless btc_pair
 
     begin
-      start_time = [ last_candle_time(btc_pair.product_id)&.+(1.hour), backfill_days.to_i.days.ago ].compact.min
+      # Choose the later of (last known + 1h) and (backfill_days ago)
+      start_time = [ last_candle_time(btc_pair.product_id)&.+(1.hour), backfill_days.to_i.days.ago ].compact.max
 
       # Use chunked fetching for large date ranges to avoid API limits
       if backfill_days.to_i > 30
