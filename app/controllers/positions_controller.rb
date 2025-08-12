@@ -47,6 +47,18 @@ class PositionsController < ActionController::Base
     end
   end
 
+  def close
+    product_id = params[:product_id]
+    size_to_close = params[:size].presence
+
+    begin
+      result = positions_service.close_position(product_id: product_id, size: size_to_close)
+      redirect_to positions_path(notice: "Close order submitted: #{result["order_id"] || result["message"] || result["success"]}")
+    rescue => e
+      redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
+    end
+  end
+
   private
 
   def require_positions_basic_auth

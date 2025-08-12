@@ -111,8 +111,20 @@ module Trading
       pos_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
       return { "success" => true, "message" => "No open position to close" } if pos_size.to_f <= 0.0
 
-      close_side = pos_side == :buy ? :sell : :buy
+      # For futures, flip LONG to SHORT and vice versa
+      close_side = case pos_side
+      when :long then :short
+      when :short then :long
+      when :buy then :sell
+      when :sell then :buy
+      else :short  # Default fallback
+      end
+      
       order_body = build_order_body(product_id: product_id, side: close_side, size: pos_size, type: :market)
+      
+      @logger.info("Closing position: product_id=#{product_id}, size=#{pos_size}, side=#{pos_side} -> #{close_side}")
+      @logger.info("Order body: #{order_body.inspect}")
+      
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
       JSON.parse(resp.body)
     end
@@ -120,8 +132,15 @@ module Trading
     private
 
     def build_order_body(product_id:, side:, size:, type:, price: nil)
-      side_str = side.to_s.downcase
-      raise ArgumentError, "side must be :buy or :sell" unless %w[buy sell].include?(side_str)
+      # For futures orders, use LONG/SHORT instead of buy/sell
+      side_str = case side.to_s.downcase
+      when "long" then "LONG"
+      when "short" then "SHORT"
+      when "buy" then "BUY"
+      when "sell" then "SELL"
+      else
+        raise ArgumentError, "side must be :long, :short, :buy, or :sell, got: #{side}"
+      end
 
       order_config = case type.to_sym
       when :market
@@ -159,14 +178,17 @@ module Trading
 
       pos = positions.find { |p| p["product_id"] == product_id } || positions.first
 
-      # Try multiple field names to extract size and side
-      size = pos["size"] || pos["base_size"] || pos["quantity"] || pos.dig("position", "size") || "0"
+      # For futures positions, use number_of_contracts as the primary size field
+      size = pos["number_of_contracts"] || pos["size"] || pos["base_size"] || pos["quantity"] || pos.dig("position", "size") || "0"
       side = pos["side"] || pos["position_side"] || pos.dig("position", "side")
 
-      normalized_side = case side.to_s.downcase
-      when "long", "buy" then :buy
-      when "short", "sell" then :sell
-      else :buy
+      # For futures orders, use LONG/SHORT instead of buy/sell
+      normalized_side = case side.to_s.upcase
+      when "LONG" then :long
+      when "SHORT" then :short
+      when "BUY" then :buy
+      when "SELL" then :sell
+      else :long  # Default to long
       end
 
       [ size.to_s, normalized_side ]
@@ -201,7 +223,22 @@ module Trading
       @conn.headers["Content-Type"] = "application/json"
       @conn.headers["Accept"] = "application/json"
       @conn.headers["Authorization"] = "Bearer #{build_jwt_token("POST", path, body: body_json)}"
-      @conn.post(path, body_json)
+      
+      @logger.debug("POST #{path} with body: #{body_json}")
+      @logger.debug("Headers: #{@conn.headers.slice('Content-Type', 'Accept', 'Authorization').inspect}")
+      
+      begin
+        resp = @conn.post(path, body_json)
+        resp
+      rescue Faraday::ClientError => e
+        @logger.error("Request failed: #{e.class} - #{e.message}")
+        if e.response
+          @logger.error("Response status: #{e.response[:status]}")
+          @logger.error("Response headers: #{e.response[:headers]}")
+          @logger.error("Response body: #{e.response[:body]}")
+        end
+        raise
+      end
     end
 
     # Build ES256 JWT per Coinbase App API requirements (Authorization: Bearer <JWT>)

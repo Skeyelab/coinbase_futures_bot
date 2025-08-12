@@ -23,8 +23,7 @@
 
   <h3>Close Position</h3>
   <p>Submit a market order in the opposite direction to close fully or partially.</p>
-  <form action="<%= position_path(@position["product_id"]) %>" method="post" style="display: inline-block;">
-    <input type="hidden" name="_method" value="patch" />
+  <form action="<%= close_position_path(@position["product_id"]) %>" method="post" style="display: inline-block;">
     <label for="size">Size to close (leave blank to close all <%= (@position["number_of_contracts"] || @position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "size") || "") %> contracts):</label>
     <input id="size" name="size" type="text" placeholder="e.g. 1" style="padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
     <button type="submit" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Submit Close</button>

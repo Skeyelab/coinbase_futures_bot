@@ -15,6 +15,10 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
-  resources :positions, only: [ :index, :edit, :update ], param: :product_id
+  resources :positions, only: [ :index, :edit, :update ], param: :product_id do
+    member do
+      post :close
+    end
+  end
   root to: "positions#index"
 end
