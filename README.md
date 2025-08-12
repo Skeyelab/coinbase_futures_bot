@@ -24,12 +24,13 @@ bin/rails s
 - Enqueue ticker subscription (GoodJob):
 ```bash
 bin/rake market_data:subscribe[BTC-USD-PERP]
-bin/rake market_data:subscribe[BTC-USD-PERP,ETH-USD-PERP]
+PRODUCT_IDS=BTC-USD-PERP,ETH-USD-PERP bin/rake market_data:subscribe
 ```
-- Spot ticker (BTC-USD):
+- Spot ticker:
 ```bash
 bin/rake market_data:subscribe_spot[BTC-USD]
-INLINE=1 bin/rake "market_data:subscribe_spot[BTC-USD]"
+PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe_spot
+INLINE=1 PRODUCT_IDS=BTC-USD bin/rake "market_data:subscribe_spot[BTC-USD]"
 ```
 
 ## Paper trading (automated)
