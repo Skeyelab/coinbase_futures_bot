@@ -45,14 +45,14 @@ module Strategy
       # Trigger logic on 15m relative to its EMA
       # Long: last close above EMA with a recent EMA interaction and 1h uptrend
       # Short: last close below EMA with a recent EMA interaction and 1h downtrend
-      recent = candles_15m.last(4)
-      return nil if recent.size < 4
+      recent = candles_15m.last(8)
+      return nil if recent.size < 8
 
       last_close = last_15m.close.to_f
 
       # Track whether price interacted with EMA recently (pullback)
       interacted_with_ema = recent.any? do |c|
-        (c.low.to_f <= ema15 && c.high.to_f >= ema15) || (c.close.to_f - ema15).abs / ema15 < 0.0005
+        (c.low.to_f <= ema15 && c.high.to_f >= ema15) || (c.close.to_f - ema15).abs / ema15 < 0.002
       end
 
       if trend == :up
