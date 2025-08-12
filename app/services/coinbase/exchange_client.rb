@@ -121,15 +121,15 @@ module Coinbase
       if File.exist?(file_path)
         begin
           data = JSON.parse(File.read(file_path))
-          
+
           # Use the full organization path as the API key
           # This is what Coinbase expects for JWT authentication
           api_key = data["name"]
           private_key = data["privateKey"]
-          
+
           @logger.info("Using API key: #{api_key}")
           @logger.info("Private key length: #{private_key.length}")
-          
+
           {
             api_key: api_key,
             private_key: private_key
