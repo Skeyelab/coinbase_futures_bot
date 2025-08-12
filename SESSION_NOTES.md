@@ -40,6 +40,40 @@
   - `Gemfile`, `config/application.rb`, `.rspec`, `spec/**/*`, `.github/workflows/test.yml`, `README.md`.
 - Next steps:
   - Run bundler and `rspec` locally/CI to refresh `Gemfile.lock` and validate tests.
+#### 2025-08-12 20:30 UTC
+- Context: Sanitize MCP config to read token from environment.
+- Changes:
+  - Updated `.cursor/mcp.json` to use `${GITHUB_TOKEN}` rather than a hardcoded PAT.
+- Commands run:
+  - n/a (file edit only)
+- Files touched:
+  - `.cursor/mcp.json`, `SESSION_NOTES.md`
+- Next steps:
+  - Ensure `GITHUB_TOKEN` is set in Cursor app environment before starting sessions.
+
+#### 2025-08-12 20:22 UTC
+- Context: Align dev container with Cursor background agent guidance and improve cloning ergonomics.
+- Changes:
+  - Updated `.cursor/Dockerfile` to add `openssh-client`, ensure Yarn availability (`npm i -g yarn`), and set `WORKDIR` to `/home/dev` with correct ownership.
+  - Bundler remains pinned to `2.7.1` per `Gemfile.lock`.
+- Commands run:
+  - n/a (file edits only)
+- Files touched:
+  - `.cursor/Dockerfile`, `SESSION_NOTES.md`
+- Next steps:
+  - Rebuild: `docker build -f .cursor/Dockerfile -t coinbase-futures-bot-dev .`
+  - Start container and clone repo; run `bundle install`.
+
+#### 2025-08-12 20:05 UTC
+- Context: Added a developer-focused container for Cursor background agent.
+- Changes:
+  - Created `.cursor/Dockerfile` with Ruby 3.2.2, Bundler 2.7.1, PostgreSQL client, Node/npm, and common CLI dev tools. Does not copy app code; intended for cloning post-build.
+- Commands run:
+  - `docker build -f .cursor/Dockerfile -t coinbase-futures-bot-dev .`
+- Files touched:
+  - `.cursor/Dockerfile`, `SESSION_NOTES.md`
+- Next steps:
+  - Start container, clone repo inside `/workspace`, run `bundle install` and `bin/rails db:prepare`.
 
 #### 2025-08-11 19:25 UTC
 - Context: Fixed inline WebSocket subscription crash due to instance_exec scoping in event handlers.
