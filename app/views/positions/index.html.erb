@@ -1,3 +1,18 @@
+<% if @notice_message.present? %>
+  <div style="padding: 8px; margin-bottom: 10px; background: #eef7ff; border: 1px solid #b6daff; color: #084b83;">
+    <%= @notice_message %>
+  </div>
+<% end %>
+
+<% if @error_message.present? %>
+  <div style="padding: 8px; margin-bottom: 10px; background: #fff4f4; border: 1px solid #ffd3d3; color: #8a1f1f;">
+    <strong>Error:</strong> <%= @error_message %><br/>
+    <small>
+      Tip: Ensure `COINBASE_API_KEY` and `COINBASE_API_SECRET` are set for the server process. Restart the server after exporting them.
+    </small>
+  </div>
+<% end %>
+
 <% if @positions.empty? %>
   <p>No open positions.</p>
 <% else %>
