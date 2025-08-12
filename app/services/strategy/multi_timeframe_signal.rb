@@ -7,9 +7,9 @@ module Strategy
   # Returns order-like hash or nil when no setup.
   class MultiTimeframeSignal
     DEFAULTS = {
-      ema_1h_short: 21,
-      ema_1h_long: 50,
-      ema_15m: 34,
+      ema_1h_short: 12,
+      ema_1h_long: 26,
+      ema_15m: 21,
       min_1h_candles: 80,
       min_15m_candles: 120,
       tp_target: 0.006, # 60 bps
