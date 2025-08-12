@@ -26,6 +26,25 @@
 
 ### Session log
 
+#### 2025-08-12 17:45 UTC
+- Context: Successfully fixed CoinbasePositions service and resolved positions controller error.
+- Changes:
+  - Updated `app/services/trading/coinbase_positions.rb` to use `cdp_api_key.json` instead of environment variables.
+  - Fixed JWT format to match working AdvancedTradeClient implementation.
+  - Corrected positions endpoint from `/api/v3/brokerage/positions` to `/api/v3/brokerage/cfm/positions`.
+  - Service now successfully returns futures positions data showing 1 open BIP futures position.
+- Commands run:
+  - `ruby test_positions_service.rb` (tested fixed service)
+  - `ruby test_advanced_trade_client.rb` (verified working endpoint)
+  - `git add -A && git commit -m "fix(positions): resolve CoinbasePositions service authentication and endpoint issues"`
+  - `git push`
+- Files touched:
+  - `app/services/trading/coinbase_positions.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - The positions controller should now work correctly without the 'undefined method empty?' error.
+  - Can test the positions UI endpoint (requires setting POSITIONS_UI_USERNAME/PASSWORD env vars).
+  - Continue with trading bot development now that both authentication and positions are working.
+
 #### 2025-08-12 17:40 UTC
 - Context: Successfully committed and pushed Coinbase client authentication fixes.
 - Changes:

@@ -1,20 +1,36 @@
 <div>
-  <p>
-    <strong>Product:</strong> <%= @position["product_id"] %><br/>
-    <strong>Current side:</strong> <%= (@position["side"] || @position["position_side"] || @position.dig("position", "side") || "") %><br/>
-    <strong>Current size:</strong> <%= (@position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "size") || "") %>
-  </p>
+  <h2>Position Details</h2>
+  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <p>
+      <strong>Product:</strong> <%= @position["product_id"] %><br/>
+      <strong>Side:</strong> 
+      <span style="color: <%= @position["side"] == 'LONG' ? '#28a745' : '#dc3545' %>; font-weight: bold;">
+        <%= (@position["side"] || @position["position_side"] || @position.dig("position", "side") || "") %>
+      </span><br/>
+      <strong>Size:</strong> <%= (@position["number_of_contracts"] || @position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "size") || "") %> contracts<br/>
+      <strong>Current Price:</strong> <%= @position["current_price"] || "N/A" %><br/>
+      <strong>Entry Price:</strong> <%= @position["avg_entry_price"] || "N/A" %><br/>
+      <strong>Unrealized P&L:</strong> 
+      <% if @position["unrealized_pnl"] %>
+        <span style="color: <%= @position["unrealized_pnl"].to_f >= 0 ? '#28a745' : '#dc3545' %>; font-weight: bold;">
+          <%= @position["unrealized_pnl"] %>
+        </span>
+      <% else %>
+        N/A
+      <% end %>
+    </p>
+  </div>
 
-  <h3>Close position</h3>
+  <h3>Close Position</h3>
   <p>Submit a market order in the opposite direction to close fully or partially.</p>
   <form action="<%= position_path(@position["product_id"]) %>" method="post" style="display: inline-block;">
     <input type="hidden" name="_method" value="patch" />
-    <label for="size">Size to close (leave blank to close inferred open size):</label>
-    <input id="size" name="size" type="text" placeholder="e.g. 0.01" />
-    <button type="submit">Submit Close</button>
+    <label for="size">Size to close (leave blank to close all <%= (@position["number_of_contracts"] || @position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "size") || "") %> contracts):</label>
+    <input id="size" name="size" type="text" placeholder="e.g. 1" style="padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
+    <button type="submit" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Submit Close</button>
   </form>
 
   <p style="margin-top: 1rem;">
-    <a class="button secondary" href="<%= positions_path %>">Back</a>
+    <a class="button secondary" href="<%= positions_path %>">← Back to Positions</a>
   </p>
 </div>

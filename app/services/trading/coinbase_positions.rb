@@ -54,9 +54,9 @@ module Trading
       raise "Authentication required" unless @authenticated
 
       # Use the correct futures positions endpoint
+      # Note: Coinbase API doesn't support filtering by product_id, so we fetch all and filter in Ruby
       path = "/api/v3/brokerage/cfm/positions"
-      params = {}
-      params[:product_id] = product_id if product_id
+      params = {}  # Don't pass product_id to API
 
       begin
         resp = authenticated_get(path, params)
@@ -79,6 +79,12 @@ module Trading
       end
 
       positions = [ positions ] unless positions.is_a?(Array)
+      
+      # Filter by product_id in Ruby if specified
+      if product_id
+        positions = positions.select { |p| p["product_id"] == product_id }
+      end
+      
       positions
     end
 
@@ -233,7 +239,7 @@ module Trading
       # Coinbase expects: "METHOD api.coinbase.com/path" format for the uri claim
       method = http_method.to_s.upcase
       host = "api.coinbase.com"
-      
+
       path_with_query = case method
       when "GET", "DELETE"
         if params&.any?
@@ -257,15 +263,15 @@ module Trading
       if File.exist?(file_path)
         begin
           data = JSON.parse(File.read(file_path))
-          
+
           # Use the full organization path as the API key
           # This is what Coinbase expects for JWT authentication
           api_key = data["name"]
           private_key = data["privateKey"]
-          
+
           @logger.info("Using API key: #{api_key}")
           @logger.info("Private key length: #{private_key.length}")
-          
+
           {
             api_key: api_key,
             private_key: private_key
