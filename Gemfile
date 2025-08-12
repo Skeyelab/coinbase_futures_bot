@@ -49,6 +49,7 @@ end
 
 group :test do
   gem "climate_control"
+  gem "rails-controller-testing"
 end
 
 

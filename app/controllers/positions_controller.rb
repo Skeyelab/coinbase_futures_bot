@@ -8,6 +8,7 @@ class PositionsController < ActionController::Base
 
   def index
     @notice_message = params[:notice]
+    @positions = []  # Initialize to empty array
 
     begin
       @positions = positions_service.list_open_positions
@@ -15,7 +16,7 @@ class PositionsController < ActionController::Base
       @error_message = e.message
     rescue => e
       @error_message = e.message
-      @positions = []
+      # @positions is already set to [] above
     end
   end
 

@@ -87,7 +87,7 @@ RSpec.describe PositionsController, type: :controller do
 
       expect(response).to have_http_status(:success)
       expect(assigns(:error_message)).to include("API Error")
-      expect(assigns(:positions)).to be_nil
+      expect(assigns(:positions)).to eq([])
     end
 
     it "handles general errors gracefully" do
@@ -167,8 +167,10 @@ RSpec.describe PositionsController, type: :controller do
 
       post :close, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
 
-      expect(response).to redirect_to(positions_path)
-      expect(flash[:notice]).to include("Close order submitted: close-123")
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("/positions")
+      expect(response.redirect_url).to include("notice=")
+      expect(response.redirect_url).to include("close-123")
     end
 
     it "closes position without size (uses inferred size)" do
@@ -177,8 +179,10 @@ RSpec.describe PositionsController, type: :controller do
 
       post :close, params: { product_id: "BIP-20DEC30-CDE" }
 
-      expect(response).to redirect_to(positions_path)
-      expect(flash[:notice]).to include("Position closed")
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("/positions")
+      expect(response.redirect_url).to include("notice=")
+      expect(response.redirect_url).to include("Position+closed")
     end
 
     it "handles service errors gracefully" do
@@ -188,8 +192,10 @@ RSpec.describe PositionsController, type: :controller do
 
       post :close, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
 
-      expect(response).to redirect_to(edit_position_path("BIP-20DEC30-CDE"))
-      expect(flash[:notice]).to include("Error: Order failed")
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("/positions/BIP-20DEC30-CDE/edit")
+      expect(response.redirect_url).to include("notice=")
+      expect(response.redirect_url).to include("Order+failed")
     end
 
     it "passes correct parameters to service" do
@@ -213,8 +219,10 @@ RSpec.describe PositionsController, type: :controller do
 
       patch :update, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
 
-      expect(response).to redirect_to(positions_path)
-      expect(flash[:notice]).to include("Close order submitted: update-123")
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("/positions")
+      expect(response.redirect_url).to include("notice=")
+      expect(response.redirect_url).to include("update-123")
     end
 
     it "handles service errors gracefully" do
@@ -224,8 +232,10 @@ RSpec.describe PositionsController, type: :controller do
 
       patch :update, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
 
-      expect(response).to redirect_to(edit_position_path("BIP-20DEC30-CDE"))
-      expect(flash[:notice]).to include("Error: Update failed")
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("/positions/BIP-20DEC30-CDE/edit")
+      expect(response.redirect_url).to include("notice=")
+      expect(response.redirect_url).to include("Update+failed")
     end
   end
 
@@ -237,10 +247,16 @@ RSpec.describe PositionsController, type: :controller do
       expect(service1).to eq(service2)
     end
 
-    it "creates new positions service instance" do
-      expect(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+        it "creates new positions service instance" do
+      # Clear the memoized service first
+      controller.instance_variable_set(:@positions_service, nil)
 
-      controller.send(:positions_service)
+      # Mock the class method to return our service
+      allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+
+      # Call the method and verify it returns our service
+      result = controller.send(:positions_service)
+      expect(result).to eq(positions_service)
     end
   end
 
