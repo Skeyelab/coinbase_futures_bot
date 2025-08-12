@@ -26,6 +26,17 @@
 
 ### Session log
 
+#### 2025-08-12 20:05 UTC
+- Context: Added a developer-focused container for Cursor background agent.
+- Changes:
+  - Created `.cursor/Dockerfile` with Ruby 3.2.2, Bundler 2.7.1, PostgreSQL client, Node/npm, and common CLI dev tools. Does not copy app code; intended for cloning post-build.
+- Commands run:
+  - `docker build -f .cursor/Dockerfile -t coinbase-futures-bot-dev .`
+- Files touched:
+  - `.cursor/Dockerfile`, `SESSION_NOTES.md`
+- Next steps:
+  - Start container, clone repo inside `/workspace`, run `bundle install` and `bin/rails db:prepare`.
+
 #### 2025-08-11 19:25 UTC
 - Context: Fixed inline WebSocket subscription crash due to instance_exec scoping in event handlers.
 - Changes:
