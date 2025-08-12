@@ -43,4 +43,4 @@ jobs:
       - name: Prepare database (create + migrate)
         run: bin/rails db:create db:migrate
       - name: Run tests
-        run: bin/rails test
+        run: bundle exec rspec

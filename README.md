@@ -20,6 +20,17 @@ bin/rails s
 # GoodJob runs async in-process by default
 ```
 
+## Tests (RSpec)
+- Run the full suite:
+```bash
+bundle exec rspec
+```
+- Run a specific spec or directory:
+```bash
+bundle exec rspec spec/models/candle_spec.rb
+```
+- CI runs `bundle exec rspec` with PostgreSQL via GitHub Actions (see `.github/workflows/test.yml`).
+
 ## Market data subscriber
 - Enqueue ticker subscription (GoodJob):
 ```bash
@@ -79,7 +90,7 @@ bundle exec good_job start
 - Consider mounting `/good_job` behind auth if exposed.
 
 ## Contributing workflow
-- All substantive changes go through PRs. CI (RuboCop, Brakeman) must pass.
+- All substantive changes go through PRs. CI (RuboCop, Brakeman, RSpec) must pass.
 - Update `SESSION_NOTES.md` for notable changes.
 
 ## Candle data collection

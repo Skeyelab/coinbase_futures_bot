@@ -26,6 +26,20 @@
 
 ### Session log
 
+#### 2025-08-12  — Minitest → RSpec migration
+- Context: Replace Minitest with RSpec across the project and adjust CI.
+- Changes:
+  - Added `rspec-rails` and `climate_control` gems; generated RSpec config (`.rspec`, `spec/*`).
+  - Converted tests to RSpec: models, services, jobs, requests, and rake tasks.
+  - Updated generators to use RSpec; removed `rails/test_unit/railtie`.
+  - Updated CI workflow to run `bundle exec rspec`.
+  - Removed legacy `test/` directory and Minitest files.
+- Commands run:
+  - Edited `Gemfile`, created `spec/` files, updated `.github/workflows/test.yml`.
+- Files touched:
+  - `Gemfile`, `config/application.rb`, `.rspec`, `spec/**/*`, `.github/workflows/test.yml`, `README.md`.
+- Next steps:
+  - Run bundler and `rspec` locally/CI to refresh `Gemfile.lock` and validate tests.
 #### 2025-08-12 20:30 UTC
 - Context: Sanitize MCP config to read token from environment.
 - Changes:
