@@ -20,6 +20,31 @@ class PositionsController < ActionController::Base
     end
   end
 
+  def new
+    @position = { "product_id" => params[:product_id] }
+  end
+
+  def create
+    product_id = params[:product_id]
+    side = params[:side]
+    size = params[:size]
+    order_type = params[:order_type] || "market"
+    price = params[:price]
+
+    begin
+      result = positions_service.open_position(
+        product_id: product_id,
+        side: side,
+        size: size,
+        type: order_type,
+        price: price
+      )
+      redirect_to positions_path(notice: "Position opened: #{result["order_id"] || result["message"] || result["success"]}")
+    rescue => e
+      redirect_to new_position_path(product_id, notice: "Error: #{e.message}")
+    end
+  end
+
   def edit
     product_id = params[:product_id]
 
@@ -50,11 +75,27 @@ class PositionsController < ActionController::Base
 
   def close
     product_id = params[:product_id]
-    size_to_close = params[:size].presence
+    size_to_close = params[:close_size].presence
+
+    Rails.logger.info("CLOSE ACTION CALLED: product_id=#{product_id}, size=#{size_to_close}")
 
     begin
       result = positions_service.close_position(product_id: product_id, size: size_to_close)
       redirect_to positions_path(notice: "Close order submitted: #{result["order_id"] || result["message"] || result["success"]}")
+    rescue => e
+      redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
+    end
+  end
+
+  def increase
+    product_id = params[:product_id]
+    size_to_increase = params[:increase_size].presence
+
+    Rails.logger.info("INCREASE ACTION CALLED: product_id=#{product_id}, size=#{size_to_increase}")
+
+    begin
+      result = positions_service.increase_position(product_id: product_id, size: size_to_increase)
+      redirect_to positions_path(notice: "Position increased: #{result["order_id"] || result["message"] || result["success"]}")
     rescue => e
       redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
     end

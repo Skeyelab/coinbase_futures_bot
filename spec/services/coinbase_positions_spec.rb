@@ -196,9 +196,9 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   end
 
   describe "position closing" do
-    it "closes LONG position by creating SHORT order" do
+    it "closes LONG position by creating SELL order" do
       allow(service).to receive(:list_open_positions).and_return([
-        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "LONG" }
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG" }
       ])
 
       mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-123" }.to_json)
@@ -209,7 +209,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       expect(result["success"]).to be true
     end
 
-    it "closes SHORT position by creating LONG order" do
+    it "closes SHORT position by creating BUY order" do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT" }
       ])
@@ -229,6 +229,165 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
       result = service.close_position(product_id: "BIP-20DEC30-CDE", size: "1.5")
       expect(result["success"]).to be true
+    end
+
+    it "builds correct order body for LONG position close (SELL order)" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG" }
+      ])
+
+      # Mock the build_order_body method to capture the side parameter
+      expect(service).to receive(:build_order_body).with(
+        product_id: "BIP-20DEC30-CDE",
+        side: :sell,
+        size: "1",
+        type: :market
+      ).and_return({
+        "client_order_id" => "test-123",
+        "product_id" => "BIP-20DEC30-CDE",
+        "side" => "SELL",
+        "order_configuration" => { "market_market_ioc" => { "base_size" => "1" } }
+      })
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-123" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      service.close_position(product_id: "BIP-20DEC30-CDE", size: "1")
+    end
+
+    it "builds correct order body for SHORT position close (BUY order)" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT" }
+      ])
+
+      # Mock the build_order_body method to capture the side parameter
+      expect(service).to receive(:build_order_body).with(
+        product_id: "BIP-20DEC30-CDE",
+        side: :buy,
+        size: "1",
+        type: :market
+      ).and_return({
+        "client_order_id" => "test-456",
+        "product_id" => "BIP-20DEC30-CDE",
+        "side" => "BUY",
+        "order_configuration" => { "market_market_ioc" => { "base_size" => "1" } }
+      })
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-456" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      service.close_position(product_id: "BIP-20DEC30-CDE", size: "1")
+    end
+  end
+
+  describe "#increase_position" do
+    it "increases LONG position by creating BUY order" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG" }
+      ])
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "increase-123" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      result = service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+      expect(result["success"]).to be true
+    end
+
+    it "increases SHORT position by creating SELL order" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT" }
+      ])
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "increase-456" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      result = service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+      expect(result["success"]).to be true
+    end
+
+    it "handles lowercase side values correctly" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "1", "side" => "long" }
+      ])
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "increase-789" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      result = service.increase_position(product_id: "BIP-20DEC30-CDE", size: "0.5")
+      expect(result["success"]).to be true
+    end
+
+    it "builds correct order body for LONG position increase (BUY order)" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG" }
+      ])
+
+      # Mock the build_order_body method to capture the side parameter
+      expect(service).to receive(:build_order_body).with(
+        product_id: "BIP-20DEC30-CDE",
+        side: :buy,
+        size: "1",
+        type: :market
+      ).and_return({
+        "client_order_id" => "test-123",
+        "product_id" => "BIP-20DEC30-CDE",
+        "side" => "BUY",
+        "order_configuration" => { "market_market_ioc" => { "base_size" => "1" } }
+      })
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "increase-123" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+    end
+
+    it "builds correct order body for SHORT position increase (SELL order)" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT" }
+      ])
+
+      # Mock the build_order_body method to capture the side parameter
+      expect(service).to receive(:build_order_body).with(
+        product_id: "BIP-20DEC30-CDE",
+        side: :sell,
+        size: "1",
+        type: :market
+      ).and_return({
+        "client_order_id" => "test-456",
+        "product_id" => "BIP-20DEC30-CDE",
+        "side" => "SELL",
+        "order_configuration" => { "market_market_ioc" => { "base_size" => "1" } }
+      })
+
+      mock_response = instance_double("Response", body: { "success" => true, "order_id" => "increase-456" }.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+    end
+
+    it "returns error when no open position found" do
+      allow(service).to receive(:list_open_positions).and_return([])
+
+      result = service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+      expect(result["success"]).to be false
+      expect(result["message"]).to match(/No open position found/)
+    end
+
+    it "raises error when position side cannot be determined" do
+      allow(service).to receive(:list_open_positions).and_return([
+        { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "1", "side" => "UNKNOWN" }
+      ])
+
+      expect {
+        service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
+      }.to raise_error(/Cannot determine position side for increase/)
     end
   end
 

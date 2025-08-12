@@ -26,6 +26,50 @@
 
 ### Session log
 
+#### 2025-01-27 15:30 UTC
+- Context: Successfully implemented UI for opening new futures positions, complementing existing position closing functionality.
+- Changes:
+  - Added `new` and `create` actions to PositionsController for opening positions
+  - Updated routes to include new and create actions for positions
+  - Created new view (`app/views/positions/new.html.erb`) with comprehensive form for opening positions
+  - Enhanced index view with quick-open form at the top for easy position creation
+  - Added support for both market and limit orders with dynamic price field
+  - Implemented proper form validation and user experience improvements
+  - Added CSS styling for consistent button appearance and form layout
+  - **NEW**: Added position increase functionality to edit page - users can now add more contracts to existing positions
+  - **NEW**: Enhanced edit view with increase position form and better navigation links
+  - **NEW**: Added `increase_position` method to CoinbasePositions service
+  - **FIXED**: Separated increase and close actions into distinct routes and controller methods to prevent confusion
+  - **FIXED**: Enhanced logging and error handling in increase_position method for better debugging
+  - **FIXED**: Added comprehensive tests for increase_position functionality to ensure proper side handling
+  - **CRITICAL FIX**: Corrected position increase logic - LONG positions now use BUY orders, SHORT positions use SELL orders
+  - **CRITICAL FIX**: Added specific tests to verify correct order body construction for both LONG and SHORT increases
+  - **CRITICAL FIX**: Fixed SHORT position closing logic - now correctly uses BUY orders to close SHORT positions
+  - **CRITICAL FIX**: Fixed LONG position closing logic - now correctly uses SELL orders to close LONG positions
+  - **DEBUGGING**: Investigating issue where both increase and close forms were adding contracts instead of closing
+  - **DEBUGGING**: Fixed form parameter conflicts by using distinct names ('increase_size' vs 'close_size')
+  - **DEBUGGING**: Added logging to controller actions to track which action is being called
+  - **DEBUGGING**: Added JavaScript debugging and visual indicators to distinguish between forms
+- Commands run:
+  - `rails routes | grep positions` (verified new routes are working)
+  - `ruby -c app/controllers/positions_controller.rb` (verified syntax)
+  - `ruby -c app/services/trading/coinbase_positions.rb` (verified service syntax)
+  - `bundle exec rspec spec/services/coinbase_positions_spec.rb -e "increase_position"` (verified tests pass)
+- Files touched:
+  - `app/controllers/positions_controller.rb` (added new/create actions, enhanced close action for increases)
+  - `config/routes.rb` (added new/create routes)
+  - `app/views/positions/new.html.erb` (created new view)
+  - `app/views/positions/index.html.erb` (added quick-open form)
+  - `app/views/layouts/application.html.erb` (enhanced CSS styling)
+  - `app/views/positions/edit.html.erb` (added increase position form and navigation)
+  - `app/services/trading/coinbase_positions.rb` (added increase_position method)
+  - `spec/services/coinbase_positions_spec.rb` (added comprehensive tests for increase functionality)
+- Next steps:
+  - Position management system now supports opening, increasing, and closing positions
+  - Users can create new futures positions, add to existing ones, and close positions through the web UI
+  - Increase and close actions are now properly separated to prevent accidental position closures
+  - Ready for testing with actual Coinbase API credentials
+
 #### 2025-08-12 19:15 UTC
 - Context: Successfully fixed all remaining RSpec test failures across the entire test suite.
 - Changes:
