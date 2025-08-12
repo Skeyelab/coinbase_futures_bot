@@ -16,7 +16,11 @@ module Strategy
       sl_target: 0.004, # 40 bps
       maker_fee: 0.0005,
       slippage: 0.0002,
-      risk_fraction: 0.005
+      risk_fraction: 0.005,
+      # Futures-specific settings
+      contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD-PERP)
+      max_position_size: 10, # Maximum contracts to open
+      min_position_size: 1 # Minimum contracts to open
     }.freeze
 
     def initialize(config = {})
@@ -97,7 +101,18 @@ module Strategy
       risk_per_unit = (entry.to_f - sl.to_f).abs
       return 0 if risk_per_unit <= 0
       risk_budget = equity_usd.to_f * risk_fraction.to_f
-      (risk_budget / risk_per_unit).floor(6)
+      
+      # Calculate BTC quantity based on risk
+      btc_quantity = (risk_budget / risk_per_unit).floor(6)
+      
+      # Convert to futures contracts
+      contract_quantity = (btc_quantity * entry.to_f / @config[:contract_size_usd]).round(0)
+      
+      # Apply position size limits
+      contract_quantity = [contract_quantity, @config[:max_position_size]].min
+      contract_quantity = [contract_quantity, @config[:min_position_size]].max
+      
+      contract_quantity
     end
 
     def order_hash(side, price, quantity, tp, sl, confidence)
