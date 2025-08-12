@@ -79,12 +79,12 @@ module Trading
       end
 
       positions = [ positions ] unless positions.is_a?(Array)
-      
+
       # Filter by product_id in Ruby if specified
       if product_id
         positions = positions.select { |p| p["product_id"] == product_id }
       end
-      
+
       positions
     end
 

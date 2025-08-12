@@ -26,6 +26,26 @@
 
 ### Session log
 
+#### 2025-08-12 17:55 UTC
+- Context: Fixed 401 error in positions edit page and enhanced UI with complete position details.
+- Changes:
+  - Fixed JWT authentication issue when filtering by product_id in `list_open_positions`.
+  - Removed product_id parameter from API call (Coinbase API doesn't support it).
+  - Implemented Ruby-side filtering instead of API-level filtering.
+  - Enhanced edit view with complete position details (size, prices, P&L).
+  - Improved UI styling with better colors, layout, and user experience.
+  - Fixed size field display to use correct `number_of_contracts` field.
+- Commands run:
+  - `ruby test_jwt_debug.rb` (identified JWT issue with product_id parameter)
+  - `git add -A && git commit -m "fix(positions): resolve 401 error in edit page and improve UI"`
+  - `git push`
+- Files touched:
+  - `app/services/trading/coinbase_positions.rb`, `app/views/positions/edit.html.erb`, `SESSION_NOTES.md`
+- Next steps:
+  - Edit page should now work without 401 errors.
+  - Users can view complete position details and close positions.
+  - Continue with trading bot development now that both list and edit views are working.
+
 #### 2025-08-12 17:45 UTC
 - Context: Successfully fixed CoinbasePositions service and resolved positions controller error.
 - Changes:
