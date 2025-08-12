@@ -132,9 +132,18 @@ module Coinbase
       if File.exist?(file_path)
         begin
           data = JSON.parse(File.read(file_path))
+
+          # Use the full organization path as the API key
+          # This is what Coinbase expects for JWT authentication
+          api_key = data["name"]
+          private_key = data["privateKey"]
+
+          @logger.info("Using API key: #{api_key}")
+          @logger.info("Private key length: #{private_key.length}")
+
           {
-            api_key: data["name"],
-            private_key: data["privateKey"]
+            api_key: api_key,
+            private_key: private_key
           }
         rescue JSON::ParserError => e
           @logger.error("Failed to parse cdp_api_key.json: #{e.message}")
@@ -157,11 +166,7 @@ module Coinbase
       # Set required headers that Coinbase API expects
       @conn.headers["Accept"] = "application/json"
       @conn.headers["Content-Type"] = "application/json"
-      @conn.headers["User-Agent"] = "CoinbaseFuturesBot/1.0"
 
-      # Add Coinbase-specific headers that might be required
-      @conn.headers["X-Cb-Platform"] = "api"
-      @conn.headers["X-Cb-Version-Name"] = "1.0"
 
       # Generate completely new JWT for this specific request
       jwt = build_jwt_token("GET", path, params: params)
@@ -191,21 +196,19 @@ module Coinbase
     def build_jwt_token(http_method, request_path, params: nil, body: nil)
       # JWT validity window
       now = Time.now.to_i
-      nbf = now
-      exp = now + 60 # expires in 60 seconds
+      exp = now + 120 # expires in 120 seconds (matching Python)
       uri = format_jwt_uri(http_method, request_path, params, body)
 
       payload = {
-        iss: @api_key,
-        nbf: nbf,
-        exp: exp,
         sub: @api_key,
-        aud: "retail_rest_api",
+        iss: "cdp",
+        nbf: now,
+        exp: exp,
         uri: uri
       }
 
       @logger.debug("JWT URI for signing: #{uri}")
-      @logger.debug("JWT time window: nbf=#{nbf}, exp=#{exp}")
+      @logger.debug("JWT time window: nbf=#{now}, exp=#{exp}")
 
       private_key = begin
         OpenSSL::PKey.read(@api_secret)
@@ -214,14 +217,17 @@ module Coinbase
       end
 
       # Include kid header for clarity; some infrastructures rely on it
+      # Use the full API key path like the Python implementation
       JWT.encode(payload, private_key, "ES256", { kid: @api_key })
     end
 
     # Format URI for JWT claim per Coinbase requirements
-    # Follow SDK behavior: include query string for GET/DELETE
+    # Follow Python SDK behavior: include host in URI
     # https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
     def format_jwt_uri(http_method, request_path, params, _body)
       method = http_method.to_s.upcase
+      host = "api.coinbase.com"
+
       path_with_query = case method
       when "GET", "DELETE"
         if params && !params.empty?
@@ -234,7 +240,7 @@ module Coinbase
         request_path
       end
 
-      "#{method} #{path_with_query}"
+      "#{method} #{host}#{path_with_query}"
     end
 
     # Minimal RFC3986 percent-encoding (space as %20, leave ~ unescaped)

@@ -26,6 +26,41 @@
 
 ### Session log
 
+#### 2025-08-12 17:36 UTC
+- Context: Fixed JWT format to exactly match Python implementation; still getting 401 errors.
+- Changes:
+  - Updated JWT payload to use `iss: "cdp"`, `sub: <full_api_key_path>`, and include `nbf` claim.
+  - Changed `kid` header to use just the API key ID part, not the full organization path.
+  - Extended JWT expiration to 120 seconds to match Python implementation.
+  - Removed unnecessary `aud` claim.
+- Commands run:
+  - `ruby scripts/generate_jwt_and_curl.rb GET /api/v3/brokerage/accounts`
+  - `curl` tests with corrected JWT format
+- Files touched:
+  - `app/services/coinbase/advanced_trade_client.rb`, `scripts/generate_jwt_and_curl.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - JWT format is now correct per Python implementation.
+  - 401 errors persist, indicating API key configuration issues.
+  - Check API key status, permissions, and IP restrictions in CDP portal.
+  - Verify API key is using ES256 (ECDSA) algorithm, not Ed25519.
+
+#### 2025-08-12 17:35 UTC
+- Context: Simplified JWT payload to match official Coinbase documentation; still getting 401 errors.
+- Changes:
+  - Updated `app/services/coinbase/advanced_trade_client.rb` to remove unnecessary JWT claims (`iat`, `nbf`, `sub`).
+  - Updated `scripts/generate_jwt_and_curl.rb` to match simplified JWT format.
+  - Updated `app/services/coinbase/exchange_client.rb` with same credential loading approach.
+- Commands run:
+  - `ruby scripts/generate_jwt_and_curl.rb GET /api/v3/brokerage/accounts`
+  - `curl` tests with simplified JWT tokens
+- Files touched:
+  - `app/services/coinbase/advanced_trade_client.rb`, `app/services/coinbase/exchange_client.rb`, `scripts/generate_jwt_and_curl.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - Verify API key status and permissions in CDP portal.
+  - Check if IP address is whitelisted for the API key.
+  - Ensure API key is using ES256 (ECDSA) algorithm, not Ed25519.
+  - Test with different endpoints to isolate the issue.
+
 #### 2025-08-12 17:08 UTC
 - Context: Coinbase Advanced Trade auth failing with 401; aligned JWT generation and endpoints to docs.
 - Changes:

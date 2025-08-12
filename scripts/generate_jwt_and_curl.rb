@@ -22,21 +22,21 @@ api_key = data.fetch('name')
 api_secret = data.fetch('privateKey')
 
 now = Time.now.to_i
-nbf = now
-exp = now + 60
+exp = now + 120
 
-jwt_uri = "#{method} #{path}"
+# Include host in URI like Python implementation
+jwt_uri = "#{method} api.coinbase.com#{path}"
 
 payload = {
-  iss: api_key,
-  nbf: nbf,
-  exp: exp,
   sub: api_key,
-  aud: 'retail_rest_api',
+  iss: 'cdp',
+  nbf: now,
+  exp: exp,
   uri: jwt_uri
 }
 
 private_key = OpenSSL::PKey.read(api_secret)
+# Use full API key path for kid header like Python implementation
 jwt_token = JWT.encode(payload, private_key, 'ES256', { kid: api_key })
 
 puts "# JWT generated for: #{jwt_uri}"
