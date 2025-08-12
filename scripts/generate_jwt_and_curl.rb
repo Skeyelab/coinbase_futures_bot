@@ -22,8 +22,8 @@ api_key = data.fetch('name')
 api_secret = data.fetch('privateKey')
 
 now = Time.now.to_i
-nbf = now - 30
-exp = now + 120
+nbf = now
+exp = now + 60
 
 jwt_uri = "#{method} #{path}"
 
@@ -37,7 +37,7 @@ payload = {
 }
 
 private_key = OpenSSL::PKey.read(api_secret)
-jwt_token = JWT.encode(payload, private_key, 'ES256')
+jwt_token = JWT.encode(payload, private_key, 'ES256', { kid: api_key })
 
 puts "# JWT generated for: #{jwt_uri}"
 puts "export JWT='#{jwt_token}'"

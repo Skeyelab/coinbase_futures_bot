@@ -189,10 +189,10 @@ module Coinbase
     # Build ES256 JWT per Coinbase App API requirements
     # Each request gets a unique JWT with fresh timestamp
     def build_jwt_token(http_method, request_path, params: nil, body: nil)
-      # Allow small clock skew by setting nbf slightly in the past
+      # JWT validity window
       now = Time.now.to_i
-      nbf = now - 30
-      exp = now + 120 # expires in 2 minutes
+      nbf = now
+      exp = now + 60 # expires in 60 seconds
       uri = format_jwt_uri(http_method, request_path, params, body)
 
       payload = {
@@ -213,7 +213,8 @@ module Coinbase
         OpenSSL::PKey::EC.new(@api_secret)
       end
 
-      JWT.encode(payload, private_key, "ES256")
+      # Include kid header for clarity; some infrastructures rely on it
+      JWT.encode(payload, private_key, "ES256", { kid: @api_key })
     end
 
     # Format URI for JWT claim per Coinbase requirements
