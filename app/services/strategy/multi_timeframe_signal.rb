@@ -19,7 +19,7 @@ module Strategy
       risk_fraction: 0.005,
       # Futures-specific settings
       contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD-PERP)
-      max_position_size: 10, # Maximum contracts to open
+      max_position_size: 5, # Maximum contracts to open
       min_position_size: 1 # Minimum contracts to open
     }.freeze
 
@@ -31,6 +31,7 @@ module Strategy
     # Returns:
     #   { side:, price:, quantity:, tp:, sl:, confidence: } or nil
     def signal(symbol:, equity_usd: 10_000.0)
+      @current_symbol = symbol
       candles_1h = Candle.for_symbol(symbol).hourly.order(:timestamp).last(@config[:min_1h_candles])
       candles_15m = Candle.for_symbol(symbol).fifteen_minute.order(:timestamp).last(@config[:min_15m_candles])
 
@@ -128,10 +129,69 @@ module Strategy
     end
 
     def confidence_score(trend:, ema1h_s:, ema1h_l:, ema15:, last_price:)
+      # 1. Trend strength (0-40 points)
       trend_strength = ((ema1h_s - ema1h_l).abs / [ ema1h_l.abs, 1e-9 ].max)
+      trend_score = (trend_strength.clamp(0, 0.05) / 0.05) * 40
+
+      # 2. Price alignment with 15m EMA (0-25 points)
+      # Closer to EMA = higher score, but not too close (avoid choppy markets)
       alignment = (last_price - ema15).abs / [ ema15.abs, 1e-9 ].max
-      score = (trend_strength.clamp(0, 0.02) / 0.02) * 0.7 + ((0.003 - alignment).clamp(0, 0.003) / 0.003) * 0.3
-      (score * 100).round(1)
+      alignment_score = if alignment < 0.001
+        25 # Very close to EMA
+      elsif alignment < 0.003
+        20 # Good alignment
+      elsif alignment < 0.005
+        15 # Moderate alignment
+      else
+        10 # Far from EMA
+      end
+
+      # 3. Volume confirmation (0-20 points)
+      volume_score = volume_confidence_score
+
+      # 4. Momentum confirmation (0-15 points)
+      momentum_score = momentum_confidence_score
+
+      total_score = trend_score + alignment_score + volume_score + momentum_score
+      [ total_score, 100 ].min.round(1)
+    end
+
+    def volume_confidence_score
+      # Get recent 15m candles for volume analysis
+      recent_candles = Candle.for_symbol(@current_symbol).fifteen_minute.order(:timestamp).last(10)
+      return 0 if recent_candles.size < 10
+
+      volumes = recent_candles.map { |c| c.volume.to_f }
+      avg_volume = volumes.sum / volumes.size
+      current_volume = volumes.last
+
+      # Volume increasing trend
+      recent_volumes = volumes.last(3)
+      volume_trend = recent_volumes.last > recent_volumes.first ? 1.0 : 0.5
+
+      # Current volume vs average
+      volume_ratio = current_volume / [ avg_volume, 1e-9 ].max
+      volume_ratio = [ volume_ratio, 3.0 ].min # Cap at 3x average
+
+      # Score based on volume strength and trend
+      (volume_ratio * volume_trend * 10).round(0)
+    end
+
+    def momentum_confidence_score
+      # Get recent 15m closes for momentum analysis
+      recent_candles = Candle.for_symbol(@current_symbol).fifteen_minute.order(:timestamp).last(8)
+      return 0 if recent_candles.size < 8
+
+      closes = recent_candles.map { |c| c.close.to_f }
+
+      # Calculate rate of change over last 4 candles
+      if closes.size >= 4
+        roc_4 = (closes.last - closes[-4]) / closes[-4]
+        roc_score = (roc_4.abs.clamp(0, 0.02) / 0.02) * 15
+        roc_score.round(0)
+      else
+        0
+      end
     end
   end
 end
