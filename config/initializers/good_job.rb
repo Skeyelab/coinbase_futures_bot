@@ -13,6 +13,12 @@ Rails.application.configure do
       cron: ENV.fetch("CANDLES_CRON", "5 * * * *"), # at minute 5 each hour
       class: "FetchCandlesJob"
     },
+    signals_15m: {
+      # Run shortly after each 15m boundary to use fresh 15m candles
+      # Default: minutes 1,16,31,46 of each hour
+      cron: ENV.fetch("SIGNALS_CRON", "1,16,31,46 * * * *"),
+      class: "GenerateSignalsJob"
+    },
     paper_step: {
       cron: ENV.fetch("PAPER_CRON", "*/15 * * * *"), # every 15 minutes
       class: "PaperTradingJob"

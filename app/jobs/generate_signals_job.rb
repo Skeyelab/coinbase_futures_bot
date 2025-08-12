@@ -23,5 +23,3 @@ class GenerateSignalsJob < ApplicationJob
     (ENV["SIGNAL_EQUITY_USD"] || 10_000).to_f
   end
 end
-
-

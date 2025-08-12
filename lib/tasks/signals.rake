@@ -12,5 +12,3 @@ namespace :signals do
     end
   end
 end
-
-
