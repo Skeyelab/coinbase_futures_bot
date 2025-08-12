@@ -28,4 +28,16 @@ RSpec.configure do |config|
     clear_enqueued_jobs
     clear_performed_jobs
   end
+
+  # Ensure a clean slate for domain tables between examples to avoid
+  # cross-test interference when external data may exist in the DB.
+  config.before(:each) do
+    begin
+      Candle.delete_all
+      TradingPair.delete_all
+      Tick.delete_all
+    rescue ActiveRecord::StatementInvalid
+      # If tables are missing in a particular environment, ignore
+    end
+  end
 end

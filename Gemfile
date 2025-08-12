@@ -45,10 +45,12 @@ group :development, :test do
 
   # RSpec for testing
   gem "rspec-rails", "~> 7.0"
+  gem "parallel_tests", group: :development, require: false
 end
 
 group :test do
   gem "climate_control"
+  gem "rails-controller-testing"
 end
 
 
@@ -56,3 +58,6 @@ end
 gem "good_job", "~> 4.11"
 gem "sentry-ruby"
 gem "sentry-rails"
+
+# JWT for Coinbase App (Advanced Trade) ES256 authentication
+gem "jwt", "~> 2.8"

@@ -126,6 +126,8 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.13.2)
+    jwt (2.10.2)
+      base64
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
     logger (1.7.0)
@@ -171,6 +173,8 @@ GEM
     nokogiri (1.18.9-x86_64-linux-musl)
       racc (~> 1.4)
     parallel (1.27.0)
+    parallel_tests (5.4.0)
+      parallel
     parser (3.3.9.0)
       ast (~> 2.4.1)
       racc
@@ -214,6 +218,10 @@ GEM
       activesupport (= 8.0.2)
       bundler (>= 1.15.0)
       railties (= 8.0.2)
+    rails-controller-testing (1.0.5)
+      actionpack (>= 5.0.1.rc1)
+      actionview (>= 5.0.1.rc1)
+      activesupport (>= 5.0.1.rc1)
     rails-dom-testing (2.3.0)
       activesupport (>= 5.0.0)
       minitest
@@ -332,9 +340,12 @@ DEPENDENCIES
   dotenv-rails
   faraday (~> 2.11)
   good_job (~> 4.11)
+  jwt (~> 2.8)
+  parallel_tests
   pg (~> 1.1)
   puma (>= 5.0)
   rails (~> 8.0.2)
+  rails-controller-testing
   rspec-rails (~> 7.0)
   rubocop-rails-omakase
   sentry-rails

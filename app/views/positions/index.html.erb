@@ -1,0 +1,63 @@
+<% if @notice_message.present? %>
+  <div style="padding: 8px; margin-bottom: 10px; background: #eef7ff; border: 1px solid #b6daff; color: #084b83;">
+    <%= @notice_message %>
+  </div>
+<% end %>
+
+<% if @error_message.present? %>
+  <div style="padding: 8px; margin-bottom: 10px; background: #fff4f4; border: 1px solid #ffd3d3; color: #8a1f1f;">
+    <strong>Error:</strong> <%= @error_message %><br/>
+    <small>
+      Tip: Ensure the `cdp_api_key.json` file is present and contains valid API credentials. Check the server logs for authentication details.
+    </small>
+  </div>
+<% end %>
+
+<% if @positions.empty? %>
+  <p>No open positions.</p>
+<% else %>
+  <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+      <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6;">Product</th>
+        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6;">Side</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">Size</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">Current Price</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">Entry Price</th>
+        <th style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">Unrealized P&L</th>
+        <th style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @positions.each do |p| %>
+        <tr style="border-bottom: 1px solid #dee2e6;">
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6;"><%= p["product_id"] %></td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">
+            <span style="color: <%= p["side"] == 'LONG' ? '#28a745' : '#dc3545' %>; font-weight: bold;">
+              <%= (p["side"] || p["position_side"] || p.dig("position", "side") || "") %>
+            </span>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">
+            <%= (p["number_of_contracts"] || p["size"] || p["base_size"] || p["quantity"] || p.dig("position", "size") || "") %>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">
+            <%= p["current_price"] ? "#{p["current_price"]}" : "" %>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">
+            <%= p["avg_entry_price"] ? "#{p["avg_entry_price"]}" : "" %>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #dee2e6;">
+            <% if p["unrealized_pnl"] %>
+              <span style="color: <%= p["unrealized_pnl"].to_f >= 0 ? '#28a745' : '#dc3545' %>; font-weight: bold;">
+                <%= p["unrealized_pnl"] %>
+              </span>
+            <% end %>
+          </td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6;">
+            <a class="button" href="<%= edit_position_path(p["product_id"]) %>">Edit</a>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
