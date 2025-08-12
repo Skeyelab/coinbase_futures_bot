@@ -43,13 +43,11 @@ module Strategy
       last_15m = candles_15m.last
 
       # Trigger logic on 15m relative to its EMA
-      # Long: last closed back above EMA after touching/undershooting it and 1h uptrend
-      # Short: last closed back below EMA after touching/overshooting it and 1h downtrend
+      # Long: last close above EMA with a recent EMA interaction and 1h uptrend
+      # Short: last close below EMA with a recent EMA interaction and 1h downtrend
       recent = candles_15m.last(4)
       return nil if recent.size < 4
 
-      prev = recent[-2]
-      prev_close = prev.close.to_f
       last_close = last_15m.close.to_f
 
       # Track whether price interacted with EMA recently (pullback)
@@ -58,8 +56,7 @@ module Strategy
       end
 
       if trend == :up
-        crossed_up = prev_close < ema15 && last_close > ema15
-        if interacted_with_ema && crossed_up
+        if interacted_with_ema && last_close > ema15
           entry = last_close
           be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
           tp = [ entry * (1.0 + @config[:tp_target]), be * 1.001 ].max
@@ -69,8 +66,7 @@ module Strategy
           return order_hash(:buy, entry, qty, tp, sl, conf)
         end
       else
-        crossed_down = prev_close > ema15 && last_close < ema15
-        if interacted_with_ema && crossed_down
+        if interacted_with_ema && last_close < ema15
           entry = last_close
           be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
           tp = [ entry * (1.0 - @config[:tp_target]), be * 0.999 ].min

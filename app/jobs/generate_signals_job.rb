@@ -4,7 +4,9 @@ class GenerateSignalsJob < ApplicationJob
   queue_as :default
 
   def perform(equity_usd: default_equity_usd)
-    strat = Strategy::MultiTimeframeSignal.new
+    strat = Strategy::MultiTimeframeSignal.new(
+      ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21, min_1h_candles: 60, min_15m_candles: 80
+    )
 
     TradingPair.enabled.find_each do |pair|
       order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
