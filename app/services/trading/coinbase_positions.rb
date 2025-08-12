@@ -19,18 +19,17 @@ module Trading
         f.adapter Faraday.default_adapter
       end
 
-      if ENV["COINBASE_API_KEY"] && (ENV["COINBASE_API_SECRET"] || ENV["COINBASE_API_SECRET_FILE"])
-        @api_key = ENV["COINBASE_API_KEY"] # e.g., organizations/{org_id}/apiKeys/{key_id}
-        secret_source = if ENV["COINBASE_API_SECRET_FILE"].present?
-          File.read(ENV["COINBASE_API_SECRET_FILE"]).to_s
-        else
-          ENV["COINBASE_API_SECRET"].to_s
-        end
-        @api_secret = normalize_pem_secret(secret_source) # PEM ECDSA private key for ES256
+      # Try to load credentials from cdp_api_key.json file (same as AdvancedTradeClient)
+      credentials = load_credentials_from_file
+
+      if credentials
+        @api_key = credentials[:api_key]
+        @api_secret = credentials[:private_key]
         @authenticated = true
+        @logger.info("CoinbasePositions service initialized with credentials from cdp_api_key.json")
       else
         @authenticated = false
-        @logger.warn("Coinbase API credentials not fully configured. Positions API requires authentication.")
+        @logger.warn("CoinbasePositions service credentials not found in cdp_api_key.json")
       end
     end
 
@@ -54,12 +53,13 @@ module Trading
     def list_open_positions(product_id: nil)
       raise "Authentication required" unless @authenticated
 
-      path = "/api/v3/brokerage/positions"
+      # Use the correct futures positions endpoint
+      path = "/api/v3/brokerage/cfm/positions"
       params = {}
-      params[:product_ids] = product_id if product_id
+      params[:product_id] = product_id if product_id
 
       begin
-      resp = authenticated_get(path, params)
+        resp = authenticated_get(path, params)
         data = JSON.parse(resp.body)
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
@@ -206,11 +206,10 @@ module Trading
       uri = format_jwt_uri(http_method, request_path, params, body)
 
       payload = {
-        iss: @api_key,
+        sub: @api_key,
+        iss: "cdp",
         nbf: now,
         exp: exp,
-        sub: @api_key,
-        aud: "retail_rest_api",
         uri: uri
       }
 
@@ -221,7 +220,9 @@ module Trading
         OpenSSL::PKey::EC.new(@api_secret)
       end
 
-      jwt = JWT.encode(payload, private_key, "ES256")
+      # Include kid header for clarity; some infrastructures rely on it
+      # Use the full API key path like the Python implementation
+      jwt = JWT.encode(payload, private_key, "ES256", { kid: @api_key })
       @logger.debug("Generated JWT for #{http_method} #{request_path}: #{jwt[0..50]}...")
       jwt
     end
@@ -229,8 +230,10 @@ module Trading
     # Match Coinbase Python SDK jwt_generator.format_jwt_uri() behavior
     # See: https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
     def format_jwt_uri(http_method, request_path, params, body)
-      # Coinbase expects: "METHOD /path" format for the uri claim
+      # Coinbase expects: "METHOD api.coinbase.com/path" format for the uri claim
       method = http_method.to_s.upcase
+      host = "api.coinbase.com"
+      
       path_with_query = case method
       when "GET", "DELETE"
         if params&.any?
@@ -245,7 +248,39 @@ module Trading
         request_path
       end
 
-      "#{method} #{path_with_query}"
+      "#{method} #{host}#{path_with_query}"
+    end
+
+    def load_credentials_from_file
+      file_path = Rails.root.join("cdp_api_key.json")
+
+      if File.exist?(file_path)
+        begin
+          data = JSON.parse(File.read(file_path))
+          
+          # Use the full organization path as the API key
+          # This is what Coinbase expects for JWT authentication
+          api_key = data["name"]
+          private_key = data["privateKey"]
+          
+          @logger.info("Using API key: #{api_key}")
+          @logger.info("Private key length: #{private_key.length}")
+          
+          {
+            api_key: api_key,
+            private_key: private_key
+          }
+        rescue JSON::ParserError => e
+          @logger.error("Failed to parse cdp_api_key.json: #{e.message}")
+          nil
+        rescue => e
+          @logger.error("Failed to load credentials from cdp_api_key.json: #{e.message}")
+          nil
+        end
+      else
+        @logger.warn("cdp_api_key.json file not found at #{file_path}")
+        nil
+      end
     end
 
     def normalize_pem_secret(secret)
