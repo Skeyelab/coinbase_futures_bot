@@ -237,7 +237,17 @@ module Trading
           @logger.error("Response headers: #{e.response[:headers]}")
           @logger.error("Response body: #{e.response[:body]}")
         end
-        raise
+
+        # Extract error message from response body for consistent error handling
+        body = (e.response && e.response[:body]).to_s
+        message = begin
+          parsed = JSON.parse(body)
+          parsed["message"] || parsed["error"] || body
+        rescue
+          body.presence || e.message
+        end
+
+        raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
       end
     end
 

@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-08-12 18:45 UTC
+- Context: Successfully fixed all RSpec test failures in CoinbasePositions service spec.
+- Changes:
+  - Fixed RSpec syntax error: removed incorrect `allow(service).to receive(:@authenticated)` which was causing 23 test failures.
+  - Fixed JWT test by properly mocking the API key to match test expectations.
+  - Fixed JWT URI formatting test by correcting parameter count (method expects 4 parameters, test was calling with 3).
+  - Fixed error handling tests by creating proper mock response objects that the service can access.
+  - Enhanced error handling consistency by updating `authenticated_post` method to parse response body for error messages (matching `list_open_positions` behavior).
+  - All 23 tests now pass consistently.
+- Commands run:
+  - `bundle exec rspec spec/services/coinbase_positions_spec.rb` (identified and fixed all test failures)
+- Files touched:
+  - `spec/services/coinbase_positions_spec.rb`, `app/services/trading/coinbase_positions.rb`
+- Next steps:
+  - CoinbasePositions service tests are now fully passing and provide reliable test coverage.
+  - Service error handling is now consistent between GET and POST operations.
+  - Can proceed with confidence that the service is working correctly.
+
 #### 2025-08-12 18:15 UTC
 - Context: Successfully implemented working position close functionality and resolved all remaining issues.
 - Changes:

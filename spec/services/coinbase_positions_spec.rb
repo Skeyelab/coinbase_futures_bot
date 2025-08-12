@@ -11,7 +11,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       api_key: "organizations/test-org/apiKeys/test-key",
       private_key: "-----BEGIN EC PRIVATE KEY-----\nMOCK_KEY\n-----END EC PRIVATE KEY-----"
     })
-    allow(service).to receive(:@authenticated).and_return(true)
+
     service.instance_variable_set(:@authenticated, true)
   end
 
@@ -22,7 +22,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
         api_key: "test-key",
         private_key: "test-secret"
       })
-      
+
       service.send(:load_credentials_from_file)
     end
 
@@ -32,7 +32,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
         api_key: "test-key",
         private_key: "test-secret"
       })
-      
+
       service.send(:initialize)
       expect(service.instance_variable_get(:@authenticated)).to be true
     end
@@ -45,15 +45,17 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
   describe "JWT token generation" do
     it "generates JWT with correct payload structure" do
+      # Mock the API key to match our test expectation
+      service.instance_variable_set(:@api_key, "organizations/test-org/apiKeys/test-key")
       allow(service).to receive(:build_jwt_token).and_call_original
       allow(service).to receive(:format_jwt_uri).and_return("GET api.coinbase.com/api/v3/brokerage/cfm/positions")
-      
+
       jwt = service.send(:build_jwt_token, "GET", "/api/v3/brokerage/cfm/positions")
-      
+
       # Decode JWT to verify payload
       decoded = JWT.decode(jwt, nil, false)
       payload = decoded.first
-      
+
       expect(payload["iss"]).to eq("cdp")
       expect(payload["sub"]).to eq("organizations/test-org/apiKeys/test-key")
       expect(payload["nbf"]).to be_present
@@ -63,9 +65,9 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "formats JWT URI correctly for different HTTP methods" do
       # GET with params
-      uri = service.send(:format_jwt_uri, "GET", "/api/v3/brokerage/cfm/positions", { product_id: "BTC-USD" })
+      uri = service.send(:format_jwt_uri, "GET", "/api/v3/brokerage/cfm/positions", { product_id: "BTC-USD" }, nil)
       expect(uri).to eq("GET api.coinbase.com/api/v3/brokerage/cfm/positions?product_id=BTC-USD")
-      
+
       # POST without params
       uri = service.send(:format_jwt_uri, "POST", "/api/v3/brokerage/orders", nil, "{}")
       expect(uri).to eq("POST api.coinbase.com/api/v3/brokerage/orders")
@@ -86,7 +88,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
           }
         ]
       }.to_json)
-      
+
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:get).and_return(mock_response)
 
@@ -104,7 +106,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
           { "product_id" => "ETH-USD-PERP", "number_of_contracts" => "1" }
         ]
       }.to_json)
-      
+
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:get).and_return(mock_response)
 
@@ -116,13 +118,13 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
   describe "futures order building" do
     it "builds order body with correct futures side values" do
-      order_body = service.send(:build_order_body, 
-        product_id: "BIP-20DEC30-CDE", 
-        side: :long, 
-        size: "2", 
+      order_body = service.send(:build_order_body,
+        product_id: "BIP-20DEC30-CDE",
+        side: :long,
+        size: "2",
         type: :market
       )
-      
+
       expect(order_body["side"]).to eq("LONG")
       expect(order_body["product_id"]).to eq("BIP-20DEC30-CDE")
       expect(order_body["order_configuration"]["market_market_ioc"]["base_size"]).to eq("2")
@@ -147,7 +149,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG" }
       ])
-      
+
       size, side = service.send(:infer_position, product_id: "BIP-20DEC30-CDE")
       expect(size).to eq("3")
       expect(side).to eq(:long)
@@ -157,7 +159,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "BTC-USD", "size" => "0.01", "side" => "SHORT" }
       ])
-      
+
       size, side = service.send(:infer_position, product_id: "BTC-USD")
       expect(size).to eq("0.01")
       expect(side).to eq(:short)
@@ -167,7 +169,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "TEST", "number_of_contracts" => "1", "side" => "LONG" }
       ])
-      
+
       _, side = service.send(:infer_position, product_id: "TEST")
       expect(side).to eq(:long)
     end
@@ -178,11 +180,11 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "LONG" }
       ])
-      
+
       mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-123" }.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:post).and_return(mock_response)
-      
+
       result = service.close_position(product_id: "BIP-20DEC30-CDE", size: "1")
       expect(result["success"]).to be true
     end
@@ -191,11 +193,11 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       allow(service).to receive(:list_open_positions).and_return([
         { "product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT" }
       ])
-      
+
       mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-456" }.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:post).and_return(mock_response)
-      
+
       result = service.close_position(product_id: "BIP-20DEC30-CDE", size: "1")
       expect(result["success"]).to be true
     end
@@ -204,35 +206,35 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       mock_response = instance_double("Response", body: { "success" => true, "order_id" => "close-789" }.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:post).and_return(mock_response)
-      
+
       result = service.close_position(product_id: "BIP-20DEC30-CDE", size: "1.5")
       expect(result["success"]).to be true
     end
   end
 
   describe "error handling" do
-    it "handles API errors gracefully with detailed logging" do
+        it "handles API errors gracefully with detailed logging" do
       conn = service.instance_variable_get(:@conn)
-      expect(conn).to receive(:get).and_raise(
-        Faraday::ClientError.new("Bad Request", response: {
-          status: 400,
-          body: '{"error": "Invalid product_id"}'
-        })
-      )
-      
-      expect { service.list_open_positions }.to raise_error(Faraday::ClientError, /Invalid product_id/)
+      # Create a mock response hash that the service can access
+      mock_response = { status: 400, body: '{"error": "Invalid product_id"}' }
+      error = Faraday::ClientError.new("Bad Request")
+      allow(error).to receive(:response).and_return(mock_response)
+
+      expect(conn).to receive(:get).and_raise(error)
+
+      expect { service.list_open_positions }.to raise_error(Faraday::ClientError, /Bad Request: Invalid product_id/)
     end
 
-    it "handles POST errors with detailed response information" do
+        it "handles POST errors with detailed response information" do
       conn = service.instance_variable_get(:@conn)
-      expect(conn).to receive(:post).and_raise(
-        Faraday::ClientError.new("Bad Request", response: {
-          status: 400,
-          body: '{"error": "Invalid order format"}'
-        })
-      )
-      
-      expect { service.close_position(product_id: "TEST", size: "1") }.to raise_error(Faraday::ClientError, /Invalid order format/)
+      # Create a mock response hash that the service can access
+      mock_response = { status: 400, body: '{"error": "Invalid order format"}' }
+      error = Faraday::ClientError.new("Bad Request")
+      allow(error).to receive(:response).and_return(mock_response)
+
+      expect(conn).to receive(:post).and_raise(error)
+
+      expect { service.close_position(product_id: "TEST", size: "1") }.to raise_error(Faraday::ClientError, /Bad Request: Invalid order format/)
     end
   end
 
