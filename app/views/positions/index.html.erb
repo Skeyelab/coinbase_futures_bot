@@ -13,6 +13,55 @@
   </div>
 <% end %>
 
+<div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+  <h3 style="margin-top: 0;">Open New Position</h3>
+  <form action="<%= positions_path %>" method="post" class="flex gap-2 items-end flex-wrap">
+    <div>
+      <label for="product_id" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Product:</label>
+      <input id="product_id" name="product_id" type="text" required placeholder="e.g. BTC-USD-PERP"
+             style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 150px;" />
+    </div>
+
+    <div>
+      <label for="side" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Side:</label>
+      <select id="side" name="side" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;">
+        <option value="">Side...</option>
+        <option value="long">LONG</option>
+        <option value="short">SHORT</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="size" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Size:</label>
+      <input id="size" name="size" type="number" step="0.01" min="0.01" required placeholder="1.0"
+             style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 80px;" />
+    </div>
+
+    <div>
+      <label for="order_type" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Type:</label>
+      <select id="order_type" name="order_type" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;">
+        <option value="market">Market</option>
+        <option value="limit">Limit</option>
+      </select>
+    </div>
+
+    <div id="quick_price_field" style="display: none;">
+      <label for="price" style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px;">Price:</label>
+      <input id="price" name="price" type="number" step="0.01" min="0.01" placeholder="50000"
+             style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;" />
+    </div>
+
+    <button type="submit">Open Position</button>
+  </form>
+
+  <div style="margin-top: 10px;">
+    <small style="color: #666;">
+      <strong>Quick Open:</strong> Fill out the form above to open a new futures position.
+      <a href="<%= new_position_path %>" style="color: #007bff;">Advanced options</a> available.
+    </small>
+  </div>
+</div>
+
 <% if @positions.empty? %>
   <p>No open positions.</p>
 <% else %>
@@ -61,3 +110,20 @@
     </tbody>
   </table>
 <% end %>
+
+<script>
+  // Handle price field visibility for limit orders in quick open form
+  document.getElementById('order_type').addEventListener('change', function() {
+    const priceField = document.getElementById('quick_price_field');
+    const priceInput = document.getElementById('price');
+
+    if (this.value === 'limit') {
+      priceField.style.display = 'block';
+      priceInput.required = true;
+    } else {
+      priceField.style.display = 'none';
+      priceInput.required = false;
+      priceInput.value = '';
+    }
+  });
+</script>

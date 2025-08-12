@@ -1,0 +1,82 @@
+<div>
+  <h2>Open New Position</h2>
+
+  <% if params[:notice].present? %>
+    <div style="padding: 8px; margin-bottom: 10px; background: #fff4f4; border: 1px solid #ffd3d3; color: #8a1f1f;">
+      <%= params[:notice] %>
+    </div>
+  <% end %>
+
+  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+    <p>
+      <strong>Product:</strong> <%= @position["product_id"] %><br/>
+      <small>This will open a new futures position using the specified parameters.</small>
+    </p>
+  </div>
+
+  <h3>Position Details</h3>
+  <form action="<%= positions_path %>" method="post" style="max-width: 500px;">
+    <input type="hidden" name="product_id" value="<%= @position["product_id"] %>" />
+
+    <div style="margin-bottom: 15px;">
+      <label for="side" style="display: block; margin-bottom: 5px; font-weight: bold;">Side:</label>
+      <select id="side" name="side" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+        <option value="">Select side...</option>
+        <option value="long">LONG (Buy)</option>
+        <option value="short">SHORT (Sell)</option>
+      </select>
+      <small style="color: #666;">LONG = bullish, SHORT = bearish</small>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label for="size" style="display: block; margin-bottom: 5px; font-weight: bold;">Size (contracts):</label>
+      <input id="size" name="size" type="number" step="0.01" min="0.01" required
+             placeholder="e.g. 1.0" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" />
+      <small style="color: #666;">Number of futures contracts to trade</small>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label for="order_type" style="display: block; margin-bottom: 5px; font-weight: bold;">Order Type:</label>
+      <select id="order_type" name="order_type" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+        <option value="market">Market Order (immediate execution)</option>
+        <option value="limit">Limit Order (specify price)</option>
+      </select>
+    </div>
+
+    <div id="price_field" style="margin-bottom: 15px; display: none;">
+      <label for="price" style="display: block; margin-bottom: 5px; font-weight: bold;">Limit Price (USD):</label>
+      <input id="price" name="price" type="number" step="0.01" min="0.01"
+             placeholder="e.g. 50000.00" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" />
+      <small style="color: #666;">Required for limit orders</small>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <button type="submit" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
+        Open Position
+      </button>
+      <a class="button secondary" href="<%= positions_path %>" style="margin-left: 10px; padding: 12px 24px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">
+        Cancel
+      </a>
+    </div>
+  </form>
+
+  <script>
+    document.getElementById('order_type').addEventListener('change', function() {
+      const priceField = document.getElementById('price_field');
+      const priceInput = document.getElementById('price');
+
+      if (this.value === 'limit') {
+        priceField.style.display = 'block';
+        priceInput.required = true;
+      } else {
+        priceField.style.display = 'none';
+        priceInput.required = false;
+        priceInput.value = '';
+      }
+    });
+  </script>
+
+  <p style="margin-top: 1rem;">
+    <a class="button secondary" href="<%= positions_path %>">← Back to Positions</a>
+  </p>
+</div>

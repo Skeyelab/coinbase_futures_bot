@@ -111,18 +111,59 @@ module Trading
       pos_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
       return { "success" => true, "message" => "No open position to close" } if pos_size.to_f <= 0.0
 
-      # For futures, flip LONG to SHORT and vice versa
+      # For futures, to close a position you need the opposite order side:
+      # LONG position: SELL contracts to close (opposite of your position)
+      # SHORT position: BUY contracts to close (opposite of your position)
+      # Note: infer_position returns :long/:short, we need to convert to :buy/:sell
       close_side = case pos_side
-      when :long then :short
-      when :short then :long
+      when :long then :sell
+      when :short then :buy
       when :buy then :sell
       when :sell then :buy
-      else :short  # Default fallback
+      else :sell  # Default fallback
       end
+
+      @logger.info("Closing position: product_id=#{product_id}, size=#{pos_size}, position_side=#{pos_side}, order_side=#{close_side}")
 
       order_body = build_order_body(product_id: product_id, side: close_side, size: pos_size, type: :market)
 
-      @logger.info("Closing position: product_id=#{product_id}, size=#{pos_size}, side=#{pos_side} -> #{close_side}")
+      @logger.info("Order body: #{order_body.inspect}")
+
+      resp = authenticated_post("/api/v3/brokerage/orders", order_body)
+      JSON.parse(resp.body)
+    end
+
+    # Increase an existing position by adding more contracts in the same direction.
+    # Returns order result hash
+    def increase_position(product_id:, size:)
+      raise "Authentication required" unless @authenticated
+
+      # Get the current position to determine the side
+      positions = list_open_positions(product_id: product_id)
+      return { "success" => false, "message" => "No open position found to increase" } if positions.empty?
+
+      position = positions.find { |p| p["product_id"] == product_id } || positions.first
+      current_side = position["side"] || position["position_side"] || position.dig("position", "side")
+
+      @logger.info("Increasing position debug: product_id=#{product_id}, current_side=#{current_side.inspect}, position=#{position.inspect}")
+
+      # Convert position side to order side for increase:
+      # LONG position: BUY more contracts to increase
+      # SHORT position: SELL more contracts to increase
+      increase_side = case current_side.to_s.upcase
+      when "LONG" then :buy
+      when "SHORT" then :sell
+      when "BUY" then :buy
+      when "SELL" then :sell
+      else
+        @logger.error("Cannot determine position side for increase: #{current_side.inspect}")
+        raise "Cannot determine position side for increase: #{current_side.inspect}"
+      end
+
+      @logger.info("Increasing position: product_id=#{product_id}, size=#{size}, original_side=#{current_side}, order_side=#{increase_side}")
+
+      order_body = build_order_body(product_id: product_id, side: increase_side, size: size, type: :market)
+
       @logger.info("Order body: #{order_body.inspect}")
 
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
@@ -171,15 +212,13 @@ module Trading
     end
 
     def infer_position(product_id:, explicit_size: nil)
-      return [ explicit_size.to_s, :buy ] if explicit_size # side will be flipped by caller
-
       positions = list_open_positions(product_id: product_id)
       return [ "0", :buy ] if positions.empty?
 
       pos = positions.find { |p| p["product_id"] == product_id } || positions.first
 
       # For futures positions, use number_of_contracts as the primary size field
-      size = pos["number_of_contracts"] || pos["size"] || pos["base_size"] || pos["quantity"] || pos.dig("position", "size") || "0"
+      size = explicit_size || pos["number_of_contracts"] || pos["size"] || pos["base_size"] || pos["quantity"] || pos.dig("position", "size") || "0"
       side = pos["side"] || pos["position_side"] || pos.dig("position", "side")
 
       # For futures orders, use LONG/SHORT instead of buy/sell
