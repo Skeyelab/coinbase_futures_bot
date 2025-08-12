@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-08-12 17:08 UTC
+- Context: Coinbase Advanced Trade auth failing with 401; aligned JWT generation and endpoints to docs.
+- Changes:
+  - Updated `app/services/coinbase/advanced_trade_client.rb` to:
+    - Include `aud: "retail_rest_api"` and sign URI including query for GET/DELETE.
+    - Fix margin window endpoint to `/api/v3/brokerage/cfm/intraday/current_margin_window`.
+    - Reduce JWT logging (no token fragments in logs).
+- Commands run:
+  - `ruby scripts/generate_jwt_and_curl.rb GET /api/v3/brokerage/accounts`
+  - `curl -s -D - -H "Authorization: Bearer $JWT" -H "Accept: application/json" 'https://api.coinbase.com/api/v3/brokerage/accounts' | cat`
+- Files touched:
+  - `app/services/coinbase/advanced_trade_client.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - Verify API key status/permissions and IP allowlist in CDP portal.
+  - Ensure system clock correct; retry `accounts` and `cfm/positions` endpoints.
+  - Add an integration spec to exercise JWT signing for GET with query params.
+
 #### 2025-08-12 03:19 UTC
 - Context: RSpec failures due to leftover records in shared test DB; cleaned setup and verified green suite.
 - Changes:

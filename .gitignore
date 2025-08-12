@@ -43,3 +43,6 @@
 .DS_Store
 
 .DS_Store
+
+# Coinbase CDP API credentials
+cdp_api_key.json

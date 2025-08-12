@@ -19,7 +19,7 @@ module Trading
         f.adapter Faraday.default_adapter
       end
 
-      if ENV["COINBASE_API_KEY"] && (ENV["COINBASE_API_SECRET"] || ENV["COINBASE_API_SECRET_FILE"]) 
+      if ENV["COINBASE_API_KEY"] && (ENV["COINBASE_API_SECRET"] || ENV["COINBASE_API_SECRET_FILE"])
         @api_key = ENV["COINBASE_API_KEY"] # e.g., organizations/{org_id}/apiKeys/{key_id}
         secret_source = if ENV["COINBASE_API_SECRET_FILE"].present?
           File.read(ENV["COINBASE_API_SECRET_FILE"]).to_s
@@ -31,6 +31,21 @@ module Trading
       else
         @authenticated = false
         @logger.warn("Coinbase API credentials not fully configured. Positions API requires authentication.")
+      end
+    end
+
+    # Test method to validate auth with simpler endpoint first
+    def test_auth_with_accounts
+      raise "Authentication required" unless @authenticated
+
+      path = "/api/v3/brokerage/accounts"
+      begin
+        resp = authenticated_get(path, {})
+        data = JSON.parse(resp.body)
+        { ok: true, count: data.is_a?(Array) ? data.size : 1, data: data }
+      rescue Faraday::ClientError => e
+        body = (e.response && e.response[:body]).to_s
+        { ok: false, error: e.class.to_s, message: e.message, body: body }
       end
     end
 
@@ -155,8 +170,24 @@ module Trading
 
     def authenticated_get(path, params = {})
       @conn.headers["Accept"] = "application/json"
-      @conn.headers["Authorization"] = "Bearer #{build_jwt_token("GET", path, params: params)}"
-      @conn.get(path, params)
+      jwt = build_jwt_token("GET", path, params: params)
+      @conn.headers["Authorization"] = "Bearer #{jwt}"
+
+      @logger.debug("GET #{path} with JWT payload: #{jwt[0..100]}...")
+      @logger.debug("Headers: #{@conn.headers.slice('Accept', 'Authorization').inspect}")
+
+      begin
+        resp = @conn.get(path, params)
+        resp
+      rescue Faraday::ClientError => e
+        @logger.error("Request failed: #{e.class} - #{e.message}")
+        if e.response
+          @logger.error("Response status: #{e.response[:status]}")
+          @logger.error("Response headers: #{e.response[:headers]}")
+          @logger.error("Response body: #{e.response[:body]}")
+        end
+        raise
+      end
     end
 
     def authenticated_post(path, body_hash = {})
@@ -179,6 +210,7 @@ module Trading
         nbf: now,
         exp: exp,
         sub: @api_key,
+        aud: "retail_rest_api",
         uri: uri
       }
 
@@ -188,13 +220,18 @@ module Trading
       rescue OpenSSL::PKey::PKeyError
         OpenSSL::PKey::EC.new(@api_secret)
       end
-      JWT.encode(payload, private_key, "ES256")
+
+      jwt = JWT.encode(payload, private_key, "ES256")
+      @logger.debug("Generated JWT for #{http_method} #{request_path}: #{jwt[0..50]}...")
+      jwt
     end
 
-    # Match SDK formatting for JWT uri claim
+    # Match Coinbase Python SDK jwt_generator.format_jwt_uri() behavior
+    # See: https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
     def format_jwt_uri(http_method, request_path, params, body)
+      # Coinbase expects: "METHOD /path" format for the uri claim
       method = http_method.to_s.upcase
-      case method
+      path_with_query = case method
       when "GET", "DELETE"
         if params&.any?
           query = params.map { |k, v| "#{k}=#{v}" }.join("&")
@@ -207,6 +244,8 @@ module Trading
       else
         request_path
       end
+
+      "#{method} #{path_with_query}"
     end
 
     def normalize_pem_secret(secret)
