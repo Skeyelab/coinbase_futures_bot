@@ -75,7 +75,7 @@ class PositionsController < ActionController::Base
 
   def close
     product_id = params[:product_id]
-    size_to_close = params[:close_size].presence
+    size_to_close = params[:size].presence
 
     Rails.logger.info("CLOSE ACTION CALLED: product_id=#{product_id}, size=#{size_to_close}")
 
@@ -89,7 +89,7 @@ class PositionsController < ActionController::Base
 
   def increase
     product_id = params[:product_id]
-    size_to_increase = params[:increase_size].presence
+    size_to_increase = params[:size].presence
 
     Rails.logger.info("INCREASE ACTION CALLED: product_id=#{product_id}, size=#{size_to_increase}")
 
