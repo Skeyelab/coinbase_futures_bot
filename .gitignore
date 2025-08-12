@@ -39,6 +39,7 @@
 /.cursor/*
 !/.cursor/rules/
 !/.cursor/rules/*.mdc
+!/.cursor/Dockerfile
 .DS_Store
 
 .DS_Store
