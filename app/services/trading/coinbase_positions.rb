@@ -3,6 +3,7 @@
 require "faraday"
 require "json"
 require "openssl"
+require "base64"
 require "securerandom"
 
 module Trading
@@ -139,12 +140,14 @@ module Trading
       timestamp = Time.now.to_i.to_s
       method = "GET"
 
+      # Build the exact request path string used for signing, including query if present
       query = params.any? ? "?" + params.map { |k, v| "#{k}=#{v}" }.join("&") : ""
       prehash = timestamp + method + path + query
 
       signature = hmac_sha256(prehash)
 
       set_auth_headers(timestamp, signature)
+      @conn.headers["Accept"] = "application/json"
       @conn.get(path, params)
     end
 
@@ -158,6 +161,8 @@ module Trading
       signature = hmac_sha256(prehash)
 
       set_auth_headers(timestamp, signature)
+      @conn.headers["Content-Type"] = "application/json"
+      @conn.headers["Accept"] = "application/json"
       @conn.post(path, body_json)
     end
 
@@ -165,11 +170,13 @@ module Trading
       @conn.headers["CB-ACCESS-KEY"] = @api_key
       @conn.headers["CB-ACCESS-SIGN"] = signature
       @conn.headers["CB-ACCESS-TIMESTAMP"] = timestamp
-      @conn.headers["Content-Type"] = "application/json"
     end
 
     def hmac_sha256(data)
-      OpenSSL::HMAC.hexdigest(OpenSSL::Digest.new("sha256"), @api_secret, data)
+      # Advanced Trade: secret is base64; signature must be base64(HMAC_SHA256(decode64(secret), prehash))
+      decoded_secret = Base64.decode64(@api_secret)
+      raw_hmac = OpenSSL::HMAC.digest("sha256", decoded_secret, data)
+      Base64.strict_encode64(raw_hmac)
     end
   end
 end
