@@ -5,7 +5,7 @@ This service collects and stores OHLCV candles primarily for Coinbase spot marke
 ## What is collected
 - **Timeframes**: `1h` and `15m`
   - `1h` candles come directly from the API with granularity 3600s.
-  - `15m` candles are fetched with granularity 900s. The code path is named `upsert_30m_candles` for historical reasons but stores as `15m`.
+  - `15m` candles are fetched with granularity 900s.
 - **Fields**: `symbol`, `timeframe`, `timestamp`, `open`, `high`, `low`, `close`, `volume`.
 - **Uniqueness**: Unique on `(symbol, timeframe, timestamp)` to prevent duplicates.
 
@@ -23,8 +23,8 @@ volume: decimal(30,10)
   - `fetch_candles(product_id:, start_iso8601:, end_iso8601:, granularity:)` returns arrays of `[time, low, high, open, close, volume]`.
   - `upsert_1h_candles(product_id:, start_time:, end_time:)` writes `1h` candles.
   - `upsert_1h_candles_chunked(...)` collects large ranges in chunks (avoids rate limits).
-  - `upsert_30m_candles(product_id:, ...)` writes `15m` candles using 900s granularity.
-  - `upsert_30m_candles_chunked(...)` chunked version for large ranges.
+  - `upsert_15m_candles(product_id:, ...)` writes `15m` candles using 900s granularity.
+- `upsert_15m_candles_chunked(...)` chunked version for large ranges.
 
 - Scheduled fetching is handled by `FetchCandlesJob` (GoodJob cron):
   - Calculates a `start_time` as the later of:
@@ -36,7 +36,7 @@ volume: decimal(30,10)
 - One-off backfill via Rake:
   - `bin/rake market_data:backfill_candles[7]` enqueues `FetchCandlesJob` with 7 days backfill.
   - `bin/rake market_data:backfill_1h_candles[30]` directly fetches and stores `1h` candles for the last 30 days.
-  - `bin/rake market_data:backfill_30m_candles[7]` fetches and stores `15m` candles for the last 7 days.
+  - `bin/rake market_data:backfill_15m_candles[7]` fetches and stores `15m` candles for the last 7 days.
   - `bin/rake market_data:test_1h_candles[1]` quick test for `1h` fetching.
   - `bin/rake market_data:test_granularities` prints supported granularities.
 

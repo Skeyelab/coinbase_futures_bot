@@ -26,6 +26,45 @@
 
 ### Session log
 
+#### 2025-08-12 19:42 UTC
+- Context: Updated FetchCandlesJob to fetch both 1h and 15m candles every time it runs.
+- Changes:
+  - Modified `FetchCandlesJob` to call both `fetch_1h_candles` and `fetch_15m_candles` methods
+  - Added separate private methods for each candle type to keep the code organized
+  - Implemented smart backfill logic: 15m candles are capped at 3 days maximum to avoid excessive API calls
+  - Added proper error handling so if one candle type fails, the other still processes
+  - Created comprehensive test suite for the job functionality
+  - Fixed syntax errors in logging statements that were preventing proper execution
+- Commands run:
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb` (verified job tests pass)
+  - `bundle exec rails runner "FetchCandlesJob.perform_now(backfill_days: 1)"` (tested job execution)
+- Files touched:
+  - `app/jobs/fetch_candles_job.rb`, `spec/jobs/fetch_candles_job_spec.rb`
+- Next steps:
+  - Job now fetches both 1h and 15m candles on every run
+  - 15m candles are limited to 3 days maximum to balance data freshness with API efficiency
+  - Error handling ensures robustness - if one candle type fails, the other still processes
+  - Test suite provides confidence in the job's functionality
+
+#### 2025-08-12 19:35 UTC
+- Context: Renamed misleading rake task and service methods from "30m" to "15m" candles for clarity.
+- Changes:
+  - Renamed rake task `market_data:backfill_30m_candles` to `market_data:backfill_15m_candles` to accurately reflect that it fetches 15m candles
+  - Renamed service methods `upsert_30m_candles` and `upsert_30m_candles_chunked` to `upsert_15m_candles` and `upsert_15m_candles_chunked`
+  - Updated all test files to use the new method names
+  - Updated documentation in `docs/candles.md` to reflect correct naming
+  - Fixed syntax error in `upsert_15m_candles_chunked` method that was introduced during editing
+- Commands run:
+  - `bundle exec rspec spec/services/coinbase_rest_spec.rb` (verified service tests pass)
+  - `bundle exec rspec spec/tasks/market_data_rake_spec.rb` (verified rake task tests pass)
+  - `bundle exec rake 'market_data:backfill_15m_candles[1]'` (tested renamed task works)
+- Files touched:
+  - `lib/tasks/market_data.rake`, `app/services/market_data/coinbase_rest.rb`, `spec/services/coinbase_rest_spec.rb`, `spec/tasks/market_data_rake_spec.rb`, `docs/candles.md`
+- Next steps:
+  - Naming is now consistent and accurate - the task clearly fetches 15m candles
+  - All tests pass and the renamed task works correctly
+  - Documentation accurately reflects the actual functionality
+
 #### 2025-08-12 19:15 UTC
 - Context: Successfully fixed all remaining RSpec test failures across the entire test suite.
 - Changes:

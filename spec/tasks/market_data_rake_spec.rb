@@ -28,7 +28,7 @@ RSpec.describe "market_data rake tasks", type: :task do
     Rake::Task["market_data:upsert_futures_products"].reenable
     Rake::Task["market_data:backfill_candles"].reenable
     Rake::Task["market_data:backfill_1h_candles"].reenable
-    Rake::Task["market_data:backfill_30m_candles"].reenable
+    Rake::Task["market_data:backfill_15m_candles"].reenable
     Rake::Task["market_data:test_1h_candles"].reenable
     Rake::Task["market_data:test_granularities"].reenable
     Rake::Task["market_data:subscribe_futures"].reenable
@@ -93,21 +93,22 @@ RSpec.describe "market_data rake tasks", type: :task do
     expect { Rake::Task["market_data:backfill_1h_candles"].invoke(1) }.not_to raise_error
   end
 
-  it "runs backfill_30m_candles and calls rest" do
+  it "runs backfill_15m_candles and calls rest" do
     mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_30m_candles)
+    allow(mock_rest).to receive(:upsert_15m_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
     expect {
-      Rake::Task["market_data:backfill_30m_candles"].invoke(1)
+      Rake::Task["market_data:backfill_15m_candles"].invoke(1)
     }.not_to raise_error
   end
 
-  it "handles missing trading pair gracefully for backfill_30m_candles" do
+  it "handles missing trading pair gracefully for backfill_15m_candles" do
     @btc_pair.destroy!
     mock_rest = instance_double(MarketData::CoinbaseRest)
+    allow(mock_rest).to receive(:upsert_15m_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-    expect { Rake::Task["market_data:backfill_30m_candles"].invoke(1) }.not_to raise_error
+    expect { Rake::Task["market_data:backfill_15m_candles"].invoke(1) }.not_to raise_error
   end
 
   it "runs test_1h_candles and calls rest" do

@@ -54,8 +54,8 @@ namespace :market_data do
     puts "Completed! Total 1h candles in database: #{count}"
   end
 
-  desc "Backfill BTC-USD 30m candles"
-  task :backfill_30m_candles, [ :days ] => :environment do |_t, args|
+  desc "Backfill BTC-USD 15m candles"
+  task :backfill_15m_candles, [ :days ] => :environment do |_t, args|
     days = (args[:days] || 7).to_i
     rest = MarketData::CoinbaseRest.new
 
@@ -71,9 +71,9 @@ namespace :market_data do
     start_time = days.days.ago
     end_time = Time.now.utc
 
-    puts "Fetching 30m candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    rest.upsert_30m_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
-    puts "Completed fetching 30m candles"
+    puts "Fetching 15m candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
+    rest.upsert_15m_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
+    puts "Completed fetching 15m candles"
   end
 
   desc "Test 1h candles (should work with most APIs)"

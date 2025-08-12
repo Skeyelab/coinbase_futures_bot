@@ -225,19 +225,19 @@ module MarketData
       Rails.logger.info("Completed upserting 1h candles for #{product_id}")
     end
 
-    # Upsert 15-minute candles (API doesn't support 30m, so we use 15m)
-    def upsert_30m_candles(product_id:, start_time:, end_time: Time.now.utc)
+    # Upsert 15-minute candles
+    def upsert_15m_candles(product_id:, start_time:, end_time: Time.now.utc)
       # For larger date ranges, use chunked fetching to avoid API limits
       if (end_time - start_time) > 3.days
-        upsert_30m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
+        upsert_15m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
 
-      # Use 15m granularity since 30m is not supported by the API
+      # Use 15m granularity (900 seconds)
       data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 900)
 
       # Debug logging
-      Rails.logger.info("Processing #{data.class} data with #{data.count} items for 15m candles (requested as 30m)")
+      Rails.logger.info("Processing #{data.class} data with #{data.count} items for 15m candles")
 
       # Ensure data is an array
       unless data.is_a?(Array)
@@ -255,7 +255,7 @@ module MarketData
         # Use create_or_find_by instead of upsert for debugging
         Candle.create_or_find_by(
           symbol: product_id,
-          timeframe: "15m", # Store as 15m since that's what we actually get
+          timeframe: "15m",
           timestamp: ts
         ) do |candle|
           candle.open = open
@@ -270,7 +270,7 @@ module MarketData
     end
 
     # Upsert 15-minute candles using chunked fetching for large date ranges
-    def upsert_30m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 3)
+    def upsert_15m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 3)
       all_data = []
       current_start = start_time
 

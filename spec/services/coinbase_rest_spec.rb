@@ -125,22 +125,22 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       expect(candle.volume).to eq(BigDecimal("23.20361858"))
     end
 
-    it "upsert_30m_candles creates 15m candles" do
+    it "upsert_15m_candles creates 15m candles" do
       mock_candles = [ [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ] ]
       allow(rest).to receive(:fetch_candles).and_return(mock_candles)
       expect {
-        rest.upsert_30m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
+        rest.upsert_15m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
       }.to change { Candle.count }.by(1)
-      candle = Candle.find_by(symbol: product_id, timeframe: "15m")
+      candle = Candle.find_by(timeframe: "15m")
       expect(candle.timeframe).to eq("15m")
     end
 
-    it "upsert_30m_candles uses chunked fetching for large ranges" do
+    it "upsert_15m_candles uses chunked fetching for large ranges" do
       large_start = 10.days.ago
       large_end = Time.now.utc
-      expect_any_instance_of(described_class).not_to receive(:upsert_30m_candles_chunked) # sanity default
-      expect(rest).to receive(:upsert_30m_candles_chunked).with(product_id: product_id, start_time: large_start, end_time: large_end)
-      rest.upsert_30m_candles(product_id: product_id, start_time: large_start, end_time: large_end)
+      expect_any_instance_of(described_class).not_to receive(:upsert_15m_candles_chunked) # sanity default
+      expect(rest).to receive(:upsert_15m_candles_chunked).with(product_id: product_id, start_time: large_start, end_time: large_end)
+      rest.upsert_15m_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
 
     it "upsert_1h_candles uses chunked fetching for large ranges" do
