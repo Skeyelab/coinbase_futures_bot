@@ -26,6 +26,17 @@
 
 ### Session log
 
+#### 2025-08-12 20:30 UTC
+- Context: Sanitize MCP config to read token from environment.
+- Changes:
+  - Updated `.cursor/mcp.json` to use `${GITHUB_TOKEN}` rather than a hardcoded PAT.
+- Commands run:
+  - n/a (file edit only)
+- Files touched:
+  - `.cursor/mcp.json`, `SESSION_NOTES.md`
+- Next steps:
+  - Ensure `GITHUB_TOKEN` is set in Cursor app environment before starting sessions.
+
 #### 2025-08-12 20:22 UTC
 - Context: Align dev container with Cursor background agent guidance and improve cloning ergonomics.
 - Changes:
