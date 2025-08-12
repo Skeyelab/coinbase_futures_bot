@@ -25,6 +25,22 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+#### 2025-08-12 18:30 UTC
+- Context: candles (1h/15m) stored; need entry decisions using both timeframes.
+- Changes:
+  - Added `Strategy::MultiTimeframeSignal` to decide entries using 1h trend and 15m triggers.
+  - Added `GenerateSignalsJob` to evaluate signals for enabled pairs and log outcomes.
+  - Added `signals:run` rake task with `INLINE=1` option for synchronous run.
+- Commands run:
+  - `bin/rake signals:run INLINE=1 SIGNAL_EQUITY_USD=10000`
+- Files touched:
+  - `app/services/strategy/multi_timeframe_signal.rb`, `app/jobs/generate_signals_job.rb`, `lib/tasks/signals.rake`
+- Migrations:
+  - none
+- Next steps:
+  - Wire signals into an executor that can place simulated/real orders on PERP.
+  - Add specs for `MultiTimeframeSignal` with synthetic candles.
+  - Optionally schedule `GenerateSignalsJob` via GoodJob cron.
 
 #### 2025-08-12 19:42 UTC
 - Context: Updated FetchCandlesJob to fetch both 1h and 15m candles every time it runs.
