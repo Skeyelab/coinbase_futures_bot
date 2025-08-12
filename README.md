@@ -54,23 +54,6 @@ INLINE=1 bin/rake "market_data:subscribe_futures[BTC-USD-PERP]"
 Note: Endpoint and schema may differ from Advanced Trade; handler logs raw fields if schema is unknown.
 
 ## Backtesting
-- CSV replay for spot-driven strategy.
-- Expected CSV headers: `time,price` (optional `product_id`). Example:
-
-```csv
-time,price
-2024-01-01T00:00:00Z,45000.12
-2024-01-01T00:00:01Z,45000.30
-```
-
-- Run backtest:
-```bash
-bin/rake market_data:backtest_spot_csv[/absolute/path/to/btc_usd_ticks.csv,BTC-USD,BTC-USD-PERP]
-# Or with env vars
-CSV_PATH=/absolute/path/to/btc_usd_ticks.csv SPOT_PRODUCT=BTC-USD FUTURES_PRODUCT=BTC-USD-PERP bin/rake market_data:backtest_spot_csv
-```
-
-- Output prints execution decisions; no orders are placed.
 
 ### DB-backed backtesting
 - Persist live ticks:
