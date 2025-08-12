@@ -171,4 +171,13 @@
   - Create GoodJob initializer for concurrency/queues
   - `bin/rails db:migrate`
 
+#### 2025-08-12
+- Context: Ensure candle data collection is working and documented.
+- Changes:
+  - Fixed `FetchCandlesJob` start_time selection to use the later of last-candle+1h and backfill window.
+  - Added `docs/candles.md` detailing schema, fetching paths, cron, env, and troubleshooting.
+  - Updated `README.md` with a Candle data collection section linking to the docs.
+- Next steps:
+  - Run test suite locally (requires Ruby/Bundler) and verify GoodJob cron executes `FetchCandlesJob`.
+
 

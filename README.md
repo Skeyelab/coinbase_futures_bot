@@ -97,3 +97,13 @@ bundle exec good_job start
 ## Contributing workflow
 - All substantive changes go through PRs. CI (RuboCop, Brakeman) must pass.
 - Update `SESSION_NOTES.md` for notable changes.
+
+## Candle data collection
+- Fetch and store OHLCV candles (Coinbase spot):
+  - `bin/rake market_data:backfill_candles[7]` enqueues `FetchCandlesJob` (default 7 days).
+  - `bin/rake market_data:backfill_1h_candles[30]` writes `1h` candles for last 30 days.
+  - `bin/rake market_data:backfill_30m_candles[7]` writes `15m` candles for last 7 days.
+  - `bin/rake market_data:test_1h_candles[1]` quick test.
+  - `bin/rake market_data:test_granularities` prints supported granularities.
+- Scheduled via GoodJob cron at minute 5 each hour by default. Override with `CANDLES_CRON`.
+- See `docs/candles.md` for full details (schema, env vars, chunked fetching, troubleshooting).
