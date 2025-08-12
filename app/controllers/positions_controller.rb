@@ -11,6 +11,8 @@ class PositionsController < ActionController::Base
 
     begin
       @positions = positions_service.list_open_positions
+    rescue Faraday::ClientError => e
+      @error_message = e.message
     rescue => e
       @error_message = e.message
       @positions = []
@@ -24,6 +26,9 @@ class PositionsController < ActionController::Base
       positions = positions_service.list_open_positions(product_id: product_id)
       @position = positions.find { |p| p["product_id"] == product_id } || positions.first
       @position ||= { "product_id" => product_id }
+    rescue Faraday::ClientError => e
+      @error_message = e.message
+      @position = { "product_id" => product_id }
     rescue => e
       @error_message = e.message
       @position = { "product_id" => product_id }

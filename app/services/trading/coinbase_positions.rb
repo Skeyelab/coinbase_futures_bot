@@ -37,8 +37,19 @@ module Trading
       params = {}
       params[:product_ids] = product_id if product_id
 
-      resp = authenticated_get(path, params)
-      data = JSON.parse(resp.body)
+      begin
+        resp = authenticated_get(path, params)
+        data = JSON.parse(resp.body)
+      rescue Faraday::ClientError => e
+        body = (e.response && e.response[:body]).to_s
+        message = begin
+          parsed = JSON.parse(body)
+          parsed["message"] || parsed["error"] || body
+        rescue
+          body.presence || e.message
+        end
+        raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
+      end
 
       positions = if data.is_a?(Hash) && data["positions"]
         data["positions"]
@@ -168,7 +179,7 @@ module Trading
 
     def set_auth_headers(timestamp, signature)
       @conn.headers["CB-ACCESS-KEY"] = @api_key
-      @conn.headers["CB-ACCESS-SIGN"] = signature
+      @conn.headers["CB-ACCESS-SIGNATURE"] = signature
       @conn.headers["CB-ACCESS-TIMESTAMP"] = timestamp
     end
 
