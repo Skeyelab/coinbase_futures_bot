@@ -26,6 +26,19 @@
 
 ### Session log
 
+#### 2025-08-12 20:22 UTC
+- Context: Align dev container with Cursor background agent guidance and improve cloning ergonomics.
+- Changes:
+  - Updated `.cursor/Dockerfile` to add `openssh-client`, ensure Yarn availability (`npm i -g yarn`), and set `WORKDIR` to `/home/dev` with correct ownership.
+  - Bundler remains pinned to `2.7.1` per `Gemfile.lock`.
+- Commands run:
+  - n/a (file edits only)
+- Files touched:
+  - `.cursor/Dockerfile`, `SESSION_NOTES.md`
+- Next steps:
+  - Rebuild: `docker build -f .cursor/Dockerfile -t coinbase-futures-bot-dev .`
+  - Start container and clone repo; run `bundle install`.
+
 #### 2025-08-12 20:05 UTC
 - Context: Added a developer-focused container for Cursor background agent.
 - Changes:
