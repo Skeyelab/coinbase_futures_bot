@@ -311,7 +311,7 @@ RSpec.describe "Positions", type: :request do
     it "handles malformed requests gracefully" do
       # Test with invalid product ID - mock the service to return empty results
       allow(positions_service).to receive(:list_open_positions).with(product_id: "invalid product").and_return([])
-      
+
       get "/positions/invalid%20product/edit", headers: @auth_header
       expect(response).to have_http_status(:success)
     end

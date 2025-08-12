@@ -45,6 +45,7 @@ group :development, :test do
 
   # RSpec for testing
   gem "rspec-rails", "~> 7.0"
+  gem "parallel_tests", group: :development, require: false
 end
 
 group :test do
