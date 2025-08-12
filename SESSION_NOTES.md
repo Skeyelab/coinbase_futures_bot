@@ -26,6 +26,17 @@
 
 ### Session log
 
+#### 2025-08-12 03:19 UTC
+- Context: RSpec failures due to leftover records in shared test DB; cleaned setup and verified green suite.
+- Changes:
+  - Added per-example cleanup of `Candle`, `TradingPair`, and `Tick` in `spec/rails_helper.rb` to avoid cross-test interference.
+- Commands run:
+  - `bundle exec rspec`
+- Files touched:
+  - `spec/rails_helper.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - Keep tests isolated; consider using database cleaner strategies if needed in future.
+
 #### 2025-08-12  — Minitest → RSpec migration
 - Context: Replace Minitest with RSpec across the project and adjust CI.
 - Changes:
