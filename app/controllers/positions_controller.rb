@@ -4,6 +4,8 @@ class PositionsController < ActionController::Base
   # In API-only apps, CSRF/session may not be configured; skip for this simple UI
   skip_forgery_protection
 
+  before_action :require_positions_basic_auth
+
   def index
     @notice_message = params[:notice]
 
@@ -41,6 +43,20 @@ class PositionsController < ActionController::Base
   end
 
   private
+
+  def require_positions_basic_auth
+    username = ENV["POSITIONS_UI_USERNAME"].to_s
+    password = ENV["POSITIONS_UI_PASSWORD"].to_s
+
+    unless username.present? && password.present?
+      render plain: "Positions UI credentials not configured. Set POSITIONS_UI_USERNAME and POSITIONS_UI_PASSWORD.", status: :forbidden and return
+    end
+
+    authenticate_or_request_with_http_basic("Positions UI") do |u, p|
+      ActiveSupport::SecurityUtils.secure_compare(u.to_s, username) &&
+        ActiveSupport::SecurityUtils.secure_compare(p.to_s, password)
+    end
+  end
 
   def positions_service
     @positions_service ||= Trading::CoinbasePositions.new
