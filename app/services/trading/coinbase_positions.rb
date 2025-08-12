@@ -119,12 +119,12 @@ module Trading
       when :sell then :buy
       else :short  # Default fallback
       end
-      
+
       order_body = build_order_body(product_id: product_id, side: close_side, size: pos_size, type: :market)
-      
+
       @logger.info("Closing position: product_id=#{product_id}, size=#{pos_size}, side=#{pos_side} -> #{close_side}")
       @logger.info("Order body: #{order_body.inspect}")
-      
+
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
       JSON.parse(resp.body)
     end
@@ -223,10 +223,10 @@ module Trading
       @conn.headers["Content-Type"] = "application/json"
       @conn.headers["Accept"] = "application/json"
       @conn.headers["Authorization"] = "Bearer #{build_jwt_token("POST", path, body: body_json)}"
-      
+
       @logger.debug("POST #{path} with body: #{body_json}")
       @logger.debug("Headers: #{@conn.headers.slice('Content-Type', 'Accept', 'Authorization').inspect}")
-      
+
       begin
         resp = @conn.post(path, body_json)
         resp
