@@ -1,0 +1,26 @@
+<% if @positions.empty? %>
+  <p>No open positions.</p>
+<% else %>
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Side</th>
+        <th>Size</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @positions.each do |p| %>
+        <tr>
+          <td><%= p["product_id"] %></td>
+          <td><%= (p["side"] || p["position_side"] || p.dig("position", "side") || "") %></td>
+          <td><%= (p["size"] || p["base_size"] || p["quantity"] || p.dig("position", "size") || "") %></td>
+          <td>
+            <a class="button" href="<%= edit_position_path(p["product_id"]) %>">Edit</a>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
