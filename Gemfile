@@ -56,3 +56,6 @@ end
 gem "good_job", "~> 4.11"
 gem "sentry-ruby"
 gem "sentry-rails"
+
+# JWT for Coinbase App (Advanced Trade) ES256 authentication
+gem "jwt", "~> 2.8"

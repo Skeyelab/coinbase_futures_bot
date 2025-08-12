@@ -4,6 +4,7 @@ require "faraday"
 require "json"
 require "openssl"
 require "base64"
+require "jwt"
 require "securerandom"
 
 module Trading
@@ -18,9 +19,14 @@ module Trading
         f.adapter Faraday.default_adapter
       end
 
-      if ENV["COINBASE_API_KEY"] && ENV["COINBASE_API_SECRET"]
-        @api_key = ENV["COINBASE_API_KEY"]
-        @api_secret = ENV["COINBASE_API_SECRET"]
+      if ENV["COINBASE_API_KEY"] && (ENV["COINBASE_API_SECRET"] || ENV["COINBASE_API_SECRET_FILE"]) 
+        @api_key = ENV["COINBASE_API_KEY"] # e.g., organizations/{org_id}/apiKeys/{key_id}
+        secret_source = if ENV["COINBASE_API_SECRET_FILE"].present?
+          File.read(ENV["COINBASE_API_SECRET_FILE"]).to_s
+        else
+          ENV["COINBASE_API_SECRET"].to_s
+        end
+        @api_secret = normalize_pem_secret(secret_source) # PEM ECDSA private key for ES256
         @authenticated = true
       else
         @authenticated = false
@@ -38,7 +44,7 @@ module Trading
       params[:product_ids] = product_id if product_id
 
       begin
-        resp = authenticated_get(path, params)
+      resp = authenticated_get(path, params)
         data = JSON.parse(resp.body)
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
@@ -148,46 +154,66 @@ module Trading
     # --- Auth helpers (Advanced Trade style signing) ---
 
     def authenticated_get(path, params = {})
-      timestamp = Time.now.to_i.to_s
-      method = "GET"
-
-      # Build the exact request path string used for signing, including query if present
-      query = params.any? ? "?" + params.map { |k, v| "#{k}=#{v}" }.join("&") : ""
-      prehash = timestamp + method + path + query
-
-      signature = hmac_sha256(prehash)
-
-      set_auth_headers(timestamp, signature)
       @conn.headers["Accept"] = "application/json"
+      @conn.headers["Authorization"] = "Bearer #{build_jwt_token("GET", path, params: params)}"
       @conn.get(path, params)
     end
 
     def authenticated_post(path, body_hash = {})
-      timestamp = Time.now.to_i.to_s
-      method = "POST"
-
       body_json = JSON.dump(body_hash)
-      prehash = timestamp + method + path + body_json
-
-      signature = hmac_sha256(prehash)
-
-      set_auth_headers(timestamp, signature)
       @conn.headers["Content-Type"] = "application/json"
       @conn.headers["Accept"] = "application/json"
+      @conn.headers["Authorization"] = "Bearer #{build_jwt_token("POST", path, body: body_json)}"
       @conn.post(path, body_json)
     end
 
-    def set_auth_headers(timestamp, signature)
-      @conn.headers["CB-ACCESS-KEY"] = @api_key
-      @conn.headers["CB-ACCESS-SIGNATURE"] = signature
-      @conn.headers["CB-ACCESS-TIMESTAMP"] = timestamp
+    # Build ES256 JWT per Coinbase App API requirements (Authorization: Bearer <JWT>)
+    # See: https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
+    def build_jwt_token(http_method, request_path, params: nil, body: nil)
+      now = Time.now.to_i
+      exp = now + 120 # expires in 2 minutes
+      uri = format_jwt_uri(http_method, request_path, params, body)
+
+      payload = {
+        iss: @api_key,
+        nbf: now,
+        exp: exp,
+        sub: @api_key,
+        uri: uri
+      }
+
+      private_key = begin
+        # Ruby/OpenSSL can read both PKCS#1/8 via OpenSSL::PKey.read
+        OpenSSL::PKey.read(@api_secret)
+      rescue OpenSSL::PKey::PKeyError
+        OpenSSL::PKey::EC.new(@api_secret)
+      end
+      JWT.encode(payload, private_key, "ES256")
     end
 
-    def hmac_sha256(data)
-      # Advanced Trade: secret is base64; signature must be base64(HMAC_SHA256(decode64(secret), prehash))
-      decoded_secret = Base64.decode64(@api_secret)
-      raw_hmac = OpenSSL::HMAC.digest("sha256", decoded_secret, data)
-      Base64.strict_encode64(raw_hmac)
+    # Match SDK formatting for JWT uri claim
+    def format_jwt_uri(http_method, request_path, params, body)
+      method = http_method.to_s.upcase
+      case method
+      when "GET", "DELETE"
+        if params&.any?
+          query = params.map { |k, v| "#{k}=#{v}" }.join("&")
+          "#{request_path}?#{query}"
+        else
+          request_path
+        end
+      when "POST", "PUT"
+        request_path
+      else
+        request_path
+      end
+    end
+
+    def normalize_pem_secret(secret)
+      pem = secret.to_s
+      # Support .env with escaped newlines
+      pem = pem.gsub("\\n", "\n")
+      pem.strip
     end
   end
 end
