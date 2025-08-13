@@ -25,7 +25,7 @@
   <p>Add more contracts to your existing position. This will execute a market order in the same direction.</p>
   <form action="<%= increase_position_path(@position["product_id"]) %>" method="post" style="display: inline-block; margin-bottom: 20px; border: 2px solid #28a745; padding: 15px; border-radius: 8px;">
     <label for="increase_size">Additional contracts to add:</label>
-    <input id="increase_size" name="increase_size" type="number" step="0.01" min="0.01" required
+    <input id="increase_size" name="size" type="number" step="0.01" min="0.01" required
            placeholder="e.g. 1" style="padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
     <button type="submit" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Increase Position</button>
   </form>
@@ -41,8 +41,8 @@
   <h3>Close Position</h3>
   <p>Submit a market order in the opposite direction to close fully or partially.</p>
   <form action="<%= close_position_path(@position["product_id"]) %>" method="post" style="display: inline-block; border: 2px solid #dc3545; padding: 15px; border-radius: 8px;">
-    <label for="close_size">Size to close (leave blank to close all <%= (@position["number_of_contracts"] || @position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "side") || "") %> contracts):</label>
-    <input id="close_size" name="close_size" type="text" placeholder="e.g. 1" style="padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
+    <label for="size">Size to close (leave blank to close all <%= (@position["number_of_contracts"] || @position["size"] || @position["base_size"] || @position["quantity"] || @position.dig("position", "size") || "") %> contracts):</label>
+    <input id="size" name="size" type="text" placeholder="e.g. 1" style="padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
     <button type="submit" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Submit Close</button>
   </form>
 
