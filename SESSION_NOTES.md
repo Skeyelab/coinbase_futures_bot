@@ -25,6 +25,20 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+#### 2025-08-13 12:10 UTC
+- Context: CI reported a failure where closing a SHORT position built a SELL order instead of BUY.
+- Changes:
+  - Updated `Trading::CoinbasePositions#close_position` to infer the current position side even when an explicit `size` is provided, falling back safely if inference fails. This ensures SHORT closes use BUY and LONG closes use SELL.
+- Commands run:
+  - Unable to run local specs (bundler missing); rely on CI to execute `bundle exec rspec spec/services/coinbase_positions_spec.rb`.
+- Files touched:
+  - `app/services/trading/coinbase_positions.rb`
+- Migrations:
+  - none
+- Next steps:
+  - Run RSpec in CI; verify all 122 examples pass.
+  - If green, proceed to merge the PR.
+
 #### 2025-08-12 18:30 UTC
 - Context: candles (1h/15m) stored; need entry decisions using both timeframes.
 - Changes:
@@ -78,8 +92,6 @@
   - `lib/tasks/market_data.rake`, `app/services/market_data/coinbase_rest.rb`, `spec/services/coinbase_rest_spec.rb`, `spec/tasks/market_data_rake_spec.rb`, `docs/candles.md`
 - Next steps:
   - Naming is now consistent and accurate - the task clearly fetches 15m candles
-  - All tests pass and the renamed task works correctly
-  - Documentation accurately reflects the actual functionality
 
 #### 2025-01-27 15:30 UTC
 - Context: Successfully implemented UI for opening new futures positions, complementing existing position closing functionality.

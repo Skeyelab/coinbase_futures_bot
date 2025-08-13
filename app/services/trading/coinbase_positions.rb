@@ -108,11 +108,16 @@ module Trading
     def close_position(product_id:, size: nil)
       raise "Authentication required" unless @authenticated
 
-      # If explicit size provided, skip fetching positions to avoid network calls in tests
+      # If explicit size provided, still infer side from current position when possible,
+      # but avoid failing if positions cannot be fetched (e.g., in tests)
       if size
-        # Default to SELL as a safe opposite; server validates side vs. actual position
         pos_size = size.to_s
-        pos_side = :buy
+        begin
+          _ignored_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
+        rescue => e
+          @logger.debug("close_position: could not infer position side with explicit size: #{e.class}: #{e.message}")
+          pos_side = :buy
+        end
       else
         pos_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
         return { "success" => true, "message" => "No open position to close" } if pos_size.to_f <= 0.0
