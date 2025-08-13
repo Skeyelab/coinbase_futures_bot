@@ -115,11 +115,12 @@ module Trading
       # LONG position: SELL contracts to close (opposite of your position)
       # SHORT position: BUY contracts to close (opposite of your position)
       # Note: infer_position returns :long/:short, we need to convert to :buy/:sell
-      close_side = case pos_side
-      when :long then :sell
-      when :short then :buy
-      when :buy then :sell
-      when :sell then :buy
+      normalized_pos_side = pos_side.to_s.downcase
+      close_side = case normalized_pos_side
+      when "long" then :sell
+      when "short" then :buy
+      when "buy" then :sell
+      when "sell" then :buy
       else :sell  # Default fallback
       end
 
