@@ -82,6 +82,56 @@ START_ISO=2025-08-11T00:00:00Z END_ISO=2025-08-11T01:00:00Z bin/rake market_data
 ## Admin UI
 - GoodJob dashboard (development): http://localhost:3000/good_job
 
+## Sentiment
+- Sources: CryptoPanic news aggregator (MVP). Reddit/Twitter can be added later.
+- Storage:
+  - `sentiment_events`: raw normalized items with optional `score`/`confidence`.
+  - `sentiment_aggregates`: rolling aggregates per symbol/window (`5m`,`15m`,`1h`) including `z_score`.
+- Scoring: lightweight lexicon scorer (dependency-free) used by `ScoreSentimentJob`. Can be replaced by FinBERT later.
+- Jobs and schedules (GoodJob cron defaults):
+  - `FetchCryptopanicJob`: every 2 minutes (`SENTIMENT_FETCH_CRON`)
+  - `ScoreSentimentJob`: every 2 minutes (`SENTIMENT_SCORE_CRON`)
+  - `AggregateSentimentJob`: every 5 minutes (`SENTIMENT_AGG_CRON`)
+- Feature flags:
+  - `SENTIMENT_ENABLE`: when `true`, gates entries in `Strategy::MultiTimeframeSignal` using 15m z-score
+  - `SENTIMENT_Z_THRESHOLD`: default `1.2`; entries require `|z| >= threshold` and sign aligned (z>0 for longs, z<0 for shorts)
+- Environment:
+  - `CRYPTOPANIC_TOKEN` (required to fetch real data)
+- Endpoint:
+  - `GET /sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=20`
+    - Returns latest aggregates as JSON for quick inspection/monitoring.
+
+### Enable sentiment in production
+1) Migrate DB
+```bash
+RAILS_ENV=production bin/rails db:migrate
+```
+2) Set environment variables
+```bash
+export CRYPTOPANIC_TOKEN=...   # required for news fetch
+export SENTIMENT_ENABLE=true    # enable gating in strategies
+export SENTIMENT_Z_THRESHOLD=1.2
+# Optional: tune schedules
+export SENTIMENT_FETCH_CRON="*/2 * * * *"
+export SENTIMENT_SCORE_CRON="*/2 * * * *"
+export SENTIMENT_AGG_CRON="*/5 * * * *"
+```
+3) Run workers (GoodJob)
+- In-process (Rails server): default `async` works for small loads.
+- Dedicated worker (recommended):
+```bash
+RAILS_ENV=production bundle exec good_job start
+```
+4) Network egress
+- Allow HTTPS egress to `cryptopanic.com`.
+
+5) Verify
+```bash
+curl -s "https://<host>/sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=5" | jq
+```
+
+Note: The `/sentiment/aggregates` endpoint is read-only and unauthenticated by default. Restrict via network or add auth if exposed publicly.
+
 ## Production notes
 - Run a dedicated worker instead of in-process:
 ```bash

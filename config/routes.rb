@@ -21,5 +21,6 @@ Rails.application.routes.draw do
       post :increase
     end
   end
+  get "/sentiment/aggregates", to: "sentiment#aggregates"
   root to: "positions#index"
 end

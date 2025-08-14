@@ -540,4 +540,51 @@
 - Next steps:
   - Run test suite locally (requires Ruby/Bundler) and verify GoodJob cron executes `FetchCandlesJob`.
 
+#### 2025-08-11 17:15 UTC
+- Context: Rails 8 API app for Coinbase futures. Added MVP sentiment ingestion, scoring, and aggregation.
+- Changes:
+  - Migrations: created `sentiment_events` and `sentiment_aggregates` tables with indexes.
+  - Models: `SentimentEvent`, `SentimentAggregate`.
+  - Services: `Sentiment::CryptoPanicClient` (Faraday), `Sentiment::SimpleLexiconScorer` (lexicon-based, no deps).
+  - Jobs: `FetchCryptopanicJob`, `ScoreSentimentJob`, `AggregateSentimentJob`.
+  - Cron: scheduled fetch/score every 2m and aggregate every 5m in `config/initializers/good_job.rb`.
+  - Strategy: added optional sentiment gate example reading `SentimentAggregate` 15m z-score in `Strategy::SpotDrivenStrategy` (not wired into `GenerateSignalsJob`).
+- Commands run:
+  - `bundle install`
+  - `bin/rails db:migrate`
+- Files touched:
+  - `db/migrate/20250811170010_create_sentiment_events.rb`, `db/migrate/20250811170020_create_sentiment_aggregates.rb`
+  - `app/models/sentiment_event.rb`, `app/models/sentiment_aggregate.rb`
+  - `app/services/sentiment/crypto_panic_client.rb`, `app/services/sentiment/simple_lexicon_scorer.rb`
+  - `app/jobs/fetch_cryptopanic_job.rb`, `app/jobs/score_sentiment_job.rb`, `app/jobs/aggregate_sentiment_job.rb`
+  - `config/initializers/good_job.rb`
+  - `app/services/strategy/spot_driven_strategy.rb`
+- Migrations:
+  - `db/migrate/20250811170010_create_sentiment_events.rb` (created)
+  - `db/migrate/20250811170020_create_sentiment_aggregates.rb` (created)
+- Next steps:
+  - Add FinBERT scorer via Python sidecar or ONNX for news; keep lexicon as fallback.
+  - Extend `GenerateSignalsJob` to incorporate a sentiment feature toggle and thresholds.
+  - Add a simple controller endpoint to view latest aggregates for debugging.
+  - Set `CRYPTOPANIC_TOKEN` in env and run jobs; verify records populated.
+
+#### 2025-08-11 17:45 UTC
+- Context: Sentiment MVP is integrated and documented.
+- Changes:
+  - Wired `SENTIMENT_ENABLE` + `SENTIMENT_Z_THRESHOLD` into `Strategy::MultiTimeframeSignal` for 15m z-score gating.
+  - Added `SentimentController#aggregates` with `GET /sentiment/aggregates` for read-only JSON of latest aggregates.
+  - Tests added for models, jobs, client, strategy gating, and endpoint.
+  - README updated with Sentiment section (env vars, jobs/cron, endpoint, feature flags).
+  - CryptoPanic client: retry middleware made optional to avoid missing `faraday-retry` in tests.
+- Commands run:
+  - `bundle exec rspec ./spec/services/sentiment/crypto_panic_client_spec.rb`
+  - `bundle exec rspec` (long-running; confirm locally)
+- Files touched:
+  - `app/services/strategy/multi_timeframe_signal.rb`, `app/controllers/sentiment_controller.rb`, `config/routes.rb`
+  - `spec/...` new specs for sentiment
+  - `README.md`
+- Next steps:
+  - Integrate sentiment feature into live execution flow when confidence is validated.
+  - Consider FinBERT/ONNX scorer and Reddit source.
+
 

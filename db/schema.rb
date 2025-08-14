@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_11_162000) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_11_170020) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -131,6 +131,40 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_11_162000) do
     t.index ["priority", "scheduled_at"], name: "index_good_jobs_on_priority_scheduled_at_unfinished_unlocked", where: "((finished_at IS NULL) AND (locked_by_id IS NULL))"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
+  end
+
+  create_table "sentiment_aggregates", force: :cascade do |t|
+    t.string "symbol", null: false
+    t.string "window", null: false
+    t.datetime "window_end_at", null: false
+    t.integer "count", default: 0, null: false
+    t.decimal "avg_score", precision: 8, scale: 4, default: "0.0", null: false
+    t.decimal "weighted_score", precision: 8, scale: 4, default: "0.0", null: false
+    t.decimal "z_score", precision: 8, scale: 4, default: "0.0", null: false
+    t.jsonb "meta", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "window", "window_end_at"], name: "index_sentiment_aggregates_on_sym_win_end", unique: true
+    t.index ["symbol"], name: "index_sentiment_aggregates_on_symbol"
+    t.index ["window_end_at"], name: "index_sentiment_aggregates_on_window_end_at"
+  end
+
+  create_table "sentiment_events", force: :cascade do |t|
+    t.string "source", null: false
+    t.string "symbol"
+    t.string "url"
+    t.string "title"
+    t.decimal "score", precision: 6, scale: 3
+    t.decimal "confidence", precision: 6, scale: 3
+    t.datetime "published_at", null: false
+    t.string "raw_text_hash", null: false
+    t.jsonb "meta", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["published_at"], name: "index_sentiment_events_on_published_at"
+    t.index ["source", "raw_text_hash"], name: "index_sentiment_events_on_source_and_raw_text_hash", unique: true
+    t.index ["symbol"], name: "index_sentiment_events_on_symbol"
+    t.index ["url"], name: "index_sentiment_events_on_url"
   end
 
   create_table "ticks", force: :cascade do |t|

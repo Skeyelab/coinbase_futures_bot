@@ -36,6 +36,8 @@ RSpec.configure do |config|
       Candle.delete_all
       TradingPair.delete_all
       Tick.delete_all
+      SentimentEvent.delete_all
+      SentimentAggregate.delete_all
     rescue ActiveRecord::StatementInvalid
       # If tables are missing in a particular environment, ignore
     end
