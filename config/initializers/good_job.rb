@@ -26,6 +26,18 @@ Rails.application.configure do
     calibrate_daily: {
       cron: ENV.fetch("CALIBRATE_CRON", "0 2 * * *"), # daily at 02:00 UTC
       class: "CalibrationJob"
+    },
+    sentiment_fetch: {
+      cron: ENV.fetch("SENTIMENT_FETCH_CRON", "*/2 * * * *"), # every 2 minutes
+      class: "FetchCryptopanicJob"
+    },
+    sentiment_score: {
+      cron: ENV.fetch("SENTIMENT_SCORE_CRON", "*/2 * * * *"), # every 2 minutes
+      class: "ScoreSentimentJob"
+    },
+    sentiment_aggregate: {
+      cron: ENV.fetch("SENTIMENT_AGG_CRON", "*/5 * * * *"), # every 5 minutes
+      class: "AggregateSentimentJob"
     }
   }
 end
