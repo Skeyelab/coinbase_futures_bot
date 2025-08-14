@@ -101,6 +101,37 @@ START_ISO=2025-08-11T00:00:00Z END_ISO=2025-08-11T01:00:00Z bin/rake market_data
   - `GET /sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=20`
     - Returns latest aggregates as JSON for quick inspection/monitoring.
 
+### Enable sentiment in production
+1) Migrate DB
+```bash
+RAILS_ENV=production bin/rails db:migrate
+```
+2) Set environment variables
+```bash
+export CRYPTOPANIC_TOKEN=...   # required for news fetch
+export SENTIMENT_ENABLE=true    # enable gating in strategies
+export SENTIMENT_Z_THRESHOLD=1.2
+# Optional: tune schedules
+export SENTIMENT_FETCH_CRON="*/2 * * * *"
+export SENTIMENT_SCORE_CRON="*/2 * * * *"
+export SENTIMENT_AGG_CRON="*/5 * * * *"
+```
+3) Run workers (GoodJob)
+- In-process (Rails server): default `async` works for small loads.
+- Dedicated worker (recommended):
+```bash
+RAILS_ENV=production bundle exec good_job start
+```
+4) Network egress
+- Allow HTTPS egress to `cryptopanic.com`.
+
+5) Verify
+```bash
+curl -s "https://<host>/sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=5" | jq
+```
+
+Note: The `/sentiment/aggregates` endpoint is read-only and unauthenticated by default. Restrict via network or add auth if exposed publicly.
+
 ## Production notes
 - Run a dedicated worker instead of in-process:
 ```bash
