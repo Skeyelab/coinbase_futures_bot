@@ -126,7 +126,7 @@ GEM
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     json (2.13.2)
-    jwt (2.10.2)
+    jwt (3.1.2)
       base64
     language_server-protocol (3.17.0.5)
     lint_roller (1.1.0)
@@ -340,7 +340,7 @@ DEPENDENCIES
   dotenv-rails
   faraday (~> 2.11)
   good_job (~> 4.11)
-  jwt (~> 2.8)
+  jwt (~> 3.1)
   parallel_tests
   pg (~> 1.1)
   puma (>= 5.0)
