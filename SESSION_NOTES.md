@@ -552,4 +552,23 @@
   - Add a simple controller endpoint to view latest aggregates for debugging.
   - Set `CRYPTOPANIC_TOKEN` in env and run jobs; verify records populated.
 
+#### 2025-08-11 17:45 UTC
+- Context: Sentiment MVP is integrated and documented.
+- Changes:
+  - Wired `SENTIMENT_ENABLE` + `SENTIMENT_Z_THRESHOLD` into `Strategy::MultiTimeframeSignal` for 15m z-score gating.
+  - Added `SentimentController#aggregates` with `GET /sentiment/aggregates` for read-only JSON of latest aggregates.
+  - Tests added for models, jobs, client, strategy gating, and endpoint.
+  - README updated with Sentiment section (env vars, jobs/cron, endpoint, feature flags).
+  - CryptoPanic client: retry middleware made optional to avoid missing `faraday-retry` in tests.
+- Commands run:
+  - `bundle exec rspec ./spec/services/sentiment/crypto_panic_client_spec.rb`
+  - `bundle exec rspec` (long-running; confirm locally)
+- Files touched:
+  - `app/services/strategy/multi_timeframe_signal.rb`, `app/controllers/sentiment_controller.rb`, `config/routes.rb`
+  - `spec/...` new specs for sentiment
+  - `README.md`
+- Next steps:
+  - Integrate sentiment feature into live execution flow when confidence is validated.
+  - Consider FinBERT/ONNX scorer and Reddit source.
+
 
