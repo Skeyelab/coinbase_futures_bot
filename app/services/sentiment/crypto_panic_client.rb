@@ -13,7 +13,17 @@ module Sentiment
       @token = token
       @logger = logger
       @conn = Faraday.new(url: API_BASE) do |f|
-        f.request :retry, max: 3, interval: 0.2, interval_randomness: 0.3, backoff_factor: 2
+        # Optional retry middleware; requires faraday-retry gem. Skip if unavailable.
+        begin
+          begin
+            require "faraday/retry"
+          rescue LoadError
+            # ignore if gem not present
+          end
+          f.request :retry, max: 3, interval: 0.2, interval_randomness: 0.3, backoff_factor: 2
+        rescue StandardError
+          # retry middleware not available; proceed without it
+        end
         f.response :raise_error
         f.adapter Faraday.default_adapter
       end
