@@ -68,7 +68,7 @@ module Strategy
           sl = entry * (1.0 - @config[:sl_target])
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
           conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, last_price: last_close)
-          return order_hash(:buy, entry, qty, tp, sl, conf)
+          return order_hash(:buy, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :buy)
         end
       else
         if interacted_with_ema && last_close < ema15
@@ -78,7 +78,7 @@ module Strategy
           sl = entry * (1.0 + @config[:sl_target])
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
           conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, last_price: last_close)
-          return order_hash(:sell, entry, qty, tp, sl, conf)
+          return order_hash(:sell, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :sell)
         end
       end
 
@@ -192,6 +192,20 @@ module Strategy
       else
         0
       end
+    end
+
+    def latest_sentiment_z(symbol, window: "15m")
+      rec = SentimentAggregate.where(symbol: symbol, window: window).order(window_end_at: :desc).first
+      rec&.z_score&.to_f || 0.0
+    end
+
+    def sentiment_gate_allows?(symbol:, side:)
+      enabled = ENV.fetch("SENTIMENT_ENABLE", "false").to_s.downcase == "true"
+      return true unless enabled
+      threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
+      z = latest_sentiment_z(symbol)
+      return false if z.abs < threshold
+      return (side == :buy && z > 0) || (side == :sell && z < 0)
     end
   end
 end
