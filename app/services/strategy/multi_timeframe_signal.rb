@@ -205,7 +205,7 @@ module Strategy
       threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
       z = latest_sentiment_z(symbol)
       return false if z.abs < threshold
-      return (side == :buy && z > 0) || (side == :sell && z < 0)
+      (side == :buy && z > 0) || (side == :sell && z < 0)
     end
   end
 end
