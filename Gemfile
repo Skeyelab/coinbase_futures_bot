@@ -44,7 +44,7 @@ group :development, :test do
   gem "dotenv-rails"
 
   # RSpec for testing
-  gem "rspec-rails", "~> 7.0"
+  gem "rspec-rails", "~> 8.0"
   gem "parallel_tests", group: :development, require: false
 end
 
