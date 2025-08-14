@@ -25,6 +25,22 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+#### 2025-08-13 12:40 UTC
+- Context: Need realtime spot prices via Coinbase websocket and to normalize payloads.
+- Changes:
+  - Implemented robust `MarketData::CoinbaseSpotSubscriber` with Advanced Trade and legacy schemas; added `on_ticker` callback matching futures subscriber.
+  - Wired rake tasks to use spot subscriber for spot-driven strategy and DB ingestion.
+  - Added `spec/services/coinbase_spot_subscriber_spec.rb` mirroring futures spec.
+- Commands run:
+  - Unable to run bundler in this environment; rely on CI to execute specs.
+- Files touched:
+  - `app/services/market_data/coinbase_spot_subscriber.rb`, `lib/tasks/market_data.rake`, `spec/services/coinbase_spot_subscriber_spec.rb`
+- Migrations:
+  - none
+- Next steps:
+  - Run `INLINE=1 bin/rake 'market_data:subscribe_spot[BTC-USD]'` locally to verify live ticks.
+  - Optionally add reconnection/backoff and heartbeat handling.
+
 #### 2025-08-13 12:10 UTC
 - Context: CI reported a failure where closing a SHORT position built a SELL order instead of BUY.
 - Changes:

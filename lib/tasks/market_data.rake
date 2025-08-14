@@ -170,7 +170,7 @@ namespace :market_data do
     )
 
     on_ticker = ->(tick) { strategy.on_ticker(tick) }
-    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
+    MarketData::CoinbaseSpotSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
   end
 
 
@@ -196,7 +196,7 @@ namespace :market_data do
       stdout_logger.error("[INGEST] failed to persist tick: #{e}")
     end
 
-    MarketData::CoinbaseFuturesSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
+    MarketData::CoinbaseSpotSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
   end
 
   desc "Backtest spot-driven strategy from DB ticks"
