@@ -10,6 +10,6 @@ class CreateTicks < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :ticks, [ :product_id, :observed_at ]
+    add_index :ticks, [:product_id, :observed_at]
   end
 end

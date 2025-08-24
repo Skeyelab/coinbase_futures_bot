@@ -44,10 +44,10 @@ module Trading
       begin
         resp = authenticated_get(path, {})
         data = JSON.parse(resp.body)
-        { ok: true, count: data.is_a?(Array) ? data.size : 1, data: data }
+        {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
-        { ok: false, error: e.class.to_s, message: e.message, body: body }
+        {ok: false, error: e.class.to_s, message: e.message, body: body}
       end
     end
 
@@ -81,7 +81,7 @@ module Trading
         data
       end
 
-      positions = [ positions ] unless positions.is_a?(Array)
+      positions = [positions] unless positions.is_a?(Array)
 
       # Filter by product_id in Ruby if specified
       if product_id
@@ -123,7 +123,7 @@ module Trading
         end
       else
         pos_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
-        return { "success" => true, "message" => "No open position to close" } if pos_size.to_f <= 0.0
+        return {"success" => true, "message" => "No open position to close"} if pos_size.to_f <= 0.0
       end
 
       close_side = case pos_side
@@ -151,7 +151,7 @@ module Trading
 
       # Get the current position to determine the side
       positions = list_open_positions(product_id: product_id)
-      return { "success" => false, "message" => "No open position found to increase" } if positions.empty?
+      return {"success" => false, "message" => "No open position found to increase"} if positions.empty?
 
       position = positions.find { |p| p["product_id"] == product_id } || positions.first
       current_side = position["side"] || position["position_side"] || position.dig("position", "side")
@@ -224,7 +224,7 @@ module Trading
 
     def infer_position(product_id:, explicit_size: nil)
       positions = list_open_positions(product_id: product_id)
-      return [ "0", :buy ] if positions.empty?
+      return ["0", :buy] if positions.empty?
 
       pos = positions.find { |p| p["product_id"] == product_id } || positions.first
 
@@ -241,7 +241,7 @@ module Trading
       else :long  # Default to long
       end
 
-      [ size.to_s, normalized_side ]
+      [size.to_s, normalized_side]
     end
 
     # --- Auth helpers (Advanced Trade style signing) ---
@@ -252,11 +252,10 @@ module Trading
       @conn.headers["Authorization"] = "Bearer #{jwt}"
 
       @logger.debug("GET #{path} with JWT payload: #{jwt[0..100]}...")
-      @logger.debug("Headers: #{@conn.headers.slice('Accept', 'Authorization').inspect}")
+      @logger.debug("Headers: #{@conn.headers.slice("Accept", "Authorization").inspect}")
 
       begin
-        resp = @conn.get(path, params)
-        resp
+        @conn.get(path, params)
       rescue Faraday::ClientError => e
         @logger.error("Request failed: #{e.class} - #{e.message}")
         if e.response
@@ -275,11 +274,10 @@ module Trading
       @conn.headers["Authorization"] = "Bearer #{build_jwt_token("POST", path, body: body_json)}"
 
       @logger.debug("POST #{path} with body: #{body_json}")
-      @logger.debug("Headers: #{@conn.headers.slice('Content-Type', 'Accept', 'Authorization').inspect}")
+      @logger.debug("Headers: #{@conn.headers.slice("Content-Type", "Accept", "Authorization").inspect}")
 
       begin
-        resp = @conn.post(path, body_json)
-        resp
+        @conn.post(path, body_json)
       rescue Faraday::ClientError => e
         @logger.error("Request failed: #{e.class} - #{e.message}")
         if e.response
@@ -325,7 +323,7 @@ module Trading
 
       # Include kid header for clarity; some infrastructures rely on it
       # Use the full API key path like the Python implementation
-      jwt = JWT.encode(payload, private_key, "ES256", { kid: @api_key })
+      jwt = JWT.encode(payload, private_key, "ES256", {kid: @api_key})
       @logger.debug("Generated JWT for #{http_method} #{request_path}: #{jwt[0..50]}...")
       jwt
     end
@@ -501,8 +499,6 @@ module Trading
         $1
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         product_id.start_with?("BIT") ? "BTC" : "ETH"
-      else
-        nil
       end
     end
 
@@ -534,7 +530,7 @@ module Trading
 
       expiring_positions = positions.select do |pos|
         contract = TradingPair.find_by(product_id: pos["product_id"])
-        contract && contract.expiration_date && contract.expiration_date <= Date.current + 3.days
+        contract&.expiration_date && contract.expiration_date <= Date.current + 3.days
       end
 
       return if expiring_positions.empty?

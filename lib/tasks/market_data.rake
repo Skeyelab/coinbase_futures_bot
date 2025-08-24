@@ -2,7 +2,7 @@
 
 namespace :market_data do
   desc "Subscribe to Coinbase futures ticker (GoodJob async)"
-  task :subscribe, [ :products ] => :environment do |_t, args|
+  task :subscribe, [:products] => :environment do |_t, args|
     products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD-PERP").split(",")
 
     if ENV["INLINE"].to_s == "1"
@@ -24,13 +24,13 @@ namespace :market_data do
   end
 
   desc "Backfill BTC-USD 1h candles"
-  task :backfill_candles, [ :days ] => :environment do |_t, args|
+  task :backfill_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 30).to_i
     FetchCandlesJob.perform_later(backfill_days: days)
   end
 
   desc "Backfill BTC-USD 1h candles (direct API)"
-  task :backfill_1h_candles, [ :days ] => :environment do |_t, args|
+  task :backfill_1h_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 30).to_i
     rest = MarketData::CoinbaseRest.new
 
@@ -55,7 +55,7 @@ namespace :market_data do
   end
 
   desc "Backfill BTC-USD 15m candles"
-  task :backfill_15m_candles, [ :days ] => :environment do |_t, args|
+  task :backfill_15m_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 7).to_i
     rest = MarketData::CoinbaseRest.new
 
@@ -82,7 +82,7 @@ namespace :market_data do
   end
 
   desc "Backfill BTC-USD 5m candles"
-  task :backfill_5m_candles, [ :days ] => :environment do |_t, args|
+  task :backfill_5m_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 2).to_i
     rest = MarketData::CoinbaseRest.new
 
@@ -109,7 +109,7 @@ namespace :market_data do
   end
 
   desc "Test 1h candles (should work with most APIs)"
-  task :test_1h_candles, [ :days ] => :environment do |_t, args|
+  task :test_1h_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 1).to_i
     rest = MarketData::CoinbaseRest.new
 
@@ -171,7 +171,7 @@ namespace :market_data do
   end
 
   desc "Subscribe to Coinbase futures (derivatives) ticker via futures WS"
-  task :subscribe_futures, [ :products ] => :environment do |_t, args|
+  task :subscribe_futures, [:products] => :environment do |_t, args|
     products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD-PERP").split(",")
 
     if ENV["INLINE"].to_s == "1"
@@ -185,7 +185,7 @@ namespace :market_data do
   end
 
   desc "Run spot-driven strategy: consume BTC-USD ticks and drive BTC-USD-PERP executor"
-  task :run_spot_driven_strategy, [ :spot_product, :futures_product ] => :environment do |_t, args|
+  task :run_spot_driven_strategy, [:spot_product, :futures_product] => :environment do |_t, args|
     spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
     perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
 
@@ -202,12 +202,11 @@ namespace :market_data do
     )
 
     on_ticker = ->(tick) { strategy.on_ticker(tick) }
-    MarketData::CoinbaseSpotSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
+    MarketData::CoinbaseSpotSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
   end
 
-
   desc "Persist live spot ticks to DB (Tick) for backtesting"
-  task :ingest_spot_to_db, [ :spot_product ] => :environment do |_t, args|
+  task :ingest_spot_to_db, [:spot_product] => :environment do |_t, args|
     spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
 
     puts "Ingesting live ticks into DB for: #{spot}"
@@ -228,11 +227,11 @@ namespace :market_data do
       stdout_logger.error("[INGEST] failed to persist tick: #{e}")
     end
 
-    MarketData::CoinbaseSpotSubscriber.new(product_ids: [ spot ], logger: stdout_logger, on_ticker: on_ticker).start
+    MarketData::CoinbaseSpotSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
   end
 
   desc "Backtest spot-driven strategy from DB ticks"
-  task :backtest_spot_db, [ :start_iso, :end_iso, :spot_product, :futures_product ] => :environment do |_t, args|
+  task :backtest_spot_db, [:start_iso, :end_iso, :spot_product, :futures_product] => :environment do |_t, args|
     start_iso = args[:start_iso] || ENV["START_ISO"]
     end_iso = args[:end_iso] || ENV["END_ISO"]
     raise ArgumentError, "start_iso and end_iso required" if start_iso.to_s.strip.empty? || end_iso.to_s.strip.empty?

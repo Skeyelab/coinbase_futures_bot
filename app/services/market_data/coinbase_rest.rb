@@ -40,7 +40,7 @@ module MarketData
       end
 
       # Ensure products is an array
-      products = [ products ] unless products.is_a?(Array)
+      products = [products] unless products.is_a?(Array)
 
       # Debug logging to see what we get
       Rails.logger.info("Fetched #{products.count} products from Exchange API")
@@ -90,16 +90,16 @@ module MarketData
     # Returns array of arrays: [ time, low, high, open, close, volume ] per Coinbase public API
     # granularity in seconds: 3600 for 1h
     def fetch_candles(product_id:, start_iso8601: nil, end_iso8601: nil, granularity: 3600)
-      params = { granularity: granularity }
+      params = {granularity: granularity}
       params[:start] = start_iso8601 if start_iso8601
       params[:end] = end_iso8601 if end_iso8601
 
-      if @authenticated
+      resp = if @authenticated
         # Use authenticated endpoint for better rate limits and access
-        resp = authenticated_get("/products/#{product_id}/candles", params)
+        authenticated_get("/products/#{product_id}/candles", params)
       else
         # Fall back to public endpoint
-        resp = @conn.get("/products/#{product_id}/candles", params)
+        @conn.get("/products/#{product_id}/candles", params)
       end
 
       data = JSON.parse(resp.body)
@@ -125,8 +125,8 @@ module MarketData
         end
       elsif data.is_a?(Hash) && data["error"]
         # Error response
-        Rails.logger.error("API Error: #{data['error']}")
-        raise "API Error: #{data['error']}"
+        Rails.logger.error("API Error: #{data["error"]}")
+        raise "API Error: #{data["error"]}"
       else
         # Unknown format, return as-is
         Rails.logger.warn("Unknown candles response format: #{data.class}")
@@ -140,7 +140,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [ current_start + chunk_days.days, end_time ].min
+        current_end = [current_start + chunk_days.days, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -254,7 +254,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [ current_start + chunk_days.days, end_time ].min
+        current_end = [current_start + chunk_days.days, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -347,7 +347,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [ current_start + chunk_days.days, end_time ].min
+        current_end = [current_start + chunk_days.days, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -440,7 +440,7 @@ module MarketData
       current_start = start_time
 
       while current_start < end_time
-        current_end = [ current_start + chunk_days.days, end_time ].min
+        current_end = [current_start + chunk_days.days, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,

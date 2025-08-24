@@ -84,19 +84,18 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     it "fetch_candles handles error response" do
       # This test might fail if the API doesn't return an error for invalid parameters
       # We'll handle it gracefully
-      begin
-        rest.fetch_candles(
-          product_id: "INVALID-PRODUCT",
-          start_iso8601: start_time.iso8601,
-          end_iso8601: end_time.iso8601,
-          granularity: 3600
-        )
-      rescue Faraday::ResourceNotFound => e
-        # Expected error for invalid product
-        expect(e.response[:status]).to eq(404)
-      rescue RuntimeError => e
-        expect(e.message).to include("API Error")
-      end
+
+      rest.fetch_candles(
+        product_id: "INVALID-PRODUCT",
+        start_iso8601: start_time.iso8601,
+        end_iso8601: end_time.iso8601,
+        granularity: 3600
+      )
+    rescue Faraday::ResourceNotFound => e
+      # Expected error for invalid product
+      expect(e.response[:status]).to eq(404)
+    rescue RuntimeError => e
+      expect(e.message).to include("API Error")
     end
 
     it "fetch_candles passes parameters" do
@@ -187,8 +186,8 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
 
     it "upsert_5m_candles_chunked processes chunks correctly" do
       mock_candles = [
-        [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ],
-        [ 1754931000, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678 ]
+        [1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858],
+        [1754931000, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678]
       ]
 
       allow(rest).to receive(:fetch_candles).and_return(mock_candles)
@@ -215,9 +214,9 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     it "5m candle integration test - complete workflow" do
       # Mock API response with realistic 5m candle data
       mock_candles = [
-        [ 1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858 ],
-        [ 1754931000, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678 ],
-        [ 1754931300, 120150.00, 120300.00, 120100.00, 120250.00, 67.89012345 ]
+        [1754930700, 119911.55, 120177.23, 119968.18, 120069.34, 23.20361858],
+        [1754931000, 120069.34, 120200.00, 120000.00, 120150.00, 45.12345678],
+        [1754931300, 120150.00, 120300.00, 120100.00, 120250.00, 67.89012345]
       ]
 
       allow(rest).to receive(:fetch_candles).and_return(mock_candles)

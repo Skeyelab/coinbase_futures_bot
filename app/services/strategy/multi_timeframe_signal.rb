@@ -58,7 +58,7 @@ module Strategy
       closes_1h = candles_1h.map { |c| c.close.to_f }
       ema1h_s = ema(closes_1h, @config[:ema_1h_short])
       ema1h_l = ema(closes_1h, @config[:ema_1h_long])
-      trend = ema1h_s > ema1h_l ? :up : :down
+      trend = (ema1h_s > ema1h_l) ? :up : :down
 
       # 15m trend confirmation (intraday direction)
       closes_15m = candles_15m.map { |c| c.close.to_f }
@@ -88,7 +88,7 @@ module Strategy
 
       # Track whether price interacted with 5m EMA recently (pullback)
       interacted_with_5m_ema = recent_5m.any? do |c|
-        (c.low.to_f <= ema5 && c.high.to_f >= ema5) || (c.close.to_f - ema5).abs / ema5 < 0.002
+        ema5.between?(c.low.to_f, c.high.to_f) || (c.close.to_f - ema5).abs / ema5 < 0.002
       end
 
       # 1m micro-timing: ensure we're not too far from 1m EMA for precise entry
@@ -98,22 +98,20 @@ module Strategy
         if interacted_with_5m_ema && last_close_5m > ema5 && micro_timing_ok
           entry = last_close_1m # Use 1m close for precise entry
           be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
-          tp = [ entry * (1.0 + @config[:tp_target]), be * 1.001 ].max
+          tp = [entry * (1.0 + @config[:tp_target]), be * 1.001].max
           sl = entry * (1.0 - @config[:sl_target])
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
           conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_close_1m)
           return order_hash(:buy, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :buy)
         end
-      else
-        if interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
-          entry = last_close_1m # Use 1m close for precise entry
-          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
-          tp = [ entry * (1.0 - @config[:tp_target]), be * 0.999 ].min
-          sl = entry * (1.0 + @config[:sl_target])
-          qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
-          conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_close_1m)
-          return order_hash(:sell, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :sell)
-        end
+      elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
+        entry = last_close_1m # Use 1m close for precise entry
+        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
+        tp = [entry * (1.0 - @config[:tp_target]), be * 0.999].min
+        sl = entry * (1.0 + @config[:sl_target])
+        qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
+        conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_close_1m)
+        return order_hash(:sell, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :sell)
       end
 
       nil
@@ -158,10 +156,8 @@ module Strategy
       contract_quantity = (btc_quantity * entry.to_f / @config[:contract_size_usd]).round(0)
 
       # Apply position size limits
-      contract_quantity = [ contract_quantity, @config[:max_position_size] ].min
-      contract_quantity = [ contract_quantity, @config[:min_position_size] ].max
-
-      contract_quantity
+      contract_quantity = [contract_quantity, @config[:max_position_size]].min
+      [contract_quantity, @config[:min_position_size]].max
     end
 
     def order_hash(side, price, quantity, tp, sl, confidence)
@@ -178,7 +174,7 @@ module Strategy
 
     def confidence_score(trend:, ema1h_s:, ema1h_l:, ema15:, ema5:, ema1:, last_price:)
       # 1. Trend strength (0-40 points)
-      trend_strength = ((ema1h_s - ema1h_l).abs / [ ema1h_l.abs, 1e-9 ].max)
+      trend_strength = ((ema1h_s - ema1h_l).abs / [ema1h_l.abs, 1e-9].max)
       trend_score = (trend_strength.clamp(0, 0.05) / 0.05) * 40
 
       # 2. Multi-timeframe alignment (0-25 points)
@@ -192,14 +188,14 @@ module Strategy
       momentum_score = momentum_confidence_score
 
       total_score = trend_score + alignment_score + volume_score + momentum_score
-      [ total_score, 100 ].min.round(1)
+      [total_score, 100].min.round(1)
     end
 
     def calculate_alignment_score(ema15, ema5, ema1, last_price)
       # Calculate alignment scores for each timeframe
-      alignment_15m = (last_price - ema15).abs / [ ema15.abs, 1e-9 ].max
-      alignment_5m = (last_price - ema5).abs / [ ema5.abs, 1e-9 ].max
-      alignment_1m = (last_price - ema1).abs / [ ema1.abs, 1e-9 ].max
+      alignment_15m = (last_price - ema15).abs / [ema15.abs, 1e-9].max
+      alignment_5m = (last_price - ema5).abs / [ema5.abs, 1e-9].max
+      alignment_1m = (last_price - ema1).abs / [ema1.abs, 1e-9].max
 
       # Weight shorter timeframes more heavily for day trading
       score_15m = if alignment_15m < 0.001
@@ -246,11 +242,11 @@ module Strategy
 
       # Volume increasing trend
       recent_volumes = volumes.last(3)
-      volume_trend = recent_volumes.last > recent_volumes.first ? 1.0 : 0.5
+      volume_trend = (recent_volumes.last > recent_volumes.first) ? 1.0 : 0.5
 
       # Current volume vs average
-      volume_ratio = current_volume / [ avg_volume, 1e-9 ].max
-      volume_ratio = [ volume_ratio, 3.0 ].min # Cap at 3x average
+      volume_ratio = current_volume / [avg_volume, 1e-9].max
+      volume_ratio = [volume_ratio, 3.0].min # Cap at 3x average
 
       # Score based on volume strength and trend
       (volume_ratio * volume_trend * 10).round(0)
@@ -336,8 +332,6 @@ module Strategy
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         # Current month contract: BIT-29AUG25-CDE -> BTC
         symbol.start_with?("BIT") ? "BTC" : "ETH"
-      else
-        nil
       end
     end
   end

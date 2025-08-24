@@ -132,8 +132,6 @@ module Execution
         $1
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         product_id.start_with?("BIT") ? "BTC" : "ETH"
-      else
-        nil
       end
     end
   end

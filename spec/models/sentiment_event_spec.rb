@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe SentimentEvent, type: :model do
   it "validates presence and uniqueness of raw_text_hash scoped to source" do
-    e1 = described_class.create!(source: "cryptopanic", published_at: Time.now.utc, raw_text_hash: "abc")
+    described_class.create!(source: "cryptopanic", published_at: Time.now.utc, raw_text_hash: "abc")
     dup = described_class.new(source: "cryptopanic", published_at: Time.now.utc, raw_text_hash: "abc")
     expect(dup.valid?).to be(false)
     expect(dup.errors[:raw_text_hash]).to be_present

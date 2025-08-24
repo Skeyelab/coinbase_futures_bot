@@ -7,7 +7,7 @@ require "time"
 
 module Sentiment
   class CryptoPanicClient
-    API_BASE = "https://cryptopanic.com/api/v1".freeze
+    API_BASE = "https://cryptopanic.com/api/v1"
 
     def initialize(token: ENV["CRYPTOPANIC_TOKEN"], logger: Rails.logger)
       @token = token
@@ -21,7 +21,7 @@ module Sentiment
             # ignore if gem not present
           end
           f.request :retry, max: 3, interval: 0.2, interval_randomness: 0.3, backoff_factor: 2
-        rescue StandardError
+        rescue
           # retry middleware not available; proceed without it
         end
         f.response :raise_error
@@ -41,7 +41,7 @@ module Sentiment
       results = []
       page = 1
       while page <= max_pages
-        params = { auth_token: @token, page: page }
+        params = {auth_token: @token, page: page}
         params[:public] = true if public_only
         resp = @conn.get("/posts/", params)
         body = JSON.parse(resp.body)
@@ -64,14 +64,18 @@ module Sentiment
     def normalize_item(item)
       title = item["title"].to_s
       url = item["url"].to_s
-      published_at = Time.parse(item["published_at"]) rescue Time.now.utc
+      published_at = begin
+        Time.parse(item["published_at"])
+      rescue
+        Time.now.utc
+      end
       votes = item["votes"] || {}
       currencies = Array(item["currencies"]).map { |c| c["code"].to_s.upcase }.uniq
 
       symbols = map_currencies_to_symbols(currencies)
-      symbols = [ nil ] if symbols.empty?
+      symbols = [nil] if symbols.empty?
 
-      raw_text_hash = Digest::SHA256.hexdigest([ url, title ].join("|"))
+      raw_text_hash = Digest::SHA256.hexdigest([url, title].join("|"))
 
       symbols.map do |sym|
         {
@@ -98,8 +102,6 @@ module Sentiment
         case code
         when "BTC" then "BTC-USD-PERP"
         when "ETH" then "ETH-USD-PERP"
-        else
-          nil
         end
       end.compact.uniq
     end

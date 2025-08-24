@@ -9,14 +9,10 @@ module Coinbase
     end
 
     # Advanced Trade API methods (futures, retail brokerage)
-    def advanced_trade
-      @advanced_trade
-    end
+    attr_reader :advanced_trade
 
     # Exchange API methods (spot trading)
-    def exchange
-      @exchange
-    end
+    attr_reader :exchange
 
     # Convenience methods for futures positions
     def futures_positions(product_id: nil)
@@ -68,13 +64,13 @@ module Coinbase
       begin
         results[:advanced_trade] = @advanced_trade.test_auth
       rescue => e
-        results[:advanced_trade] = { ok: false, error: e.class.to_s, message: e.message }
+        results[:advanced_trade] = {ok: false, error: e.class.to_s, message: e.message}
       end
 
       begin
         results[:exchange] = @exchange.test_auth
       rescue => e
-        results[:exchange] = { ok: false, error: e.class.to_s, message: e.message }
+        results[:exchange] = {ok: false, error: e.class.to_s, message: e.message}
       end
 
       results

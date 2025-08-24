@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
-
 module Sentiment
   class SimpleLexiconScorer
     POSITIVE_WORDS = %w[
@@ -21,16 +19,16 @@ module Sentiment
 
     # Returns [score, confidence] in [-1.0, 1.0]
     def score(text)
-      return [ nil, nil ] if text.to_s.strip.empty?
+      return [nil, nil] if text.to_s.strip.empty?
       tokens = tokenize(text)
       pos_count = tokens.count { |t| @pos.include?(t) }
       neg_count = tokens.count { |t| @neg.include?(t) }
       total = pos_count + neg_count
-      return [ 0.0, 0.0 ] if total == 0
+      return [0.0, 0.0] if total == 0
 
       raw = (pos_count - neg_count).to_f / total
-      conf = [ total / 6.0, 1.0 ].min.round(3) # saturate with ~6 hits
-      [ raw.round(3), conf ]
+      conf = [total / 6.0, 1.0].min.round(3) # saturate with ~6 hits
+      [raw.round(3), conf]
     end
 
     private

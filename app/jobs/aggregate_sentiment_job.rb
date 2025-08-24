@@ -3,7 +3,7 @@
 class AggregateSentimentJob < ApplicationJob
   queue_as :default
 
-  WINDOWS = [ "5m", "15m", "1h" ].freeze
+  WINDOWS = ["5m", "15m", "1h"].freeze
 
   def perform(now: Time.now.utc)
     WINDOWS.each do |win|
@@ -24,7 +24,7 @@ class AggregateSentimentJob < ApplicationJob
     window_end = Time.at((now.to_i / length) * length).utc
     window_start = window_end - length
 
-    [ "BTC-USD-PERP", "ETH-USD-PERP" ].each do |sym|
+    ["BTC-USD-PERP", "ETH-USD-PERP"].each do |sym|
       events = SentimentEvent.where(symbol: sym).where(published_at: window_start...window_end)
       count = events.count
       avg = if count > 0
@@ -51,7 +51,7 @@ class AggregateSentimentJob < ApplicationJob
         avg_score: avg.round(4),
         weighted_score: avg.round(4),
         z_score: z.round(4),
-        meta: { window_start: window_start },
+        meta: {window_start: window_start},
         created_at: Time.now.utc,
         updated_at: Time.now.utc
       }, unique_by: :index_sentiment_aggregates_on_sym_win_end)

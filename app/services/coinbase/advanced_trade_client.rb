@@ -40,10 +40,10 @@ module Coinbase
       begin
         resp = authenticated_get(path)
         data = JSON.parse(resp.body)
-        { ok: true, count: data.is_a?(Array) ? data.size : 1, data: data }
+        {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
-        { ok: false, error: e.class.to_s, message: e.message, body: body }
+        {ok: false, error: e.class.to_s, message: e.message, body: body}
       end
     end
 
@@ -83,7 +83,7 @@ module Coinbase
           data
         end
 
-        positions = [ positions ] unless positions.is_a?(Array)
+        positions = [positions] unless positions.is_a?(Array)
         positions
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
@@ -131,8 +131,8 @@ module Coinbase
       data = JSON.parse(resp.body)
 
       # The response should contain a 'products' array
-      products = data.is_a?(Hash) && data["products"] ? data["products"] : data
-      products = [ products ] unless products.is_a?(Array)
+      products = (data.is_a?(Hash) && data["products"]) ? data["products"] : data
+      products = [products] unless products.is_a?(Array)
       products
     end
 
@@ -188,7 +188,6 @@ module Coinbase
       @conn.headers["Accept"] = "application/json"
       @conn.headers["Content-Type"] = "application/json"
 
-
       # Generate completely new JWT for this specific request
       jwt = build_jwt_token("GET", path, params: params)
       @conn.headers["Authorization"] = "Bearer #{jwt}"
@@ -239,7 +238,7 @@ module Coinbase
 
       # Include kid header for clarity; some infrastructures rely on it
       # Use the full API key path like the Python implementation
-      JWT.encode(payload, private_key, "ES256", { kid: @api_key })
+      JWT.encode(payload, private_key, "ES256", {kid: @api_key})
     end
 
     # Format URI for JWT claim per Coinbase requirements
@@ -267,8 +266,7 @@ module Coinbase
     # Minimal RFC3986 percent-encoding (space as %20, leave ~ unescaped)
     def rfc3986_encode(str)
       encoded = CGI.escape(str)
-      encoded = encoded.gsub("+", "%20").gsub("%7E", "~")
-      encoded
+      encoded.gsub("+", "%20").gsub("%7E", "~")
     end
 
     def normalize_pem_secret(secret)

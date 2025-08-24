@@ -3,7 +3,14 @@
 require "rails_helper"
 
 RSpec.describe FetchCandlesJob, type: :job do
-  let(:btc_pair) { TradingPair.find_or_create_by(product_id: "BTC-USD") { |tp| tp.base_currency = "BTC"; tp.quote_currency = "USD"; tp.status = "online"; tp.enabled = true } }
+  let(:btc_pair) {
+    TradingPair.find_or_create_by(product_id: "BTC-USD") { |tp|
+      tp.base_currency = "BTC"
+      tp.quote_currency = "USD"
+      tp.status = "online"
+      tp.enabled = true
+    }
+  }
 
   after do
     # Don't destroy the BTC pair as it might be used by other tests
@@ -28,7 +35,7 @@ RSpec.describe FetchCandlesJob, type: :job do
           # Note: VCR cassette may not have all timeframes, so we check what's available
           expect(timeframes).to include("5m", "15m", "1h")
           # Log what timeframes we actually got for debugging
-          puts "Available timeframes in VCR cassette: #{timeframes.join(', ')}"
+          puts "Available timeframes in VCR cassette: #{timeframes.join(", ")}"
         end
       end
     end

@@ -22,109 +22,101 @@ class FetchCandlesJob < ApplicationJob
   private
 
   def fetch_1m_candles(rest, btc_pair, backfill_days)
-    begin
-      # Choose the later of (last known + 1m) and (backfill_days ago)
-      # Use shorter backfill for 1m candles since they're very frequent
-      backfill_days_1m = [ backfill_days.to_i, 1 ].min # Cap at 1 day for 1m
-      start_time = [ last_candle_time(btc_pair.product_id, "1m")&.+(1.minute), backfill_days_1m.days.ago ].compact.max
+    # Choose the later of (last known + 1m) and (backfill_days ago)
+    # Use shorter backfill for 1m candles since they're very frequent
+    backfill_days_1m = [backfill_days.to_i, 1].min # Cap at 1 day for 1m
+    start_time = [last_candle_time(btc_pair.product_id, "1m")&.+(1.minute), backfill_days_1m.days.ago].compact.max
 
-      # Use chunked fetching for large date ranges to avoid API limits
-      if backfill_days_1m > 1
-        rest.upsert_1m_candles_chunked(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc,
-          chunk_days: 1
-        )
-      else
-        rest.upsert_1m_candles(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc
-        )
-      end
-    rescue => e
-      Rails.logger.error("[Candles] Failed to fetch 1m candles for #{btc_pair.product_id}: #{e.message}")
+    # Use chunked fetching for large date ranges to avoid API limits
+    if backfill_days_1m > 1
+      rest.upsert_1m_candles_chunked(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_days: 1
+      )
+    else
+      rest.upsert_1m_candles(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
     end
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 1m candles for #{btc_pair.product_id}: #{e.message}")
   end
 
   def fetch_5m_candles(rest, btc_pair, backfill_days)
-    begin
-      # Choose the later of (last known + 5m) and (backfill_days ago)
-      # Use shorter backfill for 5m candles since they're frequent
-      backfill_days_5m = [ backfill_days.to_i, 2 ].min # Cap at 2 days for 5m
-      start_time = [ last_candle_time(btc_pair.product_id, "5m")&.+(5.minutes), backfill_days_5m.days.ago ].compact.max
+    # Choose the later of (last known + 5m) and (backfill_days ago)
+    # Use shorter backfill for 5m candles since they're frequent
+    backfill_days_5m = [backfill_days.to_i, 2].min # Cap at 2 days for 5m
+    start_time = [last_candle_time(btc_pair.product_id, "5m")&.+(5.minutes), backfill_days_5m.days.ago].compact.max
 
-      # Use chunked fetching for large date ranges to avoid API limits
-      if backfill_days_5m > 2
-        rest.upsert_5m_candles_chunked(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc,
-          chunk_days: 2
-        )
-      else
-        rest.upsert_5m_candles(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc
-        )
-      end
-    rescue => e
-      Rails.logger.error("[Candles] Failed to fetch 5m candles for #{btc_pair.product_id}: #{e.message}")
+    # Use chunked fetching for large date ranges to avoid API limits
+    if backfill_days_5m > 2
+      rest.upsert_5m_candles_chunked(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_days: 2
+      )
+    else
+      rest.upsert_5m_candles(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
     end
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 5m candles for #{btc_pair.product_id}: #{e.message}")
   end
 
   def fetch_15m_candles(rest, btc_pair, backfill_days)
-    begin
-      # Choose the later of (last known + 15m) and (backfill_days ago)
-      # Use shorter backfill for 15m candles since they're more frequent
-      backfill_days_15m = [ backfill_days.to_i, 3 ].min # Cap at 3 days for 15m
-      start_time = [ last_candle_time(btc_pair.product_id, "15m")&.+(15.minutes), backfill_days_15m.days.ago ].compact.max
+    # Choose the later of (last known + 15m) and (backfill_days ago)
+    # Use shorter backfill for 15m candles since they're more frequent
+    backfill_days_15m = [backfill_days.to_i, 3].min # Cap at 3 days for 15m
+    start_time = [last_candle_time(btc_pair.product_id, "15m")&.+(15.minutes), backfill_days_15m.days.ago].compact.max
 
-      # Use chunked fetching for large date ranges to avoid API limits
-      if backfill_days_15m > 3
-        rest.upsert_15m_candles_chunked(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc,
-          chunk_days: 3
-        )
-      else
-        rest.upsert_15m_candles(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc
-        )
-      end
-    rescue => e
-      Rails.logger.error("[Candles] Failed to fetch 15m candles for #{btc_pair.product_id}: #{e.message}")
+    # Use chunked fetching for large date ranges to avoid API limits
+    if backfill_days_15m > 3
+      rest.upsert_15m_candles_chunked(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_days: 3
+      )
+    else
+      rest.upsert_15m_candles(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
     end
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 15m candles for #{btc_pair.product_id}: #{e.message}")
   end
 
   def fetch_1h_candles(rest, btc_pair, backfill_days)
-    begin
-      # Choose the later of (last known + 1h) and (backfill_days ago)
-      start_time = [ last_candle_time(btc_pair.product_id, "1h")&.+(1.hour), backfill_days.to_i.days.ago ].compact.max
+    # Choose the later of (last known + 1h) and (backfill_days ago)
+    start_time = [last_candle_time(btc_pair.product_id, "1h")&.+(1.hour), backfill_days.to_i.days.ago].compact.max
 
-      # Use chunked fetching for large date ranges to avoid API limits
-      if backfill_days.to_i > 30
-        rest.upsert_1h_candles_chunked(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc,
-          chunk_days: 30
-        )
-      else
-        rest.upsert_1h_candles(
-          product_id: btc_pair.product_id,
-          start_time: start_time,
-          end_time: Time.now.utc
-        )
-      end
-    rescue => e
-      Rails.logger.error("[Candles] Failed to fetch 1h candles for #{btc_pair.product_id}: #{e.message}")
+    # Use chunked fetching for large date ranges to avoid API limits
+    if backfill_days.to_i > 30
+      rest.upsert_1h_candles_chunked(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_days: 30
+      )
+    else
+      rest.upsert_1h_candles(
+        product_id: btc_pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
     end
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 1h candles for #{btc_pair.product_id}: #{e.message}")
   end
 
   def last_candle_time(product_id, timeframe)

@@ -35,12 +35,12 @@ class TradingPair < ApplicationRecord
     else prefix
     end
 
-          {
-        base_currency: base_currency,
-        quote_currency: "USD",
-        expiration_date: expiration_date,
-        contract_type: suffix
-      }
+    {
+      base_currency: base_currency,
+      quote_currency: "USD",
+      expiration_date: expiration_date,
+      contract_type: suffix
+    }
   end
 
   # Check if contract is expired

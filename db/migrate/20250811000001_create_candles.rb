@@ -14,6 +14,6 @@ class CreateCandles < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :candles, [ :symbol, :timeframe, :timestamp ], unique: true
+    add_index :candles, [:symbol, :timeframe, :timestamp], unique: true
   end
 end

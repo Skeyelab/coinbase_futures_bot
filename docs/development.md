@@ -194,18 +194,27 @@ bin/rake signals:generate
 
 ### Ruby Style Guide
 
-Follow RuboCop configuration in `.rubocop.yml`:
+This project uses [StandardRB](https://github.com/standardrb/standard) for Ruby code formatting and linting, providing zero-configuration Ruby style guide:
 
 ```bash
 # Run style checks
-bin/rubocop
+bin/standardrb
 
 # Auto-fix style issues
-bin/rubocop -A
+bin/standardrb --fix
+
+# Auto-fix style issues (including potentially unsafe changes)
+bin/standardrb --fix-unsafely
 
 # Check specific files
-bin/rubocop app/services/
+bin/standardrb app/services/
 ```
+
+StandardRB provides:
+- Zero-configuration Ruby style guide
+- Simpler setup and maintenance than RuboCop
+- Consistent formatting across the codebase
+- Better developer experience with fewer style debates
 
 ### Code Organization
 
