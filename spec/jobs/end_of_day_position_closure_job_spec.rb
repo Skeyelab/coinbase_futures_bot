@@ -17,7 +17,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
 
   describe "#perform" do
     it "executes end-of-day position closure" do
-      summary = { open_count: 3, closed_count: 0 }
+      summary = {open_count: 3, closed_count: 0}
       allow(manager).to receive(:get_position_summary).and_return(summary)
       allow(manager).to receive(:force_close_all_day_trading_positions).and_return(3)
 
@@ -29,7 +29,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
     end
 
     it "closes all open day trading positions" do
-      summary = { open_count: 2, closed_count: 0 }
+      summary = {open_count: 2, closed_count: 0}
       allow(manager).to receive(:get_position_summary).and_return(summary)
       expect(manager).to receive(:force_close_all_day_trading_positions).and_return(2)
 
@@ -37,7 +37,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
     end
 
     it "handles case when no positions are closed" do
-      summary = { open_count: 0, closed_count: 0 }
+      summary = {open_count: 0, closed_count: 0}
       allow(manager).to receive(:get_position_summary).and_return(summary)
 
       expect(logger).to receive(:info).with("No open day trading positions to close")
@@ -47,7 +47,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
     end
 
     it "logs start and completion messages" do
-      summary = { open_count: 1, closed_count: 0 }
+      summary = {open_count: 1, closed_count: 0}
       allow(manager).to receive(:get_position_summary).and_return(summary)
       allow(manager).to receive(:force_close_all_day_trading_positions).and_return(1)
 
@@ -68,7 +68,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
       end
 
       it "handles closure execution errors gracefully" do
-        summary = { open_count: 1, closed_count: 0 }
+        summary = {open_count: 1, closed_count: 0}
         allow(manager).to receive(:get_position_summary).and_return(summary)
         allow(manager).to receive(:force_close_all_day_trading_positions).and_raise(StandardError, "Closure error")
 
@@ -99,7 +99,7 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
 
   describe "integration with manager" do
     it "calls manager methods in correct order" do
-      summary = { open_count: 1, closed_count: 0 }
+      summary = {open_count: 1, closed_count: 0}
       allow(manager).to receive(:get_position_summary).and_return(summary)
       allow(manager).to receive(:force_close_all_day_trading_positions).and_return(1)
 

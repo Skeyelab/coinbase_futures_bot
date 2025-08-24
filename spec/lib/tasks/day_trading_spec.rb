@@ -75,10 +75,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
   end
 
   it "shows confirmation prompt and closes positions when confirmed" do
-    summary = { open_count: 3 }
+    summary = {open_count: 3}
     allow(manager).to receive(:get_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(3)
-    
+
     # Mock user input
     allow($stdin).to receive(:gets).and_return("yes\n")
 
@@ -87,10 +87,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
   end
 
   it "cancels operation when user doesn't confirm" do
-    summary = { open_count: 2 }
+    summary = {open_count: 2}
     allow(manager).to receive(:get_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(0)
-    
+
     # Mock user input
     allow($stdin).to receive(:gets).and_return("no\n")
 
@@ -116,10 +116,10 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
       current_price: 51000.0,
       target_price: 50000.0
     }
-    
+
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(1)
-    
+
     # Mock user input
     allow($stdin).to receive(:gets).and_return("yes\n")
 
@@ -136,11 +136,11 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
 
   it "cancels operation when user doesn't confirm" do
     position = instance_double(Position, id: 1, side: "LONG", size: 1.0, product_id: "BIT-29AUG25-CDE")
-    trigger_info = { position: position, trigger: "take_profit", current_price: 51000.0, target_price: 50000.0 }
-    
+    trigger_info = {position: position, trigger: "take_profit", current_price: 51000.0, target_price: 50000.0}
+
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(0)
-    
+
     # Mock user input
     allow($stdin).to receive(:gets).and_return("no\n")
 
@@ -161,7 +161,7 @@ RSpec.describe "day_trading:pnl", type: :task do
   it "displays total PnL and individual position PnL" do
     position1 = instance_double(Position, product_id: "BIT-29AUG25-CDE", side: "LONG", size: 1.0)
     position2 = instance_double(Position, product_id: "ET-29AUG25-CDE", side: "SHORT", size: 2.0)
-    
+
     allow(manager).to receive(:calculate_total_pnl).and_return(250.0)
     allow(Position).to receive(:open_day_trading_positions).and_return([position1, position2])
     allow(manager).to receive(:get_current_prices).and_return({
@@ -180,7 +180,7 @@ RSpec.describe "day_trading:pnl", type: :task do
 
   it "handles positions without price data" do
     position = instance_double(Position, product_id: "BIT-29AUG25-CDE", side: "LONG", size: 1.0)
-    
+
     allow(manager).to receive(:calculate_total_pnl).and_return(0.0)
     allow(Position).to receive(:open_day_trading_positions).and_return([position])
     allow(manager).to receive(:get_current_prices).and_return({})
@@ -207,9 +207,9 @@ RSpec.describe "day_trading:cleanup", type: :task do
 
   it "cleans up old positions with custom days from environment" do
     ENV["DAYS_OLD"] = "60"
-    
+
     expect { task.execute }.to output(/Cleaning up closed positions older than 60 days/).to_stdout
-    
+
     ENV.delete("DAYS_OLD")
   end
 
@@ -235,15 +235,14 @@ RSpec.describe "day_trading:details", type: :task do
   end
 
   it "displays detailed position information" do
-    position = create(:position, 
+    create(:position,
       product_id: "BIT-29AUG25-CDE",
       side: "LONG",
       size: 1.0,
       entry_price: 50000.0,
       entry_time: Time.current,
       status: "OPEN",
-      day_trading: true
-    )
+      day_trading: true)
 
     expect { task.execute }.to output(/Position Details/).to_stdout
     expect { task.execute }.to output(/BIT-29AUG25-CDE/).to_stdout

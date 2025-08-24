@@ -114,12 +114,12 @@ RSpec.describe Trading::DayTradingPositionManager do
     it "returns positions with triggered take profit" do
       result = manager.check_tp_sl_triggers
       expect(result.length).to eq(2)
-      
+
       long_trigger = result.find { |r| r[:position].id == long_position.id }
       expect(long_trigger[:trigger]).to eq("take_profit")
       expect(long_trigger[:current_price]).to eq(51100.0)
       expect(long_trigger[:target_price]).to eq(51000.0)
-      
+
       short_trigger = result.find { |r| r[:position].id == short_position.id }
       expect(short_trigger[:trigger]).to eq("take_profit")
       expect(short_trigger[:current_price]).to eq(2890.0)
@@ -131,7 +131,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         long_position.id => 50000.0,  # No trigger
         short_position.id => 3000.0   # No trigger
       })
-      
+
       result = manager.check_tp_sl_triggers
       expect(result).to be_empty
     end
@@ -217,7 +217,7 @@ RSpec.describe Trading::DayTradingPositionManager do
       expect {
         manager.force_close_all_day_trading_positions
       }.to change { Position.open.count }.by(-2)
-      
+
       expect(position1.reload.status).to eq("CLOSED")
       expect(position2.reload.status).to eq("CLOSED")
       expect(swing_position.reload.status).to eq("OPEN") # Not affected
@@ -267,7 +267,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         position1.id => 51000.0,  # +2% PnL
         position2.id => 2900.0    # +3.33% PnL
       })
-      
+
       result = manager.calculate_total_pnl
       # Expected PnL: (51000 - 50000) / 50000 * 1.0 = 0.02 = 2%
       # Expected PnL: (3000 - 2900) / 3000 * 1.0 = 0.0333... = 3.33%
@@ -348,7 +348,7 @@ RSpec.describe Trading::DayTradingPositionManager do
       expect {
         manager.close_expired_positions
       }.to change { expired_position.reload.status }.from("OPEN").to("CLOSED")
-      
+
       expect(recent_position.reload.status).to eq("OPEN") # Not expired
     end
 

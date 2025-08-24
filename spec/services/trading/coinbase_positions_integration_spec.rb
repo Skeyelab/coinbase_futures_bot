@@ -74,8 +74,6 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     end
 
     it "updates local Position record when closing a position" do
-      close_price = 51000.0
-      
       expect {
         service.close_current_month_position(product_id, 1.0)
       }.to change { position.reload.status }.from("OPEN").to("CLOSED")
@@ -85,7 +83,6 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     end
 
     it "calculates PnL correctly when closing position" do
-      close_price = 51000.0
       service.close_current_month_position(product_id, 1.0)
 
       position.reload
@@ -140,7 +137,7 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
 
       begin
         service.open_current_month_position(product_id, "LONG", 1.0, 50000.0)
-      rescue StandardError
+      rescue
         # Expected to fail
       end
     end
@@ -150,7 +147,7 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     it "can retrieve current market prices for positions" do
       allow_any_instance_of(Coinbase::AdvancedTradeClient).to receive(:get_product_ticker)
         .with(product_id)
-        .and_return({ "price" => "51000.0" })
+        .and_return({"price" => "51000.0"})
 
       price = service.get_current_market_price(product_id)
       expect(price).to eq(51000.0)
