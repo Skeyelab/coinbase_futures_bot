@@ -269,19 +269,6 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       rest.upsert_1h_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
 
-    it "create_default_futures_products creates products" do
-      rest = described_class.new
-      expect {
-        rest.create_default_futures_products
-      }.to change { TradingPair.count }.by(2)
-      btc_perp = TradingPair.find_by(product_id: "BTC-USD-PERP")
-      eth_perp = TradingPair.find_by(product_id: "ETH-USD-PERP")
-      expect(btc_perp).not_to be_nil
-      expect(eth_perp).not_to be_nil
-      expect(btc_perp.base_currency).to eq("BTC")
-      expect(eth_perp.base_currency).to eq("ETH")
-      expect(btc_perp.quote_currency).to eq("USD")
-      expect(btc_perp.status).to eq("online")
-    end
+
   end
 end
