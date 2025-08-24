@@ -1,0 +1,34 @@
+# Coinbase Futures Bot - Cursor Rules
+
+## Project Context
+This is the **coinbase_futures_bot** repository located at:
+- Local path: `/Users/edahl/Documents/GitHub/coinbase_futures_bot`
+- GitHub: `https://github.com/Skeyelab/coinbase_futures_bot`
+- Git remote: `git@github.com:Skeyelab/coinbase_futures_bot.git`
+
+## Repository Information
+- **Repository Name**: coinbase_futures_bot
+- **Owner**: Skeyelab
+- **Description**: Coinbase futures trading bot implementation
+- **Technology Stack**: Rails 7 API, PostgreSQL, GoodJob, Coinbase Advanced Trade API
+
+## Important Notes for Cursor Agents
+1. **ALWAYS** work within this specific repository context
+2. **NEVER** suggest or create files outside this project scope
+3. **ALWAYS** reference the correct GitHub repository when discussing issues, PRs, or collaboration
+4. **USE** the existing project structure and conventions
+5. **FOLLOW** the established patterns in the codebase
+
+## Key Directories
+- `app/` - Rails application code
+- `spec/` - RSpec test files
+- `db/` - Database migrations and schema
+- `config/` - Application configuration
+- `lib/tasks/` - Custom Rake tasks
+- `services/` - Business logic services
+
+## Git Workflow
+- Use conventional commit messages
+- Create feature branches for new work
+- Follow the established PR workflow
+- Reference Linear issues when applicable
