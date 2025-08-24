@@ -97,12 +97,28 @@ module Trading
     # price: required for limit orders
     # type: :market or :limit
     # Returns order result hash
-    def open_position(product_id:, side:, size:, type: :market, price: nil)
+    def open_position(product_id:, side:, size:, type: :market, price: nil, day_trading: true, take_profit: nil, stop_loss: nil)
       raise "Authentication required" unless @authenticated
 
       order_body = build_order_body(product_id: product_id, side: side, size: size, type: type, price: price)
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      JSON.parse(resp.body)
+      result = JSON.parse(resp.body)
+
+      # If order was successful, create local Position record
+      if result["success"] || result["order_id"]
+        create_local_position_record(
+          product_id: product_id,
+          side: side,
+          size: size,
+          entry_price: price || get_current_market_price(product_id),
+          day_trading: day_trading,
+          take_profit: take_profit,
+          stop_loss: stop_loss,
+          order_result: result
+        )
+      end
+
+      result
     end
 
     # Close a position by submitting an opposite-side market order for the specified size.
@@ -141,7 +157,19 @@ module Trading
       @logger.info("Order body: #{order_body.inspect}")
 
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      JSON.parse(resp.body)
+      result = JSON.parse(resp.body)
+
+      # If order was successful, update local Position record
+      if result["success"] || result["order_id"]
+        update_local_position_record(
+          product_id: product_id,
+          size: pos_size,
+          close_price: get_current_market_price(product_id),
+          order_result: result
+        )
+      end
+
+      result
     end
 
     # Increase an existing position by adding more contracts in the same direction.
@@ -178,7 +206,19 @@ module Trading
       @logger.info("Order body: #{order_body.inspect}")
 
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      JSON.parse(resp.body)
+      result = JSON.parse(resp.body)
+
+      # If order was successful, update local Position record
+      if result["success"] || result["order_id"]
+        increase_local_position_record(
+          product_id: product_id,
+          additional_size: size,
+          additional_price: get_current_market_price(product_id),
+          order_result: result
+        )
+      end
+
+      result
     end
 
     private
@@ -244,6 +284,115 @@ module Trading
       [size.to_s, normalized_side]
     end
 
+    # --- Local Position Record Management ---
+
+    def create_local_position_record(product_id:, side:, size:, entry_price:, day_trading:, take_profit:, stop_loss:, order_result:)
+      # Convert side to LONG/SHORT for futures
+      position_side = case side.to_s.downcase
+      when "long", "buy" then "LONG"
+      when "short", "sell" then "SHORT"
+      else "LONG"
+      end
+
+      # Calculate take profit and stop loss if not provided
+      if take_profit.nil? && day_trading
+        # Use 40 bps take profit for day trading (from strategy)
+        take_profit = if position_side == "LONG"
+          entry_price * (1 + 0.004)
+        else
+          entry_price * (1 - 0.004)
+        end
+      end
+
+      if stop_loss.nil? && day_trading
+        # Use 30 bps stop loss for day trading (from strategy)
+        stop_loss = if position_side == "LONG"
+          entry_price * (1 - 0.003)
+        else
+          entry_price * (1 + 0.003)
+        end
+      end
+
+      Position.create!(
+        product_id: product_id,
+        side: position_side,
+        size: size,
+        entry_price: entry_price,
+        entry_time: Time.current,
+        status: "OPEN",
+        day_trading: day_trading,
+        take_profit: take_profit,
+        stop_loss: stop_loss
+      )
+
+      @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")
+    rescue => e
+      @logger.error("Failed to create local position record: #{e.message}")
+      # Don't fail the main operation if local record creation fails
+    end
+
+    def update_local_position_record(product_id:, size:, close_price:, order_result:)
+      # Find the most recent open position for this product
+      position = Position.open.by_product(product_id).order(:entry_time).last
+      return unless position
+
+      # Close the position
+      position.close_position!(close_price)
+      @logger.info("Updated local position record #{position.id} as closed with PnL: #{position.pnl}")
+    rescue => e
+      @logger.error("Failed to update local position record: #{e.message}")
+      # Don't fail the main operation if local record update fails
+    end
+
+    def increase_local_position_record(product_id:, additional_size:, additional_price:, order_result:)
+      # Find the most recent open position for this product
+      position = Position.open.by_product(product_id).order(:entry_time).last
+      return unless position
+
+      # Calculate new average entry price
+      total_size = position.size + additional_size.to_f
+      new_entry_price = ((position.size * position.entry_price) + (additional_size.to_f * additional_price)) / total_size
+
+      # Update the position
+      position.update!(
+        size: total_size,
+        entry_price: new_entry_price
+      )
+
+      @logger.info("Updated local position record #{position.id}: size increased to #{total_size}, new avg entry: #{new_entry_price}")
+    rescue => e
+      @logger.error("Failed to update local position record for increase: #{e.message}")
+      # Don't fail the main operation if local record update fails
+    end
+
+    def get_current_market_price(product_id)
+      # Try to get current price from recent market data
+      # This is a simplified approach - in production you might want to use real-time market data
+      
+      # Try to get from recent ticks first
+      recent_tick = Tick.where(product_id: product_id)
+                        .order(observed_at: :desc)
+                        .first
+      
+      if recent_tick && recent_tick.observed_at > 5.minutes.ago
+        return recent_tick.price
+      end
+
+      # Fall back to most recent 1-minute candle
+      recent_candle = Candle.for_symbol(product_id)
+                            .one_minute
+                            .order(timestamp: :desc)
+                            .first
+      
+      if recent_candle && recent_candle.timestamp > 5.minutes.ago
+        return recent_candle.close
+      end
+
+      # If no recent data, return nil (caller should handle this)
+      @logger.warn("No recent price data for #{product_id}")
+      nil
+    end
+
     # --- Auth helpers (Advanced Trade style signing) ---
 
     def authenticated_get(path, params = {})
@@ -277,7 +426,7 @@ module Trading
       @logger.debug("Headers: #{@conn.headers.slice("Content-Type", "Accept", "Authorization").inspect}")
 
       begin
-        @conn.post(path, body_json)
+        @conn.post(body_json)
       rescue Faraday::ClientError => e
         @logger.error("Request failed: #{e.class} - #{e.message}")
         if e.response
@@ -418,7 +567,7 @@ module Trading
     end
 
     # Open position on best available contract for an asset (current month preferred, upcoming as fallback)
-    def open_best_available_position(asset:, side:, size:, type: :market, price: nil)
+    def open_best_available_position(asset:, side:, size:, type: :market, price: nil, day_trading: true, take_profit: nil, stop_loss: nil)
       best_contract = @contract_manager.best_available_contract(asset)
       raise "No suitable contract found for #{asset}" unless best_contract
 
@@ -438,12 +587,15 @@ module Trading
         side: side,
         size: size,
         type: type,
-        price: price
+        price: price,
+        day_trading: day_trading,
+        take_profit: take_profit,
+        stop_loss: stop_loss
       )
     end
 
     # Open position on current month contract for an asset (legacy method, kept for compatibility)
-    def open_current_month_position(asset:, side:, size:, type: :market, price: nil)
+    def open_current_month_position(asset:, side:, size:, type: :market, price: nil, day_trading: true, take_profit: nil, stop_loss: nil)
       current_month_contract = @contract_manager.current_month_contract(asset)
       raise "No current month contract found for #{asset}" unless current_month_contract
 
@@ -453,7 +605,10 @@ module Trading
         side: side,
         size: size,
         type: type,
-        price: price
+        price: price,
+        day_trading: day_trading,
+        take_profit: take_profit,
+        stop_loss: stop_loss
       )
     end
 
