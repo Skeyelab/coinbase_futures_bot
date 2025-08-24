@@ -25,6 +25,30 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+#### 2025-08-24 03:25 UTC
+- Context: Implementing Linear issue FUT-3 to add 1-minute and 5-minute candle collection for day trading strategies.
+- Changes:
+  - Added 5-minute candle collection support (1-minute not supported by Coinbase API)
+  - Extended `FetchCandlesJob` to fetch 5m, 15m, and 1h candles with appropriate backfill limits
+  - Added new methods to `MarketData::CoinbaseRest`: `upsert_5m_candles` and `upsert_5m_candles_chunked`
+  - Updated `Candle` model to include 5m timeframe validation and scope
+  - Added new rake task `market_data:backfill_5m_candles[days]` for 5-minute candle backfilling
+  - Updated documentation in `docs/candles.md` to reflect supported timeframes and API limitations
+  - Discovered API limitations: Coinbase only supports 5m (300s), 15m (900s), 1h (3600s), 6h, and 1d granularities
+- Commands run:
+  - `bin/rake "market_data:backfill_5m_candles[1]"` (verified 5m candles work)
+  - `bin/rake market_data:test_granularities` (discovered API limitations)
+  - `bin/rails runner "FetchCandlesJob.perform_now(backfill_days: 1)"` (tested job execution)
+  - `bundle exec rspec spec/models/candle_spec.rb` (verified model changes)
+- Files touched:
+  - `app/models/candle.rb`, `app/services/market_data/coinbase_rest.rb`, `app/jobs/fetch_candles_job.rb`, `lib/tasks/market_data.rake`, `docs/candles.md`
+- Migrations:
+  - none (existing schema supports new timeframes)
+- Next steps:
+  - Create pull request for the 5-minute candle collection feature
+  - Consider implementing real-time 5-minute candle updates for live day trading
+  - Add tests for the new 5-minute candle functionality
+
 #### 2025-08-13 12:40 UTC
 - Context: Need realtime spot prices via Coinbase websocket and to normalize payloads.
 - Changes:
