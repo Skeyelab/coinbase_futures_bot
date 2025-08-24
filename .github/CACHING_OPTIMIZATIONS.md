@@ -18,9 +18,9 @@ With these optimizations, we expect to see:
 - **Benefit**: Avoids re-downloading gems on every run
 
 ### 2. **System Dependencies** (via `actions/cache@v4`)
-- **What**: APT package cache (`/var/cache/apt/archives`)
-- **Cache key**: `${{ runner.os }}-apt-${{ hashFiles('**/Gemfile.lock') }}`
-- **Benefit**: Avoids re-downloading system packages
+- **What**: User-level cache directories (`~/.cache/apt`, `~/.cache/pip`)
+- **Cache key**: `${{ runner.os }}-system-deps-${{ hashFiles('**/Gemfile.lock') }}`
+- **Benefit**: Avoids re-downloading system packages without permission issues
 
 ### 3. **PostgreSQL Data** (via `actions/cache@v4`)
 - **What**: PostgreSQL configuration and data (`~/.postgresql`)
@@ -61,7 +61,8 @@ With these optimizations, we expect to see:
 ~/.bundle/
 
 # System packages
-/var/cache/apt/archives
+~/.cache/apt
+~/.cache/pip
 
 # PostgreSQL
 ~/.postgresql
