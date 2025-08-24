@@ -51,14 +51,17 @@ module Execution
         asset = contract.underlying_asset
         next unless asset
 
-        # Find current month contract for this asset
-        current_month_contract = @contract_manager.current_month_contract(asset)
-        next unless current_month_contract
+        # Find the best target contract (current month if available, upcoming month as fallback)
+        target_contract = @contract_manager.best_available_contract(asset)
+        next unless target_contract
+
+        # Skip if we're already on the target contract
+        next if contract.product_id == target_contract
 
         # Perform the rollover
         rollover_contract(
           from_contract: contract.product_id,
-          to_contract: current_month_contract,
+          to_contract: target_contract,
           asset: asset
         )
       end
@@ -97,15 +100,23 @@ module Execution
         end
       end
 
-      # If it's an asset symbol, find current month contract
+      # If it's an asset symbol, find best available contract
       asset = extract_asset_from_product_id(product_id)
       if asset
-        current_contract = @contract_manager.current_month_contract(asset)
-        if current_contract
-          @logger.info("[EXEC] Resolved #{product_id} to current month contract: #{current_contract}")
-          return current_contract
+        best_contract = @contract_manager.best_available_contract(asset)
+        if best_contract
+          # Check if it's current month or upcoming month for logging
+          contract = TradingPair.find_by(product_id: best_contract)
+          if contract&.current_month?
+            @logger.info("[EXEC] Resolved #{product_id} to current month contract: #{best_contract}")
+          elsif contract&.upcoming_month?
+            @logger.info("[EXEC] Resolved #{product_id} to upcoming month contract: #{best_contract} (current month not suitable)")
+          else
+            @logger.info("[EXEC] Resolved #{product_id} to contract: #{best_contract}")
+          end
+          return best_contract
         else
-          @logger.warn("[EXEC] No current month contract found for asset #{asset}")
+          @logger.warn("[EXEC] No suitable contract found for asset #{asset}")
           return nil
         end
       end

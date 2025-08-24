@@ -298,17 +298,27 @@ module Strategy
         return symbol
       end
 
-      # If it's an asset symbol (BTC, ETH), find current month contract
+      # If it's an asset symbol (BTC, ETH), find best available contract
       asset = extract_asset_from_symbol(symbol)
       if asset
         contract_manager = MarketData::FuturesContractManager.new
-        current_month_contract = contract_manager.current_month_contract(asset)
 
-        if current_month_contract
-          Rails.logger.info("[STRATEGY] Using current month contract #{current_month_contract} for asset #{asset}")
-          return current_month_contract
+        # Try to get the best available contract (current month preferred, upcoming as fallback)
+        best_contract = contract_manager.best_available_contract(asset)
+
+        if best_contract
+          # Check if it's current month or upcoming month for logging
+          contract = TradingPair.find_by(product_id: best_contract)
+          if contract&.current_month?
+            Rails.logger.info("[STRATEGY] Using current month contract #{best_contract} for asset #{asset}")
+          elsif contract&.upcoming_month?
+            Rails.logger.info("[STRATEGY] Using upcoming month contract #{best_contract} for asset #{asset} (current month not available)")
+          else
+            Rails.logger.info("[STRATEGY] Using contract #{best_contract} for asset #{asset}")
+          end
+          return best_contract
         else
-          Rails.logger.warn("[STRATEGY] No current month contract found for asset #{asset}")
+          Rails.logger.warn("[STRATEGY] No suitable contract found for asset #{asset}")
           return nil
         end
       end

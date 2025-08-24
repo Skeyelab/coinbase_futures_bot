@@ -5,8 +5,10 @@ class TradingPair < ApplicationRecord
 
   scope :enabled, -> { where(enabled: true) }
   scope :current_month, -> { where("expiration_date >= ? AND expiration_date <= ?", Date.current.beginning_of_month, Date.current.end_of_month) }
+  scope :upcoming_month, -> { where("expiration_date >= ? AND expiration_date <= ?", Date.current.next_month.beginning_of_month, Date.current.next_month.end_of_month) }
   scope :not_expired, -> { where("expiration_date > ?", Date.current) }
   scope :active, -> { enabled.not_expired }
+  scope :tradeable, -> { enabled.where("expiration_date > ?", Date.current + 1.day) } # Avoid contracts expiring tomorrow
 
   # Parse contract information from product_id
   # Examples: ET-29AUG25-CDE, BIT-29AUG25-CDE
@@ -54,6 +56,20 @@ class TradingPair < ApplicationRecord
     current_month_range.cover?(expiration_date)
   end
 
+  # Check if this is an upcoming month contract
+  def upcoming_month?
+    return false unless expiration_date
+
+    upcoming_month_range = Date.current.next_month.beginning_of_month..Date.current.next_month.end_of_month
+    upcoming_month_range.cover?(expiration_date)
+  end
+
+  # Check if contract is available for trading (not expiring too soon)
+  def tradeable?
+    return false unless expiration_date
+    expiration_date > Date.current + 1.day
+  end
+
   # Get the underlying asset symbol (BTC, ETH, etc.)
   def underlying_asset
     # All contracts are now futures contracts, parse from product_id
@@ -67,5 +83,22 @@ class TradingPair < ApplicationRecord
       .current_month
       .where(base_currency: asset)
       .order(:expiration_date)
+  end
+
+  # Get upcoming month futures contracts for a given asset
+  def self.upcoming_month_for_asset(asset)
+    enabled
+      .upcoming_month
+      .where(base_currency: asset)
+      .order(:expiration_date)
+  end
+
+  # Get the best available contract for trading (prefer current month, fall back to upcoming)
+  def self.best_available_for_asset(asset)
+    current_month_contracts = current_month_for_asset(asset).tradeable
+    return current_month_contracts.first if current_month_contracts.any?
+
+    upcoming_month_contracts = upcoming_month_for_asset(asset).tradeable
+    upcoming_month_contracts.first
   end
 end

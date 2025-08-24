@@ -403,7 +403,48 @@ module Trading
       list_open_positions(product_id: current_month_contract)
     end
 
-    # Open position on current month contract for an asset
+    # Get positions for upcoming month contracts of a specific asset (BTC, ETH)
+    def list_upcoming_month_positions(asset:)
+      upcoming_month_contract = @contract_manager.upcoming_month_contract(asset)
+      return [] unless upcoming_month_contract
+
+      list_open_positions(product_id: upcoming_month_contract)
+    end
+
+    # Get positions for the best available contract for an asset
+    def list_best_available_positions(asset:)
+      best_contract = @contract_manager.best_available_contract(asset)
+      return [] unless best_contract
+
+      list_open_positions(product_id: best_contract)
+    end
+
+    # Open position on best available contract for an asset (current month preferred, upcoming as fallback)
+    def open_best_available_position(asset:, side:, size:, type: :market, price: nil)
+      best_contract = @contract_manager.best_available_contract(asset)
+      raise "No suitable contract found for #{asset}" unless best_contract
+
+      # Check if it's current or upcoming month for logging
+      contract = TradingPair.find_by(product_id: best_contract)
+      contract_type = if contract&.current_month?
+        "current month"
+      elsif contract&.upcoming_month?
+        "upcoming month"
+      else
+        "available"
+      end
+
+      @logger.info("Opening #{side} position of #{size} contracts on #{contract_type} #{asset} contract: #{best_contract}")
+      open_position(
+        product_id: best_contract,
+        side: side,
+        size: size,
+        type: type,
+        price: price
+      )
+    end
+
+    # Open position on current month contract for an asset (legacy method, kept for compatibility)
     def open_current_month_position(asset:, side:, size:, type: :market, price: nil)
       current_month_contract = @contract_manager.current_month_contract(asset)
       raise "No current month contract found for #{asset}" unless current_month_contract
@@ -418,7 +459,16 @@ module Trading
       )
     end
 
-    # Close position on current month contract for an asset
+    # Close position on best available contract for an asset
+    def close_best_available_position(asset:, size: nil)
+      best_contract = @contract_manager.best_available_contract(asset)
+      raise "No suitable contract found for #{asset}" unless best_contract
+
+      @logger.info("Closing position on #{asset} contract: #{best_contract}")
+      close_position(best_contract, size: size)
+    end
+
+    # Close position on current month contract for an asset (legacy method, kept for compatibility)
     def close_current_month_position(asset:, size: nil)
       current_month_contract = @contract_manager.current_month_contract(asset)
       raise "No current month contract found for #{asset}" unless current_month_contract

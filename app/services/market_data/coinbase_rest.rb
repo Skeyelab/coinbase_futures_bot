@@ -81,8 +81,8 @@ module MarketData
         end
       end
 
-      # Ensure current month contracts are updated
-      update_current_month_contracts
+      # Ensure current and upcoming month contracts are updated
+      update_all_contracts
 
       Rails.logger.info("Upserted #{futures_products.count} futures products")
     end
@@ -539,6 +539,12 @@ module MarketData
     def update_current_month_contracts
       manager = FuturesContractManager.new
       manager.update_current_month_contracts
+    end
+
+    # Update all contracts (current and upcoming month) using the FuturesContractManager
+    def update_all_contracts
+      manager = FuturesContractManager.new
+      manager.update_all_contracts
     end
   end
 end
