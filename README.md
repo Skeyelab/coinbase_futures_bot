@@ -1,158 +1,193 @@
-# Coinbase Futures Bot (Rails API + GoodJob)
+# Coinbase Futures Bot
+
+[![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
+
+An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
 **Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)
-**Owner**: Skeyelab
-**Local Path**: `/Users/edahl/Documents/GitHub/coinbase_futures_bot`
 
-Rails 8 API-only service for a Coinbase trading bot (futures and spot). Uses PostgreSQL for state and GoodJob for background processing.
+## Features
+
+- **Multi-timeframe Trading Strategies**: 1h trend analysis, 15m confirmation, 5m entry signals, 1m micro-timing
+- **Real-time Market Data**: WebSocket integration with Coinbase spot and futures APIs
+- **Sentiment Analysis**: News sentiment integration with CryptoPanic API and lexicon-based scoring
+- **Risk Management**: Position sizing, stop losses, take profits, and futures contract management
+- **Paper Trading**: Comprehensive simulation and backtesting framework
+- **Background Processing**: Reliable job processing with GoodJob and PostgreSQL
+- **Comprehensive Testing**: Full test suite with VCR for API interactions
+
+## Technology Stack
+
+- **Framework**: Rails 8.0 (API-only)
+- **Language**: Ruby 3.2.2
+- **Database**: PostgreSQL with time-series optimizations
+- **Jobs**: GoodJob with cron scheduling
+- **Testing**: RSpec with comprehensive coverage
+- **APIs**: Coinbase Advanced Trade, Exchange API, CryptoPanic
 
 ## Prerequisites
-- Ruby 3.2.x (RVM recommended; repo uses `.ruby-version`)
+- Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
 - PostgreSQL (DATABASE_URL)
 - Bundler
 
-## Setup
+## Quick Start
+
+### 1. Setup Environment
 ```bash
+# Clone and setup Ruby environment
+git clone git@github.com:Skeyelab/coinbase_futures_bot.git
+cd coinbase_futures_bot
 rvm use ruby-3.2.2@coinbase_futures_bot --create
+
+# Install dependencies and setup database
 bundle install
 bin/rails db:prepare
 ```
 
-## Run (development)
+### 2. Configure Environment Variables
 ```bash
-bin/rails s
-# GoodJob runs async in-process by default
+# Copy example and edit configuration
+cp .env.example .env
+# Edit .env with your API credentials
 ```
 
-## Tests (RSpec)
-- Run the full suite:
+Required variables:
+- `DATABASE_URL` - PostgreSQL connection string
+- `COINBASE_API_KEY` - Coinbase API credentials
+- `CRYPTOPANIC_TOKEN` - News sentiment API token
+
+### 3. Start Development Server
+```bash
+bin/rails server
+# Access GoodJob dashboard: http://localhost:3000/good_job
+```
+
+### 4. Run Tests
 ```bash
 bundle exec rspec
 ```
-- Run a specific spec or directory:
-```bash
-bundle exec rspec spec/models/candle_spec.rb
-```
-- CI runs `bundle exec rspec` with PostgreSQL via GitHub Actions (see `.github/workflows/test.yml`).
 
-## Market data subscriber
-- Enqueue ticker subscription (GoodJob):
+## 📚 Documentation
+
+- **[Architecture Overview](docs/architecture.md)** - System design and component relationships
+- **[Development Guide](docs/development.md)** - Setup, workflow, and debugging
+- **[Configuration](docs/configuration.md)** - Environment variables and settings
+- **[API Documentation](docs/api-endpoints.md)** - REST endpoints and examples
+- **[Trading Strategies](docs/strategies.md)** - Strategy implementation and tuning
+- **[Database Schema](docs/database-schema.md)** - Models and relationships
+- **[Background Jobs](docs/jobs.md)** - Job system and scheduling
+- **[Testing Guide](docs/testing.md)** - Testing strategies and coverage
+- **[Deployment Guide](docs/deployment.md)** - Production deployment and operations
+- **[Services Documentation](docs/services/)** - Core business logic components
+
+## Core Commands
+
+### Market Data Collection
 ```bash
+# Subscribe to real-time market data
 bin/rake market_data:subscribe[BTC-USD-PERP]
 PRODUCT_IDS=BTC-USD-PERP,ETH-USD-PERP bin/rake market_data:subscribe
-```
-- Spot ticker:
-```bash
-bin/rake market_data:subscribe_spot[BTC-USD]
-PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe_spot
-INLINE=1 PRODUCT_IDS=BTC-USD bin/rake "market_data:subscribe_spot[BTC-USD]"
+
+# Backfill historical candle data
+bin/rake market_data:backfill_candles[7]  # 7 days of data
+bin/rake market_data:backfill_1h_candles[30]  # 30 days of hourly data
 ```
 
-## Paper trading (automated)
-- One-off step:
+### Trading Operations
 ```bash
+# Generate trading signals
+bin/rake signals:generate
+
+# Execute paper trading step
 bin/rake paper:step
-```
-- Scheduled via GoodJob cron (defaults):
-  - PaperTradingJob: every 15 minutes (set `PAPER_CRON` to override)
-  - CalibrationJob: daily 02:00 UTC (set `CALIBRATE_CRON` to override)
 
-### Futures (Derivatives) WebSocket
-- Requires a futures WS URL via env:
-```bash
-export COINBASE_FUTURES_WS_URL=wss://<futures-ws-endpoint>
-```
-- Run inline (foreground):
-```bash
-INLINE=1 bin/rake "market_data:subscribe_futures[BTC-USD-PERP]"
-```
-Note: Endpoint and schema may differ from Advanced Trade; handler logs raw fields if schema is unknown.
-
-## Backtesting
-
-### DB-backed backtesting
-- Persist live ticks:
-```bash
-INLINE=1 bin/rake "market_data:ingest_spot_to_db[BTC-USD]"
+# View sentiment data
+curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD-PERP&limit=5"
 ```
 
-- Backtest over an interval:
+### Monitoring
 ```bash
-bin/rake market_data:backtest_spot_db[2025-08-11T00:00:00Z,2025-08-11T01:00:00Z,BTC-USD,BTC-USD-PERP]
-# Or with env vars
-START_ISO=2025-08-11T00:00:00Z END_ISO=2025-08-11T01:00:00Z bin/rake market_data:backtest_spot_db
+# GoodJob dashboard (development)
+open http://localhost:3000/good_job
+
+# Health check
+curl http://localhost:3000/up
 ```
 
-## Admin UI
-- GoodJob dashboard (development): http://localhost:3000/good_job
+## Key Features
 
-## Sentiment
-- Sources: CryptoPanic news aggregator (MVP). Reddit/Twitter can be added later.
-- Storage:
-  - `sentiment_events`: raw normalized items with optional `score`/`confidence`.
-  - `sentiment_aggregates`: rolling aggregates per symbol/window (`5m`,`15m`,`1h`) including `z_score`.
-- Scoring: lightweight lexicon scorer (dependency-free) used by `ScoreSentimentJob`. Can be replaced by FinBERT later.
-- Jobs and schedules (GoodJob cron defaults):
-  - `FetchCryptopanicJob`: every 2 minutes (`SENTIMENT_FETCH_CRON`)
-  - `ScoreSentimentJob`: every 2 minutes (`SENTIMENT_SCORE_CRON`)
-  - `AggregateSentimentJob`: every 5 minutes (`SENTIMENT_AGG_CRON`)
-- Feature flags:
-  - `SENTIMENT_ENABLE`: when `true`, gates entries in `Strategy::MultiTimeframeSignal` using 15m z-score
-  - `SENTIMENT_Z_THRESHOLD`: default `1.2`; entries require `|z| >= threshold` and sign aligned (z>0 for longs, z<0 for shorts)
-- Environment:
-  - `CRYPTOPANIC_TOKEN` (required to fetch real data)
-- Endpoint:
-  - `GET /sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=20`
-    - Returns latest aggregates as JSON for quick inspection/monitoring.
+### 🤖 Multi-Timeframe Strategy
+- **1h Analysis**: Primary trend identification using EMA crossovers
+- **15m Confirmation**: Intraday trend validation
+- **5m Entry Signals**: Pullback and momentum-based entries
+- **1m Micro-timing**: Precise entry and exit execution
 
-### Enable sentiment in production
-1) Migrate DB
+### 📊 Sentiment Integration
+- **News Analysis**: CryptoPanic API integration with lexicon-based scoring
+- **Z-Score Filtering**: Statistical normalization for signal gating
+- **Real-time Processing**: Continuous sentiment aggregation and analysis
+
+### ⚡ Background Processing
+- **Data Collection**: Automated OHLCV candle fetching and WebSocket streaming
+- **Signal Generation**: Scheduled strategy execution and position analysis
+- **Risk Management**: Automated stop-loss, take-profit, and position sizing
+
+### 🧪 Paper Trading & Backtesting
+- **Simulation Engine**: Comprehensive paper trading with realistic execution
+- **Strategy Calibration**: Automated parameter optimization
+- **Performance Analytics**: Detailed trade analysis and metrics
+
+## Production Deployment
+
+### Environment Configuration
 ```bash
-RAILS_ENV=production bin/rails db:migrate
+# Required production variables
+export RAILS_ENV=production
+export SECRET_KEY_BASE=your_secret_key
+export DATABASE_URL=postgresql://user:pass@host:port/db
+export COINBASE_API_KEY=production_key
+export COINBASE_API_SECRET=production_secret
+export CRYPTOPANIC_TOKEN=production_token
+
+# Feature flags
+export SENTIMENT_ENABLE=true
+export SENTIMENT_Z_THRESHOLD=1.5
 ```
-2) Set environment variables
+
+### Worker Process
 ```bash
-export CRYPTOPANIC_TOKEN=...   # required for news fetch
-export SENTIMENT_ENABLE=true    # enable gating in strategies
-export SENTIMENT_Z_THRESHOLD=1.2
-# Optional: tune schedules
-export SENTIMENT_FETCH_CRON="*/2 * * * *"
-export SENTIMENT_SCORE_CRON="*/2 * * * *"
-export SENTIMENT_AGG_CRON="*/5 * * * *"
-```
-3) Run workers (GoodJob)
-- In-process (Rails server): default `async` works for small loads.
-- Dedicated worker (recommended):
-```bash
+# Dedicated worker (recommended for production)
 RAILS_ENV=production bundle exec good_job start
 ```
-4) Network egress
-- Allow HTTPS egress to `cryptopanic.com`.
 
-5) Verify
-```bash
-curl -s "https://<host>/sentiment/aggregates?symbol=BTC-USD-PERP&window=15m&limit=5" | jq
-```
+## Contributing
 
-Note: The `/sentiment/aggregates` endpoint is read-only and unauthenticated by default. Restrict via network or add auth if exposed publicly.
+This project follows GitHub Flow with pull requests:
 
-## Production notes
-- Run a dedicated worker instead of in-process:
-```bash
-bundle exec good_job start
-```
-- Consider mounting `/good_job` behind auth if exposed.
+1. **Create Feature Branch**: `git checkout -b feature/description`
+2. **Make Changes**: Follow coding standards and write tests
+3. **Run Tests**: `bundle exec rspec && bundle exec rubocop`
+4. **Submit PR**: All CI checks must pass (RuboCop, Brakeman, RSpec)
+5. **Code Review**: Maintain documentation and session notes
 
-## Contributing workflow
-- All substantive changes go through PRs. CI (RuboCop, Brakeman, RSpec) must pass.
-- Update `SESSION_NOTES.md` for notable changes.
+See [Development Guide](docs/development.md) for detailed workflow and standards.
 
-## Candle data collection
-- Fetch and store OHLCV candles (Coinbase spot):
-  - `bin/rake market_data:backfill_candles[7]` enqueues `FetchCandlesJob` (default 7 days).
-  - `bin/rake market_data:backfill_1h_candles[30]` writes `1h` candles for last 30 days.
-  - `bin/rake market_data:backfill_30m_candles[7]` writes `15m` candles for last 7 days.
-  - `bin/rake market_data:test_1h_candles[1]` quick test.
-  - `bin/rake market_data:test_granularities` prints supported granularities.
-- Scheduled via GoodJob cron at minute 5 each hour by default. Override with `CANDLES_CRON`.
-- See `docs/candles.md` for full details (schema, env vars, chunked fetching, troubleshooting).
+## Security & Risk Management
+
+⚠️ **Important**: This is financial trading software. Always:
+- Test thoroughly in paper trading mode before live deployment
+- Implement proper API key security and rotation
+- Monitor position sizes and risk limits
+- Use appropriate stop-losses and position sizing
+- Understand the risks of automated trading
+
+## Support and Documentation
+
+- 📖 **Full Documentation**: See [docs/](docs/) directory
+- 🐛 **Issues**: Use GitHub Issues for bug reports
+- 💬 **Discussions**: Use GitHub Discussions for questions
+- 📝 **Project Planning**: Tracked in Linear (FuturesBot project)
+
+## License
+
+See LICENSE file for details.
