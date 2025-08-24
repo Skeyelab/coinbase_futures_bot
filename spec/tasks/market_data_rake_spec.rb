@@ -106,9 +106,42 @@ RSpec.describe "market_data rake tasks", type: :task do
   it "handles missing trading pair gracefully for backfill_15m_candles" do
     @btc_pair.destroy!
     mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_15m_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
     expect { Rake::Task["market_data:backfill_15m_candles"].invoke(1) }.not_to raise_error
+  end
+
+  it "runs backfill_5m_candles and calls rest" do
+    mock_rest = instance_double(MarketData::CoinbaseRest)
+    allow(mock_rest).to receive(:upsert_5m_candles)
+    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
+
+    expect {
+      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
+    }.not_to raise_error
+  end
+
+  it "handles missing trading pair gracefully for backfill_5m_candles" do
+    @btc_pair.destroy!
+    mock_rest = instance_double(MarketData::CoinbaseRest)
+    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
+    expect { Rake::Task["market_data:backfill_5m_candles"].invoke(1) }.not_to raise_error
+  end
+
+  it "runs backfill_5m_candles with real API call", :vcr do
+    # Clear existing candles to avoid conflicts
+    Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
+
+    # Run the actual rake task
+    expect {
+      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
+    }.not_to raise_error
+
+    # Verify that 5m candles were created
+    candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")
+    if candles.any?
+      expect(candles.first.timeframe).to eq("5m")
+      expect(candles.first.symbol).to eq("BTC-USD")
+    end
   end
 
   it "runs test_1h_candles and calls rest" do

@@ -37,6 +37,7 @@
 
 # Keep rules tracked but ignore other local Cursor artifacts
 /.cursor/*
+!/.cursor/environment.json
 !/.cursor/rules/
 !/.cursor/rules/*.mdc
 !/.cursor/Dockerfile
