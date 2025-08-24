@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache system dependencies
         uses: actions/cache@v4
         with:
@@ -32,8 +32,17 @@ jobs:
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
+      - name: Create cache directories
+        run: |
+          mkdir -p .rubocop_cache/
+          mkdir -p tmp/cache/
+
+      - name: Lint code
+        run: bin/rubocop -f github
+
       - name: Cache RuboCop results
+        if: success()
         uses: actions/cache@v4
         with:
           path: |
@@ -44,15 +53,12 @@ jobs:
             ${{ runner.os }}-rubocop-${{ hashFiles('**/Gemfile.lock') }}-
             ${{ runner.os }}-rubocop-
 
-      - name: Lint code
-        run: bin/rubocop -f github
-
   security:
     name: Brakeman (security)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache system dependencies
         uses: actions/cache@v4
         with:
@@ -67,8 +73,17 @@ jobs:
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
+      - name: Create cache directories
+        run: |
+          mkdir -p .brakeman/
+          mkdir -p tmp/cache/
+
+      - name: Static security scan
+        run: bin/brakeman --no-pager
+
       - name: Cache Brakeman results
+        if: success()
         uses: actions/cache@v4
         with:
           path: |
@@ -78,9 +93,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-brakeman-${{ hashFiles('**/Gemfile.lock') }}-
             ${{ runner.os }}-brakeman-
-
-      - name: Static security scan
-        run: bin/brakeman --no-pager
 
   test:
     name: Rails tests
@@ -103,7 +115,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache PostgreSQL data
         uses: actions/cache@v4
         with:
@@ -126,12 +138,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config
-      
+
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
+      - name: Create cache directories
+        run: |
+          mkdir -p coverage/
+          mkdir -p tmp/cache/
+          mkdir -p log/
+
       - name: Cache database setup
         uses: actions/cache@v4
         with:
@@ -145,8 +163,12 @@ jobs:
 
       - name: Prepare database (create + migrate)
         run: bin/rails db:create db:migrate
-      
+
+      - name: Run tests
+        run: bundle exec rspec
+
       - name: Cache RSpec results
+        if: success()
         uses: actions/cache@v4
         with:
           path: |
@@ -156,9 +178,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-
             ${{ runner.os }}-rspec-
-
-      - name: Run tests
-        run: bundle exec rspec
 
   # Optional: Add a job that runs only when tests pass
   success:

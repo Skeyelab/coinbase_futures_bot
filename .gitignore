@@ -47,3 +47,9 @@
 
 # Coinbase CDP API credentials
 cdp_api_key.json
+
+# CI/CD cache directories
+.rubocop_cache/
+.brakeman/
+.rspec_status
+coverage/

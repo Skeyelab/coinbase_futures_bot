@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache PostgreSQL data
         uses: actions/cache@v4
         with:
@@ -55,12 +55,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config
-      
+
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
+      - name: Create cache directories
+        run: |
+          mkdir -p coverage/
+          mkdir -p tmp/cache/
+          mkdir -p log/
+
       - name: Cache database setup
         uses: actions/cache@v4
         with:
@@ -74,8 +80,15 @@ jobs:
 
       - name: Prepare database (create + migrate)
         run: bin/rails db:create db:migrate
-      
+
+      - name: Run tests
+        run: bundle exec rspec
+        env:
+          # Enable parallel test execution hints
+          PARALLEL_TEST_PROCESSORS: 2
+
       - name: Cache RSpec results
+        if: success()
         uses: actions/cache@v4
         with:
           path: |
@@ -86,9 +99,3 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-
             ${{ runner.os }}-rspec-
-
-      - name: Run tests
-        run: bundle exec rspec
-        env:
-          # Enable parallel test execution hints
-          PARALLEL_TEST_PROCESSORS: 2
