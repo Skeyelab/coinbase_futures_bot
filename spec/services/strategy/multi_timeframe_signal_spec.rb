@@ -11,6 +11,10 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     times.each { |t| Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1h", timestamp: t, open: 100, high: 100, low: 100, close: 100, volume: 1) }
     times15 = (0...120).map { |i| i * 15 }.map { |m| m.minutes.ago }.reverse
     times15.each { |t| Candle.create!(symbol: "BTC-USD-PERP", timeframe: "15m", timestamp: t, open: 100, high: 100, low: 100, close: 100, volume: 1) }
+    times5 = (0...100).map { |i| i * 5 }.map { |m| m.minutes.ago }.reverse
+    times5.each { |t| Candle.create!(symbol: "BTC-USD-PERP", timeframe: "5m", timestamp: t, open: 100, high: 100, low: 100, close: 100, volume: 1) }
+    times1 = (0...60).map { |i| i.minutes.ago }.reverse
+    times1.each { |t| Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1m", timestamp: t, open: 100, high: 100, low: 100, close: 100, volume: 1) }
 
     # Put price slightly above EMA to trigger a hypothetical long setup
     Candle.last.update!(close: 101)
@@ -21,7 +25,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
     allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
 
-    strat = described_class.new(ema_1h_short: 1, ema_1h_long: 1, ema_15m: 1, min_1h_candles: 80, min_15m_candles: 120)
+    strat = described_class.new(ema_1h_short: 1, ema_1h_long: 1, ema_15m: 1, ema_5m: 1, ema_1m: 1, min_1h_candles: 80, min_15m_candles: 120, min_5m_candles: 100, min_1m_candles: 60)
     expect(strat.signal(symbol: "BTC-USD-PERP")).to be_nil
   end
 
@@ -55,7 +59,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         elsif i == 102
           # Final candle - well above EMA
           price = base_price + 2.0 + (i * 0.1) # This will be around 102.2
-          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "15m", timestamp: t, open: price, high: price + 0.3, low: price - 0.1, close: price + 0.2, volume: 1)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "15m", timestamp: t, open: price, high: price + 0.3, low: price - 0.2, close: price + 0.2, volume: 1)
         else
           # Ensure one of the recent candles touches the EMA
           if i == 115
@@ -64,8 +68,58 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           else
             # Other recent candles above EMA
             price = base_price + 2.0 + (i * 0.1)
-            Candle.create!(symbol: "BTC-USD-PERP", timeframe: "15m", timestamp: t, open: price, high: price + 0.3, low: price - 0.1, close: price + 0.2, volume: 1)
+            Candle.create!(symbol: "BTC-USD-PERP", timeframe: "15m", timestamp: t, open: price, high: price + 0.3, low: price - 0.2, close: price + 0.2, volume: 1)
           end
+        end
+      end
+    end
+
+    # Create 5m candles with similar pattern
+    times5 = (0...100).map { |i| i * 5 }.map { |m| m.minutes.ago }.reverse
+    times5.each_with_index do |t, i|
+      if i < 80
+        # Most candles above EMA (uptrend)
+        price = base_price + 2.0 + (i * 0.05)
+        Candle.create!(symbol: "BTC-USD-PERP", timeframe: "5m", timestamp: t, open: price, high: price + 0.3, low: price - 0.3, close: price, volume: 1)
+      else
+        # Last few candles show pullback to EMA then reclaim above
+        if i == 80
+          # Pullback candle - touches EMA
+          price = base_price + 2.0 + (i * 0.05)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "5m", timestamp: t, open: price + 0.3, high: price + 0.3, low: price - 0.1, close: price - 0.1, volume: 1)
+        elsif i == 81
+          # Reclaim candle - closes above EMA
+          price = base_price + 2.0 + (i * 0.05)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "5m", timestamp: t, open: price - 0.1, high: price + 0.2, low: price - 0.1, close: price + 0.1, volume: 1)
+        else
+          # Final candles - well above EMA
+          price = base_price + 2.0 + (i * 0.05)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "5m", timestamp: t, open: price, high: price + 0.2, low: price - 0.1, close: price + 0.1, volume: 1)
+        end
+      end
+    end
+
+    # Create 1m candles with similar pattern
+    times1 = (0...60).map { |i| i.minutes.ago }.reverse
+    times1.each_with_index do |t, i|
+      if i < 50
+        # Most candles above EMA (uptrend)
+        price = base_price + 2.0 + (i * 0.01)
+        Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1m", timestamp: t, open: price, high: price + 0.1, low: price - 0.1, close: price, volume: 1)
+      else
+        # Last few candles show pullback to EMA then reclaim above
+        if i == 50
+          # Pullback candle - touches EMA
+          price = base_price + 2.0 + (i * 0.01)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1m", timestamp: t, open: price + 0.1, high: price + 0.1, low: price - 0.05, close: price - 0.05, volume: 1)
+        elsif i == 51
+          # Reclaim candle - closes above EMA
+          price = base_price + 2.0 + (i * 0.01)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1m", timestamp: t, open: price - 0.05, high: price + 0.1, low: price - 0.05, close: price + 0.05, volume: 1)
+        else
+          # Final candles - well above EMA
+          price = base_price + 2.0 + (i * 0.01)
+          Candle.create!(symbol: "BTC-USD-PERP", timeframe: "1m", timestamp: t, open: price, high: price + 0.1, low: price - 0.05, close: price + 0.05, volume: 1)
         end
       end
     end
@@ -75,7 +129,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
     allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
 
-    strat = described_class.new(ema_1h_short: 12, ema_1h_long: 26, ema_15m: 21, min_1h_candles: 80, min_15m_candles: 120)
+    strat = described_class.new(ema_1h_short: 12, ema_1h_long: 26, ema_15m: 21, ema_5m: 13, ema_1m: 8, min_1h_candles: 80, min_15m_candles: 120, min_5m_candles: 100, min_1m_candles: 60)
 
     order = strat.signal(symbol: "BTC-USD-PERP")
 

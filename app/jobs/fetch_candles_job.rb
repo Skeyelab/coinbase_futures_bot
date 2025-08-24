@@ -12,13 +12,41 @@ class FetchCandlesJob < ApplicationJob
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
     return unless btc_pair
 
-    # Fetch all supported timeframes: 5m, 15m, and 1h
+    # Fetch all supported timeframes: 1m, 5m, 15m, and 1h
+    fetch_1m_candles(rest, btc_pair, backfill_days)
     fetch_5m_candles(rest, btc_pair, backfill_days)
     fetch_15m_candles(rest, btc_pair, backfill_days)
     fetch_1h_candles(rest, btc_pair, backfill_days)
   end
 
   private
+
+  def fetch_1m_candles(rest, btc_pair, backfill_days)
+    begin
+      # Choose the later of (last known + 1m) and (backfill_days ago)
+      # Use shorter backfill for 1m candles since they're very frequent
+      backfill_days_1m = [ backfill_days.to_i, 1 ].min # Cap at 1 day for 1m
+      start_time = [ last_candle_time(btc_pair.product_id, "1m")&.+(1.minute), backfill_days_1m.days.ago ].compact.max
+
+      # Use chunked fetching for large date ranges to avoid API limits
+      if backfill_days_1m > 1
+        rest.upsert_1m_candles_chunked(
+          product_id: btc_pair.product_id,
+          start_time: start_time,
+          end_time: Time.now.utc,
+          chunk_days: 1
+        )
+      else
+        rest.upsert_1m_candles(
+          product_id: btc_pair.product_id,
+          start_time: start_time,
+          end_time: Time.now.utc
+        )
+      end
+    rescue => e
+      Rails.logger.error("[Candles] Failed to fetch 1m candles for #{btc_pair.product_id}: #{e.message}")
+    end
+  end
 
   def fetch_5m_candles(rest, btc_pair, backfill_days)
     begin
