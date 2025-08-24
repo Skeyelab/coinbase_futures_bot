@@ -16,7 +16,9 @@ end
 Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 
 RSpec.configure do |config|
+  # Use database transactions for fast test isolation instead of expensive delete_all
   config.use_transactional_fixtures = true
+  config.use_instantiated_fixtures = false
 
   config.infer_spec_type_from_file_location!
   config.filter_rails_from_backtrace!
@@ -28,18 +30,7 @@ RSpec.configure do |config|
     clear_enqueued_jobs
     clear_performed_jobs
   end
-
-  # Ensure a clean slate for domain tables between examples to avoid
-  # cross-test interference when external data may exist in the DB.
-  config.before(:each) do
-    begin
-      Candle.delete_all
-      TradingPair.delete_all
-      Tick.delete_all
-      SentimentEvent.delete_all
-      SentimentAggregate.delete_all
-    rescue ActiveRecord::StatementInvalid
-      # If tables are missing in a particular environment, ignore
-    end
-  end
+  
+  # Removed expensive delete_all operations - transactional fixtures handle cleanup
+  # Individual tests can clean specific data if needed
 end
