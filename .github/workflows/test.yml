@@ -32,15 +32,59 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+      
+      - name: Cache PostgreSQL data
+        uses: actions/cache@v4
+        with:
+          path: ~/.postgresql
+          key: ${{ runner.os }}-postgresql-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-postgresql-
+
+      - name: Cache system dependencies
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config
-      - uses: ruby/setup-ruby@v1
+      
+      - uses: ruby/setup-ruby@v2
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
+      
+      - name: Cache database setup
+        uses: actions/cache@v4
+        with:
+          path: tmp/
+          key: ${{ runner.os }}-db-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('db/**/*') }}
+          restore-keys: |
+            ${{ runner.os }}-db-${{ hashFiles('**/Gemfile.lock') }}-
+            ${{ runner.os }}-db-
+
       - name: Prepare database (create + migrate)
         run: bin/rails db:create db:migrate
+      
+      - name: Cache RSpec results
+        uses: actions/cache@v4
+        with:
+          path: |
+            coverage/
+            tmp/cache/
+            .rspec_status
+          key: ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('spec/**/*') }}
+          restore-keys: |
+            ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-
+            ${{ runner.os }}-rspec-
+
       - name: Run tests
         run: bundle exec rspec
+        env:
+          # Enable parallel test execution hints
+          PARALLEL_TEST_PROCESSORS: 2

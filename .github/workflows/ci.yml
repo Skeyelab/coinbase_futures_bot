@@ -12,10 +12,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: ruby/setup-ruby@v1
+      
+      - name: Cache system dependencies
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - uses: ruby/setup-ruby@v2
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
+      
+      - name: Cache RuboCop results
+        uses: actions/cache@v4
+        with:
+          path: |
+            .rubocop_cache/
+            tmp/cache/
+          key: ${{ runner.os }}-rubocop-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('**/.rubocop.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-rubocop-${{ hashFiles('**/Gemfile.lock') }}-
+            ${{ runner.os }}-rubocop-
+
       - name: Lint code
         run: bin/rubocop -f github
 
@@ -24,10 +45,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: ruby/setup-ruby@v1
+      
+      - name: Cache system dependencies
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-
+
+      - uses: ruby/setup-ruby@v2
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
+      
+      - name: Cache Brakeman results
+        uses: actions/cache@v4
+        with:
+          path: |
+            .brakeman/
+            tmp/cache/
+          key: ${{ runner.os }}-brakeman-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('**/config/**/*') }}
+          restore-keys: |
+            ${{ runner.os }}-brakeman-${{ hashFiles('**/Gemfile.lock') }}-
+            ${{ runner.os }}-brakeman-
+
       - name: Static security scan
         run: bin/brakeman --no-pager
 
