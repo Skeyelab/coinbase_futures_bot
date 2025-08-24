@@ -35,12 +35,12 @@ module PaperTrading
         case o.side
         when :buy
           if candle.low.to_f <= o.price.to_f
-            fill_price = [ o.price.to_f, bid ].min
+            fill_price = [o.price.to_f, bid].min
             apply_fill(o, fill_price)
           end
         when :sell
           if candle.high.to_f >= o.price.to_f
-            fill_price = [ o.price.to_f, ask ].max
+            fill_price = [o.price.to_f, ask].max
             apply_fill(o, fill_price)
           end
         end
@@ -55,12 +55,10 @@ module PaperTrading
           elsif o.sl && candle.low.to_f <= o.sl.to_f
             exit_price = o.sl.to_f
           end
-        else
-          if o.tp && candle.low.to_f <= o.tp.to_f
-            exit_price = o.tp.to_f
-          elsif o.sl && candle.high.to_f >= o.sl.to_f
-            exit_price = o.sl.to_f
-          end
+        elsif o.tp && candle.low.to_f <= o.tp.to_f
+          exit_price = o.tp.to_f
+        elsif o.sl && candle.high.to_f >= o.sl.to_f
+          exit_price = o.sl.to_f
         end
         next unless exit_price
         realize_pnl(o, exit_price)
@@ -80,7 +78,7 @@ module PaperTrading
       order.filled_qty = order.quantity
       fee = fill_price * order.filled_qty * @maker_fee
       @equity_usd -= fee
-      @fills << { order_id: order.id, side: order.side, price: fill_price, qty: order.filled_qty, fee: fee, time: Time.now.utc }
+      @fills << {order_id: order.id, side: order.side, price: fill_price, qty: order.filled_qty, fee: fee, time: Time.now.utc}
     end
 
     def realize_pnl(order, exit_price)
@@ -92,7 +90,7 @@ module PaperTrading
       when :sell then entry_value - exit_value - fee
       end
       @equity_usd += pnl
-      @fills << { order_id: order.id, side: (order.side == :buy ? :sell : :buy), price: exit_price, qty: order.filled_qty, fee: fee, time: Time.now.utc }
+      @fills << {order_id: order.id, side: ((order.side == :buy) ? :sell : :buy), price: exit_price, qty: order.filled_qty, fee: fee, time: Time.now.utc}
     end
   end
 end

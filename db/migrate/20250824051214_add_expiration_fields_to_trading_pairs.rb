@@ -6,6 +6,6 @@ class AddExpirationFieldsToTradingPairs < ActiveRecord::Migration[8.0]
 
     # Add indexes for querying by expiration date
     add_index :trading_pairs, :expiration_date
-    add_index :trading_pairs, [ :is_perpetual, :expiration_date ]
+    add_index :trading_pairs, [:is_perpetual, :expiration_date]
   end
 end

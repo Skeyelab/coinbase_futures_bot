@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+# Fast RSpec runner with optimized parallel execution
+
+require "bundler/setup"
+
+# Optimized parallel test execution
+exec "bundle", "exec", "parallel_rspec",
+     "--group-by", "runtime",
+     "--runtime-log", "tmp/parallel_runtime_rspec.log",
+     "-n", "6",  # Reduced from 12 for better resource usage
+     "--single", "spec/services/coinbase_rest_spec.rb",  # Isolate heavy DB tests
+     "spec/"

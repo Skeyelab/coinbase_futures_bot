@@ -38,10 +38,10 @@ module Coinbase
       begin
         resp = authenticated_get(path)
         data = JSON.parse(resp.body)
-        { ok: true, count: data.is_a?(Array) ? data.size : 1, data: data }
+        {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
-        { ok: false, error: e.class.to_s, message: e.message, body: body }
+        {ok: false, error: e.class.to_s, message: e.message, body: body}
       end
     end
 
@@ -74,7 +74,7 @@ module Coinbase
         data
       end
 
-      products = [ products ] unless products.is_a?(Array)
+      products = [products] unless products.is_a?(Array)
       products
     end
 
@@ -86,7 +86,7 @@ module Coinbase
 
     # Get product candles
     def get_candles(product_id, start_time: nil, end_time: nil, granularity: 3600)
-      params = { granularity: granularity }
+      params = {granularity: granularity}
       params[:start] = start_time.iso8601 if start_time
       params[:end] = end_time.iso8601 if end_time
 

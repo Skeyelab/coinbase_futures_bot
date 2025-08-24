@@ -17,8 +17,8 @@ VCR.configure do |config|
   # Ignore Sentry requests
   config.ignore_request do |request|
     request.uri.include?("glitchtip.ger.ericdahl.dev") ||
-    request.uri.include?("sentry.io") ||
-    request.uri.include?("sentry")
+      request.uri.include?("sentry.io") ||
+      request.uri.include?("sentry")
   end
 
   # Allow real HTTP connections in development if needed
@@ -27,6 +27,6 @@ VCR.configure do |config|
   # Record new cassettes when they don't exist
   config.default_cassette_options = {
     record: :new_episodes,
-    match_requests_on: [ :method, :uri, :body ]
+    match_requests_on: [:method, :uri, :body]
   }
 end

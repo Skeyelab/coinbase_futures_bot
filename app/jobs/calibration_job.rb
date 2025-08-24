@@ -21,14 +21,14 @@ class CalibrationJob < ApplicationJob
   end
 
   def grid_search(candles)
-    tp_targets = [ 0.004, 0.006, 0.008 ]
-    sl_targets = [ 0.003, 0.004, 0.005 ]
+    tp_targets = [0.004, 0.006, 0.008]
+    sl_targets = [0.003, 0.004, 0.005]
 
     best = nil
     tp_targets.product(sl_targets).each do |tp, sl|
       pnl = simulate(candles, tp_target: tp, sl_target: sl)
       score = pnl
-      best = { tp_target: tp, sl_target: sl, pnl: pnl } if best.nil? || score > best[:pnl]
+      best = {tp_target: tp, sl_target: sl, pnl: pnl} if best.nil? || score > best[:pnl]
     end
     best
   end

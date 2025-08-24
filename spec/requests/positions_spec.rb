@@ -52,19 +52,19 @@ RSpec.describe "Positions", type: :request do
     it "accepts valid basic authentication" do
       allow(positions_service).to receive(:list_open_positions).and_return(mock_positions)
 
-      get "/positions", headers: { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      get "/positions", headers: {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
       expect(response).to have_http_status(:success)
     end
 
     it "rejects invalid basic authentication" do
-      get "/positions", headers: { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:wrongpassword") }
+      get "/positions", headers: {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:wrongpassword")}
       expect(response).to have_http_status(:unauthorized)
     end
   end
 
   describe "GET /positions" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "displays positions list successfully" do
@@ -91,7 +91,7 @@ RSpec.describe "Positions", type: :request do
 
     it "displays error message when service fails" do
       allow(positions_service).to receive(:list_open_positions).and_raise(
-        Faraday::ClientError.new("API Error", response: { status: 500, body: "Server Error" })
+        Faraday::ClientError.new("API Error", response: {status: 500, body: "Server Error"})
       )
 
       get "/positions", headers: @auth_header
@@ -129,7 +129,7 @@ RSpec.describe "Positions", type: :request do
 
   describe "GET /positions/:product_id/edit" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "displays position edit form successfully" do
@@ -158,7 +158,7 @@ RSpec.describe "Positions", type: :request do
 
     it "displays error message when service fails" do
       allow(positions_service).to receive(:list_open_positions).and_raise(
-        Faraday::ClientError.new("API Error", response: { status: 500, body: "Server Error" })
+        Faraday::ClientError.new("API Error", response: {status: 500, body: "Server Error"})
       )
 
       get "/positions/BIP-20DEC30-CDE/edit", headers: @auth_header
@@ -193,22 +193,22 @@ RSpec.describe "Positions", type: :request do
 
   describe "POST /positions/:product_id/close" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "closes position successfully and redirects" do
-      mock_result = { "success" => true, "order_id" => "close-123" }
+      mock_result = {"success" => true, "order_id" => "close-123"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
       post "/positions/BIP-20DEC30-CDE/close",
-           params: { size: "1" },
-           headers: @auth_header
+        params: {size: "1"},
+        headers: @auth_header
 
       expect(response).to redirect_to("/positions?notice=Close+order+submitted%3A+close-123")
     end
 
     it "closes position without size parameter" do
-      mock_result = { "success" => true, "message" => "Position closed" }
+      mock_result = {"success" => true, "message" => "Position closed"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
       post "/positions/BIP-20DEC30-CDE/close", headers: @auth_header
@@ -222,8 +222,8 @@ RSpec.describe "Positions", type: :request do
       )
 
       post "/positions/BIP-20DEC30-CDE/close",
-           params: { size: "1" },
-           headers: @auth_header
+        params: {size: "1"},
+        headers: @auth_header
 
       expect(response).to redirect_to("/positions/BIP-20DEC30-CDE/edit?notice=Error%3A+Order+failed")
     end
@@ -232,26 +232,26 @@ RSpec.describe "Positions", type: :request do
       expect(positions_service).to receive(:close_position).with(
         product_id: "BIP-20DEC30-CDE",
         size: "1.5"
-      ).and_return({ "success" => true })
+      ).and_return({"success" => true})
 
       post "/positions/BIP-20DEC30-CDE/close",
-           params: { size: "1.5" },
-           headers: @auth_header
+        params: {size: "1.5"},
+        headers: @auth_header
     end
   end
 
   describe "PATCH /positions/:product_id" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "updates position successfully and redirects" do
-      mock_result = { "success" => true, "order_id" => "update-123" }
+      mock_result = {"success" => true, "order_id" => "update-123"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
       patch "/positions/BIP-20DEC30-CDE",
-            params: { size: "1" },
-            headers: @auth_header
+        params: {size: "1"},
+        headers: @auth_header
 
       expect(response).to redirect_to("/positions?notice=Close+order+submitted%3A+update-123")
     end
@@ -262,8 +262,8 @@ RSpec.describe "Positions", type: :request do
       )
 
       patch "/positions/BIP-20DEC30-CDE",
-            params: { size: "1" },
-            headers: @auth_header
+        params: {size: "1"},
+        headers: @auth_header
 
       expect(response).to redirect_to("/positions/BIP-20DEC30-CDE/edit?notice=Error%3A+Update+failed")
     end
@@ -271,7 +271,7 @@ RSpec.describe "Positions", type: :request do
 
   describe "form submission workflow" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "completes full position close workflow" do
@@ -286,12 +286,12 @@ RSpec.describe "Positions", type: :request do
       expect(response.body).to include("action=\"/positions/BIP-20DEC30-CDE/close\"")
 
       # 3. Submit close form
-      mock_result = { "success" => true, "order_id" => "workflow-123" }
+      mock_result = {"success" => true, "order_id" => "workflow-123"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
       post "/positions/BIP-20DEC30-CDE/close",
-           params: { size: "1" },
-           headers: @auth_header
+        params: {size: "1"},
+        headers: @auth_header
 
       expect(response).to redirect_to("/positions?notice=Close+order+submitted%3A+workflow-123")
 
@@ -305,7 +305,7 @@ RSpec.describe "Positions", type: :request do
 
   describe "error handling" do
     before do
-      @auth_header = { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      @auth_header = {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
     end
 
     it "handles malformed requests gracefully" do
@@ -317,7 +317,7 @@ RSpec.describe "Positions", type: :request do
     end
 
     it "handles missing parameters gracefully" do
-      allow(positions_service).to receive(:close_position).and_return({ "success" => true })
+      allow(positions_service).to receive(:close_position).and_return({"success" => true})
 
       # Test close without size parameter
       post "/positions/BIP-20DEC30-CDE/close", headers: @auth_header
@@ -337,7 +337,7 @@ RSpec.describe "Positions", type: :request do
     it "validates authentication on every request" do
       # First request with valid auth
       allow(positions_service).to receive(:list_open_positions).and_return(mock_positions)
-      get "/positions", headers: { "HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123") }
+      get "/positions", headers: {"HTTP_AUTHORIZATION" => "Basic " + Base64.strict_encode64("admin:password123")}
       expect(response).to have_http_status(:success)
 
       # Second request without auth should fail

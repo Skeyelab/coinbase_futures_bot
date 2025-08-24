@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe SentimentAggregate, type: :model do
   it "validates presence and uniqueness on symbol/window/window_end_at" do
     t = Time.now.utc.change(sec: 0)
-    a1 = described_class.create!(symbol: "BTC-USD-PERP", window: "15m", window_end_at: t)
+    described_class.create!(symbol: "BTC-USD-PERP", window: "15m", window_end_at: t)
     dup = described_class.new(symbol: "BTC-USD-PERP", window: "15m", window_end_at: t)
     expect(dup.valid?).to be(false)
     expect(dup.errors[:symbol]).to be_present

@@ -21,7 +21,7 @@ class PositionsController < ActionController::Base
   end
 
   def new
-    @position = { "product_id" => params[:product_id] }
+    @position = {"product_id" => params[:product_id]}
   end
 
   def create
@@ -51,13 +51,13 @@ class PositionsController < ActionController::Base
     begin
       positions = positions_service.list_open_positions(product_id: product_id)
       @position = positions.find { |p| p["product_id"] == product_id } || positions.first
-      @position ||= { "product_id" => product_id }
+      @position ||= {"product_id" => product_id}
     rescue Faraday::ClientError => e
       @error_message = e.message
-      @position = { "product_id" => product_id }
+      @position = {"product_id" => product_id}
     rescue => e
       @error_message = e.message
-      @position = { "product_id" => product_id }
+      @position = {"product_id" => product_id}
     end
   end
 

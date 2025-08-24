@@ -26,6 +26,34 @@
 
 ### Session log
 
+#### 2025-08-24 06:40 UTC
+- Context: StandardRB implementation completed - replaced RuboCop with StandardRB for code formatting and linting
+- Changes:
+  - Removed RuboCop configuration and dependencies from Gemfile (rubocop-rails-omakase → standard gem)
+  - Deleted .rubocop.yml configuration file
+  - Updated CI/CD pipeline (.github/workflows/ci.yml) to use StandardRB instead of RuboCop
+  - Replaced bin/rubocop with bin/standardrb binstub
+  - Auto-fixed 848+ existing style violations using StandardRB --fix and --fix-unsafely
+  - Updated development documentation (docs/development.md, docs/CURSOR_AGENTS_README.md) to reflect StandardRB usage
+- Commands run:
+  - `git checkout -b implement-standardrb`
+  - `bundle install` (added standard >= 1.35.1)
+  - `bin/standardrb --fix && bin/standardrb --fix-unsafely`
+  - `bundle exec parallel_rspec spec/` (all 225 tests passing)
+  - `git add -A && git commit -m "feat(tooling): implement StandardRB..."`
+  - `git push origin implement-standardrb`
+- Files touched:
+  - `Gemfile`, `Gemfile.lock` (dependency changes)
+  - `.github/workflows/ci.yml` (CI pipeline update)
+  - `bin/standardrb` (new binstub), deleted `bin/rubocop`
+  - 70+ files auto-formatted by StandardRB
+  - `docs/development.md`, `docs/CURSOR_AGENTS_README.md` (documentation updates)
+- Linear issue:
+  - FUT-11 updated to "Done" status with completion details
+- Next steps:
+  - Ready for code review and merge to main branch
+  - Benefits: zero-configuration Ruby style guide, simpler maintenance, consistent formatting
+
 #### 2025-01-14 09:30 UTC
 - Context: Comprehensive test suite added for upcoming month futures contract functionality
 - Changes:

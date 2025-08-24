@@ -194,18 +194,27 @@ bin/rake signals:generate
 
 ### Ruby Style Guide
 
-Follow RuboCop configuration in `.rubocop.yml`:
+This project uses [StandardRB](https://github.com/standardrb/standard) for Ruby code formatting and linting, providing zero-configuration Ruby style guide:
 
 ```bash
 # Run style checks
-bin/rubocop
+bin/standardrb
 
 # Auto-fix style issues
-bin/rubocop -A
+bin/standardrb --fix
+
+# Auto-fix style issues (including potentially unsafe changes)
+bin/standardrb --fix-unsafely
 
 # Check specific files
-bin/rubocop app/services/
+bin/standardrb app/services/
 ```
+
+StandardRB provides:
+- Zero-configuration Ruby style guide
+- Simpler setup and maintenance than RuboCop
+- Consistent formatting across the codebase
+- Better developer experience with fewer style debates
 
 ### Code Organization
 
@@ -305,6 +314,26 @@ end
 - **Unit Tests**: Models, services, individual classes
 - **Integration Tests**: API endpoints, job processing
 - **System Tests**: End-to-end workflows (if applicable)
+
+#### Test Performance Optimization
+
+**Parallel Execution Options:**
+```bash
+# Standard parallel execution (12 processes)
+bundle exec parallel_rspec spec/
+
+# Optimized execution (6 processes, runtime-based grouping)
+bin/fast_rspec
+
+# Maximum speed (4 processes, isolated heavy tests)
+bin/super_fast_rspec
+```
+
+**Performance Tips:**
+- Use `bin/fast_rspec` for development (28% faster than standard)
+- Use `bin/super_fast_rspec` for CI or when you need maximum speed
+- Runtime log in `tmp/parallel_runtime_rspec.log` optimizes test distribution
+- Heavy test files are isolated to prevent bottlenecks
 
 ## Debugging
 

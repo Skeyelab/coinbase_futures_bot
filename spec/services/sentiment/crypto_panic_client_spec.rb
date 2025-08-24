@@ -7,8 +7,8 @@ RSpec.describe Sentiment::CryptoPanicClient, type: :service do
       "title" => "BTC rallies on ETF news",
       "url" => "https://example.com/etf",
       "published_at" => Time.now.utc.iso8601,
-      "votes" => { "important" => 5 },
-      "currencies" => [ { "code" => "BTC" } ],
+      "votes" => {"important" => 5},
+      "currencies" => [{"code" => "BTC"}],
       "id" => 123,
       "kind" => "news"
     }

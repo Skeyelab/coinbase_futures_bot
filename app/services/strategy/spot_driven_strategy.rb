@@ -7,7 +7,7 @@ module Strategy
     end
 
     # Returns signal per product_id: { product_id => :long|:short|:flat }
-    def generate_signals(product_ids: [ "BTC-USD-PERP", "ETH-USD-PERP" ], as_of: Time.now.utc)
+    def generate_signals(product_ids: ["BTC-USD-PERP", "ETH-USD-PERP"], as_of: Time.now.utc)
       signals = {}
       product_ids.each do |pid|
         z = latest_sentiment_z(pid, window: "15m")

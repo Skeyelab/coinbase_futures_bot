@@ -99,7 +99,7 @@ bin/rails db:prepare
 
 # Testing
 bundle exec rspec
-bundle exec rubocop
+bin/standardrb
 bundle exec brakeman
 
 # Development
@@ -125,7 +125,7 @@ open http://localhost:3000/good_job  # Job dashboard
 
 - **Branch Strategy**: Feature branches with PRs
 - **Commit Style**: Conventional Commits
-- **CI/CD**: GitHub Actions (RuboCop, Brakeman, RSpec)
+- **CI/CD**: GitHub Actions (StandardRB, Brakeman, RSpec)
 - **Email**: Use eric@skeyelab.com for git commits
 
 ### Last Updated

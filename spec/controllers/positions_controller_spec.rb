@@ -39,10 +39,10 @@ RSpec.describe PositionsController, type: :controller do
       get :index
       expect(response).to have_http_status(:unauthorized)
 
-      get :edit, params: { product_id: "BIP-20DEC30-CDE" }
+      get :edit, params: {product_id: "BIP-20DEC30-CDE"}
       expect(response).to have_http_status(:unauthorized)
 
-      post :close, params: { product_id: "BIP-20DEC30-CDE" }
+      post :close, params: {product_id: "BIP-20DEC30-CDE"}
       expect(response).to have_http_status(:unauthorized)
     end
 
@@ -80,7 +80,7 @@ RSpec.describe PositionsController, type: :controller do
 
     it "handles service errors gracefully" do
       allow(positions_service).to receive(:list_open_positions).and_raise(
-        Faraday::ClientError.new("API Error", response: { status: 500, body: "Server Error" })
+        Faraday::ClientError.new("API Error", response: {status: 500, body: "Server Error"})
       )
 
       get :index
@@ -103,7 +103,7 @@ RSpec.describe PositionsController, type: :controller do
     it "displays notice messages from params" do
       allow(positions_service).to receive(:list_open_positions).and_return(mock_positions)
 
-      get :index, params: { notice: "Position closed successfully" }
+      get :index, params: {notice: "Position closed successfully"}
 
       expect(assigns(:notice_message)).to eq("Position closed successfully")
     end
@@ -117,7 +117,7 @@ RSpec.describe PositionsController, type: :controller do
     it "shows position details for existing position" do
       allow(positions_service).to receive(:list_open_positions).and_return(mock_positions)
 
-      get :edit, params: { product_id: "BIP-20DEC30-CDE" }
+      get :edit, params: {product_id: "BIP-20DEC30-CDE"}
 
       expect(response).to have_http_status(:success)
       expect(assigns(:position)).to eq(mock_positions.first)
@@ -127,7 +127,7 @@ RSpec.describe PositionsController, type: :controller do
     it "creates placeholder position when product not found" do
       allow(positions_service).to receive(:list_open_positions).and_return([])
 
-      get :edit, params: { product_id: "NONEXISTENT" }
+      get :edit, params: {product_id: "NONEXISTENT"}
 
       expect(response).to have_http_status(:success)
       expect(assigns(:position)["product_id"]).to eq("NONEXISTENT")
@@ -135,10 +135,10 @@ RSpec.describe PositionsController, type: :controller do
 
     it "handles service errors gracefully" do
       allow(positions_service).to receive(:list_open_positions).and_raise(
-        Faraday::ClientError.new("API Error", response: { status: 500, body: "Server Error" })
+        Faraday::ClientError.new("API Error", response: {status: 500, body: "Server Error"})
       )
 
-      get :edit, params: { product_id: "BIP-20DEC30-CDE" }
+      get :edit, params: {product_id: "BIP-20DEC30-CDE"}
 
       expect(response).to have_http_status(:success)
       expect(assigns(:error_message)).to include("API Error")
@@ -148,7 +148,7 @@ RSpec.describe PositionsController, type: :controller do
     it "handles general errors gracefully" do
       allow(positions_service).to receive(:list_open_positions).and_raise(StandardError.new("Unexpected error"))
 
-      get :edit, params: { product_id: "BIP-20DEC30-CDE" }
+      get :edit, params: {product_id: "BIP-20DEC30-CDE"}
 
       expect(response).to have_http_status(:success)
       expect(assigns(:error_message)).to include("Unexpected error")
@@ -162,10 +162,10 @@ RSpec.describe PositionsController, type: :controller do
     end
 
     it "closes position successfully and redirects with notice" do
-      mock_result = { "success" => true, "order_id" => "close-123" }
+      mock_result = {"success" => true, "order_id" => "close-123"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
-      post :close, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
+      post :close, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
 
       expect(response).to have_http_status(:redirect)
       expect(response.redirect_url).to include("/positions")
@@ -174,10 +174,10 @@ RSpec.describe PositionsController, type: :controller do
     end
 
     it "closes position without size (uses inferred size)" do
-      mock_result = { "success" => true, "message" => "Position closed" }
+      mock_result = {"success" => true, "message" => "Position closed"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
-      post :close, params: { product_id: "BIP-20DEC30-CDE" }
+      post :close, params: {product_id: "BIP-20DEC30-CDE"}
 
       expect(response).to have_http_status(:redirect)
       expect(response.redirect_url).to include("/positions")
@@ -190,7 +190,7 @@ RSpec.describe PositionsController, type: :controller do
         StandardError.new("Order failed")
       )
 
-      post :close, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
+      post :close, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
 
       expect(response).to have_http_status(:redirect)
       expect(response.redirect_url).to include("/positions/BIP-20DEC30-CDE/edit")
@@ -202,9 +202,9 @@ RSpec.describe PositionsController, type: :controller do
       expect(positions_service).to receive(:close_position).with(
         product_id: "BIP-20DEC30-CDE",
         size: "1.5"
-      ).and_return({ "success" => true })
+      ).and_return({"success" => true})
 
-      post :close, params: { product_id: "BIP-20DEC30-CDE", size: "1.5" }
+      post :close, params: {product_id: "BIP-20DEC30-CDE", size: "1.5"}
     end
   end
 
@@ -214,10 +214,10 @@ RSpec.describe PositionsController, type: :controller do
     end
 
     it "updates position successfully and redirects with notice" do
-      mock_result = { "success" => true, "order_id" => "update-123" }
+      mock_result = {"success" => true, "order_id" => "update-123"}
       allow(positions_service).to receive(:close_position).and_return(mock_result)
 
-      patch :update, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
+      patch :update, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
 
       expect(response).to have_http_status(:redirect)
       expect(response.redirect_url).to include("/positions")
@@ -230,7 +230,7 @@ RSpec.describe PositionsController, type: :controller do
         StandardError.new("Update failed")
       )
 
-      patch :update, params: { product_id: "BIP-20DEC30-CDE", size: "1" }
+      patch :update, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
 
       expect(response).to have_http_status(:redirect)
       expect(response.redirect_url).to include("/positions/BIP-20DEC30-CDE/edit")
@@ -247,7 +247,7 @@ RSpec.describe PositionsController, type: :controller do
       expect(service1).to eq(service2)
     end
 
-        it "creates new positions service instance" do
+    it "creates new positions service instance" do
       # Clear the memoized service first
       controller.instance_variable_set(:@positions_service, nil)
 

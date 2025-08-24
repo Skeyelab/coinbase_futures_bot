@@ -37,21 +37,21 @@ RSpec.describe "market_data rake tasks", type: :task do
   it "enqueues subscribe with args" do
     expect {
       Rake::Task["market_data:subscribe"].invoke("BTC-USD-PERP,ETH-USD-PERP")
-    }.to have_enqueued_job(MarketDataSubscribeJob).with([ "BTC-USD-PERP", "ETH-USD-PERP" ])
+    }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP", "ETH-USD-PERP"])
   end
 
   it "uses env PRODUCT_IDS when products arg is nil" do
     ClimateControl.modify(PRODUCT_IDS: "BTC-USD-PERP") do
       expect {
         Rake::Task["market_data:subscribe"].invoke(nil)
-      }.to have_enqueued_job(MarketDataSubscribeJob).with([ "BTC-USD-PERP" ])
+      }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
     end
   end
 
   it "uses default PRODUCT_IDS when neither arg nor env provided" do
     expect {
       Rake::Task["market_data:subscribe"].invoke(nil)
-    }.to have_enqueued_job(MarketDataSubscribeJob).with([ "BTC-USD-PERP" ])
+    }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
   end
 
   it "upserts futures products via rest service and outputs completion message" do
@@ -167,7 +167,7 @@ RSpec.describe "market_data rake tasks", type: :task do
 
     ClimateControl.modify(INLINE: "1") do
       expect(MarketData::CoinbaseDerivativesSubscriber).to receive(:new) do |**kwargs|
-        expect(kwargs[:product_ids]).to eq([ "BTC-USD-PERP" ]) if kwargs[:product_ids].is_a?(Array)
+        expect(kwargs[:product_ids]).to eq(["BTC-USD-PERP"]) if kwargs[:product_ids].is_a?(Array)
         instance_double("Sub", start: nil)
       end
       expect { Rake::Task["market_data:subscribe_futures"].invoke("BTC-USD-PERP") }.not_to raise_error

@@ -16,7 +16,7 @@ class CreateSentimentEvents < ActiveRecord::Migration[8.0]
 
     add_index :sentiment_events, :published_at
     add_index :sentiment_events, :symbol
-    add_index :sentiment_events, [ :source, :raw_text_hash ], unique: true, name: "index_sentiment_events_on_source_and_raw_text_hash"
+    add_index :sentiment_events, [:source, :raw_text_hash], unique: true, name: "index_sentiment_events_on_source_and_raw_text_hash"
     add_index :sentiment_events, :url
   end
 end

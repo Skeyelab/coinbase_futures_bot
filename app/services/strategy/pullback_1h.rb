@@ -28,7 +28,7 @@ module Strategy
 
       # Trend analysis
       uptrend = last.close.to_f > ema_long
-      pullback = last.low.to_f <= ema_short && last.close.to_f >= ema_short
+      pullback = ema_short.between?(last.low.to_f, last.close.to_f)
 
       # Additional confirmation: volume and momentum
       volume_confirmation = volume_increasing?(candles)
@@ -38,7 +38,7 @@ module Strategy
 
       entry = last.close.to_f
       be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
-      tp = [ entry * (1.0 + @config[:tp_target]), be * (1.0 + @config[:tp_margin]) ].max
+      tp = [entry * (1.0 + @config[:tp_target]), be * (1.0 + @config[:tp_margin])].max
       sl = entry * (1.0 - @config[:sl_target])
 
       qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: 0.005)
@@ -61,7 +61,7 @@ module Strategy
       current_equity = equity_usd
 
       # Test strategy on each candle after minimum required
-      (@config[:min_candles]..candles.size-1).each do |i|
+      (@config[:min_candles]..candles.size - 1).each do |i|
         test_candles = candles[0..i]
         signal = signal(candles: test_candles, symbol: symbol, equity_usd: current_equity)
 
@@ -120,7 +120,7 @@ module Strategy
       pullback_quality = (ema_short - candles.last.low.to_f).abs / ema_short
 
       confidence = (trend_strength * 0.6 + pullback_quality * 0.4) * 100
-      [ confidence, 100 ].min.round(1)
+      [confidence, 100].min.round(1)
     end
 
     def simulate_trade(signal, entry_candle, equity)
@@ -130,25 +130,18 @@ module Strategy
 
       # For backtesting, assume we hit take profit or stop loss
       # This is simplified - real backtesting would track each candle
-      if rand > 0.5  # 50% win rate for demo
-        exit_price = signal[:tp]
-        pnl = CostModel.round_trip_net_pnl(
-          entry_price: entry_price,
-          exit_price: exit_price,
-          quantity: quantity,
-          fee_rate: @config[:maker_fee],
-          slippage_rate: @config[:slippage]
-        )
+      exit_price = if rand > 0.5  # 50% win rate for demo
+        signal[:tp]
       else
-        exit_price = signal[:sl]
-        pnl = CostModel.round_trip_net_pnl(
-          entry_price: entry_price,
-          exit_price: exit_price,
-          quantity: quantity,
-          fee_rate: @config[:maker_fee],
-          slippage_rate: @config[:slippage]
-        )
+        signal[:sl]
       end
+      pnl = CostModel.round_trip_net_pnl(
+        entry_price: entry_price,
+        exit_price: exit_price,
+        quantity: quantity,
+        fee_rate: @config[:maker_fee],
+        slippage_rate: @config[:slippage]
+      )
 
       {
         entry_price: entry_price,
