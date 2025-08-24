@@ -18,40 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache system dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/apt
-            ~/.cache/pip
-          key: ${{ runner.os }}-system-deps-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-system-deps-
-
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
 
-      - name: Create cache directories
-        run: |
-          mkdir -p .rubocop_cache/
-          mkdir -p tmp/cache/
-
       - name: Lint code
         run: bin/rubocop -f github
-
-      - name: Cache RuboCop results
-        if: success()
-        uses: actions/cache@v4
-        with:
-          path: |
-            .rubocop_cache/
-            tmp/cache/
-          key: ${{ runner.os }}-rubocop-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('**/.rubocop.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-rubocop-${{ hashFiles('**/Gemfile.lock') }}-
-            ${{ runner.os }}-rubocop-
 
   security:
     name: Brakeman (security)
@@ -59,40 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache system dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/apt
-            ~/.cache/pip
-          key: ${{ runner.os }}-system-deps-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-system-deps-
-
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
 
-      - name: Create cache directories
-        run: |
-          mkdir -p .brakeman/
-          mkdir -p tmp/cache/
-
       - name: Static security scan
         run: bin/brakeman --no-pager
-
-      - name: Cache Brakeman results
-        if: success()
-        uses: actions/cache@v4
-        with:
-          path: |
-            .brakeman/
-            tmp/cache/
-          key: ${{ runner.os }}-brakeman-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('**/config/**/*') }}
-          restore-keys: |
-            ${{ runner.os }}-brakeman-${{ hashFiles('**/Gemfile.lock') }}-
-            ${{ runner.os }}-brakeman-
 
   test:
     name: Rails tests
@@ -116,68 +62,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache PostgreSQL data
-        uses: actions/cache@v4
+      - uses: ruby/setup-ruby@v1
         with:
-          path: ~/.postgresql
-          key: ${{ runner.os }}-postgresql-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-postgresql-
-
-      - name: Cache system dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/apt
-            ~/.cache/pip
-          key: ${{ runner.os }}-system-deps-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-system-deps-
+          ruby-version: '3.2.2'
+          bundler-cache: true
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config
 
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2.2'
-          bundler-cache: true
-
-      - name: Create cache directories
-        run: |
-          mkdir -p coverage/
-          mkdir -p tmp/cache/
-          mkdir -p log/
-
-      - name: Cache database setup
-        uses: actions/cache@v4
-        with:
-          path: |
-            tmp/
-            log/
-          key: ${{ runner.os }}-db-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('db/**/*') }}
-          restore-keys: |
-            ${{ runner.os }}-db-${{ hashFiles('**/Gemfile.lock') }}-
-            ${{ runner.os }}-db-
-
       - name: Prepare database (create + migrate)
         run: bin/rails db:create db:migrate
 
       - name: Run tests
         run: bundle exec rspec
-
-      - name: Cache RSpec results
-        if: success()
-        uses: actions/cache@v4
-        with:
-          path: |
-            coverage/
-            tmp/cache/
-          key: ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-${{ hashFiles('spec/**/*') }}
-          restore-keys: |
-            ${{ runner.os }}-rspec-${{ hashFiles('**/Gemfile.lock') }}-
-            ${{ runner.os }}-rspec-
 
   # Optional: Add a job that runs only when tests pass
   success:
