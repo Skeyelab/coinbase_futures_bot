@@ -24,7 +24,7 @@ class EndOfDayPositionClosureJob < ApplicationJob
 
     if closed_count > 0
       @logger.warn("Successfully closed #{closed_count} day trading positions at end of day")
-      
+
       # Get final summary
       final_summary = @manager.get_position_summary
       @logger.info("Final position summary: #{final_summary}")
@@ -36,7 +36,7 @@ class EndOfDayPositionClosureJob < ApplicationJob
   rescue => e
     @logger.error("End-of-day position closure job failed: #{e.message}")
     @logger.error(e.backtrace.join("\n"))
-    
+
     # This is critical - if we can't close positions, we need to alert
     # In production, you might want to send notifications here
     raise

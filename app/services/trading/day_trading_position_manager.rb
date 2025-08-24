@@ -39,11 +39,9 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          closed_count += close_single_position(position)
-        rescue => e
-          @logger.error("Failed to close position #{position.id}: #{e.message}")
-        end
+        closed_count += close_single_position(position)
+      rescue => e
+        @logger.error("Failed to close position #{position.id}: #{e.message}")
       end
 
       @logger.info("Successfully closed #{closed_count} expired day trading positions")
@@ -59,11 +57,9 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          closed_count += close_single_position(position, reason: "Approaching closure time")
-        rescue => e
-          @logger.error("Failed to close approaching position #{position.id}: #{e.message}")
-        end
+        closed_count += close_single_position(position, reason: "Approaching closure time")
+      rescue => e
+        @logger.error("Failed to close approaching position #{position.id}: #{e.message}")
       end
 
       @logger.info("Successfully closed #{closed_count} approaching day trading positions")
@@ -79,11 +75,9 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          closed_count += close_single_position(position, reason: "Emergency closure")
-        rescue => e
-          @logger.error("Failed to force close position #{position.id}: #{e.message}")
-        end
+        closed_count += close_single_position(position, reason: "Emergency closure")
+      rescue => e
+        @logger.error("Failed to force close position #{position.id}: #{e.message}")
       end
 
       @logger.warn("Force closed #{closed_count} day trading positions")
@@ -97,12 +91,10 @@ module Trading
 
       prices = {}
       positions.each do |position|
-        begin
-          current_price = get_current_price_for_position(position)
-          prices[position.id] = current_price if current_price
-        rescue => e
-          @logger.error("Failed to get price for position #{position.id}: #{e.message}")
-        end
+        current_price = get_current_price_for_position(position)
+        prices[position.id] = current_price if current_price
+      rescue => e
+        @logger.error("Failed to get price for position #{position.id}: #{e.message}")
       end
 
       prices
@@ -235,22 +227,22 @@ module Trading
     def get_current_price_for_position(position)
       # Try to get current price from the most recent tick or candle
       # This is a simplified approach - in production you might want to use real-time market data
-      
+
       # Try to get from recent ticks first
       recent_tick = Tick.where(product_id: position.product_id)
-                        .order(observed_at: :desc)
-                        .first
-      
+        .order(observed_at: :desc)
+        .first
+
       if recent_tick && recent_tick.observed_at > 5.minutes.ago
         return recent_tick.price
       end
 
       # Fall back to most recent 1-minute candle
       recent_candle = Candle.for_symbol(position.product_id)
-                            .one_minute
-                            .order(timestamp: :desc)
-                            .first
-      
+        .one_minute
+        .order(timestamp: :desc)
+        .first
+
       if recent_candle && recent_candle.timestamp > 5.minutes.ago
         return recent_candle.close
       end

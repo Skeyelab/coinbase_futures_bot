@@ -3,12 +3,12 @@
 class Position < ApplicationRecord
   # Validations
   validates :product_id, presence: true
-  validates :side, presence: true, inclusion: { in: %w[LONG SHORT] }
-  validates :size, presence: true, numericality: { greater_than: 0 }
-  validates :entry_price, presence: true, numericality: { greater_than: 0 }
+  validates :side, presence: true, inclusion: {in: %w[LONG SHORT]}
+  validates :size, presence: true, numericality: {greater_than: 0}
+  validates :entry_price, presence: true, numericality: {greater_than: 0}
   validates :entry_time, presence: true
-  validates :status, presence: true, inclusion: { in: %w[OPEN CLOSED] }
-  validates :day_trading, inclusion: { in: [true, false] }
+  validates :status, presence: true, inclusion: {in: %w[OPEN CLOSED]}
+  validates :day_trading, inclusion: {in: [true, false]}
 
   # Scopes
   scope :open, -> { where(status: "OPEN") }
@@ -147,12 +147,10 @@ class Position < ApplicationRecord
     closed_count = 0
 
     positions.each do |position|
-      begin
-        position.force_close!(close_price, reason)
-        closed_count += 1
-      rescue => e
-        Rails.logger.error("Failed to close position #{position.id}: #{e.message}")
-      end
+      position.force_close!(close_price, reason)
+      closed_count += 1
+    rescue => e
+      Rails.logger.error("Failed to close position #{position.id}: #{e.message}")
     end
 
     Rails.logger.info("Closed #{closed_count} day trading positions for #{reason}")

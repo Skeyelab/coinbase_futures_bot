@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe Position, type: :model do
   let(:trading_pair) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", enabled: true) }
-  
+
   let(:valid_position) do
     Position.new(
       product_id: "BIT-29AUG25-CDE",
@@ -243,7 +243,7 @@ RSpec.describe Position, type: :model do
       # Mock Time.current to return a fixed time
       fixed_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
       allow(Time).to receive(:current).and_return(fixed_time)
-      
+
       position = Position.new(
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
@@ -251,9 +251,9 @@ RSpec.describe Position, type: :model do
         entry_price: 50000.0
         # Don't set status, entry_time, or day_trading - let callback set them
       )
-      
+
       position.save!
-      
+
       expect(position.status).to eq("OPEN")
       expect(position.entry_time).to eq(fixed_time)
       expect(position.day_trading).to be true
@@ -312,11 +312,11 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.duration).to eq(2.hours)
       end
 
@@ -324,14 +324,14 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         close_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         position.update!(status: "CLOSED", close_time: close_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 15, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.duration).to eq(2.hours)
       end
     end
@@ -341,11 +341,11 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.duration_hours).to eq(2.0)
       end
     end
@@ -355,11 +355,11 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.duration_minutes).to eq(120.0)
       end
     end
@@ -369,11 +369,11 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.age_in_hours).to eq(2.0)
       end
     end
@@ -383,11 +383,11 @@ RSpec.describe Position, type: :model do
         # Create a position with a fixed entry time
         fixed_entry_time = Time.new(2025, 8, 24, 10, 0, 0, "UTC")
         position.update!(entry_time: fixed_entry_time)
-        
+
         # Mock Time.current to return a fixed future time
         future_time = Time.new(2025, 8, 24, 12, 0, 0, "UTC")
         allow(Time).to receive(:current).and_return(future_time)
-        
+
         expect(position.age_in_minutes).to eq(120.0)
       end
     end
@@ -487,9 +487,9 @@ RSpec.describe Position, type: :model do
       it "closes position and sets PnL" do
         close_price = 51000.0
         close_time = Time.current
-        
+
         position.close_position!(close_price, close_time)
-        
+
         expect(position.status).to eq("CLOSED")
         expect(position.close_time).to be_within(1.second).of(close_time)
         expect(position.pnl).to eq(0.04) # (51000 - 50000) / 50000 * 2
@@ -500,9 +500,9 @@ RSpec.describe Position, type: :model do
       it "closes position with reason" do
         close_price = 51000.0
         reason = "Test closure"
-        
+
         position.force_close!(close_price, reason)
-        
+
         expect(position.status).to eq("CLOSED")
         expect(position.pnl).to eq(0.04)
       end
@@ -543,9 +543,9 @@ RSpec.describe Position, type: :model do
       it "closes all open day trading positions" do
         close_price = 50000.0
         reason = "Test closure"
-        
+
         closed_count = Position.close_all_day_trading_positions(close_price, reason)
-        
+
         expect(closed_count).to eq(2) # day_trading_open and yesterday_open
         expect(Position.open_day_trading_positions.count).to eq(0)
       end

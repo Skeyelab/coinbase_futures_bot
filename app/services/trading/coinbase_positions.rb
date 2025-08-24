@@ -368,22 +368,22 @@ module Trading
     def get_current_market_price(product_id)
       # Try to get current price from recent market data
       # This is a simplified approach - in production you might want to use real-time market data
-      
+
       # Try to get from recent ticks first
       recent_tick = Tick.where(product_id: product_id)
-                        .order(observed_at: :desc)
-                        .first
-      
+        .order(observed_at: :desc)
+        .first
+
       if recent_tick && recent_tick.observed_at > 5.minutes.ago
         return recent_tick.price
       end
 
       # Fall back to most recent 1-minute candle
       recent_candle = Candle.for_symbol(product_id)
-                            .one_minute
-                            .order(timestamp: :desc)
-                            .first
-      
+        .one_minute
+        .order(timestamp: :desc)
+        .first
+
       if recent_candle && recent_candle.timestamp > 5.minutes.ago
         return recent_candle.close
       end
