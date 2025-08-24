@@ -268,7 +268,5 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       expect(rest).to receive(:upsert_1h_candles_chunked).with(product_id: product_id, start_time: large_start, end_time: large_end)
       rest.upsert_1h_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
-
-
   end
 end

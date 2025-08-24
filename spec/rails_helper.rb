@@ -30,7 +30,7 @@ RSpec.configure do |config|
     clear_enqueued_jobs
     clear_performed_jobs
   end
-  
+
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
   # Individual tests can clean specific data if needed
 end

@@ -134,7 +134,7 @@ bundle exec rspec spec/requests/   # Integration tests
 ## Implementation Priority
 
 1. ✅ **Database cleanup fix** (immediate, huge impact)
-2. ✅ **Parallel tests setup** (easy, big impact)  
+2. ✅ **Parallel tests setup** (easy, big impact)
 3. ✅ **Optimize candle creation tests** (medium effort, good impact)
 4. ✅ **Add test tags** (easy, allows selective running)
 5. ✅ **Factory optimizations** (ongoing, incremental)
