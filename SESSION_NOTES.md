@@ -25,7 +25,6 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
-
 #### 2025-08-24 05:02 UTC
 - Context: Completed Linear issue FUT-9 to update MultiTimeframeSignal strategy for day trading with 1-minute and 5-minute timeframes.
 - Changes:
@@ -42,6 +41,7 @@
   - Updated confidence scoring to weight shorter timeframes more heavily for day trading
   - PERFORMANCE OPTIMIZATION: Enhanced tests with bulk insert operations for 37x speed improvement (120s → 3s)
   - Fixed timestamp calculation issues in tests using proper chronological ordering
+  - Enhanced tests to include 1-minute and 5-minute candle data
   - All tests passing with comprehensive coverage (17 examples across strategy, model, and job specs)
 - Commands run:
   - `git checkout -b dahleric/fut-9-update-multitimeframesignal-strategy-for-day-trading-with`
