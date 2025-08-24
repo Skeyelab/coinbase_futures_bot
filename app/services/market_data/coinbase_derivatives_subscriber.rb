@@ -4,11 +4,16 @@ require "websocket-client-simple"
 
 module MarketData
   class CoinbaseDerivativesSubscriber
-    def initialize(product_ids:, channel: ENV.fetch("FUTURES_CHANNEL", "ticker"), logger: Rails.logger)
-      @product_ids = Array(product_ids)
+    def initialize(product_ids: nil, channel: ENV.fetch("FUTURES_CHANNEL", "ticker"), logger: Rails.logger, auto_discover: true)
+      @original_product_ids = Array(product_ids) if product_ids
       @channel = channel
       @logger = logger
       @ws = nil
+      @auto_discover = auto_discover
+      @contract_manager = FuturesContractManager.new(logger: logger)
+
+      # Set up product IDs based on initialization
+      @product_ids = determine_product_ids
     end
 
     def start
@@ -68,6 +73,55 @@ module MarketData
 
       # Fallback: log compact payload for inspection
       @logger.debug("[FUT] msg: #{data.slice("channel", "type", "product_id", "price", "time")}")
+    end
+
+    # Determine which product IDs to subscribe to
+    def determine_product_ids
+      if @original_product_ids && !@original_product_ids.empty?
+        # Use explicitly provided product IDs
+        @original_product_ids
+      elsif @auto_discover
+        # Auto-discover current month contracts
+        discover_current_month_contracts
+      else
+        # Default to empty if no products specified and auto-discover disabled
+        []
+      end
+    end
+
+    # Discover current month futures contracts for BTC and ETH
+    def discover_current_month_contracts
+      contracts = []
+
+      # Update contracts first to ensure we have the latest
+      @contract_manager.update_current_month_contracts
+
+      # Get current month contracts for BTC and ETH
+      %w[BTC ETH].each do |asset|
+        contract_id = @contract_manager.current_month_contract(asset)
+        if contract_id
+          contracts << contract_id
+          @logger.info("[FUT] Found current month contract for #{asset}: #{contract_id}")
+        else
+          @logger.warn("[FUT] No current month contract found for #{asset}")
+        end
+      end
+
+      contracts
+    end
+
+    # Update product IDs (useful for contract rollover)
+    def update_product_ids
+      new_product_ids = determine_product_ids
+      if new_product_ids != @product_ids
+        @logger.info("[FUT] Updating subscribed contracts from #{@product_ids} to #{new_product_ids}")
+        @product_ids = new_product_ids
+
+        # Resubscribe if websocket is active
+        if @ws
+          subscribe
+        end
+      end
     end
   end
 end

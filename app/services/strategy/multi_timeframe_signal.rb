@@ -37,11 +37,17 @@ module Strategy
     # Returns:
     #   { side:, price:, quantity:, tp:, sl:, confidence: } or nil
     def signal(symbol:, equity_usd: 10_000.0)
-      @current_symbol = symbol
-      candles_1h = Candle.for_symbol(symbol).hourly.order(:timestamp).last(@config[:min_1h_candles])
-      candles_15m = Candle.for_symbol(symbol).fifteen_minute.order(:timestamp).last(@config[:min_15m_candles])
-      candles_5m = Candle.for_symbol(symbol).five_minute.order(:timestamp).last(@config[:min_5m_candles])
-      candles_1m = Candle.for_symbol(symbol).one_minute.order(:timestamp).last(@config[:min_1m_candles])
+      # Support both perpetual and current month contracts
+      # For current month contracts, use the symbol directly
+      # For asset symbols (BTC, ETH), find the current month contract
+      @current_symbol = resolve_trading_symbol(symbol)
+
+      return nil unless @current_symbol
+
+      candles_1h = Candle.for_symbol(@current_symbol).hourly.order(:timestamp).last(@config[:min_1h_candles])
+      candles_15m = Candle.for_symbol(@current_symbol).fifteen_minute.order(:timestamp).last(@config[:min_15m_candles])
+      candles_5m = Candle.for_symbol(@current_symbol).five_minute.order(:timestamp).last(@config[:min_5m_candles])
+      candles_1m = Candle.for_symbol(@current_symbol).one_minute.order(:timestamp).last(@config[:min_1m_candles])
 
       return nil if candles_1h.size < @config[:min_1h_candles]
       return nil if candles_15m.size < @config[:min_15m_candles]
@@ -279,6 +285,60 @@ module Strategy
       z = latest_sentiment_z(symbol)
       return false if z.abs < threshold
       (side == :buy && z > 0) || (side == :sell && z < 0)
+    end
+
+    # Resolve the actual trading symbol to use
+    # If given an asset symbol (BTC, ETH), find current month contract
+    # If given a specific contract symbol, use it directly
+    def resolve_trading_symbol(symbol)
+      return nil unless symbol
+
+      # If it's already a specific contract (contains date pattern), use it
+      if symbol.match?(/\d{2}[A-Z]{3}\d{2}/)
+        return symbol
+      end
+
+      # If it's an asset symbol (BTC, ETH), find best available contract
+      asset = extract_asset_from_symbol(symbol)
+      if asset
+        contract_manager = MarketData::FuturesContractManager.new
+
+        # Try to get the best available contract (current month preferred, upcoming as fallback)
+        best_contract = contract_manager.best_available_contract(asset)
+
+        if best_contract
+          # Check if it's current month or upcoming month for logging
+          contract = TradingPair.find_by(product_id: best_contract)
+          if contract&.current_month?
+            Rails.logger.info("[STRATEGY] Using current month contract #{best_contract} for asset #{asset}")
+          elsif contract&.upcoming_month?
+            Rails.logger.info("[STRATEGY] Using upcoming month contract #{best_contract} for asset #{asset} (current month not available)")
+          else
+            Rails.logger.info("[STRATEGY] Using contract #{best_contract} for asset #{asset}")
+          end
+          return best_contract
+        else
+          Rails.logger.warn("[STRATEGY] No suitable contract found for asset #{asset}")
+          return nil
+        end
+      end
+
+      # Default: return the symbol as-is
+      symbol
+    end
+
+    # Extract asset symbol from various formats
+    # Examples: BTC-USD -> BTC, ETH-USD -> ETH, BTC -> BTC
+    def extract_asset_from_symbol(symbol)
+      case symbol
+      when /^(BTC|ETH)(-USD)?$/
+        $1
+      when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
+        # Current month contract: BIT-29AUG25-CDE -> BTC
+        symbol.start_with?("BIT") ? "BTC" : "ETH"
+      else
+        nil
+      end
     end
   end
 end
