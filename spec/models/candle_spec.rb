@@ -33,12 +33,12 @@ RSpec.describe Candle, type: :model do
   end
 
   it "validates timeframe inclusion" do
-    %w[5m 15m 1h 6h 1d].each do |tf|
+    %w[1m 5m 15m 1h 6h 1d].each do |tf|
       valid_candle.timeframe = tf
       expect(valid_candle).to be_valid, "#{tf} should be valid"
     end
 
-    %w[1m 30m 2h 12h invalid].each do |tf|
+    %w[30m 2h 12h invalid].each do |tf|
       valid_candle.timeframe = tf
       expect(valid_candle).not_to be_valid, "#{tf} should be invalid"
       expect(valid_candle.errors[:timeframe]).to include("is not included in the list")
@@ -99,6 +99,25 @@ RSpec.describe Candle, type: :model do
     five_min_candles = Candle.five_minute
     expect(five_min_candles.count).to eq(1)
     expect(five_min_candles.first.timeframe).to eq("5m")
+  end
+
+  it "scopes one_minute" do
+    valid_candle.save!
+
+    Candle.create!(
+      symbol: "BTC-USD",
+      timeframe: "1m",
+      timestamp: Time.now.utc,
+      open: 50000.0,
+      high: 51000.0,
+      low: 49000.0,
+      close: 50500.0,
+      volume: 100.5
+    )
+
+    one_min_candles = Candle.one_minute
+    expect(one_min_candles.count).to eq(1)
+    expect(one_min_candles.first.timeframe).to eq("1m")
   end
 
   it "scopes hourly" do
