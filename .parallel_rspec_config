@@ -1,0 +1,14 @@
+# Parallel RSpec configuration for better test distribution
+# Based on runtime analysis showing major bottlenecks
+
+# Group slow tests together to avoid one process taking too long
+single:
+  - "spec/services/coinbase_rest_spec.rb"
+  - "spec/models/trading_pair_spec.rb"
+  - "spec/tasks/market_data_rake_spec.rb"
+
+# Reduce process count for better resource usage
+processes: 8
+
+# Use runtime-based grouping for better distribution
+group_by: runtime
