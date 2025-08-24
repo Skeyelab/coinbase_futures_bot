@@ -4,6 +4,8 @@
 
 The coinbase_futures_bot implements multiple trading strategies designed for cryptocurrency futures markets. Each strategy incorporates technical analysis, risk management, and sentiment filtering to generate trading signals.
 
+**Important**: This system exclusively trades current month futures contracts (e.g., BIT-29AUG25-CDE, ET-29AUG25-CDE) and does not support perpetual contracts. All strategies include automatic contract resolution and rollover management.
+
 ## Strategy Architecture
 
 ### Strategy Interface
@@ -221,6 +223,8 @@ The base strategy currently returns `:flat` signals, serving as a template for:
 - Spot-futures basis trading
 - News-driven trading strategies
 - Sentiment-momentum strategies
+
+**Note**: This project focuses exclusively on current month futures contracts, not perpetual contracts.
 
 ### 3. Pullback Strategy (1h)
 

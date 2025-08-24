@@ -7,7 +7,7 @@ This guide covers the development workflow, setup instructions, and best practic
 ## Prerequisites
 
 ### System Requirements
-- **Ruby**: 3.2.4 (managed via RVM)
+- **Ruby**: 3.2.2 (managed via RVM)
 - **PostgreSQL**: 13+ (local or remote)
 - **Git**: Latest version
 - **RVM**: Ruby Version Manager
@@ -28,7 +28,7 @@ cd coinbase_futures_bot
 ### 2. Ruby Environment Setup
 ```bash
 # Install Ruby version and create gemset
-rvm use ruby-3.2.4@coinbase_futures_bot --create
+rvm use ruby-3.2.2@coinbase_futures_bot --create
 
 # Install dependencies
 bundle install

@@ -53,7 +53,7 @@ This guide covers deployment strategies, production configuration, monitoring, a
 
 #### Dockerfile
 ```dockerfile
-FROM ruby:3.2.4-alpine
+FROM ruby:3.2.2-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \

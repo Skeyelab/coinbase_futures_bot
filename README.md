@@ -2,7 +2,7 @@
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
 
-An automated cryptocurrency futures trading bot built with Rails 7.2, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
+An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
 **Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)
 
@@ -18,15 +18,15 @@ An automated cryptocurrency futures trading bot built with Rails 7.2, featuring 
 
 ## Technology Stack
 
-- **Framework**: Rails 7.2 (API-only)
-- **Language**: Ruby 3.2.4
+- **Framework**: Rails 8.0 (API-only)
+- **Language**: Ruby 3.2.2
 - **Database**: PostgreSQL with time-series optimizations
 - **Jobs**: GoodJob with cron scheduling
 - **Testing**: RSpec with comprehensive coverage
 - **APIs**: Coinbase Advanced Trade, Exchange API, CryptoPanic
 
 ## Prerequisites
-- Ruby 3.2.x (RVM recommended; repo uses `.ruby-version`)
+- Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
 - PostgreSQL (DATABASE_URL)
 - Bundler
 
@@ -37,7 +37,7 @@ An automated cryptocurrency futures trading bot built with Rails 7.2, featuring 
 # Clone and setup Ruby environment
 git clone git@github.com:Skeyelab/coinbase_futures_bot.git
 cd coinbase_futures_bot
-rvm use ruby-3.2.4@coinbase_futures_bot --create
+rvm use ruby-3.2.2@coinbase_futures_bot --create
 
 # Install dependencies and setup database
 bundle install
