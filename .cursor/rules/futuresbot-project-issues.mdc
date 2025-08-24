@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+description: Ensures all repository issues are created in the FuturesBot project in Linear for proper project management.
+---
+
+# FuturesBot Project Issue Management
+
+All issues for this repository must be created in the **FuturesBot** project in Linear.
+
+**Project URL**: [https://linear.app/ericdahl/project/futuresbot-c639185ec497/overview](https://linear.app/ericdahl/project/futuresbot-c639185ec497/overview)
+
+## Issue Creation Requirements
+
+- **Project**: Always assign issues to the "FuturesBot" project
+- **Team**: Always assign to the "FUT" team
+- **Labels**: Apply relevant labels like "bug", "feature", "enhancement", "trading", "risk", etc.
+- **Priority**: Set appropriate priority levels (0=No priority, 1=Urgent, 2=High, 3=Normal, 4=Low)
+
+## When Creating Issues
+
+- Use the MCP Linear tools to create issues directly in the FuturesBot project
+- Navigate to the [FuturesBot project](https://linear.app/ericdahl/project/futuresbot-c639185ec497/overview) for project overview and issue management
+- Ensure proper categorization and assignment
+- Link related issues when applicable
+- Include relevant context from the codebase
+
+## Project Context
+
+This repository contains a Coinbase futures trading bot implementation. All development work, bug reports, and feature requests should be tracked in the centralized FuturesBot project for proper project management and visibility.
+
+## Example Issue Creation
+
+```ruby
+# When creating issues via MCP Linear:
+mcp_Linear_create_issue(
+  title: "Implement risk management controls",
+  description: "Add position sizing and stop-loss logic",
+  team: "FUT",
+  project: "FuturesBot",
+  labels: ["feature", "risk", "trading"],
+  priority: 2
+)
+```

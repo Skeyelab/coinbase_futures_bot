@@ -1,7 +1,7 @@
 # Coinbase Futures Bot (Rails API + GoodJob)
 
-**Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)  
-**Owner**: Skeyelab  
+**Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)
+**Owner**: Skeyelab
 **Local Path**: `/Users/edahl/Documents/GitHub/coinbase_futures_bot`
 
 Rails 8 API-only service for a Coinbase trading bot (futures and spot). Uses PostgreSQL for state and GoodJob for background processing.
