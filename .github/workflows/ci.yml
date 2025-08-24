@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache system dependencies
         uses: actions/cache@v4
         with:
@@ -25,7 +25,7 @@ jobs:
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
       - name: Cache RuboCop results
         uses: actions/cache@v4
         with:
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Cache system dependencies
         uses: actions/cache@v4
         with:
@@ -58,7 +58,7 @@ jobs:
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
-      
+
       - name: Cache Brakeman results
         uses: actions/cache@v4
         with:

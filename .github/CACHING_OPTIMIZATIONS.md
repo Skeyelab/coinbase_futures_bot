@@ -93,7 +93,7 @@ coverage/
 
 ### Updated Workflows
 - `.github/workflows/test.yml` - Enhanced test workflow
-- `.github/workflows/ci.yml` - Enhanced CI workflow  
+- `.github/workflows/ci.yml` - Enhanced CI workflow
 - `.github/workflows/ci-comprehensive.yml` - Consolidated workflow
 
 ### Key Changes
