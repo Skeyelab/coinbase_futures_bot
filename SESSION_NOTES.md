@@ -25,6 +25,44 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+#### 2025-08-24 05:22 UTC
+- Context: Successfully implemented Linear issue FUT-10 for current month futures trading of BTC-USD and ETH-USD contracts.
+- Changes:
+  - Added expiration fields to TradingPair model: `expiration_date`, `contract_type`, `is_perpetual`
+  - Created comprehensive `FuturesContractManager` service for contract discovery and lifecycle management
+  - Enhanced `CoinbaseDerivativesSubscriber` with auto-discovery of current month contracts (`BIT-29AUG25-CDE`, `ET-29AUG25-CDE`)
+  - Updated `MultiTimeframeSignal` strategy to automatically resolve asset symbols to current month contracts
+  - Implemented contract rollover logic in `FuturesExecutor` with expiration checks
+  - Enhanced `CoinbasePositions` service with current month contract helpers and rollover management
+  - Added contract parsing for Coinbase futures naming convention (PREFIX-DDMMMYY-SUFFIX)
+  - Created comprehensive test suite with 36 passing tests covering all futures functionality
+  - All services now seamlessly handle both perpetual and current month contracts with backward compatibility
+- Commands run:
+  - `bin/rails generate migration AddExpirationFieldsToTradingPairs contract_type:string expiration_date:date is_perpetual:boolean`
+  - `bin/rails db:migrate`
+  - `bundle exec rspec spec/models/trading_pair_spec.rb --format documentation` (22 examples, 0 failures)
+  - `bundle exec rspec spec/services/market_data/futures_contract_manager_spec.rb --format documentation` (14 examples, 0 failures)
+  - `git add -A && git commit -m "feat(futures): implement current month futures trading for BTC-USD and ETH-USD"`
+  - `git push origin dahleric/fut-10-implement-current-month-futures-trading-for-btc-usd-and-eth`
+- Files touched:
+  - `db/migrate/20250824051214_add_expiration_fields_to_trading_pairs.rb` (created)
+  - `app/models/trading_pair.rb` (enhanced with contract parsing and scopes)
+  - `app/services/market_data/futures_contract_manager.rb` (created)
+  - `app/services/market_data/coinbase_derivatives_subscriber.rb` (auto-discovery)
+  - `app/services/strategy/multi_timeframe_signal.rb` (contract resolution)
+  - `app/services/execution/futures_executor.rb` (rollover logic)
+  - `app/services/trading/coinbase_positions.rb` (current month helpers)
+  - `app/services/market_data/coinbase_rest.rb` (contract updates)
+  - `app/services/coinbase/advanced_trade_client.rb` (products endpoint)
+  - `spec/models/trading_pair_spec.rb`, `spec/services/market_data/futures_contract_manager_spec.rb` (created)
+- Migrations:
+  - `20250824051214_add_expiration_fields_to_trading_pairs.rb` (migrated)
+- Next steps:
+  - Review and merge PR for current month futures implementation
+  - Test with real Coinbase API to validate contract discovery
+  - Monitor contract rollover logic as contracts approach expiration
+  - Consider implementing automated rollover scheduling via GoodJob cron
+
 #### 2025-08-24 05:02 UTC
 - Context: Completed Linear issue FUT-9 to update MultiTimeframeSignal strategy for day trading with 1-minute and 5-minute timeframes.
 - Changes:

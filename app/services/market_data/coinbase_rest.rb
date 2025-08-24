@@ -56,60 +56,35 @@ module MarketData
       products.each do |p|
         next unless p["status"] == "online" && p["quote_currency"] == "USD"
 
-        # Look for futures products (ending with -PERP) or create them if they don't exist
-        if p["id"].end_with?("-PERP") || p["id"] == "BTC-USD" || p["id"] == "ETH-USD"
+        # Look for futures products with date patterns (current month contracts)
+        if p["id"].match?(/^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/)
           futures_products << p
+
+          # Parse contract info for futures contracts
+          contract_info = TradingPair.parse_contract_info(p["id"])
+          next unless contract_info
 
           TradingPair.upsert({
             product_id: p["id"],
-            base_currency: p["base_currency"],
-            quote_currency: p["quote_currency"],
+            base_currency: contract_info[:base_currency],
+            quote_currency: contract_info[:quote_currency],
+            expiration_date: contract_info[:expiration_date],
+            contract_type: contract_info[:contract_type],
             status: p["status"],
             min_size: p.dig("base_increment"),
             price_increment: p.dig("quote_increment"),
             size_increment: p.dig("base_increment"),
             enabled: true,
-            is_perpetual: p["id"].end_with?("-PERP"),
             created_at: Time.now.utc,
             updated_at: Time.now.utc
           }, unique_by: :index_trading_pairs_on_product_id)
         end
       end
 
-      # If no futures products found, create the common ones manually
-      if futures_products.empty?
-        create_default_futures_products
-      end
-
       # Ensure current month contracts are updated
       update_current_month_contracts
 
       Rails.logger.info("Upserted #{futures_products.count} futures products")
-    end
-
-    def create_default_futures_products
-      # Create common futures products that might not be in the exchange API
-      default_products = [
-        { id: "BTC-USD-PERP", base: "BTC", quote: "USD" },
-        { id: "ETH-USD-PERP", base: "ETH", quote: "USD" }
-      ]
-
-      default_products.each do |product|
-        TradingPair.upsert({
-          product_id: product[:id],
-          base_currency: product[:base],
-          quote_currency: product[:quote],
-          status: "online",
-          min_size: "0.001",
-          price_increment: "0.01",
-          size_increment: "0.001",
-          enabled: true,
-          created_at: Time.now.utc,
-          updated_at: Time.now.utc
-        }, unique_by: :index_trading_pairs_on_product_id)
-      end
-
-      Rails.logger.info("Created default futures products: #{default_products.map { |p| p[:id] }.join(', ')}")
     end
 
     # Returns array of arrays: [ time, low, high, open, close, volume ] per Coinbase public API

@@ -14,7 +14,7 @@ module Execution
     def consider_entry(spot_price:, futures_product_id:, at: Time.now.utc.iso8601)
       # Check if rollover is needed before considering entry
       check_and_perform_rollover
-      
+
       # Resolve to current month contract if needed
       trading_contract = resolve_trading_contract(futures_product_id)
       return unless trading_contract
@@ -43,10 +43,10 @@ module Execution
     # Perform contract rollover - close positions in expiring contracts and move to current month
     def perform_rollover
       expiring_contracts = @contract_manager.expiring_contracts(days_ahead: 3)
-      
+
       expiring_contracts.each do |contract|
         @logger.info("[EXEC] Processing rollover for expiring contract: #{contract.product_id}")
-        
+
         # Get asset for this contract
         asset = contract.underlying_asset
         next unless asset
@@ -69,14 +69,14 @@ module Execution
       return if from_contract == to_contract
 
       @logger.info("[EXEC] Rolling over #{asset} from #{from_contract} to #{to_contract}")
-      
+
       # TODO: Implement actual position rollover logic
       # This would involve:
       # 1. Getting current position in from_contract
       # 2. Closing position in from_contract
       # 3. Opening equivalent position in to_contract
       # 4. Handling any basis differences and slippage
-      
+
       @logger.info("[EXEC] Rollover completed: #{from_contract} -> #{to_contract}")
     end
 
@@ -95,11 +95,6 @@ module Execution
           @logger.warn("[EXEC] Contract #{product_id} is expired or not found")
           return nil
         end
-      end
-
-      # If it's a perpetual, use it directly
-      if product_id.end_with?('-PERP')
-        return product_id
       end
 
       # If it's an asset symbol, find current month contract
@@ -122,10 +117,10 @@ module Execution
     # Extract asset from product ID
     def extract_asset_from_product_id(product_id)
       case product_id
-      when /^(BTC|ETH)(-USD)?(-PERP)?$/
+      when /^(BTC|ETH)(-USD)?$/
         $1
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
-        product_id.start_with?('BIT') ? 'BTC' : 'ETH'
+        product_id.start_with?("BIT") ? "BTC" : "ETH"
       else
         nil
       end

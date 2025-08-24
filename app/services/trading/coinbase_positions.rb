@@ -447,10 +447,10 @@ module Trading
     # Extract asset from product ID
     def extract_asset_from_product_id(product_id)
       case product_id
-      when /^(BTC|ETH)(-USD)?(-PERP)?$/
+      when /^(BTC|ETH)(-USD)?$/
         $1
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
-        product_id.start_with?('BIT') ? 'BTC' : 'ETH'
+        product_id.start_with?("BIT") ? "BTC" : "ETH"
       else
         nil
       end
@@ -506,7 +506,7 @@ module Trading
       begin
         # Close the old position
         close_position(product_id, size: size)
-        
+
         # Open new position in current month contract
         # Convert side: if we had a LONG position, we want to open a LONG position
         new_side = case side.to_s.upcase

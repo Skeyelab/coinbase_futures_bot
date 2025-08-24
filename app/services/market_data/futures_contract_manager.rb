@@ -40,15 +40,14 @@ module MarketData
 
       # Create or update the trading pair
       trading_pair = TradingPair.find_or_initialize_by(product_id: contract_id)
-      trading_pair.assign_attributes(
-        base_currency: contract_info[:base_currency],
-        quote_currency: contract_info[:quote_currency],
-        expiration_date: contract_info[:expiration_date],
-        contract_type: contract_info[:contract_type],
-        is_perpetual: false,
-        enabled: true,
-        status: "online"
-      )
+              trading_pair.assign_attributes(
+          base_currency: contract_info[:base_currency],
+          quote_currency: contract_info[:quote_currency],
+          expiration_date: contract_info[:expiration_date],
+          contract_type: contract_info[:contract_type],
+          enabled: true,
+          status: "online"
+        )
 
       if trading_pair.save
         @logger.info("Created current month contract: #{contract_id}")
@@ -85,14 +84,13 @@ module MarketData
 
     # Get all active futures contracts
     def active_futures_contracts
-      TradingPair.enabled.futures_contracts.not_expired
+      TradingPair.active
     end
 
     # Get contracts that are expiring soon (within next 7 days)
     def expiring_contracts(days_ahead: 7)
       cutoff_date = Date.current + days_ahead.days
       TradingPair.enabled
-                 .futures_contracts
                  .where("expiration_date <= ? AND expiration_date > ?", cutoff_date, Date.current)
     end
 
@@ -115,11 +113,10 @@ module MarketData
         @logger.warn("Could not discover current month contract for #{asset}")
       end
 
-      # Disable expired contracts
-      expired_contracts = TradingPair.enabled
-                                    .futures_contracts
-                                    .where(base_currency: asset)
-                                    .where("expiration_date < ?", current_date)
+        # Disable expired contracts
+        expired_contracts = TradingPair.enabled
+                                      .where(base_currency: asset)
+                                      .where("expiration_date < ?", current_date)
 
       expired_contracts.update_all(enabled: false)
 

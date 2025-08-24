@@ -22,24 +22,16 @@ RSpec.describe TradingPair, type: :model do
   end
 
   describe 'scopes' do
-    let!(:btc_perp) { TradingPair.create!(product_id: 'BTC-USD-PERP', base_currency: 'BTC', quote_currency: 'USD', is_perpetual: true, enabled: true) }
-    let!(:eth_perp) { TradingPair.create!(product_id: 'ETH-USD-PERP', base_currency: 'ETH', quote_currency: 'USD', is_perpetual: true, enabled: true) }
-    let!(:btc_current_month) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false, enabled: true) }
-    let!(:eth_current_month) { TradingPair.create!(product_id: 'ET-29AUG25-CDE', base_currency: 'ETH', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false, enabled: true) }
-    let!(:btc_next_month) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), is_perpetual: false, enabled: true) }
-    let!(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31), is_perpetual: false, enabled: true) }
+    let!(:btc_current_month) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:eth_current_month) { TradingPair.create!(product_id: 'ET-29AUG25-CDE', base_currency: 'ETH', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:btc_next_month) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), enabled: true) }
+    let!(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31), enabled: true) }
 
-    describe '.perpetual' do
-      it 'returns only perpetual contracts' do
-        expect(TradingPair.perpetual).to contain_exactly(btc_perp, eth_perp)
-      end
-    end
-
-    describe '.futures_contracts' do
-      it 'returns only non-perpetual contracts' do
-        futures = TradingPair.futures_contracts
-        expect(futures).to include(btc_current_month, eth_current_month, btc_next_month, expired_contract)
-        expect(futures).not_to include(btc_perp, eth_perp)
+    describe '.active' do
+      it 'returns only enabled and non-expired contracts' do
+        active = TradingPair.active
+        expect(active).to include(btc_current_month, eth_current_month, btc_next_month)
+        expect(active).not_to include(expired_contract)
       end
     end
 
@@ -52,7 +44,7 @@ RSpec.describe TradingPair, type: :model do
     describe '.not_expired' do
       it 'returns contracts that have not expired' do
         not_expired = TradingPair.not_expired
-        expect(not_expired).to include(btc_perp, eth_perp, btc_current_month, eth_current_month, btc_next_month)
+        expect(not_expired).to include(btc_current_month, eth_current_month, btc_next_month)
         expect(not_expired).not_to include(expired_contract)
       end
     end
@@ -79,8 +71,7 @@ RSpec.describe TradingPair, type: :model do
         base_currency: 'BTC',
         quote_currency: 'USD',
         expiration_date: Date.new(2025, 8, 29),
-        contract_type: 'CDE',
-        is_perpetual: false
+        contract_type: 'CDE'
       })
     end
 
@@ -90,8 +81,7 @@ RSpec.describe TradingPair, type: :model do
         base_currency: 'ETH',
         quote_currency: 'USD',
         expiration_date: Date.new(2025, 8, 29),
-        contract_type: 'CDE',
-        is_perpetual: false
+        contract_type: 'CDE'
       })
     end
 
@@ -108,16 +98,11 @@ RSpec.describe TradingPair, type: :model do
   end
 
   describe 'instance methods' do
-    let(:perpetual_contract) { TradingPair.create!(product_id: 'BTC-USD-PERP', base_currency: 'BTC', quote_currency: 'USD', is_perpetual: true) }
-    let(:current_month_contract) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false) }
-    let(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31), is_perpetual: false) }
-    let(:next_month_contract) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), is_perpetual: false) }
+    let(:current_month_contract) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29)) }
+    let(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31)) }
+    let(:next_month_contract) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30)) }
 
     describe '#expired?' do
-      it 'returns false for perpetual contracts' do
-        expect(perpetual_contract.expired?).to be false
-      end
-
       it 'returns false for current month contracts' do
         expect(current_month_contract.expired?).to be false
       end
@@ -132,10 +117,6 @@ RSpec.describe TradingPair, type: :model do
     end
 
     describe '#current_month?' do
-      it 'returns false for perpetual contracts' do
-        expect(perpetual_contract.current_month?).to be false
-      end
-
       it 'returns true for current month contracts' do
         expect(current_month_contract.current_month?).to be true
       end
@@ -150,10 +131,6 @@ RSpec.describe TradingPair, type: :model do
     end
 
     describe '#underlying_asset' do
-      it 'returns base_currency for perpetual contracts' do
-        expect(perpetual_contract.underlying_asset).to eq('BTC')
-      end
-
       it 'returns parsed asset for futures contracts' do
         expect(current_month_contract.underlying_asset).to eq('BTC')
       end

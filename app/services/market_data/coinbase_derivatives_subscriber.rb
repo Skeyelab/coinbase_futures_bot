@@ -11,7 +11,7 @@ module MarketData
       @ws = nil
       @auto_discover = auto_discover
       @contract_manager = FuturesContractManager.new(logger: logger)
-      
+
       # Set up product IDs based on initialization
       @product_ids = determine_product_ids
     end
@@ -92,10 +92,10 @@ module MarketData
     # Discover current month futures contracts for BTC and ETH
     def discover_current_month_contracts
       contracts = []
-      
+
       # Update contracts first to ensure we have the latest
       @contract_manager.update_current_month_contracts
-      
+
       # Get current month contracts for BTC and ETH
       %w[BTC ETH].each do |asset|
         contract_id = @contract_manager.current_month_contract(asset)
@@ -106,7 +106,7 @@ module MarketData
           @logger.warn("[FUT] No current month contract found for #{asset}")
         end
       end
-      
+
       contracts
     end
 
@@ -116,7 +116,7 @@ module MarketData
       if new_product_ids != @product_ids
         @logger.info("[FUT] Updating subscribed contracts from #{@product_ids} to #{new_product_ids}")
         @product_ids = new_product_ids
-        
+
         # Resubscribe if websocket is active
         if @ws
           subscribe

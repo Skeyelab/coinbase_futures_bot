@@ -41,7 +41,7 @@ module Strategy
       # For current month contracts, use the symbol directly
       # For asset symbols (BTC, ETH), find the current month contract
       @current_symbol = resolve_trading_symbol(symbol)
-      
+
       return nil unless @current_symbol
 
       candles_1h = Candle.for_symbol(@current_symbol).hourly.order(:timestamp).last(@config[:min_1h_candles])
@@ -298,17 +298,12 @@ module Strategy
         return symbol
       end
 
-      # If it's a perpetual contract, use it directly
-      if symbol.end_with?('-PERP')
-        return symbol
-      end
-
       # If it's an asset symbol (BTC, ETH), find current month contract
       asset = extract_asset_from_symbol(symbol)
       if asset
         contract_manager = MarketData::FuturesContractManager.new
         current_month_contract = contract_manager.current_month_contract(asset)
-        
+
         if current_month_contract
           Rails.logger.info("[STRATEGY] Using current month contract #{current_month_contract} for asset #{asset}")
           return current_month_contract
@@ -330,7 +325,7 @@ module Strategy
         $1
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         # Current month contract: BIT-29AUG25-CDE -> BTC
-        symbol.start_with?('BIT') ? 'BTC' : 'ETH'
+        symbol.start_with?("BIT") ? "BTC" : "ETH"
       else
         nil
       end

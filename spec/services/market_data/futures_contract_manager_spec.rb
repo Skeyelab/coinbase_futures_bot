@@ -32,18 +32,17 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   describe '#discover_current_month_contract' do
     it 'creates BTC current month contract if it does not exist' do
       expect(TradingPair.find_by(product_id: 'BIT-29AUG25-CDE')).to be_nil
-      
+
       contract_id = manager.discover_current_month_contract('BTC')
       expect(contract_id).to eq('BIT-29AUG25-CDE')
-      
+
       trading_pair = TradingPair.find_by(product_id: 'BIT-29AUG25-CDE')
       expect(trading_pair).to be_present
-      expect(trading_pair.base_currency).to eq('BTC')
-      expect(trading_pair.quote_currency).to eq('USD')
-      expect(trading_pair.expiration_date).to eq(Date.new(2025, 8, 29))
-      expect(trading_pair.contract_type).to eq('CDE')
-      expect(trading_pair.is_perpetual).to be false
-      expect(trading_pair.enabled).to be true
+              expect(trading_pair.base_currency).to eq('BTC')
+        expect(trading_pair.quote_currency).to eq('USD')
+        expect(trading_pair.expiration_date).to eq(Date.new(2025, 8, 29))
+        expect(trading_pair.contract_type).to eq('CDE')
+        expect(trading_pair.enabled).to be true
     end
 
     it 'returns existing contract ID if contract already exists' do
@@ -54,7 +53,6 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         quote_currency: 'USD',
         expiration_date: Date.new(2025, 8, 29),
         contract_type: 'CDE',
-        is_perpetual: false,
         enabled: true
       )
 
@@ -72,7 +70,6 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
           quote_currency: 'USD',
           expiration_date: Date.new(2025, 8, 29),
           contract_type: 'CDE',
-          is_perpetual: false,
           enabled: true
         )
       end
@@ -91,24 +88,23 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   end
 
   describe '#active_futures_contracts' do
-    let!(:btc_current) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false, enabled: true) }
-    let!(:eth_current) { TradingPair.create!(product_id: 'ET-29AUG25-CDE', base_currency: 'ETH', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false, enabled: true) }
-    let!(:btc_next) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), is_perpetual: false, enabled: true) }
-    let!(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31), is_perpetual: false, enabled: true) }
-    let!(:disabled_contract) { TradingPair.create!(product_id: 'BIT-31DEC25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 12, 31), is_perpetual: false, enabled: false) }
-    let!(:perpetual_contract) { TradingPair.create!(product_id: 'BTC-USD-PERP', base_currency: 'BTC', quote_currency: 'USD', is_perpetual: true, enabled: true) }
+    let!(:btc_current) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:eth_current) { TradingPair.create!(product_id: 'ET-29AUG25-CDE', base_currency: 'ETH', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:btc_next) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), enabled: true) }
+    let!(:expired_contract) { TradingPair.create!(product_id: 'BIT-31JUL25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 7, 31), enabled: true) }
+    let!(:disabled_contract) { TradingPair.create!(product_id: 'BIT-31DEC25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 12, 31), enabled: false) }
 
     it 'returns only active, non-expired futures contracts' do
       active_contracts = manager.active_futures_contracts
       expect(active_contracts).to contain_exactly(btc_current, eth_current, btc_next)
-      expect(active_contracts).not_to include(expired_contract, disabled_contract, perpetual_contract)
+      expect(active_contracts).not_to include(expired_contract, disabled_contract)
     end
   end
 
   describe '#expiring_contracts' do
-    let!(:expiring_soon) { TradingPair.create!(product_id: 'BIT-17AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 17), is_perpetual: false, enabled: true) }
-    let!(:expiring_later) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), is_perpetual: false, enabled: true) }
-    let!(:expiring_next_month) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), is_perpetual: false, enabled: true) }
+    let!(:expiring_soon) { TradingPair.create!(product_id: 'BIT-17AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 17), enabled: true) }
+    let!(:expiring_later) { TradingPair.create!(product_id: 'BIT-29AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:expiring_next_month) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), enabled: true) }
 
     it 'returns contracts expiring within specified days' do
       # Test with 7 days ahead (default)
@@ -125,7 +121,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
   describe '#rollover_needed?' do
     context 'when contracts are expiring soon' do
-      let!(:expiring_soon) { TradingPair.create!(product_id: 'BIT-17AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 17), is_perpetual: false, enabled: true) }
+      let!(:expiring_soon) { TradingPair.create!(product_id: 'BIT-17AUG25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 8, 17), enabled: true) }
 
       it 'returns true' do
         expect(manager.rollover_needed?).to be true
@@ -133,7 +129,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     end
 
     context 'when no contracts are expiring soon' do
-      let!(:expiring_later) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), is_perpetual: false, enabled: true) }
+      let!(:expiring_later) { TradingPair.create!(product_id: 'BIT-30SEP25-CDE', base_currency: 'BTC', quote_currency: 'USD', expiration_date: Date.new(2025, 9, 30), enabled: true) }
 
       it 'returns false' do
         expect(manager.rollover_needed?).to be false
@@ -163,7 +159,6 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         base_currency: 'BTC',
         quote_currency: 'USD',
         expiration_date: Date.new(2025, 7, 31),
-        is_perpetual: false,
         enabled: true
       )
 
