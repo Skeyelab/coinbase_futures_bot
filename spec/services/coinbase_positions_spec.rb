@@ -417,6 +417,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
   end
 
+
+
   # Keep existing tests for backward compatibility
   describe "legacy functionality" do
     it "lists open positions (basic)" do

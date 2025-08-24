@@ -262,4 +262,184 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     expect(order).to be_present
     expect(order[:side]).to eq(:buy)
   end
+
+  describe 'upcoming month contract functionality' do
+    let(:current_date) { Date.new(2025, 8, 15) } # Mid-August 2025
+
+    before do
+      # Mock Date.current to return a fixed date for testing
+      allow(Date).to receive(:current).and_return(current_date)
+    end
+
+    let!(:btc_current_month) do
+      TradingPair.create!(
+        product_id: 'BIT-29AUG25-CDE',
+        base_currency: 'BTC',
+        quote_currency: 'USD',
+        expiration_date: Date.new(2025, 8, 29),
+        contract_type: 'CDE',
+        enabled: true
+      )
+    end
+
+    let!(:btc_upcoming_month) do
+      TradingPair.create!(
+        product_id: 'BIT-26SEP25-CDE',
+        base_currency: 'BTC',
+        quote_currency: 'USD',
+        expiration_date: Date.new(2025, 9, 26),
+        contract_type: 'CDE',
+        enabled: true
+      )
+    end
+
+    describe '#resolve_trading_symbol' do
+      let(:strategy) { described_class.new }
+
+      context 'when current month contract is available and tradeable' do
+        it 'resolves BTC to current month contract' do
+          result = strategy.send(:resolve_trading_symbol, 'BTC')
+          expect(result).to eq('BIT-29AUG25-CDE')
+        end
+
+        it 'resolves BTC-USD to current month contract' do
+          result = strategy.send(:resolve_trading_symbol, 'BTC-USD')
+          expect(result).to eq('BIT-29AUG25-CDE')
+        end
+
+        it 'logs current month contract usage' do
+          expect(Rails.logger).to receive(:info).with(/Using current month contract BIT-29AUG25-CDE for asset BTC/)
+          strategy.send(:resolve_trading_symbol, 'BTC')
+        end
+      end
+
+      context 'when current month contract is not tradeable' do
+        before do
+          # Mock Date.current to make current month contracts expire tomorrow
+          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
+        end
+
+        it 'falls back to upcoming month contract for BTC' do
+          result = strategy.send(:resolve_trading_symbol, 'BTC')
+          expect(result).to eq('BIT-26SEP25-CDE')
+        end
+
+        it 'logs upcoming month contract usage' do
+          expect(Rails.logger).to receive(:info).with(/Using upcoming month contract BIT-26SEP25-CDE for asset BTC/)
+          strategy.send(:resolve_trading_symbol, 'BTC')
+        end
+      end
+
+      context 'when no contracts are available' do
+        it 'returns nil for supported assets with no contracts' do
+          # Mock the contract manager to return nil
+          mock_contract_manager = instance_double(MarketData::FuturesContractManager)
+          allow(MarketData::FuturesContractManager).to receive(:new).and_return(mock_contract_manager)
+          allow(mock_contract_manager).to receive(:best_available_contract).with('BTC').and_return(nil)
+
+          expect(Rails.logger).to receive(:warn).with(/No suitable contract found for asset BTC/)
+          result = strategy.send(:resolve_trading_symbol, 'BTC')
+          expect(result).to be_nil
+        end
+      end
+
+      context 'when given specific contract symbols' do
+        it 'returns the contract symbol as-is for current month contracts' do
+          result = strategy.send(:resolve_trading_symbol, 'BIT-29AUG25-CDE')
+          expect(result).to eq('BIT-29AUG25-CDE')
+        end
+
+        it 'returns the contract symbol as-is for upcoming month contracts' do
+          result = strategy.send(:resolve_trading_symbol, 'BIT-26SEP25-CDE')
+          expect(result).to eq('BIT-26SEP25-CDE')
+        end
+      end
+
+      context 'when given unsupported symbols' do
+        it 'returns the symbol as-is for non-futures assets' do
+          result = strategy.send(:resolve_trading_symbol, 'DOGE-USD')
+          expect(result).to eq('DOGE-USD')
+        end
+      end
+    end
+
+    describe '#extract_asset_from_symbol' do
+      let(:strategy) { described_class.new }
+
+      it 'extracts BTC from BTC-USD' do
+        result = strategy.send(:extract_asset_from_symbol, 'BTC-USD')
+        expect(result).to eq('BTC')
+      end
+
+      it 'extracts ETH from ETH-USD' do
+        result = strategy.send(:extract_asset_from_symbol, 'ETH-USD')
+        expect(result).to eq('ETH')
+      end
+
+      it 'extracts BTC from BTC' do
+        result = strategy.send(:extract_asset_from_symbol, 'BTC')
+        expect(result).to eq('BTC')
+      end
+
+      it 'extracts BTC from current month BTC contract' do
+        result = strategy.send(:extract_asset_from_symbol, 'BIT-29AUG25-CDE')
+        expect(result).to eq('BTC')
+      end
+
+      it 'extracts ETH from current month ETH contract' do
+        result = strategy.send(:extract_asset_from_symbol, 'ET-29AUG25-CDE')
+        expect(result).to eq('ETH')
+      end
+
+      it 'returns nil for unsupported symbols' do
+        result = strategy.send(:extract_asset_from_symbol, 'DOGE-USD')
+        expect(result).to be_nil
+      end
+    end
+
+    describe 'contract rollover scenarios' do
+      let(:strategy) { described_class.new }
+
+      context 'when contracts expire tomorrow (not tradeable)' do
+        before do
+          # Set date to make current month contracts expire tomorrow (not tradeable)
+          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
+        end
+
+        it 'prioritizes upcoming month contracts for new signals' do
+          # Current month expires tomorrow so not tradeable, use upcoming month
+          result = strategy.send(:resolve_trading_symbol, 'BTC')
+          expect(result).to eq('BIT-26SEP25-CDE')
+        end
+      end
+
+      context 'when contracts expire today' do
+        before do
+          # Set date to expiration day
+          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 29))
+        end
+
+        it 'uses upcoming month contracts only' do
+          result = strategy.send(:resolve_trading_symbol, 'BTC')
+          expect(result).to eq('BIT-26SEP25-CDE')
+        end
+      end
+    end
+
+    describe 'error handling in contract resolution' do
+      let(:strategy) { described_class.new }
+
+      context 'when contract manager fails' do
+        before do
+          allow_any_instance_of(MarketData::FuturesContractManager).to receive(:best_available_contract).and_raise(StandardError, 'Contract manager error')
+        end
+
+        it 'raises the error (no error handling implemented)' do
+          expect {
+            strategy.send(:resolve_trading_symbol, 'BTC')
+          }.to raise_error(StandardError, 'Contract manager error')
+        end
+      end
+    end
+  end
 end
