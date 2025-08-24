@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  RAILS_ENV: test
+  RAILS_SKIP_DB_PREPARE: '1'
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/coinbase_futures_bot_test
+
 jobs:
   lint:
     name: RuboCop (lint)
@@ -35,3 +40,50 @@ jobs:
       - name: Static security scan
         run: bin/brakeman --no-pager
 
+  test:
+    name: Rails tests
+    runs-on: ubuntu-latest
+    needs: [lint, security]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2.2'
+          bundler-cache: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev pkg-config
+
+      - name: Prepare database (create + migrate)
+        run: bin/rails db:create db:migrate
+
+      - name: Run tests
+        run: bundle exec rspec
+
+  # Optional: Add a job that runs only when tests pass
+  success:
+    name: Success
+    runs-on: ubuntu-latest
+    needs: [lint, security, test]
+    if: always() && needs.lint.result == 'success' && needs.security.result == 'success' && needs.test.result == 'success'
+    steps:
+      - name: All checks passed
+        run: echo "🎉 All CI checks passed successfully!"
