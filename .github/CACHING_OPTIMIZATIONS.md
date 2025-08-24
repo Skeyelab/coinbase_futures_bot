@@ -12,7 +12,7 @@ With these optimizations, we expect to see:
 
 ## 📦 Caching Layers Implemented
 
-### 1. **Ruby Dependencies** (via `ruby/setup-ruby@v2`)
+### 1. **Ruby Dependencies** (via `ruby/setup-ruby@v1`)
 - **What**: Gems from `Gemfile.lock`
 - **Cache key**: Based on `Gemfile.lock` hash
 - **Benefit**: Avoids re-downloading gems on every run
@@ -98,7 +98,7 @@ coverage/
 
 ### Key Changes
 - Upgraded to `actions/cache@v4` (latest version)
-- Upgraded to `ruby/setup-ruby@v2` (better caching)
+- Using `ruby/setup-ruby@v1` (stable version with bundler caching)
 - Added comprehensive cache layers
 - Implemented fallback cache strategies
 

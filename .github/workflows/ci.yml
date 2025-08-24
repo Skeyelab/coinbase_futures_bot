@@ -21,7 +21,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-apt-
 
-      - uses: ruby/setup-ruby@v2
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
@@ -54,7 +54,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-apt-
 
-      - uses: ruby/setup-ruby@v2
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2.2'
           bundler-cache: true
