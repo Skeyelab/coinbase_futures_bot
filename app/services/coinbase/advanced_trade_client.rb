@@ -123,6 +123,27 @@ module Coinbase
       JSON.parse(resp.body)
     end
 
+    # List all available products (including futures contracts)
+    def list_products
+      raise "Authentication required" unless @authenticated
+      path = "/api/v3/brokerage/market/products"
+      resp = authenticated_get(path)
+      data = JSON.parse(resp.body)
+
+      # The response should contain a 'products' array
+      products = data.is_a?(Hash) && data["products"] ? data["products"] : data
+      products = [ products ] unless products.is_a?(Array)
+      products
+    end
+
+    # Get specific product details
+    def get_product(product_id)
+      raise "Authentication required" unless @authenticated
+      path = "/api/v3/brokerage/market/products/#{product_id}"
+      resp = authenticated_get(path)
+      JSON.parse(resp.body)
+    end
+
     private
 
     # Load credentials from cdp_api_key.json file

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_11_170020) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_24_051214) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -187,6 +187,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_11_170020) do
     t.boolean "enabled", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "contract_type"
+    t.date "expiration_date"
+    t.boolean "is_perpetual", default: false
+    t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
+    t.index ["is_perpetual", "expiration_date"], name: "index_trading_pairs_on_is_perpetual_and_expiration_date"
     t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
   end
 end

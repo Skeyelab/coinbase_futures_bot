@@ -31,6 +31,9 @@ module Trading
         @authenticated = false
         @logger.warn("CoinbasePositions service credentials not found in cdp_api_key.json")
       end
+
+      # Initialize contract manager for current month contract resolution
+      @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
     end
 
     # Test method to validate auth with simpler endpoint first
@@ -388,6 +391,142 @@ module Trading
       # Support .env with escaped newlines
       pem = pem.gsub("\\n", "\n")
       pem.strip
+    end
+
+    # --- Current Month Contract Helpers ---
+
+    # Get positions for current month contracts of a specific asset (BTC, ETH)
+    def list_current_month_positions(asset:)
+      current_month_contract = @contract_manager.current_month_contract(asset)
+      return [] unless current_month_contract
+
+      list_open_positions(product_id: current_month_contract)
+    end
+
+    # Open position on current month contract for an asset
+    def open_current_month_position(asset:, side:, size:, type: :market, price: nil)
+      current_month_contract = @contract_manager.current_month_contract(asset)
+      raise "No current month contract found for #{asset}" unless current_month_contract
+
+      @logger.info("Opening #{side} position of #{size} contracts on current month #{asset} contract: #{current_month_contract}")
+      open_position(
+        product_id: current_month_contract,
+        side: side,
+        size: size,
+        type: type,
+        price: price
+      )
+    end
+
+    # Close position on current month contract for an asset
+    def close_current_month_position(asset:, size: nil)
+      current_month_contract = @contract_manager.current_month_contract(asset)
+      raise "No current month contract found for #{asset}" unless current_month_contract
+
+      @logger.info("Closing position on current month #{asset} contract: #{current_month_contract}")
+      close_position(current_month_contract, size: size)
+    end
+
+    # Get all positions grouped by underlying asset
+    def positions_by_asset
+      all_positions = list_open_positions
+      positions_by_asset = {}
+
+      all_positions.each do |position|
+        product_id = position["product_id"]
+        asset = extract_asset_from_product_id(product_id)
+        next unless asset
+
+        positions_by_asset[asset] ||= []
+        positions_by_asset[asset] << position
+      end
+
+      positions_by_asset
+    end
+
+    # Extract asset from product ID
+    def extract_asset_from_product_id(product_id)
+      case product_id
+      when /^(BTC|ETH)(-USD)?(-PERP)?$/
+        $1
+      when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
+        product_id.start_with?('BIT') ? 'BTC' : 'ETH'
+      else
+        nil
+      end
+    end
+
+    # Check if any positions need to be rolled over to current month contracts
+    def positions_need_rollover?
+      expiring_contracts = @contract_manager.expiring_contracts(days_ahead: 3)
+      all_positions = list_open_positions
+
+      # Check if we have positions in any expiring contracts
+      expiring_product_ids = expiring_contracts.map(&:product_id)
+      all_positions.any? { |pos| expiring_product_ids.include?(pos["product_id"]) }
+    end
+
+    # Rollover positions from expiring contracts to current month contracts
+    def rollover_positions
+      return unless positions_need_rollover?
+
+      @logger.info("Starting position rollover process")
+      positions_by_asset.each do |asset, positions|
+        rollover_asset_positions(asset, positions)
+      end
+    end
+
+    private
+
+    def rollover_asset_positions(asset, positions)
+      current_month_contract = @contract_manager.current_month_contract(asset)
+      return unless current_month_contract
+
+      expiring_positions = positions.select do |pos|
+        contract = TradingPair.find_by(product_id: pos["product_id"])
+        contract && contract.expiration_date && contract.expiration_date <= Date.current + 3.days
+      end
+
+      return if expiring_positions.empty?
+
+      @logger.info("Rolling over #{expiring_positions.size} #{asset} positions to #{current_month_contract}")
+
+      expiring_positions.each do |position|
+        rollover_single_position(position, current_month_contract, asset)
+      end
+    end
+
+    def rollover_single_position(position, target_contract, asset)
+      product_id = position["product_id"]
+      size = position["number_of_contracts"] || position["size"]
+      side = position["side"]
+
+      @logger.info("Rolling over #{asset} position: #{size} contracts from #{product_id} to #{target_contract}")
+
+      begin
+        # Close the old position
+        close_position(product_id, size: size)
+        
+        # Open new position in current month contract
+        # Convert side: if we had a LONG position, we want to open a LONG position
+        new_side = case side.to_s.upcase
+        when "LONG" then :long
+        when "SHORT" then :short
+        else :long
+        end
+
+        open_position(
+          product_id: target_contract,
+          side: new_side,
+          size: size,
+          type: :market
+        )
+
+        @logger.info("Successfully rolled over #{asset} position to #{target_contract}")
+      rescue => e
+        @logger.error("Failed to rollover #{asset} position: #{e.message}")
+        raise
+      end
     end
   end
 end

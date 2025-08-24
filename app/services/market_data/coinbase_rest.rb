@@ -69,6 +69,7 @@ module MarketData
             price_increment: p.dig("quote_increment"),
             size_increment: p.dig("base_increment"),
             enabled: true,
+            is_perpetual: p["id"].end_with?("-PERP"),
             created_at: Time.now.utc,
             updated_at: Time.now.utc
           }, unique_by: :index_trading_pairs_on_product_id)
@@ -79,6 +80,9 @@ module MarketData
       if futures_products.empty?
         create_default_futures_products
       end
+
+      # Ensure current month contracts are updated
+      update_current_month_contracts
 
       Rails.logger.info("Upserted #{futures_products.count} futures products")
     end
@@ -554,6 +558,12 @@ module MarketData
 
       # Make the request
       @conn.get(path, params)
+    end
+
+    # Update current month contracts using the FuturesContractManager
+    def update_current_month_contracts
+      manager = FuturesContractManager.new
+      manager.update_current_month_contracts
     end
   end
 end
