@@ -318,6 +318,99 @@ module MarketData
       Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
     end
 
+    # Upsert 5-minute candles
+    def upsert_5m_candles(product_id:, start_time:, end_time: Time.now.utc)
+      # For larger date ranges, use chunked fetching to avoid API limits
+      if (end_time - start_time) > 2.days
+        upsert_5m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
+        return
+      end
+
+      # Use 5m granularity (300 seconds)
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 300)
+
+      # Debug logging
+      Rails.logger.info("Processing #{data.class} data with #{data.count} items for 5m candles")
+
+      # Ensure data is an array
+      unless data.is_a?(Array)
+        Rails.logger.error("Expected array data, got #{data.class}: #{data.inspect[0..200]}")
+        return
+      end
+
+      # API returns most recent first; normalize oldest→newest
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        # Use create_or_find_by instead of upsert for debugging
+        Candle.create_or_find_by(
+          symbol: product_id,
+          timeframe: "5m",
+          timestamp: ts
+        ) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 5m candles for #{product_id}")
+    end
+
+    # Upsert 5-minute candles using chunked fetching for large date ranges
+    def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 2)
+      all_data = []
+      current_start = start_time
+
+      while current_start < end_time
+        current_end = [ current_start + chunk_days.days, end_time ].min
+        begin
+          chunk_data = fetch_candles(
+            product_id: product_id,
+            start_iso8601: current_start.iso8601,
+            end_iso8601: current_end.iso8601,
+            granularity: 300
+          )
+          all_data.concat(chunk_data)
+          current_start = current_end
+          # Small delay to avoid rate limiting
+          sleep(0.1) if chunk_data.any?
+        rescue => e
+          Rails.logger.error("Failed to fetch 5m candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
+          current_start = current_end
+        end
+      end
+
+      # Process all the collected data
+      Rails.logger.info("Processing #{all_data.count} total 5m candles in chunks")
+
+      all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        Candle.create_or_find_by(
+          symbol: product_id,
+          timeframe: "5m",
+          timestamp: ts
+        ) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting #{all_data.count} 5m candles in chunks for #{product_id}")
+    end
+
     # Upsert candles using chunked fetching for large date ranges
     def upsert_1h_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 30)
       data = fetch_candles_in_chunks(product_id: product_id, start_time: start_time, end_time: end_time, chunk_days: chunk_days)
