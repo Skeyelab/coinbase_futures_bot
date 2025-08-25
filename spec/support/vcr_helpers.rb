@@ -94,7 +94,7 @@ module VCRHelpers
 
     # Check for placeholder values that indicate filtering issues
     yaml_content = File.read(cassette_path)
-    return false if yaml_content.include?("<TIMESTAMP>") && yaml_content.scan(/<TIMESTAMP>/).length > 50
+    return false if yaml_content.include?("<TIMESTAMP>") && yaml_content.scan("<TIMESTAMP>").length > 50
 
     true
   rescue => e
