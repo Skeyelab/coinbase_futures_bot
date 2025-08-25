@@ -119,7 +119,7 @@ RSpec.describe 'day_trading:force_close_all', type: :task do
 
   it 'forces close when FORCE environment variable is set' do
     ENV['FORCE'] = 'true'
-    
+
     summary = { open_count: 2 }
     allow(manager).to receive(:get_position_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(2)
@@ -202,14 +202,16 @@ RSpec.describe 'day_trading:check_tp_sl', type: :task do
 
   it 'forces close when FORCE environment variable is set' do
     ENV['FORCE'] = 'true'
-    
+
     position = instance_double(Position, id: 1, side: 'LONG', size: 1.0, product_id: 'BIT-29AUG25-CDE')
     trigger_info = { position: position, trigger: 'take_profit', current_price: 51_000.0, target_price: 50_000.0 }
 
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(1)
 
-    expect { task.execute }.to output(/Force mode enabled - proceeding to close positions without confirmation/).to_stdout
+    expect do
+      task.execute
+    end.to output(/Force mode enabled - proceeding to close positions without confirmation/).to_stdout
     expect { task.execute }.to output(%r{✅ Closed 1 TP/SL positions}).to_stdout
 
     ENV.delete('FORCE')
@@ -272,6 +274,9 @@ RSpec.describe 'day_trading:cleanup', type: :task do
       double(where: double(count: 5))
     )
     allow(Position).to receive(:cleanup_old_positions).and_return(5)
+    # Mock interactive behavior for both task.execute calls
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/Cleaning up closed positions older than 30 days/).to_stdout
     expect { task.execute }.to output(/Delete 5 old positions\? Type 'yes' to confirm/).to_stdout
@@ -285,6 +290,9 @@ RSpec.describe 'day_trading:cleanup', type: :task do
       double(where: double(count: 5))
     )
     allow(Position).to receive(:cleanup_old_positions).and_return(5)
+    # Mock interactive behavior for both task.execute calls
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/Cleaning up closed positions older than 60 days/).to_stdout
 
@@ -328,7 +336,7 @@ RSpec.describe 'day_trading:cleanup', type: :task do
 
   it 'forces cleanup when FORCE environment variable is set' do
     ENV['FORCE'] = 'true'
-    
+
     # Mock the count query to return 5 old positions
     allow(Position).to receive(:closed).and_return(
       double(where: double(count: 5))

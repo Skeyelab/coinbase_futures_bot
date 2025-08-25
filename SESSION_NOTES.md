@@ -26,6 +26,27 @@
 
 ### Session log
 
+#### 2025-01-14 10:15 UTC
+- Context: Fixed day_trading:cleanup rake task hanging issue that was preventing automated execution
+- Changes:
+  - Added FORCE environment variable support to skip confirmation prompts in interactive tasks
+  - Updated cleanup, force_close_all, and check_tp_sl tasks to handle non-interactive environments gracefully
+  - Added proper tty? detection to prevent hanging in CI/CD or background execution scenarios
+  - Fixed regex syntax issues in tests (TP/SL pattern matching)
+  - Updated all interactive task tests to properly mock tty? behavior and test new FORCE functionality
+- Commands run:
+  - `bundle exec rake day_trading:cleanup` (confirmed hanging issue)
+  - `FORCE=true bundle exec rake day_trading:cleanup` (verified fix works)
+  - `bundle exec rspec spec/lib/tasks/day_trading_spec.rb` (tests now pass)
+  - `git add -A && git commit -m "fix(rake): resolve day_trading:cleanup task hanging issue"`
+- Files touched:
+  - `lib/tasks/day_trading.rake` (added FORCE env var and non-interactive handling)
+  - `spec/lib/tasks/day_trading_spec.rb` (updated tests for new behavior)
+- Next steps:
+  - Test other interactive rake tasks in non-interactive environments
+  - Consider adding similar FORCE support to other confirmation-requiring tasks
+  - Verify cron job execution works properly with updated tasks
+
 #### 2025-08-24 19:40 UTC
 - Context: Implemented day trading position management with same-day closure for Linear issue FUT-5
 - Changes:
