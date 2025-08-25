@@ -1,0 +1,33 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.coinbase.com/api/v3/brokerage/orders
+    body:
+      encoding: UTF-8
+      string: '{"client_order_id":"cli-<UUID>","product_id":"BIT-29AUG25-CDE","side":"LONG","order_configuration":{"market_market_ioc":{"base_size":"1.0"}}}'
+    headers:
+      Accept:
+      - application/json
+      Authorization:
+      - Bearer <JWT_TOKEN>
+      Content-Type:
+      - application/json
+      User-Agent:
+      - Faraday v2.13.4
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 23 Jan 2025 12:00:00 GMT
+      Server:
+      - nginx
+    body:
+      encoding: UTF-8
+      string: '{"order_id":"test-order-long-123","status":"FILLED","success":true,"filled_size":"1.0","filled_value":"50000.0"}'
+  recorded_at: Thu, 23 Jan 2025 12:00:00 GMT
+recorded_with: VCR 6.3.1

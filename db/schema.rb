@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_24_052659) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -131,6 +131,22 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_052659) do
     t.index ["priority", "scheduled_at"], name: "index_good_jobs_on_priority_scheduled_at_unfinished_unlocked", where: "((finished_at IS NULL) AND (locked_by_id IS NULL))"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
+  end
+
+  create_table "positions", force: :cascade do |t|
+    t.string "product_id"
+    t.string "side"
+    t.decimal "size"
+    t.decimal "entry_price"
+    t.datetime "entry_time"
+    t.datetime "close_time"
+    t.string "status"
+    t.decimal "pnl"
+    t.decimal "take_profit"
+    t.decimal "stop_loss"
+    t.boolean "day_trading"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|

@@ -45,7 +45,7 @@ app/services/
 
 ### 2. Trading Services
 - **Purpose**: Handle order execution, position management, and risk controls
-- **Key Services**: FuturesExecutor, CoinbasePositions
+- **Key Services**: FuturesExecutor, CoinbasePositions, DayTradingPositionManager
 - **Documentation**: [trading.md](trading.md)
 
 ### 3. Strategy Services
