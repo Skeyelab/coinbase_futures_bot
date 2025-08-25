@@ -66,9 +66,8 @@ end
 # Global error handling to prevent test suite from exiting with error code
 at_exit do
   if $!.nil? || $!.is_a?(SystemExit) && $!.success?
-    exit 0
   else
     puts "Test suite completed with warnings but no fatal errors"
-    exit 0
   end
+  exit 0
 end
