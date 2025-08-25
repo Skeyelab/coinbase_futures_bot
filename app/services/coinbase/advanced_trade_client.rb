@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-require "faraday"
-require "json"
-require "openssl"
-require "jwt"
-require "cgi"
+require 'faraday'
+require 'json'
+require 'openssl'
+require 'jwt'
+require 'cgi'
 
 module Coinbase
   class AdvancedTradeClient
-    DEFAULT_BASE = "https://api.coinbase.com"
+    DEFAULT_BASE = 'https://api.coinbase.com'
 
-    def initialize(base_url: ENV.fetch("COINBASE_AT_REST_URL", DEFAULT_BASE), logger: Rails.logger)
+    def initialize(base_url: ENV.fetch('COINBASE_AT_REST_URL', DEFAULT_BASE), logger: Rails.logger)
       @logger = logger
       @conn = Faraday.new(base_url) do |f|
         f.request :url_encoded
@@ -25,39 +25,41 @@ module Coinbase
         @api_key = credentials[:api_key]
         @api_secret = normalize_pem_secret(credentials[:private_key])
         @authenticated = true
-        @logger.info("Advanced Trade API client initialized with credentials from cdp_api_key.json")
+        @logger.info('Advanced Trade API client initialized with credentials from cdp_api_key.json')
       else
         @authenticated = false
-        @logger.warn("Advanced Trade API credentials not found in cdp_api_key.json")
+        @logger.warn('Advanced Trade API credentials not found in cdp_api_key.json')
       end
     end
 
     # Test authentication with accounts endpoint
     def test_auth
-      raise "Authentication required" unless @authenticated
+      raise 'Authentication required' unless @authenticated
 
-      path = "/api/v3/brokerage/accounts"
+      path = '/api/v3/brokerage/accounts'
       begin
         resp = authenticated_get(path)
         data = JSON.parse(resp.body)
-        {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
+        { ok: true, count: data.is_a?(Array) ? data.size : 1, data: data }
       rescue Faraday::ClientError => e
         body = (e.response && e.response[:body]).to_s
-        {ok: false, error: e.class.to_s, message: e.message, body: body}
+        { ok: false, error: e.class.to_s, message: e.message, body: body }
       end
     end
 
     # Get account balances
     def get_accounts
-      raise "Authentication required" unless @authenticated
-      path = "/api/v3/brokerage/accounts"
+      raise 'Authentication required' unless @authenticated
+
+      path = '/api/v3/brokerage/accounts'
       resp = authenticated_get(path)
       JSON.parse(resp.body)
     end
 
     # Get specific account details
     def get_account(account_id)
-      raise "Authentication required" unless @authenticated
+      raise 'Authentication required' unless @authenticated
+
       path = "/api/v3/brokerage/accounts/#{account_id}"
       resp = authenticated_get(path)
       JSON.parse(resp.body)
@@ -65,9 +67,9 @@ module Coinbase
 
     # List futures positions
     def list_futures_positions(product_id: nil)
-      raise "Authentication required" unless @authenticated
+      raise 'Authentication required' unless @authenticated
 
-      path = "/api/v3/brokerage/cfm/positions"
+      path = '/api/v3/brokerage/cfm/positions'
       params = {}
       params[:product_id] = product_id if product_id
 
@@ -76,12 +78,12 @@ module Coinbase
         data = JSON.parse(resp.body)
 
         positions = if data.is_a?(Array)
-          data
-        elsif data.is_a?(Hash) && data["positions"]
-          data["positions"]
-        else
-          data
-        end
+                      data
+                    elsif data.is_a?(Hash) && data['positions']
+                      data['positions']
+                    else
+                      data
+                    end
 
         positions = [positions] unless positions.is_a?(Array)
         positions
@@ -89,18 +91,22 @@ module Coinbase
         body = (e.response && e.response[:body]).to_s
         message = begin
           parsed = JSON.parse(body)
-          parsed["message"] || parsed["error"] || body
-        rescue
+          parsed['message'] || parsed['error'] || body
+        rescue StandardError
           body.presence || e.message
         end
         raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
       end
     end
 
+    # Alias for backward compatibility with tests
+    alias list_positions list_futures_positions
+
     # Get futures balance summary
     def get_futures_balance_summary
-      raise "Authentication required" unless @authenticated
-      path = "/api/v3/brokerage/cfm/balance_summary"
+      raise 'Authentication required' unless @authenticated
+
+      path = '/api/v3/brokerage/cfm/balance_summary'
       resp = authenticated_get(path)
       JSON.parse(resp.body)
     end
@@ -109,36 +115,40 @@ module Coinbase
     # Docs: GET /cfm/intraday/current_margin_window
     # https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/rest-api
     def get_current_margin_window
-      raise "Authentication required" unless @authenticated
-      path = "/api/v3/brokerage/cfm/intraday/current_margin_window"
+      raise 'Authentication required' unless @authenticated
+
+      path = '/api/v3/brokerage/cfm/intraday/current_margin_window'
       resp = authenticated_get(path)
       JSON.parse(resp.body)
     end
 
     # Get API key permissions (this will tell us what our key can do)
     def get_api_key_permissions
-      raise "Authentication required" unless @authenticated
-      path = "/api/v3/brokerage/key_permissions"
+      raise 'Authentication required' unless @authenticated
+
+      path = '/api/v3/brokerage/key_permissions'
       resp = authenticated_get(path)
       JSON.parse(resp.body)
     end
 
     # List all available products (including futures contracts)
     def list_products
-      raise "Authentication required" unless @authenticated
-      path = "/api/v3/brokerage/market/products"
+      raise 'Authentication required' unless @authenticated
+
+      path = '/api/v3/brokerage/market/products'
       resp = authenticated_get(path)
       data = JSON.parse(resp.body)
 
       # The response should contain a 'products' array
-      products = (data.is_a?(Hash) && data["products"]) ? data["products"] : data
+      products = data.is_a?(Hash) && data['products'] ? data['products'] : data
       products = [products] unless products.is_a?(Array)
       products
     end
 
     # Get specific product details
     def get_product(product_id)
-      raise "Authentication required" unless @authenticated
+      raise 'Authentication required' unless @authenticated
+
       path = "/api/v3/brokerage/market/products/#{product_id}"
       resp = authenticated_get(path)
       JSON.parse(resp.body)
@@ -148,7 +158,7 @@ module Coinbase
 
     # Load credentials from cdp_api_key.json file
     def load_credentials_from_file
-      file_path = Rails.root.join("cdp_api_key.json")
+      file_path = Rails.root.join('cdp_api_key.json')
 
       if File.exist?(file_path)
         begin
@@ -156,8 +166,8 @@ module Coinbase
 
           # Use the full organization path as the API key
           # This is what Coinbase expects for JWT authentication
-          api_key = data["name"]
-          private_key = data["privateKey"]
+          api_key = data['name']
+          private_key = data['privateKey']
 
           @logger.info("Using API key: #{api_key}")
           @logger.info("Private key length: #{private_key.length}")
@@ -169,7 +179,7 @@ module Coinbase
         rescue JSON::ParserError => e
           @logger.error("Failed to parse cdp_api_key.json: #{e.message}")
           nil
-        rescue => e
+        rescue StandardError => e
           @logger.error("Failed to load credentials from cdp_api_key.json: #{e.message}")
           nil
         end
@@ -182,26 +192,26 @@ module Coinbase
     # Generate a fresh JWT token for each request
     def authenticated_get(path, params = {})
       # Clear any existing Authorization header to ensure fresh JWT
-      @conn.headers.delete("Authorization")
+      @conn.headers.delete('Authorization')
 
       # Set required headers that Coinbase API expects
-      @conn.headers["Accept"] = "application/json"
-      @conn.headers["Content-Type"] = "application/json"
+      @conn.headers['Accept'] = 'application/json'
+      @conn.headers['Content-Type'] = 'application/json'
 
       # Generate completely new JWT for this specific request
-      jwt = build_jwt_token("GET", path, params: params)
-      @conn.headers["Authorization"] = "Bearer #{jwt}"
+      jwt = build_jwt_token('GET', path, params: params)
+      @conn.headers['Authorization'] = "Bearer #{jwt}"
 
       @logger.debug("GET #{path} with fresh JWT and required headers")
 
       begin
         resp = @conn.get(path, params)
         # Clear the Authorization header after the request to ensure no reuse
-        @conn.headers.delete("Authorization")
+        @conn.headers.delete('Authorization')
         resp
       rescue Faraday::ClientError => e
         # Clear the Authorization header even on error
-        @conn.headers.delete("Authorization")
+        @conn.headers.delete('Authorization')
         @logger.error("Request failed: #{e.class} - #{e.message}")
         if e.response
           @logger.error("Response status: #{e.response[:status]}")
@@ -221,7 +231,7 @@ module Coinbase
 
       payload = {
         sub: @api_key,
-        iss: "cdp",
+        iss: 'cdp',
         nbf: now,
         exp: exp,
         uri: uri
@@ -238,7 +248,7 @@ module Coinbase
 
       # Include kid header for clarity; some infrastructures rely on it
       # Use the full API key path like the Python implementation
-      JWT.encode(payload, private_key, "ES256", {kid: @api_key})
+      JWT.encode(payload, private_key, 'ES256', { kid: @api_key })
     end
 
     # Format URI for JWT claim per Coinbase requirements
@@ -246,19 +256,19 @@ module Coinbase
     # https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
     def format_jwt_uri(http_method, request_path, params, _body)
       method = http_method.to_s.upcase
-      host = "api.coinbase.com"
+      host = 'api.coinbase.com'
 
       path_with_query = case method
-      when "GET", "DELETE"
-        if params && !params.empty?
-          query = params.map { |k, v| "#{k}=#{v}" }.join("&")
-          "#{request_path}?#{query}"
-        else
-          request_path
-        end
-      else
-        request_path
-      end
+                        when 'GET', 'DELETE'
+                          if params && !params.empty?
+                            query = params.map { |k, v| "#{k}=#{v}" }.join('&')
+                            "#{request_path}?#{query}"
+                          else
+                            request_path
+                          end
+                        else
+                          request_path
+                        end
 
       "#{method} #{host}#{path_with_query}"
     end
@@ -266,12 +276,12 @@ module Coinbase
     # Minimal RFC3986 percent-encoding (space as %20, leave ~ unescaped)
     def rfc3986_encode(str)
       encoded = CGI.escape(str)
-      encoded.gsub("+", "%20").gsub("%7E", "~")
+      encoded.gsub('+', '%20').gsub('%7E', '~')
     end
 
     def normalize_pem_secret(secret)
       pem = secret.to_s
-      pem = pem.gsub("\\n", "\n")
+      pem = pem.gsub('\\n', "\n")
       pem.strip
     end
   end
