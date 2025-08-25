@@ -51,13 +51,13 @@ module VCRConfig
     VCR.configure do |config|
       # In CI, never record new cassettes
       config.default_cassette_options[:record] = :none
-      
+
       # Allow playback repeats for better test reliability
       config.default_cassette_options[:allow_playback_repeats] = true
-      
+
       # Fail fast if cassette missing in CI
       config.default_cassette_options[:erb] = true
-      
+
       # More strict matching in CI
       config.default_cassette_options[:match_requests_on] = [
         :method, :uri, :body, :headers
@@ -74,10 +74,10 @@ module VCRConfig
       config.default_cassette_options[:match_requests_on] = [
         :method, :uri, :body
       ]
-      
+
       # Allow new episodes by default
       config.default_cassette_options[:record] = :new_episodes
-      
+
       # Helpful warnings for missing cassettes
       config.before_record do |interaction|
         puts "📼 Recording VCR interaction: #{interaction.request.method.upcase} #{interaction.request.uri}"

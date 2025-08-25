@@ -11,12 +11,12 @@ module VCRHelpers
     config.filter_sensitive_data("<ISO8601_TIMESTAMP>") do |interaction|
       interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, "<ISO8601_TIMESTAMP>")
     end
-    
+
     # Unix timestamps (10-13 digits)
     config.filter_sensitive_data("<UNIX_TIMESTAMP>") do |interaction|
       interaction.response.body.gsub(/\b\d{10,13}\b/, "<UNIX_TIMESTAMP>")
     end
-    
+
     # JWT tokens
     config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
       interaction.response.body.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>")
@@ -45,7 +45,7 @@ module VCRHelpers
   def self.record_mode
     if ENV["CI"] == "true"
       :none # Never record in CI
-    elsif ENV["VCR_RECORD_MODE"] 
+    elsif ENV["VCR_RECORD_MODE"]
       ENV["VCR_RECORD_MODE"].to_sym
     else
       :new_episodes # Default for development
@@ -54,7 +54,7 @@ module VCRHelpers
 
   # Standard cassette naming convention
   def self.cassette_name(test_class, test_method, variant = nil)
-    base_name = "#{test_class.name.gsub('::', '_')}/#{test_method}"
+    base_name = "#{test_class.name.gsub("::", "_")}/#{test_method}"
     variant ? "#{base_name}/#{variant}" : base_name
   end
 end

@@ -15,7 +15,7 @@ module VCRTestHelpers
 
     test_class = example.example_group.described_class&.name || "AnonymousClass"
     test_method = example.description.parameterize(separator: "_")
-    
+
     VCRHelpers.cassette_name(test_class, test_method)
   end
 
@@ -45,13 +45,13 @@ module VCRTestHelpers
       record: VCRHelpers.record_mode,
       match_requests_on: [:method, :uri, :body]
     }
-    
+
     if trim_responses
       options[:before_record] = ->(interaction) do
         VCRHelpers.trim_large_responses(interaction)
       end
     end
-    
+
     with_vcr_cassette(name, options, &block)
   end
 
@@ -59,10 +59,10 @@ module VCRTestHelpers
   def with_fresh_vcr_cassette(name = nil, &block)
     cassette_name = name || auto_cassette_name
     cassette_path = File.join(VCR.configuration.cassette_library_dir, "#{cassette_name}.yml")
-    
+
     FileUtils.rm_f(cassette_path) if File.exist?(cassette_path)
-    
-    options = { record: :new_episodes }
+
+    options = {record: :new_episodes}
     VCR.use_cassette(cassette_name, options, &block)
   end
 end
@@ -74,85 +74,48 @@ module VCRHelpers
     return unless interaction.response.body
 
     # Trim candle data
-    if interaction.request.uri.include?("/candles")
-      trim_candle_response(interaction)
-    end
+    trim_candle_response(interaction) if interaction.request.uri.include?("/candles")
 
     # Trim products list
-    if interaction.request.uri.include?("/products")
-      trim_products_response(interaction)
-    end
-  end
-
-  private
-
-  def self.trim_candle_response(interaction)
-    begin
-      parsed = JSON.parse(interaction.response.body)
-      if parsed.is_a?(Array) && parsed.length > 10
-        # Keep first 3, middle 2, and last 3 for representative sample
-        middle_index = parsed.length / 2
-        trimmed = parsed.first(3) + 
-                 parsed[middle_index, 2] + 
-                 parsed.last(3)
-        interaction.response.body = trimmed.to_json
-      end
-    rescue JSON::ParserError
-      # Keep original if not valid JSON
-    end
-  end
-
-  def self.trim_products_response(interaction)
-    begin
-      parsed = JSON.parse(interaction.response.body)
-      if parsed.is_a?(Array) && parsed.length > 20
-        # Keep first 10 and last 10 products
-        trimmed = parsed.first(10) + parsed.last(10)
-        interaction.response.body = trimmed.to_json
-      end
-    rescue JSON::ParserError
-      # Keep original if not valid JSON
-    end
+    trim_products_response(interaction) if interaction.request.uri.include?("/products")
   end
 
   # Cassette health check
   def self.cassette_healthy?(cassette_path)
     return false unless File.exist?(cassette_path)
-    
-    begin
-      content = YAML.load_file(cassette_path)
-      return false unless content.is_a?(Hash)
-      return false unless content["http_interactions"]
-      
-      # Check for common issues
-      interactions = content["http_interactions"]
-      return false if interactions.empty?
-      
-      # Check for placeholder values that indicate filtering issues
-      yaml_content = File.read(cassette_path)
-      return false if yaml_content.include?("<TIMESTAMP>") && yaml_content.scan(/<TIMESTAMP>/).length > 50
-      
-      true
-    rescue => e
-      Rails.logger.warn "VCR cassette health check failed for #{cassette_path}: #{e.message}"
-      false
-    end
+
+    content = YAML.load_file(cassette_path)
+    return false unless content.is_a?(Hash)
+    return false unless content["http_interactions"]
+
+    # Check for common issues
+    interactions = content["http_interactions"]
+    return false if interactions.empty?
+
+    # Check for placeholder values that indicate filtering issues
+    yaml_content = File.read(cassette_path)
+    return false if yaml_content.include?("<TIMESTAMP>") && yaml_content.scan(/<TIMESTAMP>/).length > 50
+
+    true
+  rescue => e
+    Rails.logger.warn "VCR cassette health check failed for #{cassette_path}: #{e.message}"
+    false
   end
 
   # Get cassette expiration date
   def self.cassette_expired?(cassette_path, max_age_days = 30)
     return true unless File.exist?(cassette_path)
-    
+
     File.mtime(cassette_path) < max_age_days.days.ago
   end
 
   # Clean up old or unhealthy cassettes
   def self.cleanup_cassettes!(max_age_days: 30, remove_unhealthy: true)
     cassette_dir = VCR.configuration.cassette_library_dir
-    return unless Dir.exist?(cassette_dir)
+    return 0 unless Dir.exist?(cassette_dir)
 
     removed_count = 0
-    
+
     Dir.glob(File.join(cassette_dir, "**", "*.yml")).each do |cassette_path|
       should_remove = false
       reason = nil
@@ -174,6 +137,32 @@ module VCRHelpers
 
     Rails.logger.info "VCR cleanup complete: removed #{removed_count} cassettes"
     removed_count
+  end
+
+  # Private helper methods for response trimming
+  def self.trim_candle_response(interaction)
+    parsed = JSON.parse(interaction.response.body)
+    if parsed.is_a?(Array) && parsed.length > 10
+      # Keep first 3, middle 2, and last 3 for representative sample
+      middle_index = parsed.length / 2
+      trimmed = parsed.first(3) +
+        parsed[middle_index, 2] +
+        parsed.last(3)
+      interaction.response.body = trimmed.to_json
+    end
+  rescue JSON::ParserError
+    # Keep original if not valid JSON
+  end
+
+  def self.trim_products_response(interaction)
+    parsed = JSON.parse(interaction.response.body)
+    if parsed.is_a?(Array) && parsed.length > 20
+      # Keep first 10 and last 10 products
+      trimmed = parsed.first(10) + parsed.last(10)
+      interaction.response.body = trimmed.to_json
+    end
+  rescue JSON::ParserError
+    # Keep original if not valid JSON
   end
 end
 
