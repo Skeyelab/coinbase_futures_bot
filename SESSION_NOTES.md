@@ -26,6 +26,28 @@
 
 ### Session log
 
+#### 2025-01-14 19:30 UTC
+- Context: Removed all PERP (perpetual) contract references from the codebase and replaced with monthly futures contract examples
+- Changes:
+  - Updated all documentation files to remove PERP references
+  - Replaced BTC-USD-PERP and ETH-USD-PERP with BTC-USD and ETH-USD throughout
+  - Updated all spec files to use new symbol naming convention
+  - Removed PERP suffix checks from market data subscription logic
+  - Updated default product IDs in rake tasks and configuration
+  - Updated services, jobs, controllers, and views
+- Commands run:
+  - `git add -A`
+  - `git commit -m "refactor: remove all PERP references and replace with monthly futures contracts"`
+  - `git push -u origin removing-perp`
+  - `gh pr create` (PR #37 created)
+- Files touched:
+  - 33 files changed, 1026 insertions(+), 693 deletions(-)
+  - All documentation files, spec files, and core application files updated
+- Next steps:
+  - Review and merge PR #37
+  - Verify all tests pass with new symbol naming
+  - Consider updating any remaining external references or documentation
+
 #### 2025-08-25 06:30 UTC
 - Context: Successfully completed comprehensive VCR improvements to resolve Linear issue FUT-12
 - Changes:
