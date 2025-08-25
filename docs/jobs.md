@@ -302,6 +302,93 @@ def grid_search(candles)
 end
 ```
 
+#### DayTradingPositionManagementJob
+
+**Purpose**: Manages day trading positions with automatic closure and risk management.
+
+**Schedule**: `*/15 * * * *` (every 15 minutes, configurable)
+
+**Queue**: `critical` (high priority for risk management)
+
+**Key Functions**:
+- Closes expired day trading positions (opened yesterday)
+- Closes positions approaching closure time (within 30 minutes of 24 hours)
+- Monitors take profit/stop loss triggers
+- Provides position summary and monitoring
+
+**Implementation**:
+```ruby
+class DayTradingPositionManagementJob < ApplicationJob
+  queue_as :critical
+
+  def perform
+    @manager = Trading::DayTradingPositionManager.new(logger: @logger)
+
+    # Close expired positions
+    if @manager.positions_need_closure?
+      closed_count = @manager.close_expired_positions
+    end
+
+    # Close approaching positions
+    if @manager.positions_approaching_closure?
+      closed_count = @manager.close_approaching_positions
+    end
+
+    # Check TP/SL triggers
+    triggered_positions = @manager.check_tp_sl_triggers
+    if triggered_positions.any?
+      closed_count = @manager.close_tp_sl_positions
+    end
+
+    # Get position summary
+    summary = @manager.get_position_summary
+  end
+end
+```
+
+**Error Handling**:
+- Graceful failure handling per position
+- Continues processing other positions if one fails
+- Detailed logging for troubleshooting
+- Critical queue ensures high priority execution
+
+#### EndOfDayPositionClosureJob
+
+**Purpose**: Force closes all remaining day trading positions at the end of the trading day.
+
+**Schedule**: `0 0 * * *` (daily at midnight UTC, configurable)
+
+**Queue**: `critical` (highest priority for risk management)
+
+**Key Functions**:
+- Force closes all open day trading positions
+- Provides final position summary
+- Critical for regulatory compliance (day trading rules)
+
+**Implementation**:
+```ruby
+class EndOfDayPositionClosureJob < ApplicationJob
+  queue_as :critical
+
+  def perform
+    @manager = Trading::DayTradingPositionManager.new(logger: @logger)
+
+    # Get current position summary
+    summary = @manager.get_position_summary
+
+    if summary[:open_count] > 0
+      # Force close all remaining day trading positions
+      closed_count = @manager.force_close_all_day_trading_positions
+    end
+  end
+end
+```
+
+**Error Handling**:
+- Critical error handling - job will raise on failure
+- Designed for production alerting if positions can't be closed
+- Ensures regulatory compliance for day trading
+
 ### Utility Jobs
 
 #### TestJob

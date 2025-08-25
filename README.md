@@ -79,6 +79,7 @@ bundle exec rspec
 - **[Testing Guide](docs/testing.md)** - Testing strategies and coverage
 - **[Deployment Guide](docs/deployment.md)** - Production deployment and operations
 - **[Services Documentation](docs/services/)** - Core business logic components
+- **[Day Trading System](docs/day-trading.md)** - Day trading position management and compliance
 
 ## Core Commands
 
@@ -100,6 +101,14 @@ bin/rake signals:generate
 
 # Execute paper trading step
 bin/rake paper:step
+
+# Day trading position management
+bin/rake day_trading:check_positions    # Check position status
+bin/rake day_trading:pnl               # View current PnL
+bin/rake day_trading:close_expired     # Close expired positions
+bin/rake day_trading:check_tp_sl       # Check take profit/stop loss
+bin/rake day_trading:force_close_all   # Emergency close all positions
+bin/rake day_trading:manage            # Run full management cycle
 
 # View sentiment data
 curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD-PERP&limit=5"
@@ -136,6 +145,13 @@ curl http://localhost:3000/up
 - **Simulation Engine**: Comprehensive paper trading with realistic execution
 - **Strategy Calibration**: Automated parameter optimization
 - **Performance Analytics**: Detailed trade analysis and metrics
+
+### 📈 Day Trading Position Management
+- **Automatic Closure**: Same-day position closure for regulatory compliance
+- **Risk Management**: Take profit/stop loss monitoring and execution
+- **24-Hour Limits**: Enforced maximum position duration for day trading
+- **Real-time Monitoring**: Live PnL tracking and position status updates
+- **Emergency Controls**: Force closure capabilities for risk management
 
 ## Production Deployment
 
