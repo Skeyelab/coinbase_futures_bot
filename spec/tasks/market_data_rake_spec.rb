@@ -130,20 +130,22 @@ RSpec.describe "market_data rake tasks", type: :task do
     expect { Rake::Task["market_data:backfill_5m_candles"].invoke(1) }.not_to raise_error
   end
 
-  it "runs backfill_5m_candles with real API call", :vcr do
-    # Clear existing candles to avoid conflicts
-    Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
+  it "runs backfill_5m_candles with real API call" do
+    with_integration_vcr("rake_task_backfill_5m_candles") do
+      # Clear existing candles to avoid conflicts
+      Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
 
-    # Run the actual rake task
-    expect do
-      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-    end.not_to raise_error
+      # Run the actual rake task
+      expect do
+        Rake::Task["market_data:backfill_5m_candles"].invoke(1)
+      end.not_to raise_error
 
-    # Verify that 5m candles were created
-    candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")
-    if candles.any?
-      expect(candles.first.timeframe).to eq("5m")
-      expect(candles.first.symbol).to eq("BTC-USD")
+      # Verify that 5m candles were created
+      candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")
+      if candles.any?
+        expect(candles.first.timeframe).to eq("5m")
+        expect(candles.first.symbol).to eq("BTC-USD")
+      end
     end
   end
 

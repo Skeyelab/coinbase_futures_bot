@@ -1,6 +1,63 @@
 # frozen_string_literal: true
 
 require "vcr"
+require "json"
+
+# VCR Helper Module for common patterns and utilities
+module VCRHelpers
+  # Smart filtering for dynamic timestamps
+  def self.setup_timestamp_filters(config)
+    # ISO 8601 timestamps
+    config.filter_sensitive_data("<ISO8601_TIMESTAMP>") do |interaction|
+      interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, "<ISO8601_TIMESTAMP>")
+    end
+
+    # Unix timestamps (10-13 digits)
+    config.filter_sensitive_data("<UNIX_TIMESTAMP>") do |interaction|
+      interaction.response.body.gsub(/\b\d{10,13}\b/, "<UNIX_TIMESTAMP>")
+    end
+
+    # JWT tokens
+    config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
+      interaction.response.body.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>")
+    end
+  end
+
+  # Trim large candle response bodies for faster tests
+  def self.setup_response_trimming(config)
+    config.before_record do |interaction|
+      if interaction.request.uri.include?("/candles") && interaction.response.body
+        begin
+          parsed = JSON.parse(interaction.response.body)
+          if parsed.is_a?(Array) && parsed.length > 10
+            # Keep only first 5 and last 5 candles for testing
+            trimmed = parsed.first(5) + parsed.last(5)
+            interaction.response.body = trimmed.to_json
+          end
+        rescue JSON::ParserError
+          # Keep original if not valid JSON
+        end
+      end
+    end
+  end
+
+  # Environment-specific record modes
+  def self.record_mode
+    if ENV["CI"] == "true"
+      :none # Never record in CI
+    elsif ENV["VCR_RECORD_MODE"]
+      ENV["VCR_RECORD_MODE"].to_sym
+    else
+      :new_episodes # Default for development
+    end
+  end
+
+  # Standard cassette naming convention
+  def self.cassette_name(test_class, test_method, variant = nil)
+    base_name = "#{test_class.name.gsub("::", "_")}/#{test_method}"
+    variant ? "#{base_name}/#{variant}" : base_name
+  end
+end
 
 VCR.configure do |config|
   config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
@@ -11,8 +68,21 @@ VCR.configure do |config|
   config.filter_sensitive_data("<COINBASE_API_KEY>") { ENV["COINBASE_API_KEY"] }
   config.filter_sensitive_data("<COINBASE_API_SECRET>") { ENV["COINBASE_API_SECRET"] }
 
-  # Filter out timestamps that change between runs
-  config.filter_sensitive_data("<TIMESTAMP>") { Time.now.to_i.to_s }
+  # Setup smart filtering
+  VCRHelpers.setup_timestamp_filters(config)
+  VCRHelpers.setup_response_trimming(config)
+
+  # Filter Authorization headers
+  config.filter_sensitive_data("<AUTHORIZATION>") do |interaction|
+    interaction.request.headers["Authorization"]&.first
+  end
+
+  # Filter CB-ACCESS headers
+  %w[CB-ACCESS-KEY CB-ACCESS-SIGN CB-ACCESS-TIMESTAMP CB-ACCESS-PASSPHRASE].each do |header|
+    config.filter_sensitive_data("<#{header}>") do |interaction|
+      interaction.request.headers[header]&.first
+    end
+  end
 
   # Filter out JWT tokens in Authorization headers (they contain timestamps)
   config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
@@ -42,9 +112,10 @@ VCR.configure do |config|
   # Allow real HTTP connections in development if needed
   config.allow_http_connections_when_no_cassette = false
 
-  # Record new cassettes when they don't exist
+  # Environment-specific record mode
   config.default_cassette_options = {
-    record: :new_episodes,
-    match_requests_on: %i[method uri body]
+    record: VCRHelpers.record_mode,
+    match_requests_on: %i[method uri body],
+    allow_playback_repeats: true
   }
 end

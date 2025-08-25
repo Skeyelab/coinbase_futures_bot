@@ -17,8 +17,8 @@ RSpec.describe FetchCandlesJob, type: :job do
   end
 
   describe "#perform" do
-    it "fetches 1m, 5m, 15m, and 1h candles", :vcr do
-      VCR.use_cassette("FetchCandlesJob/_perform/fetches_1m_5m_15m_and_1h_candles") do
+    it "fetches 1m, 5m, 15m, and 1h candles" do
+      with_integration_vcr("fetch_candles_job_perform_all_timeframes") do
         # Clear existing candles to avoid conflicts
         Candle.where(symbol: "BTC-USD").destroy_all
 

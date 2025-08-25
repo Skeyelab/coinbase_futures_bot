@@ -46,104 +46,120 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     end
   end
 
-  describe "API calls", :vcr do
+  describe "API calls" do
     it "list_products handles array response" do
-      products = rest.list_products
-      expect(products).to be_an(Array)
-      expect(products.first).to have_key("id")
-    end
-
-    it "list_products handles hash response" do
-      products = rest.list_products
-      expect(products).to be_an(Array)
-      expect(products.first).to have_key("id")
-    end
-
-    it "fetch_candles handles array response" do
-      candles = rest.fetch_candles(
-        product_id: product_id,
-        start_iso8601: start_time.iso8601,
-        end_iso8601: end_time.iso8601,
-        granularity: 3600
-      )
-      expect(candles).to be_an(Array)
-      expect(candles.first).to be_an(Array) if candles.any?
-    end
-
-    it "fetch_candles handles hash response" do
-      candles = rest.fetch_candles(
-        product_id: product_id,
-        start_iso8601: start_time.iso8601,
-        end_iso8601: end_time.iso8601,
-        granularity: 3600
-      )
-      expect(candles).to be_an(Array)
-      expect(candles.first).to be_an(Array) if candles.any?
-    end
-
-    it "fetch_candles handles error response" do
-      # This test might fail if the API doesn't return an error for invalid parameters
-      # We'll handle it gracefully
-
-      rest.fetch_candles(
-        product_id: "INVALID-PRODUCT",
-        start_iso8601: start_time.iso8601,
-        end_iso8601: end_time.iso8601,
-        granularity: 3600
-      )
-    rescue Faraday::ResourceNotFound => e
-      # Expected error for invalid product
-      expect(e.response[:status]).to eq(404)
-    rescue RuntimeError => e
-      expect(e.message).to include("API Error")
-    end
-
-    it "fetch_candles passes parameters" do
-      # Use a supported granularity (300s for 5m instead of 1800s for 30m)
-      candles = rest.fetch_candles(
-        product_id: product_id,
-        start_iso8601: start_time.iso8601,
-        end_iso8601: end_time.iso8601,
-        granularity: 300
-      )
-      expect(candles).to be_an(Array)
-    end
-
-    it "upsert_1h_candles creates candles", :vcr do
-      # Clear existing candles to avoid conflicts
-      Candle.where(timeframe: "1h", symbol: product_id).destroy_all
-
-      expect {
-        rest.upsert_1h_candles(product_id: product_id, start_time: start_time, end_time: end_time)
-      }.to change { Candle.count }.by_at_least(0) # May not create new ones if they exist
-
-      # Verify candles exist and have correct format
-      candles = Candle.where(timeframe: "1h", symbol: product_id)
-      if candles.any?
-        candle = candles.first
-        expect(candle.symbol).to eq(product_id)
-        expect(candle.timeframe).to eq("1h")
-        expect(candle.open).to be_a(BigDecimal)
-        expect(candle.high).to be_a(BigDecimal)
-        expect(candle.low).to be_a(BigDecimal)
-        expect(candle.close).to be_a(BigDecimal)
-        expect(candle.volume).to be_a(BigDecimal)
+      with_api_vcr("list_products_array_response") do
+        products = rest.list_products
+        expect(products).to be_an(Array)
+        expect(products.first).to have_key("id")
       end
     end
 
-    it "upsert_15m_candles creates 15m candles", :vcr do
-      # Clear existing candles to avoid conflicts
-      Candle.where(timeframe: "15m", symbol: product_id).destroy_all
+    it "list_products handles hash response" do
+      with_api_vcr("list_products_hash_response") do
+        products = rest.list_products
+        expect(products).to be_an(Array)
+        expect(products.first).to have_key("id")
+      end
+    end
 
-      expect {
-        rest.upsert_15m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
-      }.to change { Candle.count }.by_at_least(0)
+    it "fetch_candles handles array response" do
+      with_api_vcr("fetch_candles_array_response", trim_responses: true) do
+        candles = rest.fetch_candles(
+          product_id: product_id,
+          start_iso8601: start_time.iso8601,
+          end_iso8601: end_time.iso8601,
+          granularity: 3600
+        )
+        expect(candles).to be_an(Array)
+        expect(candles.first).to be_an(Array) if candles.any?
+      end
+    end
 
-      candles = Candle.where(timeframe: "15m", symbol: product_id)
-      if candles.any?
-        candle = candles.first
-        expect(candle.timeframe).to eq("15m")
-        expect(candle.symbol).to eq(product_id)
+    it "fetch_candles handles hash response" do
+      with_api_vcr("fetch_candles_hash_response", trim_responses: true) do
+        candles = rest.fetch_candles(
+          product_id: product_id,
+          start_iso8601: start_time.iso8601,
+          end_iso8601: end_time.iso8601,
+          granularity: 3600
+        )
+        expect(candles).to be_an(Array)
+        expect(candles.first).to be_an(Array) if candles.any?
+      end
+    end
+
+    it "fetch_candles handles error response" do
+      with_api_vcr("fetch_candles_error_response") do
+        # This test might fail if the API doesn't return an error for invalid parameters
+        # We'll handle it gracefully
+
+        rest.fetch_candles(
+          product_id: "INVALID-PRODUCT",
+          start_iso8601: start_time.iso8601,
+          end_iso8601: end_time.iso8601,
+          granularity: 3600
+        )
+      rescue Faraday::ResourceNotFound => e
+        # Expected error for invalid product
+        expect(e.response[:status]).to eq(404)
+      rescue RuntimeError => e
+        expect(e.message).to include("API Error")
+      end
+    end
+
+    it "fetch_candles passes parameters" do
+      with_api_vcr("fetch_candles_with_parameters", trim_responses: true) do
+        # Use a supported granularity (300s for 5m instead of 1800s for 30m)
+        candles = rest.fetch_candles(
+          product_id: product_id,
+          start_iso8601: start_time.iso8601,
+          end_iso8601: end_time.iso8601,
+          granularity: 300
+        )
+        expect(candles).to be_an(Array)
+      end
+    end
+
+    it "upsert_1h_candles creates candles" do
+      with_integration_vcr("upsert_1h_candles_integration") do
+        # Clear existing candles to avoid conflicts
+        Candle.where(timeframe: "1h", symbol: product_id).destroy_all
+
+        expect {
+          rest.upsert_1h_candles(product_id: product_id, start_time: start_time, end_time: end_time)
+        }.to change { Candle.count }.by_at_least(0) # May not create new ones if they exist
+
+        # Verify candles exist and have correct format
+        candles = Candle.where(timeframe: "1h", symbol: product_id)
+        if candles.any?
+          candle = candles.first
+          expect(candle.symbol).to eq(product_id)
+          expect(candle.timeframe).to eq("1h")
+          expect(candle.open).to be_a(BigDecimal)
+          expect(candle.high).to be_a(BigDecimal)
+          expect(candle.low).to be_a(BigDecimal)
+          expect(candle.close).to be_a(BigDecimal)
+          expect(candle.volume).to be_a(BigDecimal)
+        end
+      end
+    end
+
+    it "upsert_15m_candles creates 15m candles" do
+      with_integration_vcr("upsert_15m_candles_integration") do
+        # Clear existing candles to avoid conflicts
+        Candle.where(timeframe: "15m", symbol: product_id).destroy_all
+
+        expect {
+          rest.upsert_15m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
+        }.to change { Candle.count }.by_at_least(0)
+
+        candles = Candle.where(timeframe: "15m", symbol: product_id)
+        if candles.any?
+          candle = candles.first
+          expect(candle.timeframe).to eq("15m")
+          expect(candle.symbol).to eq(product_id)
+        end
       end
     end
 
@@ -155,24 +171,26 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       rest.upsert_15m_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
 
-    it "upsert_5m_candles creates 5m candles", :vcr do
-      # Clear existing candles to avoid conflicts
-      Candle.where(timeframe: "5m", symbol: product_id).destroy_all
+    it "upsert_5m_candles creates 5m candles" do
+      with_integration_vcr("upsert_5m_candles_integration") do
+        # Clear existing candles to avoid conflicts
+        Candle.where(timeframe: "5m", symbol: product_id).destroy_all
 
-      expect {
-        rest.upsert_5m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
-      }.to change { Candle.count }.by_at_least(0)
+        expect {
+          rest.upsert_5m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
+        }.to change { Candle.count }.by_at_least(0)
 
-      candles = Candle.where(timeframe: "5m", symbol: product_id)
-      if candles.any?
-        candle = candles.first
-        expect(candle.symbol).to eq(product_id)
-        expect(candle.timeframe).to eq("5m")
-        expect(candle.open).to be_a(BigDecimal)
-        expect(candle.high).to be_a(BigDecimal)
-        expect(candle.low).to be_a(BigDecimal)
-        expect(candle.close).to be_a(BigDecimal)
-        expect(candle.volume).to be_a(BigDecimal)
+        candles = Candle.where(timeframe: "5m", symbol: product_id)
+        if candles.any?
+          candle = candles.first
+          expect(candle.symbol).to eq(product_id)
+          expect(candle.timeframe).to eq("5m")
+          expect(candle.open).to be_a(BigDecimal)
+          expect(candle.high).to be_a(BigDecimal)
+          expect(candle.low).to be_a(BigDecimal)
+          expect(candle.close).to be_a(BigDecimal)
+          expect(candle.volume).to be_a(BigDecimal)
+        end
       end
     end
 
