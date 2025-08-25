@@ -10,7 +10,7 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     # Mock the Coinbase API client to avoid real API calls
     allow_any_instance_of(Coinbase::AdvancedTradeClient).to receive(:list_positions)
       .and_return(mock_positions_response)
-    
+
     # Mock the authenticated_post method to avoid real HTTP calls but allow local logic to run
     allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_post)
       .and_return(double(body: mock_order_response.to_json))

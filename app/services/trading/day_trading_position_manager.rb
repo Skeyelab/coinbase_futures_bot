@@ -40,7 +40,7 @@ module Trading
 
       positions.each do |position|
         closed_count += close_single_position(position)
-      rescue StandardError => e
+      rescue => e
         @logger.error("Failed to close position #{position.id}: #{e.message}")
       end
 
@@ -57,8 +57,8 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        closed_count += close_single_position(position, reason: 'Approaching closure time')
-      rescue StandardError => e
+        closed_count += close_single_position(position, reason: "Approaching closure time")
+      rescue => e
         @logger.error("Failed to close approaching position #{position.id}: #{e.message}")
       end
 
@@ -75,8 +75,8 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        closed_count += close_single_position(position, reason: 'Emergency closure')
-      rescue StandardError => e
+        closed_count += close_single_position(position, reason: "Emergency closure")
+      rescue => e
         @logger.error("Failed to force close position #{position.id}: #{e.message}")
       end
 
@@ -93,7 +93,7 @@ module Trading
       positions.each do |position|
         current_price = get_current_price_for_position(position)
         prices[position.id] = current_price if current_price
-      rescue StandardError => e
+      rescue => e
         @logger.error("Failed to get price for position #{position.id}: #{e.message}")
       end
 
@@ -136,7 +136,7 @@ module Trading
     end
 
     # Alias for backward compatibility with tests
-    alias get_summary get_position_summary
+    alias_method :get_summary, :get_position_summary
 
     # Check if any positions have hit take profit or stop loss
     def check_tp_sl_triggers
@@ -153,14 +153,14 @@ module Trading
         if position.hit_take_profit?(current_price)
           triggered_positions << {
             position: position,
-            trigger: 'take_profit',
+            trigger: "take_profit",
             current_price: current_price,
             target_price: position.take_profit
           }
         elsif position.hit_stop_loss?(current_price)
           triggered_positions << {
             position: position,
-            trigger: 'stop_loss',
+            trigger: "stop_loss",
             current_price: current_price,
             target_price: position.stop_loss
           }
@@ -185,7 +185,7 @@ module Trading
 
         begin
           closed_count += close_single_position(position, reason: "#{trigger} triggered at #{current_price}")
-        rescue StandardError => e
+        rescue => e
           @logger.error("Failed to close TP/SL position #{position.id}: #{e.message}")
         end
       end
@@ -196,7 +196,7 @@ module Trading
 
     private
 
-    def close_single_position(position, reason: 'Day trading closure')
+    def close_single_position(position, reason: "Day trading closure")
       @logger.info("Closing position #{position.id}: #{position.side} #{position.size} #{position.product_id} - #{reason}")
 
       # Get current market price for accurate PnL calculation
@@ -210,7 +210,7 @@ module Trading
           size: position.size
         )
 
-        if result['success'] || result['order_id']
+        if result["success"] || result["order_id"]
           # Update local position record
           position.force_close!(current_price, reason)
           @logger.info("Successfully closed position #{position.id} with PnL: #{position.pnl}")
@@ -219,7 +219,7 @@ module Trading
           @logger.error("Failed to close position #{position.id} in Coinbase: #{result}")
           0
         end
-      rescue StandardError => e
+      rescue => e
         @logger.error("Exception closing position #{position.id} in Coinbase: #{e.message}")
         # Still update local record to prevent infinite retry loops
         position.force_close!(current_price, "#{reason} (API error: #{e.message})")
@@ -233,16 +233,16 @@ module Trading
 
       # Try to get from recent ticks first
       recent_tick = Tick.where(product_id: position.product_id)
-                        .order(observed_at: :desc)
-                        .first
+        .order(observed_at: :desc)
+        .first
 
       return recent_tick.price if recent_tick && recent_tick.observed_at > 5.minutes.ago
 
       # Fall back to most recent 1-minute candle
       recent_candle = Candle.for_symbol(position.product_id)
-                            .one_minute
-                            .order(timestamp: :desc)
-                            .first
+        .one_minute
+        .order(timestamp: :desc)
+        .first
 
       return recent_candle.close if recent_candle && recent_candle.timestamp > 5.minutes.ago
 
