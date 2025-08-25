@@ -417,7 +417,7 @@
 - Migrations:
   - none
 - Next steps:
-  - Wire signals into an executor that can place simulated/real orders on PERP.
+  - Wire signals into an executor that can place simulated/real orders on futures.
   - Add specs for `MultiTimeframeSignal` with synthetic candles.
   - Optionally schedule `GenerateSignalsJob` via GoodJob cron.
 
@@ -741,7 +741,7 @@
   - Updated `app/services/market_data/coinbase_futures_subscriber.rb` to bind handlers with captured references so `subscribe` and logger calls work
   - Added `mark_ws_as_closed` to reliably end the sleep loop on close
 - Commands run:
-  - `INLINE=1 bin/rake "market_data:subscribe[BTC-USD-PERP]"`
+  - `INLINE=1 bin/rake "market_data:subscribe[BTC-USD]"`
 - Files touched:
   - `app/services/market_data/coinbase_futures_subscriber.rb`, `SESSION_NOTES.md`
 - Next steps:

@@ -51,7 +51,7 @@ module Trading
       end
     end
 
-    # List open positions. Optionally filter by product_id (e.g., "BTC-USD-PERP").
+    # List open positions. Optionally filter by product_id (e.g., "BTC-USD").
     # Returns array of positions.
     def list_open_positions(product_id: nil)
       raise "Authentication required" unless @authenticated

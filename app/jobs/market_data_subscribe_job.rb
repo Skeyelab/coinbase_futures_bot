@@ -5,10 +5,7 @@ class MarketDataSubscribeJob < ApplicationJob
 
   def perform(product_ids)
     product_ids = Array(product_ids)
-    if product_ids.any? { |p| p.end_with?("-PERP") }
-      MarketData::CoinbaseFuturesSubscriber.new(product_ids: product_ids).start
-    else
-      MarketData::CoinbaseSpotSubscriber.new(product_ids: product_ids).start
-    end
+    # No need to check for PERP suffix since we don't support perpetual contracts
+    MarketData::CoinbaseSpotSubscriber.new(product_ids: product_ids).start
   end
 end

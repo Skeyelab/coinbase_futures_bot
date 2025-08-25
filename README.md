@@ -86,8 +86,8 @@ bundle exec rspec
 ### Market Data Collection
 ```bash
 # Subscribe to real-time market data
-bin/rake market_data:subscribe[BTC-USD-PERP]
-PRODUCT_IDS=BTC-USD-PERP,ETH-USD-PERP bin/rake market_data:subscribe
+bin/rake market_data:subscribe[BTC-USD]
+PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
 
 # Backfill historical candle data
 bin/rake market_data:backfill_candles[7]  # 7 days of data
@@ -111,7 +111,7 @@ bin/rake day_trading:force_close_all   # Emergency close all positions
 bin/rake day_trading:manage            # Run full management cycle
 
 # View sentiment data
-curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD-PERP&limit=5"
+curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 ```
 
 ### Monitoring

@@ -91,7 +91,7 @@ end
 **Example Usage**:
 ```ruby
 subscriber = MarketData::CoinbaseFuturesSubscriber.new(
-  product_ids: ["BTC-USD-PERP", "ETH-USD-PERP"]
+  product_ids: ["BTC-USD", "ETH-USD"]
 )
 subscriber.start # Blocks until stopped
 ```
@@ -151,11 +151,7 @@ end
 ```ruby
 def resolve_contract(product_id)
   # Handle current month contract resolution
-  if product_id.end_with?('-PERP')
-    current_month_contract(extract_base_currency(product_id))
-  else
-    TradingPair.find_by(product_id: product_id)
-  end
+  TradingPair.find_by(product_id: product_id)
 end
 ```
 
@@ -397,7 +393,7 @@ end
 RSpec.describe 'Market Data Integration' do
   it 'processes live websocket data' do
     subscriber = MarketData::CoinbaseFuturesSubscriber.new(
-      product_ids: ['BTC-USD-PERP']
+      product_ids: ['BTC-USD']
     )
 
     # Test with recorded WebSocket data
@@ -418,7 +414,7 @@ end
 ```bash
 # Check recent tick data
 bin/rails console -e production
-Tick.where(product_id: 'BTC-USD-PERP').order(:observed_at).last(10)
+Tick.where(product_id: 'BTC-USD').order(:observed_at).last(10)
 
 # Verify candle data integrity
 Candle.where(symbol: 'BTC-USD', timeframe: '1h').where('high < low').count

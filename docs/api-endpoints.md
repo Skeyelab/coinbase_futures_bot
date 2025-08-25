@@ -83,7 +83,7 @@ curl -X GET http://localhost:3000/positions
 ```bash
 curl -X POST http://localhost:3000/positions \
   -H "Content-Type: application/json" \
-  -d '{"product_id": "BTC-USD-PERP", ...}'
+  -d '{"product_id": "BTC-USD", ...}'
 ```
 
 ### GET /positions/:product_id/edit
@@ -110,7 +110,7 @@ curl -X POST http://localhost:3000/positions \
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/positions/BTC-USD-PERP/close
+curl -X POST http://localhost:3000/positions/BTC-USD/close
 ```
 
 ### POST /positions/:product_id/increase
@@ -123,7 +123,7 @@ curl -X POST http://localhost:3000/positions/BTC-USD-PERP/close
 
 **Example:**
 ```bash
-curl -X POST http://localhost:3000/positions/BTC-USD-PERP/increase
+curl -X POST http://localhost:3000/positions/BTC-USD/increase
 ```
 
 ## Sentiment Analysis
@@ -133,7 +133,7 @@ curl -X POST http://localhost:3000/positions/BTC-USD-PERP/increase
 **Description:** Retrieve sentiment aggregates for monitoring and analysis.
 
 **Parameters:**
-- `symbol` (optional) - Trading pair symbol (e.g., "BTC-USD-PERP")
+- `symbol` (optional) - Trading pair symbol (e.g., "BTC-USD")
 - `window` (optional) - Time window (5m, 15m, 1h)
 - `limit` (optional) - Number of records to return (default: 20)
 
@@ -142,7 +142,7 @@ curl -X POST http://localhost:3000/positions/BTC-USD-PERP/increase
 [
   {
     "id": 123,
-    "symbol": "BTC-USD-PERP",
+    "symbol": "BTC-USD",
     "window": "15m",
     "window_end_at": "2025-01-14T10:15:00.000Z",
     "count": 5,
@@ -162,7 +162,7 @@ curl -X POST http://localhost:3000/positions/BTC-USD-PERP/increase
 
 ```bash
 # Get latest BTC sentiment aggregates
-curl -X GET "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD-PERP&limit=10"
+curl -X GET "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=10"
 
 # Get 15-minute window aggregates
 curl -X GET "http://localhost:3000/sentiment/aggregates?window=15m&limit=20"
