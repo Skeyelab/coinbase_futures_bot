@@ -41,28 +41,22 @@ RSpec.configure do |config|
 
   # Prevent individual test failures from causing the suite to exit
   config.fail_fast = false
-  
+
   # Add better error handling for test failures
   config.around(:each) do |example|
-    begin
-      example.run
-    rescue => e
-      puts "Test failed but continuing: #{e.message}"
-      example.fail!
-    end
+    example.run
+  rescue => e
+    puts "Test failed but continuing: #{e.message}"
+    example.fail!
   end
 
   # Add safety for database operations
   config.before(:suite) do
-    begin
-      # Ensure database is available before starting tests
-      if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-        ActiveRecord::Base.connection.execute("SELECT 1")
-      end
-    rescue => e
-      puts "Warning: Database health check failed: #{e.message}"
-      puts "Tests will continue but may have database-related issues"
-    end
+    # Ensure database is available before starting tests
+    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue => e
+    puts "Warning: Database health check failed: #{e.message}"
+    puts "Tests will continue but may have database-related issues"
   end
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
