@@ -12,7 +12,7 @@ namespace :paper do
   end
 end
 
-namespace :market_data do
+namespace :paper_market_data do
   desc "Subscribe to Coinbase spot ticker (GoodJob async)"
   task :subscribe_spot, [:products] => :environment do |_t, args|
     products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD").split(",")

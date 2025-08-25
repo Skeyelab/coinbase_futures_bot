@@ -38,6 +38,21 @@ Rails.application.configure do
     sentiment_aggregate: {
       cron: ENV.fetch("SENTIMENT_AGG_CRON", "*/5 * * * *"), # every 5 minutes
       class: "AggregateSentimentJob"
+    },
+    # Day trading position management - run every 15 minutes during trading hours
+    day_trading_management: {
+      cron: ENV.fetch("DAY_TRADING_MANAGEMENT_CRON", "*/15 9-16 * * 1-5"), # every 15 min, 9AM-4PM, Mon-Fri
+      class: "DayTradingPositionManagementJob"
+    },
+    # End of day position closure - run at market close (4:00 PM ET = 8:00 PM UTC)
+    end_of_day_closure: {
+      cron: ENV.fetch("END_OF_DAY_CLOSURE_CRON", "0 20 * * 1-5"), # 8:00 PM UTC, Mon-Fri
+      class: "EndOfDayPositionClosureJob"
+    },
+    # Emergency position closure - run at midnight UTC to catch any missed closures
+    emergency_closure: {
+      cron: ENV.fetch("EMERGENCY_CLOSURE_CRON", "0 0 * * *"), # midnight UTC daily
+      class: "EndOfDayPositionClosureJob"
     }
   }
 end

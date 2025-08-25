@@ -44,20 +44,21 @@ group :development, :test do
   gem "dotenv-rails"
 
   # RSpec for testing
-  gem "rspec-rails", "~> 8.0"
   gem "parallel_tests", group: :development, require: false
+  gem "rspec-rails", "~> 8.0"
 end
 
 group :test do
   gem "climate_control"
+  gem "factory_bot_rails", "~> 6.2"
   gem "rails-controller-testing"
   gem "vcr"
   gem "webmock"
 end
 
 gem "good_job", "~> 4.11"
-gem "sentry-ruby"
 gem "sentry-rails"
+gem "sentry-ruby"
 
 # JWT for Coinbase App (Advanced Trade) ES256 authentication
 gem "jwt", "~> 3.1"

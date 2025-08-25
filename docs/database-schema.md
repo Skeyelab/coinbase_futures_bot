@@ -25,22 +25,24 @@ The application uses PostgreSQL as the primary database with a focus on time-ser
 │ updated_at      │
 └─────────────────┘
 
-┌─────────────────┐    ┌─────────────────┐
-│sentiment_events │    │sentiment_aggreg │
-├─────────────────┤    ├─────────────────┤
-│ id (PK)         │    │ id (PK)         │
-│ source          │───┤│ symbol          │
-│ symbol          │    │ window          │
-│ url             │    │ window_end_at   │
-│ title           │    │ count           │
-│ score           │    │ avg_score       │
-│ confidence      │    │ weighted_score  │
-│ published_at    │    │ z_score         │
-│ raw_text_hash   │    │ meta (jsonb)    │
-│ meta (jsonb)    │    │ created_at      │
-│ created_at      │    │ updated_at      │
-│ updated_at      │    └─────────────────┘
-└─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│sentiment_events │    │sentiment_aggreg │    │   positions     │
+├─────────────────┤    ├─────────────────┤    ├─────────────────┤
+│ id (PK)         │    │ id (PK)         │    │ id (PK)         │
+│ source          │───┤│ symbol          │    │ product_id      │
+│ symbol          │    │ window          │    │ side            │
+│ url             │    │ window_end_at   │    │ size            │
+│ title           │    │ count           │    │ entry_price     │
+│ score           │    │ avg_score       │    │ entry_time      │
+│ confidence      │    │ weighted_score  │    │ close_time      │
+│ published_at    │    │ z_score         │    │ status          │
+│ raw_text_hash   │    │ meta (jsonb)    │    │ pnl             │
+│ meta (jsonb)    │    │ created_at      │    │ take_profit     │
+│ created_at      │    │ updated_at      │    │ stop_loss       │
+│ updated_at      │    └─────────────────┘    │ day_trading     │
+└─────────────────┘                          │ created_at      │
+                                             │ updated_at      │
+                                             └─────────────────┘
 
 ┌─────────────────┐
 │   good_jobs     │ (GoodJob tables for background processing)
@@ -133,6 +135,57 @@ Stores real-time price tick data from WebSocket feeds.
 **Scopes:**
 - `for_product(product_id)` - Filter by product
 - `between(start_time, end_time)` - Filter by time range
+
+### positions
+
+Stores trading position information for both day trading and swing trading strategies.
+
+| Column | Type | Description | Constraints |
+|--------|------|-------------|-------------|
+| id | bigint | Primary key | NOT NULL, AUTO_INCREMENT |
+| product_id | string | Trading pair identifier (e.g., "BTC-USD", "BTC-29AUG25-CDE") | NOT NULL |
+| side | string | Position side ("LONG" or "SHORT") | NOT NULL, inclusion: ["LONG", "SHORT"] |
+| size | decimal(20,10) | Position size in base currency | NOT NULL, > 0 |
+| entry_price | decimal(20,10) | Price at which position was opened | NOT NULL, > 0 |
+| entry_time | timestamp | When the position was opened | NOT NULL |
+| close_time | timestamp | When the position was closed | NULL for open positions |
+| status | string | Position status ("OPEN" or "CLOSED") | NOT NULL, inclusion: ["OPEN", "CLOSED"] |
+| pnl | decimal(20,10) | Profit/Loss when closed | NULL for open positions |
+| take_profit | decimal(20,10) | Take profit target price | NULL if not set |
+| stop_loss | decimal(20,10) | Stop loss target price | NULL if not set |
+| day_trading | boolean | Whether this is a day trading position | NOT NULL, default: true |
+| created_at | timestamp | Record creation time | NOT NULL |
+| updated_at | timestamp | Record update time | NOT NULL |
+
+**Indexes:**
+- `index_positions_on_product_id`
+- `index_positions_on_status`
+- `index_positions_on_day_trading`
+- `index_positions_on_entry_time`
+
+**Key Scopes:**
+- `open` - Open positions
+- `closed` - Closed positions
+- `day_trading` - Day trading positions only
+- `swing_trading` - Swing trading positions only
+- `opened_today` - Positions opened today
+- `opened_yesterday` - Positions opened yesterday
+- `expiring_soon` - Day trading positions opened yesterday
+
+**Key Methods:**
+- `open?` / `closed?` - Check position status
+- `long?` / `short?` - Check position side
+- `duration` / `duration_hours` - Calculate position age
+- `needs_same_day_closure?` - Check if day trading position needs closure
+- `needs_closure_soon?` - Check if approaching 24-hour limit
+- `calculate_pnl(current_price)` - Calculate unrealized PnL
+- `hit_take_profit?(current_price)` - Check if take profit triggered
+- `hit_stop_loss?(current_price)` - Check if stop loss triggered
+- `close_position!(close_price, close_time)` - Close position normally
+- `force_close!(close_price, reason, close_time)` - Force close position
+
+**Associations:**
+- `belongs_to :trading_pair` - Links to trading pair metadata
 
 ## Sentiment Analysis Tables
 

@@ -84,6 +84,24 @@ VCR.configure do |config|
     end
   end
 
+  # Filter out JWT tokens in Authorization headers (they contain timestamps)
+  config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
+    if interaction.request.headers["Authorization"]
+      # Extract just the JWT part after "Bearer "
+      auth_header = interaction.request.headers["Authorization"].first
+      auth_header.sub("Bearer ", "") if auth_header&.start_with?("Bearer ")
+    end
+  end
+
+  # Filter client order IDs that use UUIDs
+  config.before_record do |interaction|
+    if interaction.request.body
+      body = interaction.request.body
+      # Replace UUIDs in client_order_id with a placeholder
+      body.gsub!(/("client_order_id":"cli-)[a-f0-9-]+(")/i, '\1<UUID>\2')
+    end
+  end
+
   # Ignore Sentry requests
   config.ignore_request do |request|
     request.uri.include?("glitchtip.ger.ericdahl.dev") ||
