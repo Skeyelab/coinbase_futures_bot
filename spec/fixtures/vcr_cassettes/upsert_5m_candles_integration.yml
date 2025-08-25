@@ -72,4 +72,148 @@ http_interactions:
       encoding: ASCII-8BIT
       string: "<JWT_TOKEN>"
   recorded_at: Mon, 25 Aug 2025 18:50:58 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T19:26:25Z&granularity=300&start=2025-08-24T19:26:25Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 19:26:25 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"1c94-gSl/MyoeQLhjsSz7yYSpSKMtOp0"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Set-Cookie:
+      - __cf_bm=B9U3Kj_R_w.t6QsmaUnAEU6y7y4qbo0RnHHjHuIGNcE-1756149985-1.0.1.1-w9z389khk8y094DgjRY7PYUYpTWmH5cUQ5Ejr3QMq_7aQuKCQKcJuX.cPkBYbZXhMAMhyHN0uoWnbsO_rhxJgfye8XrPJY34TpiU3IsRePk;
+        path=/; expires=Mon, 25-Aug-25 19:56:25 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=kCnhM%2B7EkPb1ovxQhNB3Zw9jnS1Qj3kvLIwO8nzuQKbRnb1%2Bxh0SwttZ8T%2BBzqwvr%2B%2BOKn8%2B5wUz4hrB5KgdmVEiAgoMQQS2%2FDS8qLKgvd6p3zfnJk%2BFrDgVoqnGaiF1MHzMj7JZ3PJRk3s%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 974d7b21dd2b8722-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "<JWT_TOKEN>"
+  recorded_at: Mon, 25 Aug 2025 19:26:25 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T19:29:40Z&granularity=300&start=2025-08-24T19:29:40Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 19:29:40 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"1c9a-QYZKF7xMxObBPb3TfQ7TB3+rdlw"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Set-Cookie:
+      - __cf_bm=941ZqAj_p0wdloQOxi6Iak3vVs3RKgDVNXUEQ1xK4Zo-1756150180-1.0.1.1-A5WIN8wy2IsghCjm9KrBgQ.Ae_UGeX3dJQjkpg_afSYhU9bfB6wLzk5KG5hJbItldXP7k0_rRN40haSRiUVzohXHJ0Wgc3kGMrNFQ4x4k7U;
+        path=/; expires=Mon, 25-Aug-25 19:59:40 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=JJaNyrRmhZgW0dGYWgndLVSWZR0EDORL8yO%2BO52ZSTi%2Fd38TAr75CBfphiZXuSKwkQCWc4ab6Ec1Dm9jejH%2BLEexdGoV20H7SJYgEzd6k36AiWC63EInv6S8ZFCu%2FDvOaeIOQvOcVtihL7k%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 974d7fe4cc5de450-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "<JWT_TOKEN>"
+  recorded_at: Mon, 25 Aug 2025 19:29:40 GMT
 recorded_with: VCR 6.3.1
