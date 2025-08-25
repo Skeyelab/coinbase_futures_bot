@@ -4,9 +4,9 @@ GoodJob.retry_on_unhandled_error = true
 Rails.application.configure do
   config.good_job.execution_mode = ENV.fetch("GOOD_JOB_EXECUTION_MODE", "async").to_sym
   config.good_job.enable_cron = true
-  config.good_job.queues = ENV.fetch("GOOD_JOB_QUEUES", "default:5;critical:2;low:1")
-  config.good_job.max_threads = ENV.fetch("GOOD_JOB_MAX_THREADS", 5).to_i
-  config.good_job.poll_interval = ENV.fetch("GOOD_JOB_POLL_INTERVAL", 5).to_i
+  config.good_job.queues = ENV.fetch("GOOD_JOB_QUEUES", "default:5;critical:2;low:1;high_frequency:10")
+  config.good_job.max_threads = ENV.fetch("GOOD_JOB_MAX_THREADS", 10).to_i
+  config.good_job.poll_interval = ENV.fetch("GOOD_JOB_POLL_INTERVAL", 1).to_i
 
   config.good_job.cron = {
     candles_1h: {
@@ -53,6 +53,37 @@ Rails.application.configure do
     emergency_closure: {
       cron: ENV.fetch("EMERGENCY_CLOSURE_CRON", "0 0 * * *"), # midnight UTC daily
       class: "EndOfDayPositionClosureJob"
+    },
+    # High-frequency market data updates - every 30 seconds
+    hf_market_data: {
+      cron: ENV.fetch("HF_MARKET_DATA_CRON", "*/30 * * * * *"), # every 30 seconds
+      class: "HighFrequencyMarketDataJob"
+    },
+    # High-frequency 1-minute candle updates - every minute
+    hf_candles_1m: {
+      cron: ENV.fetch("HF_CANDLES_1M_CRON", "0 * * * * *"), # every minute
+      class: "HighFrequency1mCandleJob"
+    },
+    # High-frequency P&L tracking - every 15 seconds
+    hf_pnl_tracking: {
+      cron: ENV.fetch("HF_PNL_TRACKING_CRON", "*/15 * * * * *"), # every 15 seconds
+      class: "HighFrequencyPnLTrackingJob"
+    },
+    # High-frequency position monitoring - every 30 seconds during trading hours
+    hf_position_monitor: {
+      cron: ENV.fetch("HF_POSITION_MONITOR_CRON", "*/30 * * * * *"), # every 30 seconds
+      class: "HighFrequencyPositionMonitorJob"
+    },
+    # High-frequency signal generation - every 5 minutes for 1m/5m analysis
+    hf_signals_5m: {
+      cron: ENV.fetch("HF_SIGNALS_5M_CRON", "*/5 * * * *"), # every 5 minutes
+      class: "HighFrequencySignalGenerationJob"
     }
   }
+
+  # High-frequency performance optimizations
+  config.good_job.max_cache = ENV.fetch("GOOD_JOB_MAX_CACHE", 1000).to_i
+  config.good_job.smaller_number_is_higher_priority = true
+  config.good_job.dashboard_default_locale = :en
+  config.good_job.cron_timezone = 'UTC'
 end

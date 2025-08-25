@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_25_065902) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -40,7 +40,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
     t.decimal "volume", precision: 30, scale: 10, default: "0.0", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["symbol", "timeframe", "timestamp"], name: "idx_candles_hf_timeframes", where: "((timeframe)::text = ANY ((ARRAY['1m'::character varying, '5m'::character varying])::text[]))"
     t.index ["symbol", "timeframe", "timestamp"], name: "index_candles_on_symbol_and_timeframe_and_timestamp", unique: true
+    t.index ["symbol", "timeframe"], name: "idx_candles_symbol_timeframe"
+    t.index ["timeframe", "timestamp"], name: "idx_candles_timeframe_timestamp"
+    t.index ["timestamp"], name: "idx_candles_timestamp"
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -129,6 +133,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
     t.index ["priority", "created_at"], name: "index_good_job_jobs_for_candidate_lookup", where: "(finished_at IS NULL)"
     t.index ["priority", "created_at"], name: "index_good_jobs_jobs_on_priority_created_at_when_unfinished", order: { priority: "DESC NULLS LAST" }, where: "(finished_at IS NULL)"
     t.index ["priority", "scheduled_at"], name: "index_good_jobs_on_priority_scheduled_at_unfinished_unlocked", where: "((finished_at IS NULL) AND (locked_by_id IS NULL))"
+    t.index ["queue_name", "priority", "scheduled_at"], name: "idx_good_jobs_queue_priority_scheduled", where: "(finished_at IS NULL)"
     t.index ["queue_name", "scheduled_at"], name: "index_good_jobs_on_queue_name_and_scheduled_at", where: "(finished_at IS NULL)"
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
   end
@@ -147,6 +152,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
     t.boolean "day_trading"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "unrealized_pnl", precision: 20, scale: 10
+    t.decimal "current_price", precision: 20, scale: 10
+    t.index ["close_time"], name: "idx_positions_close_time"
+    t.index ["day_trading", "entry_time"], name: "idx_positions_day_trading_entry_time"
+    t.index ["day_trading", "status"], name: "idx_positions_open_day_trading", where: "((day_trading = true) AND ((status)::text = 'OPEN'::text))"
+    t.index ["entry_time"], name: "idx_positions_entry_time"
+    t.index ["product_id", "status"], name: "idx_positions_product_status"
+    t.index ["status", "day_trading"], name: "idx_positions_status_day_trading"
+    t.index ["status", "entry_time"], name: "idx_positions_status_entry_time"
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|
@@ -205,7 +219,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
     t.datetime "updated_at", null: false
     t.string "contract_type"
     t.date "expiration_date"
+    t.decimal "last_price", precision: 20, scale: 10
+    t.datetime "last_price_updated_at"
+    t.decimal "volume_24h", precision: 30, scale: 10
+    t.decimal "price_change_24h", precision: 20, scale: 10
+    t.index ["enabled", "last_price_updated_at"], name: "idx_trading_pairs_enabled_price_updated"
     t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
+    t.index ["last_price_updated_at"], name: "idx_trading_pairs_last_price_updated"
     t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
   end
 end

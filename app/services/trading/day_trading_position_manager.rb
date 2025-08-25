@@ -250,5 +250,165 @@ module Trading
       @logger.warn("No recent price data for #{position.product_id}, using entry price")
       position.entry_price
     end
+
+    # High-frequency methods for real-time position management
+
+    # Close a specific position immediately (for high-frequency operations)
+    def close_position_immediately(position, current_price, reason)
+      @logger.info("Immediately closing position #{position.id}: #{reason} at $#{current_price}")
+      
+      begin
+        position.force_close!(current_price, reason, Time.current)
+        @logger.info("Successfully closed position #{position.id} for #{reason}")
+        return true
+      rescue => e
+        @logger.error("Failed to immediately close position #{position.id}: #{e.message}")
+        return false
+      end
+    end
+
+    # Check for TP/SL triggers with current market prices
+    def check_tp_sl_triggers
+      triggered_positions = []
+      
+      Position.open.includes(:trading_pair).find_each do |position|
+        begin
+          current_price = get_current_price_hf(position.product_id)
+          next unless current_price
+
+          if position.hit_stop_loss?(current_price)
+            triggered_positions << {
+              position: position,
+              trigger_type: 'stop_loss',
+              current_price: current_price
+            }
+          elsif position.hit_take_profit?(current_price)
+            triggered_positions << {
+              position: position,
+              trigger_type: 'take_profit', 
+              current_price: current_price
+            }
+          end
+        rescue => e
+          @logger.warn("Failed to check TP/SL for position #{position.id}: #{e.message}")
+        end
+      end
+
+      triggered_positions
+    end
+
+    # Close positions that have hit TP/SL levels
+    def close_tp_sl_positions
+      triggered_positions = check_tp_sl_triggers
+      return 0 if triggered_positions.empty?
+
+      closed_count = 0
+      
+      triggered_positions.each do |trigger_data|
+        position = trigger_data[:position]
+        trigger_type = trigger_data[:trigger_type]
+        current_price = trigger_data[:current_price]
+        
+        if close_position_immediately(position, current_price, trigger_type)
+          closed_count += 1
+        end
+      end
+
+      @logger.info("Closed #{closed_count} positions due to TP/SL triggers")
+      closed_count
+    end
+
+    # Get optimized current price for high-frequency operations
+    def get_current_price_hf(product_id)
+      # First try cached price from high-frequency market data
+      trading_pair = TradingPair.find_by(product_id: product_id)
+      
+      if trading_pair&.last_price && 
+         trading_pair.last_price_updated_at && 
+         trading_pair.last_price_updated_at > 1.minute.ago
+        return trading_pair.last_price
+      end
+
+      # Fallback to existing method
+      get_current_price_for_position_product(trading_pair&.first || OpenStruct.new(product_id: product_id))
+    end
+
+    # Real-time position summary for high-frequency monitoring
+    def get_real_time_position_summary
+      summary = get_position_summary
+      
+      # Add high-frequency specific metrics
+      summary[:high_frequency_metrics] = {
+        positions_with_stale_prices: count_positions_with_stale_prices,
+        positions_near_tp_sl: count_positions_near_tp_sl,
+        average_position_age_minutes: calculate_average_position_age_minutes,
+        positions_needing_urgent_attention: identify_urgent_positions.size
+      }
+
+      summary
+    end
+
+    private
+
+    def count_positions_with_stale_prices
+      Position.open.joins(:trading_pair)
+              .where('trading_pairs.last_price_updated_at < ? OR trading_pairs.last_price_updated_at IS NULL', 
+                     2.minutes.ago)
+              .count
+    end
+
+    def count_positions_near_tp_sl
+      near_tp_sl_count = 0
+      
+      Position.open.find_each do |position|
+        current_price = get_current_price_hf(position.product_id)
+        next unless current_price
+
+        # Check if within 2% of TP or SL
+        if position.take_profit
+          tp_distance = (current_price - position.take_profit).abs / current_price
+          near_tp_sl_count += 1 if tp_distance < 0.02
+        end
+
+        if position.stop_loss
+          sl_distance = (current_price - position.stop_loss).abs / current_price  
+          near_tp_sl_count += 1 if sl_distance < 0.02
+        end
+      end
+
+      near_tp_sl_count
+    end
+
+    def calculate_average_position_age_minutes
+      ages = Position.open.where.not(entry_time: nil)
+                     .map { |p| (Time.current - p.entry_time) / 1.minute }
+      
+      ages.any? ? ages.sum / ages.size : 0
+    end
+
+    def identify_urgent_positions
+      urgent_positions = []
+      
+      Position.open.find_each do |position|
+        # Positions approaching 24-hour limit
+        if position.day_trading? && position.age_in_hours.to_f > 23
+          urgent_positions << { position: position, reason: 'time_limit_exceeded' }
+        end
+
+        # Positions with large unrealized losses
+        current_price = get_current_price_hf(position.product_id)
+        if current_price
+          unrealized_pnl = position.calculate_pnl(current_price)
+          position_value = (position.size * position.entry_price).abs
+          loss_percentage = (unrealized_pnl / position_value * 100).abs
+          
+          if loss_percentage > 10 # More than 10% loss
+            urgent_positions << { position: position, reason: 'large_unrealized_loss' }
+          end
+        end
+      end
+
+      urgent_positions
+    end
   end
 end
