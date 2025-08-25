@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-ENV["RAILS_ENV"] ||= "test"
-require File.expand_path("../config/environment", __dir__)
-abort("The Rails environment is running in production mode!") if Rails.env.production?
-require "rspec/rails"
+ENV['RAILS_ENV'] ||= 'test'
+require File.expand_path('../config/environment', __dir__)
+abort('The Rails environment is running in production mode!') if Rails.env.production?
+require 'rspec/rails'
 
 # Maintain test schema
 begin
@@ -13,7 +13,7 @@ rescue ActiveRecord::PendingMigrationError => e
 end
 
 # Require support files
-Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
+Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
 
 RSpec.configure do |config|
   # Use database transactions for fast test isolation instead of expensive delete_all
@@ -24,6 +24,7 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
 
   config.include ActiveJob::TestHelper
+  config.include FactoryBot::Syntax::Methods
 
   config.before(:each) do
     ActiveJob::Base.queue_adapter = :test
