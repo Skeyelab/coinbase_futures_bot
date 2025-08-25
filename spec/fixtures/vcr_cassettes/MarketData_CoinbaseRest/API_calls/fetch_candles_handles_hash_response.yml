@@ -57,7 +57,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=tLSCuXcJOwAqrZuQfl17aRxEQfoJ8ayAnhfQCn3oG0I-<TIMESTAMP>-1.0.1.1-_Y6uSCg6G_9QP2SPHipTD9G3djtAfLhVtXexkhagYG32y5oLRJYteuLzNnzUVRrpSbA0SQ.hk0VBvJMHwMqJ6q7KVcauS_lRw8LYS6fNiOo;
+      - __cf_bm=tLSCuXcJOwAqrZuQfl17aRxEQfoJ8ayAnhfQCn3oG0I-1756064584-1.0.1.1-_Y6uSCg6G_9QP2SPHipTD9G3djtAfLhVtXexkhagYG32y5oLRJYteuLzNnzUVRrpSbA0SQ.hk0VBvJMHwMqJ6q7KVcauS_lRw8LYS6fNiOo;
         path=/; expires=Sun, 24-Aug-25 04:09:00 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -133,7 +133,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=xstiJ84vU3ibgQMcZeMjn_11JBvvZN6wnYAEerglEoo-<TIMESTAMP>-1.0.1.1-xNN6rM14Zag_I.W0Eq7.xnrhXyb.2AQeyp0BWdCYx.ofazXLeIGCbFVhMHb1aAgzu5xIsQdL1dlhQQBOlVQEyQTqfkfLD0SIcRbk7tW6Ha8;
+      - __cf_bm=xstiJ84vU3ibgQMcZeMjn_11JBvvZN6wnYAEerglEoo-1756064584-1.0.1.1-xNN6rM14Zag_I.W0Eq7.xnrhXyb.2AQeyp0BWdCYx.ofazXLeIGCbFVhMHb1aAgzu5xIsQdL1dlhQQBOlVQEyQTqfkfLD0SIcRbk7tW6Ha8;
         path=/; expires=Sun, 24-Aug-25 04:10:36 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -207,7 +207,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=sQ9ufvuOF8UidQUertUJGCSneLBHMgoRBaL.S7SMo3U-<TIMESTAMP>-1.0.1.1-UYyHWCwwH6m_4IIwrgrHeCkCpwq_b9nVNcMfmcPi6S6LItV3fN0yhDR4RMgQVZx0le40ciZ1unT7YJqrH5Lzs0zON7qJUXbHTug6pN3otkM;
+      - __cf_bm=sQ9ufvuOF8UidQUertUJGCSneLBHMgoRBaL.S7SMo3U-1756064584-1.0.1.1-UYyHWCwwH6m_4IIwrgrHeCkCpwq_b9nVNcMfmcPi6S6LItV3fN0yhDR4RMgQVZx0le40ciZ1unT7YJqrH5Lzs0zON7qJUXbHTug6pN3otkM;
         path=/; expires=Sun, 24-Aug-25 04:15:27 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -355,7 +355,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=vfXlcwIxYHnynivMokX.kL3jWVy9A7uYtJBXfHRexaU-<TIMESTAMP>-1.0.1.1-w7ReD8S_2Qc9fdxVzomEiXnTWpE6dXeabO181StaZqHsCMC4Lj2eDh_6sGFasW.UWZSbrJbfUpNL8dOW6s7KjFjd38Z.ukReUM6KIEC.FwE;
+      - __cf_bm=vfXlcwIxYHnynivMokX.kL3jWVy9A7uYtJBXfHRexaU-1756064584-1.0.1.1-w7ReD8S_2Qc9fdxVzomEiXnTWpE6dXeabO181StaZqHsCMC4Lj2eDh_6sGFasW.UWZSbrJbfUpNL8dOW6s7KjFjd38Z.ukReUM6KIEC.FwE;
         path=/; expires=Sun, 24-Aug-25 06:29:37 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -429,7 +429,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=IyTXjJHq5apqGo9UiatY2jzVIZP6KT7hVr.xAcW3q_s-<TIMESTAMP>-1.0.1.1-nCOP8ZXCnxrdOYJVAQ5VotY3g6dQcfRW8QpD25RLr7NGpXhZzODEFtRo8sZdBUTbsTiueNM5NBpgwzlZk4xlkCYeseHDHVjL__Oq.gzrzTg;
+      - __cf_bm=IyTXjJHq5apqGo9UiatY2jzVIZP6KT7hVr.xAcW3q_s-1756064584-1.0.1.1-nCOP8ZXCnxrdOYJVAQ5VotY3g6dQcfRW8QpD25RLr7NGpXhZzODEFtRo8sZdBUTbsTiueNM5NBpgwzlZk4xlkCYeseHDHVjL__Oq.gzrzTg;
         path=/; expires=Sun, 24-Aug-25 06:31:42 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -505,7 +505,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=3DzNH_DZ5iAZvjCCdLoOEP53wx8V3ZMYZ7gVXfDFszM-<TIMESTAMP>-1.0.1.1-_Bmmvl5bqQqD_kfOSQI2NHQ6yHJsRiUWhZVgCsR5RRZ76nPucXeyuMBJr_nt3GgAxttogNePvIQ.2qSAUc8zrB3.ATvn0E5USVbcnTiUc_Y;
+      - __cf_bm=3DzNH_DZ5iAZvjCCdLoOEP53wx8V3ZMYZ7gVXfDFszM-1756064584-1.0.1.1-_Bmmvl5bqQqD_kfOSQI2NHQ6yHJsRiUWhZVgCsR5RRZ76nPucXeyuMBJr_nt3GgAxttogNePvIQ.2qSAUc8zrB3.ATvn0E5USVbcnTiUc_Y;
         path=/; expires=Sun, 24-Aug-25 06:31:44 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -579,7 +579,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=oELjZqWmVS85MrWO2Z5t6C5OnQCqGiR5Fdhyqz4N_wc-<TIMESTAMP>-1.0.1.1-NMmdjSb9_DoxWFkYyy4A2Pi.XJIIipUqQdIGPwRrAfM9Byg3jmCowbwftzws1l89eDhjL8asapWEk.OSKDHEcOpFjW1h3HeYLZdyyE5VMYw;
+      - __cf_bm=oELjZqWmVS85MrWO2Z5t6C5OnQCqGiR5Fdhyqz4N_wc-1756064584-1.0.1.1-NMmdjSb9_DoxWFkYyy4A2Pi.XJIIipUqQdIGPwRrAfM9Byg3jmCowbwftzws1l89eDhjL8asapWEk.OSKDHEcOpFjW1h3HeYLZdyyE5VMYw;
         path=/; expires=Sun, 24-Aug-25 07:08:05 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -653,7 +653,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=LwVeoTOc7x6v6XXpB5ofzqhEA.GQwjCSPBH9eKYFXgs-<TIMESTAMP>-1.0.1.1-LSMnI39kmxpKe9HCNSE07Ldh2LRl7betjNGhjokKm51vB4C7kob9fMEyGoRLEnURmz9Z4NTISPHHPLCESbPAvGj_oQOl9JD5cg.qulyHvIM;
+      - __cf_bm=LwVeoTOc7x6v6XXpB5ofzqhEA.GQwjCSPBH9eKYFXgs-1756064584-1.0.1.1-LSMnI39kmxpKe9HCNSE07Ldh2LRl7betjNGhjokKm51vB4C7kob9fMEyGoRLEnURmz9Z4NTISPHHPLCESbPAvGj_oQOl9JD5cg.qulyHvIM;
         path=/; expires=Sun, 24-Aug-25 07:10:58 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -727,7 +727,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=WDcrnwzKL7FgCtH_PaZNLrn7YULq6djhDWF_y7xwVzo-<TIMESTAMP>-1.0.1.1-tQ5DGrzmjxaPUFpk_mpzGoi0Wu9WFpTkWo_YjjOhhXuBE5gq3hppGBT8GLUSGxQNMUHeuSnpIhGeSw5xJ7czff.cizc8OFBiQes9UKk2kjQ;
+      - __cf_bm=WDcrnwzKL7FgCtH_PaZNLrn7YULq6djhDWF_y7xwVzo-1756064584-1.0.1.1-tQ5DGrzmjxaPUFpk_mpzGoi0Wu9WFpTkWo_YjjOhhXuBE5gq3hppGBT8GLUSGxQNMUHeuSnpIhGeSw5xJ7czff.cizc8OFBiQes9UKk2kjQ;
         path=/; expires=Sun, 24-Aug-25 07:14:12 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -801,7 +801,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=RJkCdZIWET0exeFbiCxWzmk6X71htIpw3kT2O.EN2Oo-<TIMESTAMP>-1.0.1.1-oaewTkjQVYJFPV3Gi0ncg1wpinjLrLpOS0QGotkYduhR1EYDe3TIszELiBc8B.5pV1PexETkEuh58xHLa3QlLfLp1IVpk_ZQkpXlC_VasHo;
+      - __cf_bm=RJkCdZIWET0exeFbiCxWzmk6X71htIpw3kT2O.EN2Oo-1756064584-1.0.1.1-oaewTkjQVYJFPV3Gi0ncg1wpinjLrLpOS0QGotkYduhR1EYDe3TIszELiBc8B.5pV1PexETkEuh58xHLa3QlLfLp1IVpk_ZQkpXlC_VasHo;
         path=/; expires=Sun, 24-Aug-25 07:15:53 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -875,7 +875,7 @@ http_interactions:
       Accept-Ranges:
       - bytes
       Set-Cookie:
-      - __cf_bm=jAQGIzPOaevyunYmXhkGCr1eQ5WwqUWrqx7md6WLQAA-<TIMESTAMP>-1.0.1.1-GiUCWqhCgseWDBhxkmyV4rM68eZj85bDBhmB8HB2IfwHGbnSfn5SpeOJVyVxP_mVvlxcHdCCsqaWWi_iPAljWt4nOmIofaqhqrSphwa2Jaw;
+      - __cf_bm=jAQGIzPOaevyunYmXhkGCr1eQ5WwqUWrqx7md6WLQAA-1756064584-1.0.1.1-GiUCWqhCgseWDBhxkmyV4rM68eZj85bDBhmB8HB2IfwHGbnSfn5SpeOJVyVxP_mVvlxcHdCCsqaWWi_iPAljWt4nOmIofaqhqrSphwa2Jaw;
         path=/; expires=Sun, 24-Aug-25 07:16:46 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
@@ -892,4 +892,1354 @@ http_interactions:
       encoding: ASCII-8BIT
       string: "[[1756015200,114811.24,115011.15,114955.68,114942.78,46.30636115],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641],[1756008000,114986.76,115247.33,114986.76,115124.88,41.39049271],[1756004400,114880.12,115147.06,114955.01,114986.76,66.08990903],[1756000800,114945.77,115616.53,115422.46,114955.01,103.1756698],[1755997200,115135.96,115527.83,115330,115422.46,81.31314517],[1755993600,115250.63,115497.43,115383.87,115329.99,76.77286713],[1755990000,115195.74,115396.27,115278.43,115383.87,45.21318235],[1755986400,114983.8,115299.81,114983.8,115278.45,47.82200861],[1755982800,114962.64,115288.67,115284.86,114983.8,65.91057116],[1755979200,115056.34,115297.1,115100.69,115288.99,58.2394854],[1755975600,115000,115137.43,115108.64,115098.49,49.7164098],[1755972000,115000,115154.99,115054.91,115108.64,50.03304051],[1755968400,114904.25,115130.29,114966.66,115054.9,78.60900003],[1755964800,114637.4,115062.12,114770.01,114967.39,137.27657284],[1755961200,114505,114920.81,114581.87,114770,127.33612406],[1755957600,114575.13,115043.58,114825.03,114581.87,197.92015766],[1755954000,114695.01,115167.95,115167.95,114825.03,202.59761412],[1755950400,115131.54,115441.6,115261.55,115166.74,93.14816454],[1755946800,115129.35,115580.14,115524.21,115249.95,79.39494469],[1755943200,115521.18,115728.21,115709.35,115521.18,59.21938238],[1755939600,115543.27,115743.57,115691.64,115709.35,69.79492251],[1755936000,115555.88,115830.9,115762.08,115691.64,53.58703416],[1755932400,115600,115883.08,115720,115762.06,85.97679202]]"
   recorded_at: Sun, 24 Aug 2025 06:46:46 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-24T19:43:04Z&granularity=3600&start=2025-08-23T19:43:04Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Sun, 24 Aug 2025 19:43:05 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1542'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"286-QRk84CbHqcLhOe+IHuXKIJWxGGw"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '1'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=1AtCbZGxE2yhNVJOQscO2iwMFn11b3rENbaWCkl4Oww-1756095428-1.0.1.1-HlWusGwK9PdFcHF0mewZXbmHt7r9zovSx92sNondfYLgxuvJuiWuXh2loHP7GSgP7rBQWTJYF0BHM.NwsTCIaNaXTCrvfce2ZJQBCcddaMw;
+        path=/; expires=Sun, 24-Aug-25 20:13:05 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=XYXTS0%2B9GwcW1Se6NXefY3Vd79%2FEplF6IlLXeLlgIiSRQZa6U99l%2Bx%2BzWP1YBi19coLSqMWLBRXnSBTXVmimsDkS0NCondSiWrqpywzLH3VEZrbywwkS6tpe0%2B2dG0WF8zrleJjmwGCB6wQ%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 974556284ad70055-PDX
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756062000,110635,114754.44,114577.21,112600.82,1157.72557303],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641],[1756008000,114986.76,115247.33,114986.76,115124.88,41.39049271],[1756004400,114880.12,115147.06,114955.01,114986.76,66.08990903],[1756000800,114945.77,115616.53,115422.46,114955.01,103.1756698],[1755997200,115135.96,115527.83,115330,115422.46,81.31314517],[1755993600,115250.63,115497.43,115383.87,115329.99,76.77286713],[1755990000,115195.74,115396.27,115278.43,115383.87,45.21318235],[1755986400,114983.8,115299.81,114983.8,115278.45,47.82200861],[1755982800,114962.64,115288.67,115284.86,114983.8,65.91057116],[1755979200,115056.34,115297.1,115100.69,115288.99,58.2394854]]"
+  recorded_at: Sun, 24 Aug 2025 19:43:05 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:05:46Z&granularity=3600&start=2025-08-24T04:05:46Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:05:46 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28e-0x5/UpFYs93oyn1K83pITQYKLLQ"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=F090H8ZqitlO2RCumEmIuPu15Te4VR4O9.gPNlFakKg-1756095428-1.0.1.1-ZzeDnmAerCNZ37eEVpD.2LAZfzLOq8nzhsygr9EvdSA4NbkbyFx2gsEyyuoDBPM0lF7ipto25Iec9dDkfwEtTO_hjuF5b53OMEzZ8bqIw7E;
+        path=/; expires=Mon, 25-Aug-25 04:35:46 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=wOavLIXFDbZcdQ61wP0PgsaRQl1sIsQZv%2Fhk0M9CytY3cworq1A82b7VKw4rLhQ1XBIwTkBUYMLICSrV4JYNK3%2FY4%2BzJTADCZIgD%2Fo3qhzdlrnDrdroKBou%2FvSUT2wN0nZ17t6S3Fquhjbs%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 974836885c92c071-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112850.84,113034.82,112883.89,113024.38,30.48364778],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:05:46 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:10:41Z&granularity=3600&start=2025-08-24T04:10:41Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:10:41 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28e-DRoEc3OxBTsnOR3S39PwMJtkMtU"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=gf14N3EurSSYPw7qYEbdtiX_ErEeyEYkiOJMLo6X7hY-1756095428-1.0.1.1-aBgoFf7N9PgVgiHYRcjtDpFOzmeyJvOoMMpEYITYZRuflBH.xbAWME6fijFoxISwz3ZKTHTbECOsSyqqQASKVYpHVDq7P4IK_tJ4KSUYRl8;
+        path=/; expires=Mon, 25-Aug-25 04:40:41 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=G7xGqk%2F1iPgE%2FyZG6v8njK3rnuLT7LWEP93sR%2BtZ464vOnWBpWQMKiPo7IHOgIu%2BDfdvI6PCSjYMDakcMZDUOwnBGBp%2F1WDWpjXqKQnKOKqeqDhOnab%2BENh%2FlWe0ytFUPaltFwa8lI7xvV8%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97483dba9e24f4ae-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112850.84,113034.82,112883.89,112886.88,48.86280351],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:10:41 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:17:08Z&granularity=3600&start=2025-08-24T04:17:08Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:17:09 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28f-ga8zzaw4xMA0RC1TEZHzqUSC1q8"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '1'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=B_90jJVRoouvy9OPHPWrS6QyZ2nDMEsX_evsOy56orE-<TIMESTAMP>-1.0.1.1-Yja0nATLrZyrbBkjaVZhpNiC6oE1A4WeSoVHHXdp6KbP_Okd9DF4dezSfcBdBgTuL5wZLDgJTTXikJ6lqQ0T0m1zddwLi6J5VpWt07HeTMg;
+        path=/; expires=Mon, 25-Aug-25 04:47:09 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=Fz46LUegTXKXqlRSm0TgiDMFdPru%2BvucuNd3YabCd3%2BB9o4bnF%2F7AGSrlRK7Ys%2BMkHxHGAC5n3Y55UUSDoCbt1NFRG%2FXcF2MtciIxNnF0OuPaxpz4P3PyWn79yGnl5JGia4B%2B96UMYiwwMY%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748472fc9b74783-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112794.99,113034.82,112883.89,112822.79,67.13237031],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:17:09 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:22:46Z&granularity=3600&start=2025-08-24T04:22:46Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:22:46 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"290-LHJw9DyiesiIRKDTQhDbPKIfvVs"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=URKrQrt3Ex.p6aQw1fVxlC.HnsbkawwCnNIOB1Cr5kw-<TIMESTAMP>-1.0.1.1-ucupN7e4OWbiDguccsxOFfOs7yIPLreq4.pUwOrKMQohiih92tf6PxcFiObE4l2oz_WqpCYLBrhTCWV06GbB2fdVcJTh8uvZjlb7asoq8Vg;
+        path=/; expires=Mon, 25-Aug-25 04:52:46 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=rLz9ItmP4zq%2BsMbA1kd64pOnBGivdGO9x%2Fqin6pn2GqrgyZp4e5mZwjuuRkJHw9HPhrb6ni8PZw2lhM6ne8gmpSiN%2F1zeGQUNat%2BLI99eJ%2BKZob%2Br1S871l9q%2BmWC5MMEkxF%2Bc0XqmZVfxU%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97484f6a6850e814-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112687.35,113034.82,112883.89,112710.11,93.80859375],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:22:46 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:26:28Z&granularity=3600&start=2025-08-24T04:26:28Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:26:28 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"290-+baMbF/YO7VWi4DqMnKbjqxQFGY"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=p9ilb.No1yCaKDasZ8IsFN5RL88gV_sMJpFfg_U6suA-<TIMESTAMP>-1.0.1.1-e1M5RSpzSDaZAA0dYr9hy9g0.5iL6KDeJy7PcUNfcbXrK3_Ql3TY5M21ebDwdozdR4QmedtQMm3avxnyE0NgSgYKA763KP03HQH8qHM6NOU;
+        path=/; expires=Mon, 25-Aug-25 04:56:28 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=bss54acXLOvJUrljM7diVpGfSZelparg3Dg7nMHUiYkhEuRS0CS8LcCNmeayLwhGGtE0UaqpyX5oedI9G634FkOIwBrdYfkir%2BCOv4qVb%2FFmWVgCfYdhl%2FrLsEdYPez3tzUEEJGC4Pdas3o%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 974854d9a83c1aeb-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112634.49,113034.82,112883.89,112726.02,106.75877648],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:26:28 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:30:12Z&granularity=3600&start=2025-08-24T04:30:12Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:30:12 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"290-eyTLcnGUfw8Q4yC2017VKKrWluY"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=CahZr3c_qF5308DdCg4_cCvI4Y4Q_BF4446AtHtTm2I-<TIMESTAMP>-1.0.1.1-2j56b1wg0.kRj8iMWnT_L6cYxBnC2ReF0flkzdbT8B_ZKh2TDuuBIb2HRl8OAHaHP3UDne5LiKeAePH8CGR0Tcmt_npDOvfZRHJXSz_yKQ4;
+        path=/; expires=Mon, 25-Aug-25 05:00:12 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=KWocHoSLFj6fWwPg1izyr%2Fbr52VP3tQ4YjFCu0P7O61HmM0IuCdGoYW7JTMCh50fQWFr2TNuiOiOUTFN9N%2BJCyQzv6JNYp2bzpdhoab6IUqgx6ZrRQg%2F7TGIOyHoaxN1djwwGAOimhxwzB0%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97485a51de574354-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112626.87,113034.82,112883.89,112684.47,118.38446589],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:30:12 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:33:52Z&granularity=3600&start=2025-08-24T04:33:52Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:33:52 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1541'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28f-kmXK2EcyUZfgwSrbJKRdUfscxY0"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=zeyssI9d.nTrFkkyuLMPo4v.iYodvPoaOOffsTX2fwc-<TIMESTAMP>-1.0.1.1-TmQ9Wf_zXaHb53psjzJ4QKbL6vBDO0rCo6b3AiT5VlPpMdgmYtksmi09PWWuuiyLwC6YbGMcT1wcdIDzFW41WUfGdG1epsYnQG7FiDTIQaI;
+        path=/; expires=Mon, 25-Aug-25 05:03:52 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=bqCw3MdL6MF5%2Bm4yZnF%2FcNv00ei9sZ%2FArjqzDg1JFRmJ%2Bgp6qD17eN%2F1YIzCT6lHhku5ARaUB8qYvD720P%2BKXDfy9o6zX6b2kPZbtHDstchppunGCOoRlTg7S2KnH1CCtXWwAfDnLDkN2cc%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97485faf7fa20ffa-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112626.87,113034.82,112883.89,112640,126.12797743],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:33:52 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:36:58Z&granularity=3600&start=2025-08-24T04:36:58Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:36:58 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"290-DRdPGL5ephv4PrekxhGNpOBt9ZA"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=ZqbM.q6um48Qi4kZhKzMD0jMSHjDB4GBUNsLYFzprCg-<TIMESTAMP>-1.0.1.1-J8Ohkhuxl0AYkEIsf5ORb6G302dyHJmVgtbEkPyL7uAjoWKVZ31I1CxLj3kJHoy72f32FTRjTHiGFkFLL591EXvVkJxJ4jWb1tzX8goILLg;
+        path=/; expires=Mon, 25-Aug-25 05:06:58 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=8C7emhKYr9Eoy5Mbi3FG88p3l45CCpbDYZ6EOohwCdQc%2F4qNjyqUVZFiHtfrBtDtQD8xk5AF%2FOyah78VtpyPLcAv5H1Zdr9dFPnK9e%2Fepwosp9xndG4oIfxobyAxzDwwXZ1gO%2FjLh9fzjRI%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97486437483fe82a-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112575.04,113034.82,112883.89,112623.35,136.46063074],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:36:58 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:47:26Z&granularity=3600&start=2025-08-24T04:47:26Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:47:26 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28f-4J4Pu8TLG34TJQszu3OipvUsPtE"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=_YVrUgPp5WJuOdMiEOdyjDgLlc3m1hVP4TlSZMyuS6E-<TIMESTAMP>-1.0.1.1-H6Nfj6WhHHuX8k1pG1QWgV0B5dQSWTHZtsaUUukpkNBCma2jvo6e2wx9PFmxhw3rW4ow_1.XkXUDGIHwMT.qqIxcAbqg9t6iV_ENTnxL0qE;
+        path=/; expires=Mon, 25-Aug-25 05:17:26 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=ZGN%2BLGfWNKQnvPju4urpd8DBH2w%2FIHhbZmJFNpW0WNMOJztUkiV6JwsjsXoElgg0w96C%2F8r%2B8MbQ3v2%2FqXWrwTidDVYztxT0syvyF83s41LCk%2FHdzEhm70d0Evqdiw9HKYLMBm4jdpNrcxI%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97487390ecf5356a-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112575.04,113034.82,112883.89,112790.35,160.48455341],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:47:26 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T04:59:43Z&granularity=3600&start=2025-08-24T04:59:43Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 04:59:43 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"291-m11IQgRC4k1dTGbXgP1eLKEi/DM"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=.27XZg8Ei221zcQ2ZtQm7uuGduxdN8Vi3P0ULUXL_9c-<TIMESTAMP>-1.0.1.1-4b9wm2ttLqULYnrx1zRqOLn44PpcL_8khkqix.uhv6cT60wnaC6mD5OVJLdzyijGaiHJtc7MAGc7BWj.8mv_37rw7zyvfkblTt5MnrI3NHI;
+        path=/; expires=Mon, 25-Aug-25 05:29:43 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=4UqywoKBkq4%2F%2B9j9YSJTQTk3yucH9ApAMgG%2FKW5%2F6rSxZOmV9Z3qdjonyEDhDXPfaE1Pqf1Edo4e7kMPdqsuIdPPb5byRQuTWLDmEpUIXmGqSs2WfuDXZ6URroWWzpMH9BFQ7K4v4mNTMf4%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748858c8cc3acb2-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756094400,112575.04,113034.82,112883.89,112731.75,179.48770713],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944],[1756011600,114862.43,115164.51,115124.88,114944.39,49.62511641]]"
+  recorded_at: Mon, 25 Aug 2025 04:59:43 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:06:48Z&granularity=3600&start=2025-08-24T05:06:48Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:06:48 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28c-KmOEi3giTWKmhAb4Jz6JdO0C1EE"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=cMRoE82I2LHJrZCP36PwE.KTE2QKuq03bWTsuWp4snc-<TIMESTAMP>-1.0.1.1-ZMqykB_bCT1SWv6k0UyYAq5p_m_OqxJyamHyCU2BwSYeiNkSdxTIkplIF3s9rDWdaoKj_l37l.4dA939S06Lm6UQMluLYhNeWGBTLfuqkOk;
+        path=/; expires=Mon, 25-Aug-25 05:36:48 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=0sh6ewYCAaaUdaaV0BuM12w26A3ae%2BSXF%2BhnuE2RK0RTlV%2FkrkjFSGlrxczj006ImTD%2BhzT4lYHikBrTppCTVUOeJolvnOAVUNkHt2yZ6Avdf%2BizRa7Dn9B7oYCP4IVBqL%2FJlddgdxEfBto%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97488fecbace11fd-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112656.72,112840.41,112756.82,112690.85,18.85293742],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:06:48 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:09:04Z&granularity=3600&start=2025-08-24T05:09:04Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:09:04 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28c-dS1YH+hjFHX5soiTQb3dAt8izDE"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=4CjCvTQDbxNv0NVtMrNDsLt9qnwHkijVvz3c6oLHeOE-<TIMESTAMP>-1.0.1.1-oAdlWwi8Btl2re2tezO9Uk4EkExsCXtIoTTyPhuFMS4Fe4mRAVpECD8AuF98uVk6rhWL2CJWksATa0MIfUmvMJcvF8BvcCpuguoubvn0RIY;
+        path=/; expires=Mon, 25-Aug-25 05:39:04 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=HQNFzgPZHZLyJguRvHF%2FcSWNqDJ6F%2FMUn5TdlCiNAx9Y%2FbNbz1A1eHEAif6ZMgPG18ri4qaFaWJ5ZNeehQ3DjSGBnxvQ6jg2csKOwJ9D%2FvDe%2B648kbNEwS491bwCN0NMFfQYX5X9pTksE60%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748933d8b022256-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112561.37,112840.41,112756.82,112563.87,24.87272985],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:09:04 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:11:20Z&granularity=3600&start=2025-08-24T05:11:20Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:11:20 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1541'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28d-K2AnQ8upMU9VaO15W7/ymqF3JkI"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=PIXyAIueTWcXb73jg6f.7WsFVzL8yePpQuMaS4s3m_U-<TIMESTAMP>-1.0.1.1-2P3nqnj.AlzTFxeTD4Pz2npHa3VPFU5u6KMhyoT2haGg59mu22jKLPfUd9CObX7EjnSkK9SrG6Kava1ie8VP25SvgxYHWynF6gLgtE0YoVY;
+        path=/; expires=Mon, 25-Aug-25 05:41:20 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=QM8ZxaORaSJXeIflUynOLGKNQBvBBrWYUwwR6uFwVq72UHvEUAVkw9Gad1dr6k%2FDJLmQImvu4O2ZwR00Cki4%2F63MtuezjmgrKGOagX6lUUFzpqSW9Hro1B64UzJ7gSzainFIHO7VryBO4vo%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748968fcf5710df-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112550,112840.41,112756.82,112564.68,30.43029728],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:11:20 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:15:39Z&granularity=3600&start=2025-08-24T05:15:39Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:15:39 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28d-Q77pP6QLaX0C2S2UyV8dY0lhnFU"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '0'
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=Mr4V.vUPM.A4_XgReciATgu1Dh5ZShah5L4.j7jDYKw-<TIMESTAMP>-1.0.1.1-YYIdT9ND53QhgUBqSNWdcXbHkT_CmRwAN9AFxJkiK8Uxehhr7p3fdOYuolMeA_brepMwzZto63AF_kASRNPLGjyztJFk7WKgQWOq2unDGeY;
+        path=/; expires=Mon, 25-Aug-25 05:45:39 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=pIx%2BdpP5EwGZ8xzAAZ9EsVOVzJt6w4EF6EZSdWL7%2BWDf9oFq%2FU%2Bx%2FHwh0F72HGrKzwD3%2ByOXFYutmb9Q9Aqtn%2Bw6Rc9dd%2FsT5hCRmXBnsPfgT%2Fjm09biNB0zLk3ULreZHxkG4CLbdRD%2BScc%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97489ce458c9b98a-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112485.26,112840.41,112756.82,112512.17,45.0051929],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:15:39 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:21:19Z&granularity=3600&start=2025-08-24T05:21:19Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:21:19 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1540'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28c-BcIy21Q+zUnqWnc2ilfCDKSRKn4"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=cnrBU7NQxjUEn_frCbUqxCNxin8c0fgkfmqsI0YXBMA-<TIMESTAMP>-1.0.1.1-JyS0eLlMIFidobaxbn2eI_UP_ijC699mdD.L04taxlhKq5On9hghQidS01ajFhSKDWDdIzRatyx5t6FNvCWrylEn6eQ486mM94EQ8wy3oNg;
+        path=/; expires=Mon, 25-Aug-25 05:51:19 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=vlpEIzvogMKIo2nruFmJt4UCKQVfX6AZYlRxh3E4Okm89P2mBY8U6Kv7Hn89XEWUP%2BUKmCFITk1tYwJFNGwbiVJQ2ryatUPB3s0Abhw7j3yToFTsY4n9e8srkhX6rGi28sqgOp3MWz3%2FlT0%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748a52fee2789f7-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112478,112840.41,112756.82,112547.64,55.8137355],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:21:19 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:25:27Z&granularity=3600&start=2025-08-24T05:25:27Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:25:27 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1544'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28b-0SghtWjbYwB2f2pZUU4y2vEgOGQ"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=0UtUFfRoACM88a_Gb8VWMUYkseWIGbhz7CGfOLwMuZs-<TIMESTAMP>-1.0.1.1-ttX8sOyHMEnUkQmMTyDqj_FOdcOqyXI3WmlKRzdNucWWr.k.MKDbQjpATgfvM.TcxnBoZpe2Z0AmWGgh9bWPNW0Mmd5_sd6BT9YKSL9oBAg;
+        path=/; expires=Mon, 25-Aug-25 05:55:27 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=Hy3l7wCTPCPBvv5LK8e8cOe0lGupuREzUZMq%2BtCzSJ%2B5h1f0FyT2iE76c97smfGX9MXTaY4IlyJdbw6%2F6w3C%2FFAGUhgxbu0WdbBBNznzcaUrOOj5afY7pIuTEOVHNUiJE4Xo8ZjHk9C%2BJL4%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748ab3e9f481230-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112461.93,112840.41,112756.82,112489.91,62.46886019],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:25:27 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/BTC-USD/candles?end=2025-08-25T05:30:35Z&granularity=3600&start=2025-08-24T05:30:35Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Mon, 25 Aug 2025 05:30:35 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '1543'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=300, must-revalidate
+      Etag:
+      - W/"28d-0zPoOVGeusR0mVC1D7/hUhUMLl0"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Accept-Ranges:
+      - bytes
+      Set-Cookie:
+      - __cf_bm=z69ErRxoCfMKmfeCxR.QWR42GmGvdM0V_cf.nUwG5B4-<TIMESTAMP>-1.0.1.1-2jYxFzym3SnDGMNnkeyFbuFeYOmvYTLLqFyP4UXkRGhStkGTJC0kBEPtW.jBR20IfYjbulkXVv1b4NvZneInJByPdyywkuoylHffXFcGxKY;
+        path=/; expires=Mon, 25-Aug-25 06:00:35 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=R%2BNND6j%2BUONrNaX%2BlSWJTscIoGViZgxY1%2BW6iIQiHJNubGRQ%2BEYeTb4WRWL6AqaEhSP6wiIrVaCZ2dzpA5QwHrRY4Ty3ba3NJLub3lyCTRKUG%2FEdBTKr%2FrnAGAzg5ILmluFN%2FULu4lN1HTI%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 9748b2c3a978f606-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "[[1756098000,112461.93,112840.41,112756.82,112553.5,69.68418823],[1756094400,112575.04,113034.82,112883.89,112740.78,179.62139202],[1756090800,112846.22,113645.32,113382.63,112883.89,187.9473754],[1756087200,113041.5,113612.03,113058.61,113384.2,138.22005574],[1756083600,112593.22,113130.1,112627.1,113058.64,186.29358673],[1756080000,112135.98,113500,113478,112628.06,264.33387323],[1756076400,113343.32,113677.84,113437.17,113478,120.08367421],[1756072800,112602.01,113487.81,112978.96,113434.27,206.21862398],[1756069200,112365.24,113393.09,112772.22,112975.77,203.36067346],[1756065600,111613.24,112980.96,112577.95,112764.29,587.21287864],[1756062000,110635,114754.44,114577.21,112588.1,1632.95010557],[1756058400,114254.8,114865.26,114368.26,114582.51,282.9565205],[1756054800,114200,114531.69,114229.59,114372.01,154.65686214],[1756051200,114210.16,114506.75,114368.39,114229.61,137.03924093],[1756047600,114362.57,114827.6,114466.37,114368.38,115.11075223],[1756044000,114310.09,114622.5,114528.67,114466.37,317.15057909],[1756040400,114518.76,114839.65,114626.23,114525.18,79.94762771],[1756036800,114554.37,114793.58,114697.06,114626.23,39.48399515],[1756033200,114577.32,114862.37,114739.3,114697.43,46.52679802],[1756029600,114548.45,114920.63,114792.85,114739.3,57.39992018],[1756026000,114615.04,115010.7,114790.25,114792.84,66.73621855],[1756022400,114701,114934.66,114839.21,114790.25,47.67920156],[1756018800,114797.85,115067.65,114810.59,114837.1,31.51039325],[1756015200,114795.39,115011.15,114955.68,114810.6,58.37195944]]"
+  recorded_at: Mon, 25 Aug 2025 05:30:35 GMT
 recorded_with: VCR 6.3.1
