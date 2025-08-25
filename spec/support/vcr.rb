@@ -1,25 +1,25 @@
 # frozen_string_literal: true
 
-require 'vcr'
+require "vcr"
 
 VCR.configure do |config|
-  config.cassette_library_dir = 'spec/fixtures/vcr_cassettes'
+  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
   config.hook_into :webmock
   config.configure_rspec_metadata!
 
   # Filter out sensitive data
-  config.filter_sensitive_data('<COINBASE_API_KEY>') { ENV['COINBASE_API_KEY'] }
-  config.filter_sensitive_data('<COINBASE_API_SECRET>') { ENV['COINBASE_API_SECRET'] }
+  config.filter_sensitive_data("<COINBASE_API_KEY>") { ENV["COINBASE_API_KEY"] }
+  config.filter_sensitive_data("<COINBASE_API_SECRET>") { ENV["COINBASE_API_SECRET"] }
 
   # Filter out timestamps that change between runs
-  config.filter_sensitive_data('<TIMESTAMP>') { Time.now.to_i.to_s }
+  config.filter_sensitive_data("<TIMESTAMP>") { Time.now.to_i.to_s }
 
   # Filter out JWT tokens in Authorization headers (they contain timestamps)
-  config.filter_sensitive_data('<JWT_TOKEN>') do |interaction|
-    if interaction.request.headers['Authorization']
+  config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
+    if interaction.request.headers["Authorization"]
       # Extract just the JWT part after "Bearer "
-      auth_header = interaction.request.headers['Authorization'].first
-      auth_header.sub('Bearer ', '') if auth_header&.start_with?('Bearer ')
+      auth_header = interaction.request.headers["Authorization"].first
+      auth_header.sub("Bearer ", "") if auth_header&.start_with?("Bearer ")
     end
   end
 
@@ -34,9 +34,9 @@ VCR.configure do |config|
 
   # Ignore Sentry requests
   config.ignore_request do |request|
-    request.uri.include?('glitchtip.ger.ericdahl.dev') ||
-      request.uri.include?('sentry.io') ||
-      request.uri.include?('sentry')
+    request.uri.include?("glitchtip.ger.ericdahl.dev") ||
+      request.uri.include?("sentry.io") ||
+      request.uri.include?("sentry")
   end
 
   # Allow real HTTP connections in development if needed
