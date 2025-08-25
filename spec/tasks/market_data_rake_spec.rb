@@ -35,23 +35,23 @@ RSpec.describe "market_data rake tasks", type: :task do
   end
 
   it "enqueues subscribe with args" do
-    expect do
+    expect {
       Rake::Task["market_data:subscribe"].invoke("BTC-USD-PERP,ETH-USD-PERP")
-    end.to have_enqueued_job(MarketDataSubscribeJob).with(%w[BTC-USD-PERP ETH-USD-PERP])
+    }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP", "ETH-USD-PERP"])
   end
 
   it "uses env PRODUCT_IDS when products arg is nil" do
     ClimateControl.modify(PRODUCT_IDS: "BTC-USD-PERP") do
-      expect do
+      expect {
         Rake::Task["market_data:subscribe"].invoke(nil)
-      end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
+      }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
     end
   end
 
   it "uses default PRODUCT_IDS when neither arg nor env provided" do
-    expect do
+    expect {
       Rake::Task["market_data:subscribe"].invoke(nil)
-    end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
+    }.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
   end
 
   it "upserts futures products via rest service and outputs completion message" do
@@ -59,21 +59,21 @@ RSpec.describe "market_data rake tasks", type: :task do
     allow(mock_rest).to receive(:upsert_products)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-    expect do
+    expect {
       Rake::Task["market_data:upsert_futures_products"].invoke
-    end.to output(/Completed upserting futures products/).to_stdout
+    }.to output(/Completed upserting futures products/).to_stdout
   end
 
   it "enqueues backfill candles job with provided days" do
-    expect do
+    expect {
       Rake::Task["market_data:backfill_candles"].invoke(7)
-    end.to have_enqueued_job(FetchCandlesJob).with(backfill_days: 7)
+    }.to have_enqueued_job(FetchCandlesJob).with(backfill_days: 7)
   end
 
   it "enqueues backfill candles job with default days" do
-    expect do
+    expect {
       Rake::Task["market_data:backfill_candles"].invoke(nil)
-    end.to have_enqueued_job(FetchCandlesJob).with(backfill_days: 30)
+    }.to have_enqueued_job(FetchCandlesJob).with(backfill_days: 30)
   end
 
   it "runs backfill_1h_candles without error and calls rest" do
@@ -81,9 +81,9 @@ RSpec.describe "market_data rake tasks", type: :task do
     allow(mock_rest).to receive(:upsert_1h_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-    expect do
+    expect {
       Rake::Task["market_data:backfill_1h_candles"].invoke(1)
-    end.not_to raise_error
+    }.not_to raise_error
   end
 
   it "handles missing trading pair gracefully for backfill_1h_candles" do
@@ -98,9 +98,9 @@ RSpec.describe "market_data rake tasks", type: :task do
     allow(mock_rest).to receive(:upsert_15m_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-    expect do
+    expect {
       Rake::Task["market_data:backfill_15m_candles"].invoke(1)
-    end.not_to raise_error
+    }.not_to raise_error
   end
 
   it "handles missing trading pair gracefully for backfill_15m_candles" do
@@ -115,9 +115,9 @@ RSpec.describe "market_data rake tasks", type: :task do
     allow(mock_rest).to receive(:upsert_5m_candles)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-    expect do
+    expect {
       Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-    end.not_to raise_error
+    }.not_to raise_error
   end
 
   it "handles missing trading pair gracefully for backfill_5m_candles" do
@@ -132,9 +132,9 @@ RSpec.describe "market_data rake tasks", type: :task do
     Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
 
     # Run the actual rake task
-    expect do
+    expect {
       Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-    end.not_to raise_error
+    }.not_to raise_error
 
     # Verify that 5m candles were created
     candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")

@@ -11,7 +11,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: 1.day.ago,
         status: "OPEN",
         day_trading: true
@@ -49,7 +49,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: 24.hours.ago,
         status: "OPEN",
         day_trading: true
@@ -81,12 +81,12 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: true,
-        take_profit: 51_000.0,
-        stop_loss: 49_000.0
+        take_profit: 51000.0,
+        stop_loss: 49000.0
       )
     end
 
@@ -106,8 +106,8 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     before do
       allow(manager).to receive(:get_current_prices).and_return({
-        long_position.id => 51_100.0, # Above take profit
-        short_position.id => 2890.0 # Below take profit
+        long_position.id => 51100.0,  # Above take profit
+        short_position.id => 2890.0   # Below take profit
       })
     end
 
@@ -117,8 +117,8 @@ RSpec.describe Trading::DayTradingPositionManager do
 
       long_trigger = result.find { |r| r[:position].id == long_position.id }
       expect(long_trigger[:trigger]).to eq("take_profit")
-      expect(long_trigger[:current_price]).to eq(51_100.0)
-      expect(long_trigger[:target_price]).to eq(51_000.0)
+      expect(long_trigger[:current_price]).to eq(51100.0)
+      expect(long_trigger[:target_price]).to eq(51000.0)
 
       short_trigger = result.find { |r| r[:position].id == short_position.id }
       expect(short_trigger[:trigger]).to eq("take_profit")
@@ -128,8 +128,8 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     it "returns empty array when no triggers are hit" do
       allow(manager).to receive(:get_current_prices).and_return({
-        long_position.id => 50_000.0, # No trigger
-        short_position.id => 3000.0 # No trigger
+        long_position.id => 50000.0,  # No trigger
+        short_position.id => 3000.0   # No trigger
       })
 
       result = manager.check_tp_sl_triggers
@@ -143,24 +143,24 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: true,
-        take_profit: 51_000.0
+        take_profit: 51000.0
       )
     end
 
     before do
       allow(manager).to receive(:get_current_prices).and_return({
-        position.id => 51_100.0
+        position.id => 51100.0
       })
     end
 
     it "closes positions with triggered TP/SL" do
-      expect do
+      expect {
         manager.close_tp_sl_positions
-      end.to change { position.reload.status }.from("OPEN").to("CLOSED")
+      }.to change { position.reload.status }.from("OPEN").to("CLOSED")
     end
 
     it "returns count of closed positions" do
@@ -175,7 +175,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: true
@@ -199,7 +199,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: false
@@ -208,15 +208,15 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     before do
       allow(manager).to receive(:get_current_prices).and_return({
-        position1.id => 50_000.0,
+        position1.id => 50000.0,
         position2.id => 3000.0
       })
     end
 
     it "closes all open day trading positions" do
-      expect do
+      expect {
         manager.force_close_all_day_trading_positions
-      end.to change { Position.open.count }.by(-2)
+      }.to change { Position.open.count }.by(-2)
 
       expect(position1.reload.status).to eq("CLOSED")
       expect(position2.reload.status).to eq("CLOSED")
@@ -235,7 +235,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: true
@@ -256,16 +256,16 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     before do
       allow(manager).to receive(:get_current_prices).and_return({
-        position1.id => 51_000.0, # +2% PnL
-        position2.id => 2900.0 # +3.33% PnL
+        position1.id => 51000.0,  # +2% PnL
+        position2.id => 2900.0    # +3.33% PnL
       })
     end
 
     it "calculates total PnL for all open day trading positions" do
       # Mock the get_current_prices method to return our test values
       allow(manager).to receive(:get_current_prices).and_return({
-        position1.id => 51_000.0, # +2% PnL
-        position2.id => 2900.0 # +3.33% PnL
+        position1.id => 51000.0,  # +2% PnL
+        position2.id => 2900.0    # +3.33% PnL
       })
 
       result = manager.calculate_total_pnl
@@ -288,7 +288,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: Time.current,
         status: "OPEN",
         day_trading: true
@@ -297,10 +297,10 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     it "returns current prices for open day trading positions" do
       # Mock the private method that actually gets the price
-      allow(manager).to receive(:get_current_price_for_position).with(position).and_return(51_000.0)
+      allow(manager).to receive(:get_current_price_for_position).with(position).and_return(51000.0)
 
       result = manager.get_current_prices
-      expect(result[position.id]).to eq(51_000.0)
+      expect(result[position.id]).to eq(51000.0)
     end
 
     it "handles API errors gracefully" do
@@ -318,7 +318,7 @@ RSpec.describe Trading::DayTradingPositionManager do
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
         size: 1.0,
-        entry_price: 50_000.0,
+        entry_price: 50000.0,
         entry_time: 25.hours.ago,
         status: "OPEN",
         day_trading: true
@@ -339,15 +339,15 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     before do
       allow(manager).to receive(:get_current_prices).and_return({
-        expired_position.id => 50_000.0,
+        expired_position.id => 50000.0,
         recent_position.id => 3000.0
       })
     end
 
     it "closes only expired positions" do
-      expect do
+      expect {
         manager.close_expired_positions
-      end.to change { expired_position.reload.status }.from("OPEN").to("CLOSED")
+      }.to change { expired_position.reload.status }.from("OPEN").to("CLOSED")
 
       expect(recent_position.reload.status).to eq("OPEN") # Not expired
     end

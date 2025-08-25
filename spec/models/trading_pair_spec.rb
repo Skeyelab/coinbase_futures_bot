@@ -22,26 +22,11 @@ RSpec.describe TradingPair, type: :model do
   end
 
   describe "scopes" do
-    let!(:btc_current_month) do
-      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 8, 29), enabled: true)
-    end
-    let!(:eth_current_month) do
-      TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD",
-        expiration_date: Date.new(2025, 8, 29), enabled: true)
-    end
-    let!(:btc_upcoming_month) do
-      TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 9, 26), enabled: true)
-    end
-    let!(:eth_upcoming_month) do
-      TradingPair.create!(product_id: "ET-26SEP25-CDE", base_currency: "ETH", quote_currency: "USD",
-        expiration_date: Date.new(2025, 9, 26), enabled: true)
-    end
-    let!(:expired_contract) do
-      TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 7, 31), enabled: true)
-    end
+    let!(:btc_current_month) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:eth_current_month) { TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:btc_upcoming_month) { TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
+    let!(:eth_upcoming_month) { TradingPair.create!(product_id: "ET-26SEP25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
+    let!(:expired_contract) { TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31), enabled: true) }
 
     describe ".active" do
       it "returns only enabled and non-expired contracts" do
@@ -164,18 +149,9 @@ RSpec.describe TradingPair, type: :model do
   end
 
   describe "instance methods" do
-    let(:current_month_contract) do
-      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 8, 29))
-    end
-    let(:upcoming_month_contract) do
-      TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 9, 26))
-    end
-    let(:expired_contract) do
-      TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD",
-        expiration_date: Date.new(2025, 7, 31))
-    end
+    let(:current_month_contract) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29)) }
+    let(:upcoming_month_contract) { TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26)) }
+    let(:expired_contract) { TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31)) }
 
     describe "#expired?" do
       it "returns false for current month contracts" do
