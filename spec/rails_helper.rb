@@ -1,27 +1,27 @@
 # frozen_string_literal: true
 
-ENV["RAILS_ENV"] ||= "test"
-require File.expand_path("../config/environment", __dir__)
-abort("The Rails environment is running in production mode!") if Rails.env.production?
-require "rspec/rails"
-require "factory_bot_rails"
+ENV['RAILS_ENV'] ||= 'test'
+require File.expand_path('../config/environment', __dir__)
+abort('The Rails environment is running in production mode!') if Rails.env.production?
+require 'rspec/rails'
+require 'factory_bot_rails'
 
 # Maintain test schema with better error handling
 begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   puts "Warning: Pending migrations detected: #{e.message}"
-  puts "Tests will continue but may have unexpected behavior"
+  puts 'Tests will continue but may have unexpected behavior'
 rescue ActiveRecord::ConnectionNotEstablished => e
   puts "Warning: Database connection failed: #{e.message}"
-  puts "Tests will continue but may have unexpected behavior"
-rescue => e
+  puts 'Tests will continue but may have unexpected behavior'
+rescue StandardError => e
   puts "Warning: Schema maintenance failed: #{e.message}"
-  puts "Tests will continue but may have unexpected behavior"
+  puts 'Tests will continue but may have unexpected behavior'
 end
 
 # Require support files
-Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
+Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
 
 RSpec.configure do |config|
   # Use database transactions for fast test isolation instead of expensive delete_all
@@ -45,40 +45,18 @@ RSpec.configure do |config|
     clear_performed_jobs
   end
 
-  # Add timeout to prevent hanging tests
-  config.around(:each) do |example|
-    Timeout::timeout(30) do
-      example.run
-    end
-  rescue Timeout::Error
-    puts "⏰ TIMEOUT: Test '#{example.full_description}' took longer than 30 seconds"
-    example.fail!("Test timed out after 30 seconds")
-  rescue => e
-    puts "❌ Test failed but continuing: #{e.message}"
-    example.fail!
-  end
-
   # Prevent individual test failures from causing the suite to exit
   config.fail_fast = false
 
   # Add safety for database operations
   config.before(:suite) do
     # Ensure database is available before starting tests
-    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-  rescue => e
+    ActiveRecord::Base.connection.execute('SELECT 1') if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue StandardError => e
     puts "Warning: Database health check failed: #{e.message}"
-    puts "Tests will continue but may have database-related issues"
+    puts 'Tests will continue but may have database-related issues'
   end
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
   # Individual tests can clean specific data if needed
-end
-
-# Global error handling to prevent test suite from exiting with error code
-at_exit do
-  if $!.nil? || $!.is_a?(SystemExit) && $!.success?
-  else
-    puts "Test suite completed with warnings but no fatal errors"
-  end
-  exit 0
 end

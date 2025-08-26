@@ -19,7 +19,7 @@ http_interactions:
       message: OK
     headers:
       Date:
-      - Tue, 26 Aug 2025 21:22:10 GMT
+      - Tue, 26 Aug 2025 21:50:47 GMT
       Content-Type:
       - application/json; charset=utf-8
       Transfer-Encoding:
@@ -39,7 +39,7 @@ http_interactions:
       Cache-Control:
       - public, max-age=5, must-revalidate
       Etag:
-      - W/"56ca-43hJBbzrOCkgfOXbQmy+vwQSYng"
+      - W/"56db-+CbFDVVyqWXnEfM+dFjYnKiKFnw"
       Strict-Transport-Security:
       - max-age=15552000; includeSubDomains
       X-Content-Type-Options:
@@ -55,13 +55,13 @@ http_interactions:
       Cf-Cache-Status:
       - HIT
       Age:
-      - '5'
+      - '0'
       Set-Cookie:
-      - __cf_bm=qUdgUYnSbodCHHPQN46IZ17dBNZwk3zYTjY3a4yhuTY-1756243330-1.0.1.1-jLNhYUlRrzQl._vFngaLEvqDLgYDJM75wtDyYMiEVswwyrlP8LjaG_YIeLZoiqHiuvLGtxL1Kh3KJdoXmdvt1Rwk6u2.s__VGWiklgMQ1W0;
-        path=/; expires=Tue, 26-Aug-25 21:52:10 GMT; domain=.exchange.coinbase.com;
+      - __cf_bm=ZHR80C23oq0S6DLiEr2CohkeEj8YYt5BtCeZWQmtumc-1756245047-1.0.1.1-G9cAnrqVx7c1Fn.g4Z.h2.s3lNYH82oPZW5sGtHAZUGYMySUjpa1mzDnvLWoSd60EcfeKwRnmtbhoYOiLn8R2Jw64x9clAOCAzYiYDKXssU;
+        path=/; expires=Tue, 26-Aug-25 22:20:47 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
-      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=5Cucx86J%2BnGUnTX%2FQEu%2Br9xy49%2Fi3rTbRJlhGXbBiiiMT7P2r5o6%2FQYsJ7LdguyN1h2CpNnDLxRtWPgEwQrshMoJB3r6RsjZSPgJ8j%2Fo1uJIRu%2Bik9Xh2mjNvOy%2FEh8eRxSQNgRdFh6kRt4%3D"}],"group":"cf-nel","max_age":604800}'
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=sarf74a6IoSdO3%2B5Rk3PXavCz4GJFuY%2BEXrR%2FYOcVTvMzBjTBuH2sbnmigCWpMoqEkxSKOFBlZfy4HfTP5hFZVlbF3BvaVRF2LVTh6QsUdU6Q5McllRaUrQXNAk1kO6TrApXkHpismjQWvE%3D"}],"group":"cf-nel","max_age":604800}'
       Nel:
       - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
       Vary:
@@ -69,9 +69,9 @@ http_interactions:
       Server:
       - cloudflare
       Cf-Ray:
-      - 9756620fec486096-ORD
+      - 97568bf91c18e938-ORD
     body:
       encoding: ASCII-8BIT
-      string: "<JWT_TOKEN>"
-  recorded_at: Tue, 26 Aug 2025 21:22:10 GMT
+      string: "<UNIX_TIMESTAMP>"
+  recorded_at: Tue, 26 Aug 2025 21:50:47 GMT
 recorded_with: VCR 6.3.1
