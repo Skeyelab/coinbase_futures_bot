@@ -1,0 +1,77 @@
+---
+http_interactions:
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Tue, 26 Aug 2025 21:22:21 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=5, must-revalidate
+      Etag:
+      - W/"57a9-OMKKaCTKv5xvRqX7U5GZNc1oQ6w"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '4'
+      Set-Cookie:
+      - __cf_bm=3pAo.EWuh_84mOhGCFydFEqrUsyDU6xYWugaq340xB4-1756243341-1.0.1.1-Igso2HTd31S_0BDGBjlRpX6azQMWG4PDpw4fFdFNaEraDSEWB1iJrSzz2ZiE1ND9kMZxLUzKe7o2Farc1HK3lvhw1WGJ6mQwUtH6qKlZH_c;
+        path=/; expires=Tue, 26-Aug-25 21:52:21 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=E5OtC6twrE6FaVuuz%2FNaPjJR%2BAjSvbLFCpowd8bHFp94Yioty3xInsVQlgBld5ZyjMyoYhGsqzQRzjndK59wb0Y5Y0X0PVfZyXS0dhZFRjKLfJI54%2BdZO7ROUMhgYaGrb5S0HX9QNSCoPE8%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97566256b94110a1-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: "<JWT_TOKEN>"
+  recorded_at: Tue, 26 Aug 2025 21:22:21 GMT
+recorded_with: VCR 6.3.1

@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-08-25 21:01 UTC
+- Context: Successfully created Linear issue for BTC-USD and ETH-USD real-time monitoring and trading readiness
+- Changes:
+  - Created Linear issue FUT-15: "Implement real-time monitoring and trading readiness for BTC-USD and ETH-USD pairs"
+  - Issue requirements: Focus on BTC-USD and ETH-USD as core trading pairs with real-time monitoring for ~20 ETH contracts
+  - Issue assigned to FuturesBot team and project with High priority
+  - Git branch `dahleric/fut-15-implement-real-time-monitoring-and-trading-readiness-for-btc` created
+- Commands run:
+  - `mcp_Linear_create_issue` (successful - issue FUT-15 created)
+- Files touched:
+  - Linear issue FUT-15 created in FuturesBot project
+- Next steps:
+  - Plan implementation approach for real-time monitoring
+  - Update market data subscribers to focus on BTC-USD and ETH-USD
+  - Configure trading capacity for 20 ETH contracts
+  - Set up monitoring and alerting infrastructure
+
 #### 2025-01-14 19:30 UTC
 - Context: Removed all PERP (perpetual) contract references from the codebase and replaced with monthly futures contract examples
 - Changes:

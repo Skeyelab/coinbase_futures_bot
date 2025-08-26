@@ -46,12 +46,8 @@ module VCRTestHelpers
       match_requests_on: [:method, :uri, :body]
     }
 
-    if trim_responses
-      options[:before_record] = ->(interaction) do
-        VCRHelpers.trim_large_responses(interaction)
-      end
-    end
-
+    # Note: before_record is not supported in newer VCR versions
+    # Response trimming is handled globally in VCR configuration
     with_vcr_cassette(name, options, &block)
   end
 

@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Simple test runner that shows test names clearly
+require 'rspec/core'
+
+# Configure RSpec to show test names
+RSpec.configure do |config|
+  config.before(:each) do |example|
+    puts "\n🧪 RUNNING: #{example.full_description}"
+    puts "   📁 #{example.file_path}:#{example.line_number}"
+    puts "   ⏱️  Started at: #{Time.now.strftime('%H:%M:%S')}"
+    puts "   " + "=" * 60
+  end
+
+  config.around(:each) do |example|
+    start_time = Time.now
+    example.run
+    duration = Time.now - start_time
+    puts "   ⏱️  Completed in: #{duration.round(2)}s"
+    puts "   " + "=" * 60
+  rescue => e
+    puts "   ❌ ERROR: #{e.message}"
+    puts "   " + "=" * 60
+    raise
+  end
+end
+
+# Run the tests
+exit RSpec::Core::Runner.run(ARGV)

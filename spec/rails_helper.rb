@@ -34,22 +34,32 @@ RSpec.configure do |config|
   config.include ActiveJob::TestHelper
   config.include FactoryBot::Syntax::Methods
 
-  config.before(:each) do
+  # Add custom formatter for clear test identification
+  config.add_formatter TestNameFormatter
+
+  # Show test names clearly before they run
+  config.before(:each) do |example|
+    puts "\n🧪 Running: #{example.full_description}"
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
   end
 
-  # Prevent individual test failures from causing the suite to exit
-  config.fail_fast = false
-
-  # Add better error handling for test failures
+  # Add timeout to prevent hanging tests
   config.around(:each) do |example|
-    example.run
+    Timeout::timeout(30) do
+      example.run
+    end
+  rescue Timeout::Error
+    puts "⏰ TIMEOUT: Test '#{example.full_description}' took longer than 30 seconds"
+    example.fail!("Test timed out after 30 seconds")
   rescue => e
-    puts "Test failed but continuing: #{e.message}"
+    puts "❌ Test failed but continuing: #{e.message}"
     example.fail!
   end
+
+  # Prevent individual test failures from causing the suite to exit
+  config.fail_fast = false
 
   # Add safety for database operations
   config.before(:suite) do

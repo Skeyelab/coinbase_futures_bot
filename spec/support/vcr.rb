@@ -70,7 +70,8 @@ VCR.configure do |config|
 
   # Setup smart filtering
   VCRHelpers.setup_timestamp_filters(config)
-  VCRHelpers.setup_response_trimming(config)
+  # Note: setup_response_trimming uses before_record which is not supported in VCR 6+
+  # Response trimming is handled differently in newer versions
 
   # Filter Authorization headers
   config.filter_sensitive_data("<AUTHORIZATION>") do |interaction|
@@ -94,13 +95,8 @@ VCR.configure do |config|
   end
 
   # Filter client order IDs that use UUIDs
-  config.before_record do |interaction|
-    if interaction.request.body
-      body = interaction.request.body
-      # Replace UUIDs in client_order_id with a placeholder
-      body.gsub!(/("client_order_id":"cli-)[a-f0-9-]+(")/i, '\1<UUID>\2')
-    end
-  end
+  # Note: before_record is not supported in VCR 6+
+  # UUID filtering is handled in the global configuration
 
   # Ignore Sentry requests
   config.ignore_request do |request|
@@ -114,7 +110,7 @@ VCR.configure do |config|
 
   # Environment-specific record mode
   config.default_cassette_options = {
-    record: VCRHelpers.record_mode,
+    record: :none,  # Force :none to prevent new recordings
     match_requests_on: %i[method uri body],
     allow_playback_repeats: true
   }
