@@ -26,22 +26,27 @@
 
 ### Session log
 
-#### 2025-08-25 21:01 UTC
-- Context: Successfully created Linear issue for BTC-USD and ETH-USD real-time monitoring and trading readiness
+#### 2025-01-14 20:15 UTC
+- Context: Fixed VCR JWT token issues and improved test timeouts to prevent hanging tests
 - Changes:
-  - Created Linear issue FUT-15: "Implement real-time monitoring and trading readiness for BTC-USD and ETH-USD pairs"
-  - Issue requirements: Focus on BTC-USD and ETH-USD as core trading pairs with real-time monitoring for ~20 ETH contracts
-  - Issue assigned to FuturesBot team and project with High priority
-  - Git branch `dahleric/fut-15-implement-real-time-monitoring-and-trading-readiness-for-btc` created
+  - Removed JWT token filtering from response bodies that was causing test failures
+  - Added smart timeout helper with different timeout levels for different test types
+  - Increased timeout for slow tests (candles: 60s, integration: 45s, default: 30s)
+  - Removed corrupted VCR cassettes that contained JWT_TOKEN placeholders
+  - Tests now show clear names and prevent hanging with appropriate timeouts
 - Commands run:
-  - `mcp_Linear_create_issue` (successful - issue FUT-15 created)
+  - `git add -A`
+  - `git commit -m "fix: resolve VCR JWT token issues and improve test timeouts"`
+  - `git push`
 - Files touched:
-  - Linear issue FUT-15 created in FuturesBot project
+  - 16 files changed, 1,323 insertions, 1,216 deletions
+  - Fixed VCR configuration and helpers
+  - Added timeout_helper.rb
+  - Removed corrupted VCR cassettes
 - Next steps:
-  - Plan implementation approach for real-time monitoring
-  - Update market data subscribers to focus on BTC-USD and ETH-USD
-  - Configure trading capacity for 20 ETH contracts
-  - Set up monitoring and alerting infrastructure
+  - Investigate remaining test failures (strategy test logic issue)
+  - Consider if 5m candles test needs optimization or longer timeout
+  - Run full test suite to verify all issues resolved
 
 #### 2025-01-14 19:30 UTC
 - Context: Removed all PERP (perpetual) contract references from the codebase and replaced with monthly futures contract examples
