@@ -7,7 +7,7 @@ RSpec.describe MarketDataSubscribeJob, type: :job do
     fake = instance_double("Subscriber")
     allow(fake).to receive(:start)
 
-    expect(MarketData::CoinbaseFuturesSubscriber).to receive(:new).with(hash_including(product_ids: ["BTC-USD"])) {
+    expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(hash_including(product_ids: ["BTC-USD"])) {
       fake
     }
 

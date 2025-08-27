@@ -7,15 +7,18 @@ require 'json'
 module VCRHelpers
   # Smart filtering for dynamic timestamps
   def self.setup_timestamp_filters(config)
-    # ISO 8601 timestamps
-    config.filter_sensitive_data('<ISO8601_TIMESTAMP>') do |interaction|
-      interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, '<ISO8601_TIMESTAMP>')
-    end
+    # Remove all timestamp filtering from response bodies - this was corrupting JSON data
+    # The timestamps in response bodies should be preserved as they're part of the actual data
+    
+    # Only filter sensitive data from headers, not response bodies
+    # ISO 8601 timestamps and Unix timestamps in response bodies are actual data, not sensitive
+    # config.filter_sensitive_data('<ISO8601_TIMESTAMP>') do |interaction|
+    #   interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, '<ISO8601_TIMESTAMP>')
+    # end
 
-    # Unix timestamps (10-13 digits)
-    config.filter_sensitive_data('<UNIX_TIMESTAMP>') do |interaction|
-      interaction.response.body.gsub(/\b\d{10,13}\b/, '<UNIX_TIMESTAMP>')
-    end
+    # config.filter_sensitive_data('<UNIX_TIMESTAMP>') do |interaction|
+    #   interaction.response.body.gsub(/\b\d{10,13}\b/, '<UNIX_TIMESTAMP>')
+    # end
 
     # Remove JWT token filtering from response bodies - this was causing test failures
     # config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|

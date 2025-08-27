@@ -19,6 +19,7 @@ RSpec.describe "market_data rake tasks", type: :task do
     Rake::Task["market_data:backfill_candles"].reenable
     Rake::Task["market_data:backfill_1h_candles"].reenable
     Rake::Task["market_data:backfill_15m_candles"].reenable
+    Rake::Task["market_data:backfill_5m_candles"].reenable
     Rake::Task["market_data:test_1h_candles"].reenable
     Rake::Task["market_data:test_granularities"].reenable
     Rake::Task["market_data:subscribe_futures"].reenable
