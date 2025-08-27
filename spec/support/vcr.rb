@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'vcr'
-require 'json'
+require "vcr"
+require "json"
 
 # VCR Helper Module for common patterns and utilities
 module VCRHelpers
@@ -9,7 +9,7 @@ module VCRHelpers
   def self.setup_timestamp_filters(config)
     # Remove all timestamp filtering from response bodies - this was corrupting JSON data
     # The timestamps in response bodies should be preserved as they're part of the actual data
-    
+
     # Only filter sensitive data from headers, not response bodies
     # ISO 8601 timestamps and Unix timestamps in response bodies are actual data, not sensitive
     # config.filter_sensitive_data('<ISO8601_TIMESTAMP>') do |interaction|
@@ -29,7 +29,7 @@ module VCRHelpers
   # Trim large candle response bodies for faster tests
   def self.setup_response_trimming(config)
     config.before_record do |interaction|
-      if interaction.request.uri.include?('/candles') && interaction.response.body
+      if interaction.request.uri.include?("/candles") && interaction.response.body
         begin
           parsed = JSON.parse(interaction.response.body)
           if parsed.is_a?(Array) && parsed.length > 10
@@ -46,10 +46,10 @@ module VCRHelpers
 
   # Environment-specific record modes
   def self.record_mode
-    if ENV['CI'] == 'true'
+    if ENV["CI"] == "true"
       :none # Never record in CI
-    elsif ENV['VCR_RECORD_MODE']
-      ENV['VCR_RECORD_MODE'].to_sym
+    elsif ENV["VCR_RECORD_MODE"]
+      ENV["VCR_RECORD_MODE"].to_sym
     else
       :new_episodes # Default for development
     end
@@ -57,19 +57,19 @@ module VCRHelpers
 
   # Standard cassette naming convention
   def self.cassette_name(test_class, test_method, variant = nil)
-    base_name = "#{test_class.name.gsub('::', '_')}/#{test_method}"
+    base_name = "#{test_class.name.gsub("::", "_")}/#{test_method}"
     variant ? "#{base_name}/#{variant}" : base_name
   end
 end
 
 VCR.configure do |config|
-  config.cassette_library_dir = 'spec/fixtures/vcr_cassettes'
+  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
   config.hook_into :webmock
   config.configure_rspec_metadata!
 
   # Filter out sensitive data
-  config.filter_sensitive_data('<COINBASE_API_KEY>') { ENV['COINBASE_API_KEY'] }
-  config.filter_sensitive_data('<COINBASE_API_SECRET>') { ENV['COINBASE_API_SECRET'] }
+  config.filter_sensitive_data("<COINBASE_API_KEY>") { ENV["COINBASE_API_KEY"] }
+  config.filter_sensitive_data("<COINBASE_API_SECRET>") { ENV["COINBASE_API_SECRET"] }
 
   # Setup smart filtering
   VCRHelpers.setup_timestamp_filters(config)
@@ -77,8 +77,8 @@ VCR.configure do |config|
   # Response trimming is handled differently in newer versions
 
   # Filter Authorization headers
-  config.filter_sensitive_data('<AUTHORIZATION>') do |interaction|
-    interaction.request.headers['Authorization']&.first
+  config.filter_sensitive_data("<AUTHORIZATION>") do |interaction|
+    interaction.request.headers["Authorization"]&.first
   end
 
   # Filter CB-ACCESS headers
@@ -103,9 +103,9 @@ VCR.configure do |config|
 
   # Ignore Sentry requests
   config.ignore_request do |request|
-    request.uri.include?('glitchtip.ger.ericdahl.dev') ||
-      request.uri.include?('sentry.io') ||
-      request.uri.include?('sentry')
+    request.uri.include?("glitchtip.ger.ericdahl.dev") ||
+      request.uri.include?("sentry.io") ||
+      request.uri.include?("sentry")
   end
 
   # Allow real HTTP connections in development if needed

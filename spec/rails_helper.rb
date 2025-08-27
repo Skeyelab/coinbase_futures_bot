@@ -1,27 +1,27 @@
 # frozen_string_literal: true
 
-ENV['RAILS_ENV'] ||= 'test'
-require File.expand_path('../config/environment', __dir__)
-abort('The Rails environment is running in production mode!') if Rails.env.production?
-require 'rspec/rails'
-require 'factory_bot_rails'
+ENV["RAILS_ENV"] ||= "test"
+require File.expand_path("../config/environment", __dir__)
+abort("The Rails environment is running in production mode!") if Rails.env.production?
+require "rspec/rails"
+require "factory_bot_rails"
 
 # Maintain test schema with better error handling
 begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   puts "Warning: Pending migrations detected: #{e.message}"
-  puts 'Tests will continue but may have unexpected behavior'
+  puts "Tests will continue but may have unexpected behavior"
 rescue ActiveRecord::ConnectionNotEstablished => e
   puts "Warning: Database connection failed: #{e.message}"
-  puts 'Tests will continue but may have unexpected behavior'
-rescue StandardError => e
+  puts "Tests will continue but may have unexpected behavior"
+rescue => e
   puts "Warning: Schema maintenance failed: #{e.message}"
-  puts 'Tests will continue but may have unexpected behavior'
+  puts "Tests will continue but may have unexpected behavior"
 end
 
 # Require support files
-Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
+Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 
 RSpec.configure do |config|
   # Use database transactions for fast test isolation instead of expensive delete_all
@@ -51,10 +51,10 @@ RSpec.configure do |config|
   # Add safety for database operations
   config.before(:suite) do
     # Ensure database is available before starting tests
-    ActiveRecord::Base.connection.execute('SELECT 1') if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-  rescue StandardError => e
+    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue => e
     puts "Warning: Database health check failed: #{e.message}"
-    puts 'Tests will continue but may have database-related issues'
+    puts "Tests will continue but may have database-related issues"
   end
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup

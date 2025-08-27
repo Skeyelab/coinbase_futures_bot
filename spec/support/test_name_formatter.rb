@@ -15,11 +15,11 @@ class TestNameFormatter
 
   def example_finished(notification)
     status = case notification.example.execution_result.status
-             when :passed then '✅ PASSED'
-             when :failed then '❌ FAILED'
-             when :pending then '⏸️  PENDING'
-             else '❓ UNKNOWN'
-             end
+    when :passed then "✅ PASSED"
+    when :failed then "❌ FAILED"
+    when :pending then "⏸️  PENDING"
+    else "❓ UNKNOWN"
+    end
 
     @output.puts "   #{status}: #{notification.example.full_description}"
     @output.flush
