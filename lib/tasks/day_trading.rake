@@ -71,13 +71,19 @@ namespace :day_trading do
       print "Are you sure? Type 'yes' to confirm (or set FORCE=true to skip): "
 
       # Handle non-interactive scenarios gracefully
-      if $stdin.tty?
-        confirmation = $stdin.gets&.chomp
-        if confirmation&.casecmp("yes")&.zero?
-          closed_count = manager.force_close_all_day_trading_positions
-          puts "✅ Force closed #{closed_count} day trading positions"
-        else
-          puts "❌ Operation cancelled"
+      if $stdin.tty? && !$stdin.eof?
+        begin
+          confirmation = $stdin.gets&.chomp
+          if confirmation&.casecmp("yes")&.zero?
+            closed_count = manager.force_close_all_day_trading_positions
+            puts "✅ Force closed #{closed_count} day trading positions"
+          else
+            puts "❌ Operation cancelled"
+          end
+        rescue
+          puts "\n⚠️  Error reading input. Set FORCE=true to run without confirmation."
+          puts "Example: FORCE=true bundle exec rake day_trading:force_close_all"
+          exit 1
         end
       else
         puts "\n⚠️  Non-interactive environment detected. Set FORCE=true to run without confirmation."
@@ -117,13 +123,19 @@ namespace :day_trading do
       print "Close these positions now? Type 'yes' to confirm (or set FORCE=true to skip): "
 
       # Handle non-interactive scenarios gracefully
-      if $stdin.tty?
-        confirmation = $stdin.gets&.chomp
-        if confirmation&.casecmp("yes")&.zero?
-          closed_count = manager.close_tp_sl_positions
-          puts "✅ Closed #{closed_count} TP/SL positions"
-        else
-          puts "❌ Operation cancelled"
+      if $stdin.tty? && !$stdin.eof?
+        begin
+          confirmation = $stdin.gets&.chomp
+          if confirmation&.casecmp("yes")&.zero?
+            closed_count = manager.close_tp_sl_positions
+            puts "✅ Closed #{closed_count} TP/SL positions"
+          else
+            puts "❌ Operation cancelled"
+          end
+        rescue
+          puts "\n⚠️  Error reading input. Set FORCE=true to run without confirmation."
+          puts "Example: FORCE=true bundle exec rake day_trading:check_tp_sl"
+          exit 1
         end
       else
         puts "\n⚠️  Non-interactive environment detected. Set FORCE=true to run without confirmation."
@@ -179,13 +191,19 @@ namespace :day_trading do
       print "Delete #{old_count} old positions? Type 'yes' to confirm (or set FORCE=true to skip): "
 
       # Handle non-interactive scenarios gracefully
-      if $stdin.tty?
-        confirmation = $stdin.gets&.chomp
-        if confirmation&.casecmp("yes")&.zero?
-          deleted_count = Position.cleanup_old_positions(days_old)
-          puts "✅ Cleaned up #{deleted_count} old positions"
-        else
-          puts "❌ Operation cancelled"
+      if $stdin.tty? && !$stdin.eof?
+        begin
+          confirmation = $stdin.gets&.chomp
+          if confirmation&.casecmp("yes")&.zero?
+            deleted_count = Position.cleanup_old_positions(days_old)
+            puts "✅ Cleaned up #{deleted_count} old positions"
+          else
+            puts "❌ Operation cancelled"
+          end
+        rescue
+          puts "\n⚠️  Error reading input. Set FORCE=true to run without confirmation."
+          puts "Example: FORCE=true bundle exec rake day_trading:cleanup"
+          exit 1
         end
       else
         puts "\n⚠️  Non-interactive environment detected. Set FORCE=true to run without confirmation."

@@ -14,7 +14,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     # Set the instance variables directly to avoid initialization issues
     service.instance_variable_set(:@api_key, "organizations/test-org/apiKeys/test-key")
-    service.instance_variable_set(:@api_secret, "-----BEGIN EC PRIVATE KEY-----\nMOCK_KEY\n-----END EC PRIVATE KEY-----")
+    service.instance_variable_set(:@api_secret,
+      "-----BEGIN EC PRIVATE KEY-----\nMOCK_KEY\n-----END EC PRIVATE KEY-----")
     service.instance_variable_set(:@authenticated, true)
 
     # Mock JWT generation to avoid OpenSSL issues in tests
@@ -123,7 +124,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       mock_response = instance_double("Response", body: {
         "positions" => [
           {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3"},
-          {"product_id" => "ETH-USD-PERP", "number_of_contracts" => "1"}
+          {"product_id" => "ETH-USD", "number_of_contracts" => "1"}
         ]
       }.to_json)
 
@@ -150,23 +151,28 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
 
     it "converts side values correctly for futures orders" do
-      expect(service.send(:build_order_body, product_id: "TEST", side: :long, size: "1", type: :market)["side"]).to eq("LONG")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :short, size: "1", type: :market)["side"]).to eq("SHORT")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :buy, size: "1", type: :market)["side"]).to eq("BUY")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :sell, size: "1", type: :market)["side"]).to eq("SELL")
+      expect(service.send(:build_order_body, product_id: "TEST", side: :long, size: "1",
+        type: :market)["side"]).to eq("LONG")
+      expect(service.send(:build_order_body, product_id: "TEST", side: :short, size: "1",
+        type: :market)["side"]).to eq("SHORT")
+      expect(service.send(:build_order_body, product_id: "TEST", side: :buy, size: "1",
+        type: :market)["side"]).to eq("BUY")
+      expect(service.send(:build_order_body, product_id: "TEST", side: :sell, size: "1",
+        type: :market)["side"]).to eq("SELL")
     end
 
     it "raises error for invalid side values" do
-      expect {
+      expect do
         service.send(:build_order_body, product_id: "TEST", side: :invalid, size: "1", type: :market)
-      }.to raise_error(ArgumentError, /side must be :long, :short, :buy, or :sell/)
+      end.to raise_error(ArgumentError, /side must be :long, :short, :buy, or :sell/)
     end
   end
 
   describe "position inference" do
     it "infers position size from number_of_contracts field" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "3", "side" => "LONG"}
       ])
 
       size, side = service.send(:infer_position, product_id: "BIP-20DEC30-CDE")
@@ -176,7 +182,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "falls back to other size fields when number_of_contracts is not available" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BTC-USD", "size" => "0.01", "side" => "SHORT"}
+        {"product_id" => "BTC-USD", "size" => "0.01",
+         "side" => "SHORT"}
       ])
 
       size, side = service.send(:infer_position, product_id: "BTC-USD")
@@ -186,7 +193,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "normalizes side values correctly" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "TEST", "number_of_contracts" => "1", "side" => "LONG"}
+        {"product_id" => "TEST",
+         "number_of_contracts" => "1", "side" => "LONG"}
       ])
 
       _, side = service.send(:infer_position, product_id: "TEST")
@@ -197,7 +205,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   describe "position closing" do
     it "closes LONG position by creating SELL order" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "3", "side" => "LONG"}
       ])
 
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "close-123"}.to_json)
@@ -210,7 +219,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "closes SHORT position by creating BUY order" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "2", "side" => "SHORT"}
       ])
 
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "close-456"}.to_json)
@@ -232,7 +242,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "builds correct order body for LONG position close (SELL order)" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "3", "side" => "LONG"}
       ])
 
       # Mock the build_order_body method to capture the side parameter
@@ -257,7 +268,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "builds correct order body for SHORT position close (BUY order)" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "2", "side" => "SHORT"}
       ])
 
       # Mock the build_order_body method to capture the side parameter
@@ -284,7 +296,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   describe "#increase_position" do
     it "increases LONG position by creating BUY order" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "3", "side" => "LONG"}
       ])
 
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "increase-123"}.to_json)
@@ -297,7 +310,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "increases SHORT position by creating SELL order" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "2", "side" => "SHORT"}
       ])
 
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "increase-456"}.to_json)
@@ -310,7 +324,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "handles lowercase side values correctly" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "1", "side" => "long"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "1", "side" => "long"}
       ])
 
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "increase-789"}.to_json)
@@ -323,7 +338,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "builds correct order body for LONG position increase (BUY order)" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "3", "side" => "LONG"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "3", "side" => "LONG"}
       ])
 
       # Mock the build_order_body method to capture the side parameter
@@ -348,7 +364,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "builds correct order body for SHORT position increase (SELL order)" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "SHORT"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "2", "side" => "SHORT"}
       ])
 
       # Mock the build_order_body method to capture the side parameter
@@ -381,12 +398,13 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
     it "raises error when position side cannot be determined" do
       allow(service).to receive(:list_open_positions).and_return([
-        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "1", "side" => "UNKNOWN"}
+        {"product_id" => "BIP-20DEC30-CDE",
+         "number_of_contracts" => "1", "side" => "UNKNOWN"}
       ])
 
-      expect {
+      expect do
         service.increase_position(product_id: "BIP-20DEC30-CDE", size: "1")
-      }.to raise_error(/Cannot determine position side for increase/)
+      end.to raise_error(/Cannot determine position side for increase/)
     end
   end
 
@@ -412,48 +430,54 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
       expect(conn).to receive(:post).and_raise(error)
 
-      expect { service.close_position(product_id: "TEST", size: "1") }.to raise_error(Faraday::ClientError, /Bad Request: Invalid order format/)
+      expect do
+        service.close_position(product_id: "TEST",
+          size: "1")
+      end.to raise_error(Faraday::ClientError, /Bad Request: Invalid order format/)
     end
   end
 
   # Keep existing tests for backward compatibility
   describe "legacy functionality" do
     it "lists open positions (basic)" do
-      mock_response = instance_double("Response", body: {"positions" => [{"product_id" => "BTC-USD-PERP", "size" => "0.01", "side" => "long"}]}.to_json)
+      mock_response = instance_double("Response",
+        body: {"positions" => [{"product_id" => "BTC-USD", "size" => "0.01",
+                                "side" => "long"}]}.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:get).and_return(mock_response)
 
       positions = service.list_open_positions
       expect(positions.size).to eq(1)
-      expect(positions.first["product_id"]).to eq("BTC-USD-PERP")
+      expect(positions.first["product_id"]).to eq("BTC-USD")
     end
 
     it "opens a market position" do
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "abc"}.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:post).and_return(mock_response)
-      res = service.open_position(product_id: "BTC-USD-PERP", side: :buy, size: "0.01")
+      res = service.open_position(product_id: "BTC-USD", side: :buy, size: "0.01")
       expect(res["success"]).to be true
     end
 
     it "requires price for limit orders" do
-      expect {
-        service.open_position(product_id: "BTC-USD-PERP", side: :buy, size: "0.01", type: :limit)
-      }.to raise_error(ArgumentError)
+      expect do
+        service.open_position(product_id: "BTC-USD", side: :buy, size: "0.01", type: :limit)
+      end.to raise_error(ArgumentError)
     end
 
     it "closes position using inferred size" do
-      allow(service).to receive(:list_open_positions).and_return([{"product_id" => "BTC-USD-PERP", "size" => "0.02", "side" => "long"}])
+      allow(service).to receive(:list_open_positions).and_return([{"product_id" => "BTC-USD", "size" => "0.02",
+                                                                   "side" => "long"}])
       mock_response = instance_double("Response", body: {"success" => true, "order_id" => "def"}.to_json)
       conn = service.instance_variable_get(:@conn)
       expect(conn).to receive(:post).and_return(mock_response)
-      res = service.close_position(product_id: "BTC-USD-PERP")
+      res = service.close_position(product_id: "BTC-USD")
       expect(res["success"]).to be true
     end
 
     it "returns success with message when no open size" do
       allow(service).to receive(:list_open_positions).and_return([])
-      res = service.close_position(product_id: "BTC-USD-PERP")
+      res = service.close_position(product_id: "BTC-USD")
       expect(res["success"]).to eq(true)
       expect(res["message"]).to match(/No open position/)
     end

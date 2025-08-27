@@ -19,6 +19,7 @@ RSpec.describe "market_data rake tasks", type: :task do
     Rake::Task["market_data:backfill_candles"].reenable
     Rake::Task["market_data:backfill_1h_candles"].reenable
     Rake::Task["market_data:backfill_15m_candles"].reenable
+    Rake::Task["market_data:backfill_5m_candles"].reenable
     Rake::Task["market_data:test_1h_candles"].reenable
     Rake::Task["market_data:test_granularities"].reenable
     Rake::Task["market_data:subscribe_futures"].reenable
@@ -39,22 +40,22 @@ RSpec.describe "market_data rake tasks", type: :task do
 
   it "enqueues subscribe with args" do
     expect do
-      Rake::Task["market_data:subscribe"].invoke("BTC-USD-PERP,ETH-USD-PERP")
-    end.to have_enqueued_job(MarketDataSubscribeJob).with(%w[BTC-USD-PERP ETH-USD-PERP])
+      Rake::Task["market_data:subscribe"].invoke("BTC-USD,ETH-USD")
+    end.to have_enqueued_job(MarketDataSubscribeJob).with(%w[BTC-USD ETH-USD])
   end
 
   it "uses env PRODUCT_IDS when products arg is nil" do
-    ClimateControl.modify(PRODUCT_IDS: "BTC-USD-PERP") do
+    ClimateControl.modify(PRODUCT_IDS: "BTC-USD") do
       expect do
         Rake::Task["market_data:subscribe"].invoke(nil)
-      end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
+      end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD"])
     end
   end
 
   it "uses default PRODUCT_IDS when neither arg nor env provided" do
     expect do
       Rake::Task["market_data:subscribe"].invoke(nil)
-    end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD-PERP"])
+    end.to have_enqueued_job(MarketDataSubscribeJob).with(["BTC-USD"])
   end
 
   it "upserts futures products via rest service and outputs completion message" do
@@ -130,23 +131,22 @@ RSpec.describe "market_data rake tasks", type: :task do
     expect { Rake::Task["market_data:backfill_5m_candles"].invoke(1) }.not_to raise_error
   end
 
-  it "runs backfill_5m_candles with real API call" do
-    with_integration_vcr("rake_task_backfill_5m_candles") do
-      # Clear existing candles to avoid conflicts
-      Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
+  it "runs backfill_5m_candles with mocked service" do
+    # Mock the CoinbaseRest service to avoid real API calls
+    mock_rest = instance_double(MarketData::CoinbaseRest)
+    allow(mock_rest).to receive(:upsert_5m_candles)
+    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-      # Run the actual rake task
-      expect do
-        Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-      end.not_to raise_error
+    # Clear existing candles to avoid conflicts
+    Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
 
-      # Verify that 5m candles were created
-      candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")
-      if candles.any?
-        expect(candles.first.timeframe).to eq("5m")
-        expect(candles.first.symbol).to eq("BTC-USD")
-      end
-    end
+    # Run the actual rake task
+    expect do
+      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
+    end.not_to raise_error
+
+    # Verify that the mock was called
+    expect(mock_rest).to have_received(:upsert_5m_candles)
   end
 
   it "runs test_1h_candles and calls rest" do
@@ -172,10 +172,10 @@ RSpec.describe "market_data rake tasks", type: :task do
 
     ClimateControl.modify(INLINE: "1") do
       expect(MarketData::CoinbaseDerivativesSubscriber).to receive(:new) do |**kwargs|
-        expect(kwargs[:product_ids]).to eq(["BTC-USD-PERP"]) if kwargs[:product_ids].is_a?(Array)
+        expect(kwargs[:product_ids]).to eq(["BTC-USD"]) if kwargs[:product_ids].is_a?(Array)
         instance_double("Sub", start: nil)
       end
-      expect { Rake::Task["market_data:subscribe_futures"].invoke("BTC-USD-PERP") }.not_to raise_error
+      expect { Rake::Task["market_data:subscribe_futures"].invoke("BTC-USD") }.not_to raise_error
     end
   end
 end

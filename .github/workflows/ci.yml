@@ -72,11 +72,34 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config
 
+      - name: Cache test database and artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            tmp/
+            .rspec_status
+            coverage/
+            spec/fixtures/vcr_cassettes/
+          key: ${{ runner.os }}-test-cache-${{ hashFiles('db/**/*', 'spec/**/*', 'Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-test-cache-${{ hashFiles('Gemfile.lock') }}
+            ${{ runner.os }}-test-cache-
+
       - name: Prepare database (create + migrate)
-        run: bin/rails db:create db:migrate
+        run: |
+          # Use cached schema if available, create fresh if needed
+          bin/rails db:create db:migrate db:test:prepare
 
       - name: Run tests
-        run: bundle exec rspec
+        timeout-minutes: 10
+        run: |
+          echo "Starting test suite..."
+          echo "Running: bundle exec rspec --format documentation --backtrace"
+          bundle exec rspec --format documentation --backtrace
+        env:
+          # Ensure VCR uses cached cassettes in CI
+          VCR_RECORD_MODE: none
+          CI: true
 
   # Optional: Add a job that runs only when tests pass
   success:

@@ -3,7 +3,7 @@
 class AggregateSentimentJob < ApplicationJob
   queue_as :default
 
-  WINDOWS = ["5m", "15m", "1h"].freeze
+  WINDOWS = %w[5m 15m 1h].freeze
 
   def perform(now: Time.now.utc)
     WINDOWS.each do |win|
@@ -24,7 +24,7 @@ class AggregateSentimentJob < ApplicationJob
     window_end = Time.at((now.to_i / length) * length).utc
     window_start = window_end - length
 
-    ["BTC-USD-PERP", "ETH-USD-PERP"].each do |sym|
+    %w[BTC-USD ETH-USD].each do |sym|
       events = SentimentEvent.where(symbol: sym).where(published_at: window_start...window_end)
       count = events.count
       avg = if count > 0
@@ -34,7 +34,8 @@ class AggregateSentimentJob < ApplicationJob
       end
 
       # Simple z-score proxy using rolling past N windows
-      past = SentimentAggregate.where(symbol: sym, window: window).where("window_end_at < ?", window_end).order(window_end_at: :desc).limit(50)
+      past = SentimentAggregate.where(symbol: sym, window: window).where("window_end_at < ?",
+        window_end).order(window_end_at: :desc).limit(50)
       mu = past.average(:avg_score)&.to_f || 0.0
       sigma = Math.sqrt(past.average("POWER(avg_score - #{mu}, 2)")&.to_f || 0.0)
       z = if sigma > 0

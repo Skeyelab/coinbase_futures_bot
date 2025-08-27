@@ -46,12 +46,8 @@ module VCRTestHelpers
       match_requests_on: [:method, :uri, :body]
     }
 
-    if trim_responses
-      options[:before_record] = ->(interaction) do
-        VCRHelpers.trim_large_responses(interaction)
-      end
-    end
-
+    # Note: before_record is not supported in newer VCR versions
+    # Response trimming is handled globally in VCR configuration
     with_vcr_cassette(name, options, &block)
   end
 
@@ -163,6 +159,24 @@ module VCRHelpers
     end
   rescue JSON::ParserError
     # Keep original if not valid JSON
+  end
+
+  # Smart filtering for dynamic timestamps
+  def self.setup_timestamp_filters(config)
+    # ISO 8601 timestamps
+    config.filter_sensitive_data("<ISO8601_TIMESTAMP>") do |interaction|
+      interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, "<ISO8601_TIMESTAMP>")
+    end
+
+    # Unix timestamps (10-13 digits)
+    config.filter_sensitive_data("<UNIX_TIMESTAMP>") do |interaction|
+      interaction.response.body.gsub(/\b\d{10,13}\b/, "<UNIX_TIMESTAMP>")
+    end
+
+    # Remove JWT token filtering from response bodies - this was causing test failures
+    # config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
+    #   interaction.response.body.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>")
+    # end
   end
 end
 

@@ -24,10 +24,10 @@ RSpec.describe "day_trading:check_positions", type: :task do
     }
     allow(manager).to receive(:get_position_summary).and_return(summary)
 
-    expect { task.execute }.to output(/Open positions: 3/).to_stdout
-    expect { task.execute }.to output(/Closed today: 2/).to_stdout
-    expect { task.execute }.to output(/Total PnL: 250\.0/).to_stdout
-    expect { task.execute }.to output(/Positions needing closure: 1/).to_stdout
+    # Capture all output from a single task execution
+    expect do
+      task.execute
+    end.to output(/Open positions: 3.*Closed today: 2.*Total PnL: 250\.0.*Positions needing closure: 1/m).to_stdout
   end
 
   it "handles empty positions gracefully" do
@@ -84,9 +84,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
     summary = {open_count: 3}
     allow(manager).to receive(:get_position_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(3)
-    allow($stdin).to receive(:tty?).and_return(true)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
     expect { task.execute }.to output(/⚠️  Force closing all 3 day trading positions/).to_stdout
@@ -97,9 +98,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
     summary = {open_count: 2}
     allow(manager).to receive(:get_position_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(0)
-    allow($stdin).to receive(:tty?).and_return(true)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout
@@ -128,12 +130,15 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(1)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
-    expect { task.execute }.to output(%r{Found 1 positions with triggered TP/SL}).to_stdout
-    expect { task.execute }.to output(/Position 1: LONG 1\.0 BIT-29AUG25-CDE/).to_stdout
-    expect { task.execute }.to output(%r{✅ Closed 1 TP/SL positions}).to_stdout
+    # Capture all output from a single task execution
+    expect do
+      task.execute
+    end.to output(%r{Found 1 positions with triggered TP/SL.*Position 1: LONG 1\.0 BIT-29AUG25-CDE.*✅ Closed 1 TP/SL positions}m).to_stdout
   end
 
   it "shows no triggers message when none exist" do
@@ -149,7 +154,9 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(0)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout
@@ -181,9 +188,10 @@ RSpec.describe "day_trading:pnl", type: :task do
     allow(position1).to receive(:calculate_pnl).with(51_000.0).and_return(100.0)
     allow(position2).to receive(:calculate_pnl).with(2900.0).and_return(150.0)
 
-    expect { task.execute }.to output(/Current PnL for open day trading positions: 250\.0/).to_stdout
-    expect { task.execute }.to output(/BIT-29AUG25-CDE: LONG 1\.0 - PnL: 100\.0/).to_stdout
-    expect { task.execute }.to output(/ET-29AUG25-CDE: SHORT 2\.0 - PnL: 150\.0/).to_stdout
+    # Capture all output from a single task execution
+    expect do
+      task.execute
+    end.to output(/Current PnL for open day trading positions: 250\.0.*BIT-29AUG25-CDE: LONG 1\.0 - PnL: 100\.0.*ET-29AUG25-CDE: SHORT 2\.0 - PnL: 150\.0/m).to_stdout
   end
 
   it "handles positions without price data" do
@@ -214,7 +222,8 @@ RSpec.describe "day_trading:cleanup", type: :task do
 
     # Mock stdin to avoid hanging on user input
     allow($stdin).to receive(:tty?).and_return(true)
-    allow($stdin).to receive(:gets).and_return("no\n")  # Don't actually delete in this test
+    allow($stdin).to receive(:eof?).and_return(false)
+    allow($stdin).to receive(:gets).and_return("no\n") # Don't actually delete in this test
 
     expect { task.execute }.to output(/Cleaning up closed positions older than 30 days/).to_stdout
     expect { task.execute }.to output(/Delete 5 old positions\? Type 'yes' to confirm/).to_stdout
@@ -231,7 +240,10 @@ RSpec.describe "day_trading:cleanup", type: :task do
   it "deletes positions when user confirms" do
     # Create some old positions for the test
     create_list(:position, 5, :old)
+
+    # Mock stdin to simulate interactive environment
     allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
     expect { task.execute }.to output(/✅ Cleaned up 5 old positions/).to_stdout
@@ -240,7 +252,10 @@ RSpec.describe "day_trading:cleanup", type: :task do
   it "cancels operation when user doesn't confirm" do
     # Create some old positions for the test
     create_list(:position, 5, :old)
+
+    # Mock stdin to simulate interactive environment
     allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout

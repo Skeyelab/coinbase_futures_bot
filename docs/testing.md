@@ -279,16 +279,16 @@ RSpec.describe Strategy::MultiTimeframeSignal do
   let(:strategy) { described_class.new }
 
   describe "#signal" do
-    let(:btc_pair) { TradingPair.create!(product_id: "BTC-USD-PERP") }
+    let(:btc_pair) { TradingPair.create!(product_id: "BTC-USD") }
 
     before do
       # Create test candle data
-      create_candle_data("BTC-USD-PERP", "1h", 100)
-      create_candle_data("BTC-USD-PERP", "15m", 200)
+      create_candle_data("BTC-USD", "1h", 100)
+      create_candle_data("BTC-USD", "15m", 200)
     end
 
     it "generates valid signals" do
-      signal = strategy.signal(symbol: "BTC-USD-PERP", equity_usd: 10_000)
+      signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
 
       if signal
         expect(signal).to include(:side, :price, :quantity, :tp, :sl, :confidence)
@@ -300,7 +300,7 @@ RSpec.describe Strategy::MultiTimeframeSignal do
 
     it "handles insufficient data gracefully" do
       Candle.delete_all
-      signal = strategy.signal(symbol: "BTC-USD-PERP", equity_usd: 10_000)
+      signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
       expect(signal).to be_nil
     end
   end
@@ -331,7 +331,7 @@ RSpec.describe "Sentiment API", type: :request do
   describe "GET /sentiment/aggregates" do
     let!(:btc_aggregate) do
       SentimentAggregate.create!(
-        symbol: "BTC-USD-PERP",
+        symbol: "BTC-USD",
         window: "15m",
         window_end_at: Time.current,
         count: 5,
@@ -341,12 +341,12 @@ RSpec.describe "Sentiment API", type: :request do
     end
 
     it "returns sentiment aggregates" do
-      get "/sentiment/aggregates", params: { symbol: "BTC-USD-PERP", limit: 10 }
+      get "/sentiment/aggregates", params: { symbol: "BTC-USD", limit: 10 }
 
       expect(response).to have_http_status(:ok)
       json_response = JSON.parse(response.body)
       expect(json_response).to be_an(Array)
-      expect(json_response.first["symbol"]).to eq("BTC-USD-PERP")
+      expect(json_response.first["symbol"]).to eq("BTC-USD")
     end
 
     it "filters by window parameter" do
@@ -390,7 +390,7 @@ RSpec.describe PositionsController, type: :controller do
   end
 
   describe "POST #create" do
-    let(:valid_params) { { product_id: "BTC-USD-PERP" } }
+    let(:valid_params) { { product_id: "BTC-USD" } }
 
     it "creates a new position with valid parameters" do
       expect { post :create, params: valid_params }
@@ -443,7 +443,7 @@ before do
   allow_any_instance_of(Coinbase::AdvancedTradeClient)
     .to receive(:list_futures_positions)
     .and_return([
-      { "product_id" => "BTC-USD-PERP", "size" => "0.1" }
+      { "product_id" => "BTC-USD", "size" => "0.1" }
     ])
 end
 ```
@@ -500,7 +500,7 @@ end
 # Create test data with specific attributes
 def create_trading_pair(overrides = {})
   defaults = {
-    product_id: "BTC-USD-PERP",
+    product_id: "BTC-USD",
     base_currency: "BTC",
     quote_currency: "USD",
     enabled: true

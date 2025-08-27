@@ -79,9 +79,8 @@ module VCRConfig
       config.default_cassette_options[:record] = :new_episodes
 
       # Helpful warnings for missing cassettes
-      config.before_record do |interaction|
-        puts "📼 Recording VCR interaction: #{interaction.request.method.upcase} #{interaction.request.uri}"
-      end
+      # Note: before_record is not supported in VCR 6+
+      # Recording notifications are handled differently in newer versions
     end
   end
 end

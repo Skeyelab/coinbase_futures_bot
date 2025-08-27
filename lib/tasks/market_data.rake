@@ -3,7 +3,7 @@
 namespace :market_data do
   desc "Subscribe to Coinbase futures ticker (GoodJob async)"
   task :subscribe, [:products] => :environment do |_t, args|
-    products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD-PERP").split(",")
+    products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD").split(",")
 
     if ENV["INLINE"].to_s == "1"
       stdout_logger = Logger.new($stdout)
@@ -60,7 +60,7 @@ namespace :market_data do
     rest = MarketData::CoinbaseRest.new
 
     # Use existing BTC-USD product for now (spot trading)
-    # TODO: Research correct futures API endpoints for BTC-USD-PERP
+    # TODO: Research correct futures API endpoints for BTC-USD
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
 
     unless btc_pair
@@ -87,7 +87,7 @@ namespace :market_data do
     rest = MarketData::CoinbaseRest.new
 
     # Use existing BTC-USD product for now (spot trading)
-    # TODO: Research correct futures API endpoints for BTC-USD-PERP
+    # TODO: Research correct futures API endpoints for BTC-USD
     btc_pair = TradingPair.find_by(product_id: "BTC-USD")
 
     unless btc_pair
@@ -145,8 +145,8 @@ namespace :market_data do
       "15m" => 900,
       "30m" => 1800,
       "1h" => 3600,
-      "6h" => 21600,
-      "1d" => 86400
+      "6h" => 21_600,
+      "1d" => 86_400
     }
 
     start_time = 1.day.ago
@@ -172,7 +172,7 @@ namespace :market_data do
 
   desc "Subscribe to Coinbase futures (derivatives) ticker via futures WS"
   task :subscribe_futures, [:products] => :environment do |_t, args|
-    products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD-PERP").split(",")
+    products = (args[:products] || ENV["PRODUCT_IDS"] || "BTC-USD").split(",")
 
     if ENV["INLINE"].to_s == "1"
       puts "Running inline futures subscription for: #{products.join(",")}"
@@ -184,10 +184,10 @@ namespace :market_data do
     end
   end
 
-  desc "Run spot-driven strategy: consume BTC-USD ticks and drive BTC-USD-PERP executor"
-  task :run_spot_driven_strategy, [:spot_product, :futures_product] => :environment do |_t, args|
+  desc "Run spot-driven strategy: consume BTC-USD ticks and drive BTC-USD executor"
+  task :run_spot_driven_strategy, %i[spot_product futures_product] => :environment do |_t, args|
     spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
-    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
+    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD").to_s
 
     puts "Running spot-driven strategy: spot=#{spot} -> futures=#{perp}"
     stdout_logger = Logger.new($stdout)
@@ -231,12 +231,13 @@ namespace :market_data do
   end
 
   desc "Backtest spot-driven strategy from DB ticks"
-  task :backtest_spot_db, [:start_iso, :end_iso, :spot_product, :futures_product] => :environment do |_t, args|
+  task :backtest_spot_db, %i[start_iso end_iso spot_product futures_product] => :environment do |_t, args|
     start_iso = args[:start_iso] || ENV["START_ISO"]
     end_iso = args[:end_iso] || ENV["END_ISO"]
     raise ArgumentError, "start_iso and end_iso required" if start_iso.to_s.strip.empty? || end_iso.to_s.strip.empty?
+
     spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
-    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD-PERP").to_s
+    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD").to_s
 
     stdout_logger = Logger.new($stdout)
     stdout_logger.level = Logger::INFO
@@ -249,6 +250,7 @@ namespace :market_data do
       logger: stdout_logger
     )
 
-    Backtest::SpotDbReplay.new(product_id: spot, strategy: strategy, start_time: start_iso, end_time: end_iso, logger: stdout_logger).run
+    Backtest::SpotDbReplay.new(product_id: spot, strategy: strategy, start_time: start_iso, end_time: end_iso,
+      logger: stdout_logger).run
   end
 end
