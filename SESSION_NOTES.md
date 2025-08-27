@@ -26,7 +26,25 @@
 
 ### Session log
 
-<<<<<<< HEAD
+#### 2025-08-27 13:15 UTC
+- Context: Successfully resolved 95 merge conflicts across 13 VCR cassette files by re-recording instead of manual resolution
+- Changes:
+  - **Fixed merge conflicts**: Resolved syntax errors in VCR support files (`spec/support/vcr.rb`, `spec/support/vcr_helpers.rb`)
+  - **Re-recorded all VCR cassettes**: Deleted corrupted cassettes with merge conflict markers and re-recorded fresh test data
+  - **All tests passing**: 346 examples, 0 failures after conflict resolution
+  - **Clean merge**: Successfully merged main branch changes into feature branch
+- Commands run:
+  - `rm -rf spec/fixtures/vcr_cassettes/*` (removed corrupted cassettes)
+  - `bundle exec rspec --format progress` (re-recorded all cassettes)
+  - `git add -A && git commit -m "fix: resolve merge conflicts and re-record VCR cassettes"`
+- Files touched:
+  - `spec/support/vcr.rb` (resolved merge conflicts)
+  - `spec/support/vcr_helpers.rb` (resolved merge conflicts)
+  - All VCR cassette files re-recorded (13 files)
+- Next steps:
+  - Push the resolved branch to origin
+  - Continue with real-time monitoring implementation for BTC-USD and ETH-USD
+
 #### 2025-08-27 12:45 UTC
 - Context: Fixed CI test failures in FetchCandlesJob spec related to ETH-USD support
 - Changes:
@@ -45,7 +63,7 @@
 - Next steps:
   - Monitor CI pipeline to ensure tests pass in GitHub Actions
   - Investigate remaining VCR cassette issue in "fetches 1m, 5m, 15m, and 1h candles" test if needed
-=======
+
 #### 2025-08-27 05:30 UTC
 - Context: Addressed Linear issue FUT-1 to enable branch protection on main branch
 - Changes:
@@ -61,7 +79,7 @@
   - `BRANCH_PROTECTION_SETUP.md`: Complete manual setup instructions for branch protection
 - Status checks identified:
   - `lint`: StandardRB linting from CI workflow
-  - `security`: Brakeman security scanning from CI workflow  
+  - `security`: Brakeman security scanning from CI workflow
   - `test`: Rails test suite from CI workflow
 - Next steps:
   - Repository admin needs to manually apply branch protection settings using provided guide
