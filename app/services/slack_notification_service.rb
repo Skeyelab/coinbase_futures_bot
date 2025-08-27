@@ -5,7 +5,7 @@ class SlackNotificationService
     # Send a trading signal notification
     def signal_generated(signal_data)
       return unless enabled?
-      
+
       message = format_signal_message(signal_data)
       send_message(message, channel: signals_channel)
     end
@@ -13,7 +13,7 @@ class SlackNotificationService
     # Send position update notification
     def position_update(position, action)
       return unless enabled?
-      
+
       message = format_position_message(position, action)
       send_message(message, channel: positions_channel)
     end
@@ -21,7 +21,7 @@ class SlackNotificationService
     # Send bot status notification
     def bot_status(status_data)
       return unless enabled?
-      
+
       message = format_status_message(status_data)
       send_message(message, channel: status_channel)
     end
@@ -29,21 +29,21 @@ class SlackNotificationService
     # Send error/alert notification
     def alert(level, title, details = nil)
       return unless enabled?
-      
+
       message = format_alert_message(level, title, details)
       channel = case level.to_s.downcase
-                when 'critical', 'error'
-                  alerts_channel
-                else
-                  status_channel
-                end
+      when "critical", "error"
+        alerts_channel
+      else
+        status_channel
+      end
       send_message(message, channel: channel)
     end
 
     # Send PnL update notification
     def pnl_update(pnl_data)
       return unless enabled?
-      
+
       message = format_pnl_message(pnl_data)
       send_message(message, channel: positions_channel)
     end
@@ -51,7 +51,7 @@ class SlackNotificationService
     # Send health check notification
     def health_check(health_data)
       return unless enabled?
-      
+
       message = format_health_message(health_data)
       send_message(message, channel: status_channel)
     end
@@ -59,7 +59,7 @@ class SlackNotificationService
     # Send market condition alert
     def market_alert(market_data)
       return unless enabled?
-      
+
       message = format_market_message(market_data)
       send_message(message, channel: alerts_channel)
     end
@@ -67,27 +67,27 @@ class SlackNotificationService
     private
 
     def enabled?
-      ENV['SLACK_ENABLED']&.downcase == 'true' && bot_token.present?
+      ENV["SLACK_ENABLED"]&.downcase == "true" && bot_token.present?
     end
 
     def bot_token
-      ENV['SLACK_BOT_TOKEN']
+      ENV["SLACK_BOT_TOKEN"]
     end
 
     def signals_channel
-      ENV['SLACK_SIGNALS_CHANNEL'] || '#trading-signals'
+      ENV["SLACK_SIGNALS_CHANNEL"] || "#trading-signals"
     end
 
     def positions_channel
-      ENV['SLACK_POSITIONS_CHANNEL'] || '#trading-positions'
+      ENV["SLACK_POSITIONS_CHANNEL"] || "#trading-positions"
     end
 
     def status_channel
-      ENV['SLACK_STATUS_CHANNEL'] || '#bot-status'
+      ENV["SLACK_STATUS_CHANNEL"] || "#bot-status"
     end
 
     def alerts_channel
-      ENV['SLACK_ALERTS_CHANNEL'] || '#trading-alerts'
+      ENV["SLACK_ALERTS_CHANNEL"] || "#trading-alerts"
     end
 
     def client
@@ -110,10 +110,10 @@ class SlackNotificationService
         Rails.logger.info("[Slack] Message sent to #{channel}")
       rescue Slack::Web::Api::Errors::SlackError => e
         Rails.logger.error("[Slack] API Error: #{e.message}")
-        
+
         retries += 1
         if retries <= max_retries
-          sleep(2 ** retries) # Exponential backoff
+          sleep(2**retries) # Exponential backoff
           retry
         else
           Rails.logger.error("[Slack] Failed to send message after #{max_retries} retries")
@@ -134,13 +134,13 @@ class SlackNotificationService
       sl = signal_data[:sl]&.round(2)
 
       color = case side.to_s.downcase
-              when 'long', 'buy'
-                'good'
-              when 'short', 'sell'
-                'danger'
-              else
-                'warning'
-              end
+      when "long", "buy"
+        "good"
+      when "short", "sell"
+        "danger"
+      else
+        "warning"
+      end
 
       {
         text: "🎯 New Trading Signal: #{symbol}",
@@ -196,24 +196,24 @@ class SlackNotificationService
 
     def format_position_message(position, action)
       action_emoji = case action.to_s.downcase
-                     when 'opened'
-                       '🟢'
-                     when 'closed'
-                       '🔴'
-                     when 'updated'
-                       '🔄'
-                     else
-                       '📊'
-                     end
+      when "opened"
+        "🟢"
+      when "closed"
+        "🔴"
+      when "updated"
+        "🔄"
+      else
+        "📊"
+      end
 
       color = case action.to_s.downcase
-              when 'opened'
-                'good'
-              when 'closed'
-                position.pnl&.positive? ? 'good' : 'danger'
-              else
-                'warning'
-              end
+      when "opened"
+        "good"
+      when "closed"
+        position.pnl&.positive? ? "good" : "danger"
+      else
+        "warning"
+      end
 
       fields = [
         {
@@ -270,16 +270,16 @@ class SlackNotificationService
         text: "🤖 Bot Status Update",
         attachments: [
           {
-            color: status_data[:healthy] ? 'good' : 'danger',
+            color: status_data[:healthy] ? "good" : "danger",
             fields: [
               {
                 title: "Status",
-                value: status_data[:status] || 'Unknown',
+                value: status_data[:status] || "Unknown",
                 short: true
               },
               {
                 title: "Trading Active",
-                value: status_data[:trading_active] ? '✅' : '❌',
+                value: status_data[:trading_active] ? "✅" : "❌",
                 short: true
               },
               {
@@ -294,7 +294,7 @@ class SlackNotificationService
               },
               {
                 title: "Last Signal",
-                value: status_data[:last_signal_time] || 'N/A',
+                value: status_data[:last_signal_time] || "N/A",
                 short: true
               },
               {
@@ -310,26 +310,26 @@ class SlackNotificationService
 
     def format_alert_message(level, title, details)
       emoji = case level.to_s.downcase
-              when 'critical'
-                '🚨'
-              when 'error'
-                '❌'
-              when 'warning'
-                '⚠️'
-              when 'info'
-                'ℹ️'
-              else
-                '📢'
-              end
+      when "critical"
+        "🚨"
+      when "error"
+        "❌"
+      when "warning"
+        "⚠️"
+      when "info"
+        "ℹ️"
+      else
+        "📢"
+      end
 
       color = case level.to_s.downcase
-              when 'critical', 'error'
-                'danger'
-              when 'warning'
-                'warning'
-              else
-                'good'
-              end
+      when "critical", "error"
+        "danger"
+      when "warning"
+        "warning"
+      else
+        "good"
+      end
 
       fields = [
         {
@@ -365,8 +365,8 @@ class SlackNotificationService
 
     def format_pnl_message(pnl_data)
       total_pnl = pnl_data[:total_pnl]
-      color = total_pnl&.positive? ? 'good' : 'danger'
-      emoji = total_pnl&.positive? ? '📈' : '📉'
+      color = total_pnl&.positive? ? "good" : "danger"
+      emoji = total_pnl&.positive? ? "📈" : "📉"
 
       {
         text: "#{emoji} PnL Update",
@@ -413,22 +413,22 @@ class SlackNotificationService
     def format_health_message(health_data)
       overall_health = health_data[:overall_health]
       color = case overall_health
-              when 'healthy'
-                'good'
-              when 'warning'
-                'warning'
-              else
-                'danger'
-              end
+      when "healthy"
+        "good"
+      when "warning"
+        "warning"
+      else
+        "danger"
+      end
 
       emoji = case overall_health
-              when 'healthy'
-                '✅'
-              when 'warning'
-                '⚠️'
-              else
-                '❌'
-              end
+      when "healthy"
+        "✅"
+      when "warning"
+        "⚠️"
+      else
+        "❌"
+      end
 
       {
         text: "#{emoji} Health Check",
@@ -443,17 +443,17 @@ class SlackNotificationService
               },
               {
                 title: "Database",
-                value: health_data[:database] ? '✅' : '❌',
+                value: health_data[:database] ? "✅" : "❌",
                 short: true
               },
               {
                 title: "Coinbase API",
-                value: health_data[:coinbase_api] ? '✅' : '❌',
+                value: health_data[:coinbase_api] ? "✅" : "❌",
                 short: true
               },
               {
                 title: "Background Jobs",
-                value: health_data[:background_jobs] ? '✅' : '❌',
+                value: health_data[:background_jobs] ? "✅" : "❌",
                 short: true
               },
               {
@@ -477,7 +477,7 @@ class SlackNotificationService
         text: "📊 Market Alert",
         attachments: [
           {
-            color: 'warning',
+            color: "warning",
             fields: [
               {
                 title: "Alert Type",
@@ -517,11 +517,11 @@ class SlackNotificationService
 
     def duration_in_words(start_time, end_time)
       return "N/A" unless start_time && end_time
-      
+
       duration_seconds = end_time - start_time
       hours = (duration_seconds / 3600).to_i
       minutes = ((duration_seconds % 3600) / 60).to_i
-      
+
       if hours > 0
         "#{hours}h #{minutes}m"
       else
