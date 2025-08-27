@@ -84,9 +84,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
     summary = {open_count: 3}
     allow(manager).to receive(:get_position_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(3)
-    allow($stdin).to receive(:tty?).and_return(true)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
     expect { task.execute }.to output(/⚠️  Force closing all 3 day trading positions/).to_stdout
@@ -97,9 +98,10 @@ RSpec.describe "day_trading:force_close_all", type: :task do
     summary = {open_count: 2}
     allow(manager).to receive(:get_position_summary).and_return(summary)
     allow(manager).to receive(:force_close_all_day_trading_positions).and_return(0)
-    allow($stdin).to receive(:tty?).and_return(true)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout
@@ -128,7 +130,9 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(1)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
     # Capture all output from a single task execution
@@ -150,7 +154,9 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
     allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
     allow(manager).to receive(:close_tp_sl_positions).and_return(0)
 
-    # Mock user input
+    # Mock stdin to simulate interactive environment
+    allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout
@@ -216,6 +222,7 @@ RSpec.describe "day_trading:cleanup", type: :task do
 
     # Mock stdin to avoid hanging on user input
     allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n") # Don't actually delete in this test
 
     expect { task.execute }.to output(/Cleaning up closed positions older than 30 days/).to_stdout
@@ -233,7 +240,10 @@ RSpec.describe "day_trading:cleanup", type: :task do
   it "deletes positions when user confirms" do
     # Create some old positions for the test
     create_list(:position, 5, :old)
+
+    # Mock stdin to simulate interactive environment
     allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("yes\n")
 
     expect { task.execute }.to output(/✅ Cleaned up 5 old positions/).to_stdout
@@ -242,7 +252,10 @@ RSpec.describe "day_trading:cleanup", type: :task do
   it "cancels operation when user doesn't confirm" do
     # Create some old positions for the test
     create_list(:position, 5, :old)
+
+    # Mock stdin to simulate interactive environment
     allow($stdin).to receive(:tty?).and_return(true)
+    allow($stdin).to receive(:eof?).and_return(false)
     allow($stdin).to receive(:gets).and_return("no\n")
 
     expect { task.execute }.to output(/❌ Operation cancelled/).to_stdout
