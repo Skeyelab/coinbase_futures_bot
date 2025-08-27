@@ -320,7 +320,7 @@ end
 **Parallel Execution Options:**
 ```bash
 # Standard parallel execution (12 processes)
-bundle exec parallel_rspec spec/
+bundle exec rspec spec/
 
 # Optimized execution (6 processes, runtime-based grouping)
 bin/fast_rspec

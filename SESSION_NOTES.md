@@ -263,7 +263,7 @@
   - `git checkout -b implement-standardrb`
   - `bundle install` (added standard >= 1.35.1)
   - `bin/standardrb --fix && bin/standardrb --fix-unsafely`
-  - `bundle exec parallel_rspec spec/` (all 225 tests passing)
+  - `bundle exec rspec spec/` (all 225 tests passing)
   - `git add -A && git commit -m "feat(tooling): implement StandardRB..."`
   - `git push origin implement-standardrb`
 - Files touched:

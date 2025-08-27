@@ -90,8 +90,8 @@ jobs:
           # Use cached schema if available, create fresh if needed
           bin/rails db:create db:migrate db:test:prepare
 
-      - name: Run tests with parallel execution
-        run: bin/fast_rspec
+      - name: Run tests
+        run: bundle exec rspec
         env:
           # Ensure VCR uses cached cassettes in CI
           VCR_RECORD_MODE: none

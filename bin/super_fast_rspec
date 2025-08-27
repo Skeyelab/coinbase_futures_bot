@@ -1,13 +1,7 @@
 #!/usr/bin/env ruby
-# Super-fast RSpec runner with aggressive optimizations
+# Super-fast RSpec runner
 
 require "bundler/setup"
 
-# Ultimate optimized parallel test execution
-exec "bundle", "exec", "parallel_rspec",
-     "--group-by", "runtime",
-     "--runtime-log", "tmp/parallel_runtime_rspec.log",
-     "-n", "4",  # Even fewer processes for optimal resource usage
-     "--single", "spec/services/coinbase_rest_spec.rb",  # Isolate DB-heavy tests
-     "--single", "spec/models/trading_pair_spec.rb",     # Isolate another DB-heavy test
-     "spec/"
+# Regular RSpec execution with fail-fast option
+exec "bundle", "exec", "rspec", "--fail-fast", "spec/"
