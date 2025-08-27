@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-08-27 13:30 UTC
+- Context: Reduced system capacity from 20 ETH contracts to 10 ETH contracts for more conservative testing
+- Changes:
+  - **Reduced capacity limits**: MAX_ETH_CONTRACTS: 20→10, MAX_BTC_CONTRACTS: 10→5
+  - **Reduced position limits**: Concurrent ETH positions: 5→3, Concurrent BTC positions: 3→2
+  - **Reduced equity requirement**: SIGNAL_EQUITY_USD: $50k→$25k
+  - **Updated all related methods**: RapidSignalEvaluationJob and real_time_monitoring.rake
+- Commands run:
+  - `bin/standardrb --fix` (ensured consistent formatting)
+  - `bundle exec rake real_time:configure_capacity` (verified new configuration)
+  - `git add -A && git commit -m "feat: reduce system capacity from 20 to 10 ETH contracts"`
+- Files touched:
+  - `lib/tasks/real_time_monitoring.rake`, `app/jobs/rapid_signal_evaluation_job.rb`
+- Next steps:
+  - Test the reduced capacity configuration
+  - Consider further adjustments based on initial testing results
+  - Monitor system performance with smaller position sizes
+
 #### 2025-08-27 13:15 UTC
 - Context: Successfully resolved 95 merge conflicts across 13 VCR cassette files by re-recording instead of manual resolution
 - Changes:
@@ -216,7 +234,6 @@
   - Review and merge PR #37
   - Verify all tests pass with new symbol naming
   - Consider updating any remaining external references or documentation
->>>>>>> main
 
 #### 2025-08-25 06:30 UTC
 - Context: Successfully completed comprehensive VCR improvements to resolve Linear issue FUT-12
@@ -514,6 +531,7 @@
   - Test strategy with real market data to validate performance
   - Monitor strategy performance and adjust parameters based on backtesting results
   - Consider additional position sizing optimizations for day trading volatility
+
 #### 2025-08-24 03:25 UTC
 - Context: Implementing Linear issue FUT-3 to add 1-minute and 5-minute candle collection for day trading strategies.
 - Changes:

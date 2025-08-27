@@ -124,11 +124,11 @@ namespace :real_time do
     puts
 
     # Check recent activity
-    recent_ticks = Tick.where("timestamp > ?", 5.minutes.ago).group(:symbol).count
+    recent_ticks = Tick.where("observed_at > ?", 5.minutes.ago).group(:product_id).count
     puts "Recent Tick Data (last 5 minutes):"
     if recent_ticks.any?
-      recent_ticks.each do |symbol, count|
-        puts "  #{symbol}: #{count} ticks"
+      recent_ticks.each do |product_id, count|
+        puts "  #{product_id}: #{count} ticks"
       end
     else
       puts "  No recent tick data"

@@ -33,9 +33,9 @@ class FuturesBasisMonitoringJob < ApplicationJob
 
   def get_futures_price(futures_product_id)
     # Try to get recent tick data first
-    recent_tick = Tick.where(symbol: futures_product_id)
-      .where("timestamp > ?", 5.minutes.ago)
-      .order(timestamp: :desc)
+    recent_tick = Tick.where(product_id: futures_product_id)
+      .where("observed_at > ?", 5.minutes.ago)
+      .order(observed_at: :desc)
       .first
 
     if recent_tick
