@@ -40,6 +40,7 @@ class SlackCommandHandler
 
     def authorized?(user_id)
       return true if AUTHORIZED_USERS.empty? # If no users configured, allow all
+
       AUTHORIZED_USERS.include?(user_id)
     end
 

@@ -70,7 +70,11 @@ class SlackController < ApplicationController
     if health_status[:slack_enabled] && health_status[:bot_token_configured]
       # Test Slack API connection
       begin
-        client = Slack::Web::Client.new(token: ENV["SLACK_BOT_TOKEN"])
+        client = Slack::Web::Client.new(
+          token: ENV["SLACK_BOT_TOKEN"],
+          timeout: 10,
+          open_timeout: 5
+        )
         auth_test = client.auth_test
         health_status[:api_connection] = true
         health_status[:bot_user_id] = auth_test["user_id"]
@@ -157,7 +161,11 @@ class SlackController < ApplicationController
     return if event[:bot_id] # Ignore bot messages
 
     begin
-      client = Slack::Web::Client.new(token: ENV["SLACK_BOT_TOKEN"])
+      client = Slack::Web::Client.new(
+        token: ENV["SLACK_BOT_TOKEN"],
+        timeout: 10,
+        open_timeout: 5
+      )
       client.chat_postMessage(
         channel: event[:channel],
         text: "👋 Hi! I'm the Coinbase Futures Trading Bot. Use slash commands like `/bot-status` or `/bot-help` to interact with me.",
@@ -187,7 +195,11 @@ class SlackController < ApplicationController
     end
 
     begin
-      client = Slack::Web::Client.new(token: ENV["SLACK_BOT_TOKEN"])
+      client = Slack::Web::Client.new(
+        token: ENV["SLACK_BOT_TOKEN"],
+        timeout: 10,
+        open_timeout: 5
+      )
       client.chat_postMessage(
         channel: event[:channel],
         text: response_text,

@@ -91,7 +91,11 @@ class SlackNotificationService
     end
 
     def client
-      @client ||= Slack::Web::Client.new(token: bot_token)
+      @client ||= Slack::Web::Client.new(
+        token: bot_token,
+        timeout: 10,
+        open_timeout: 5
+      )
     end
 
     def send_message(message, channel:)

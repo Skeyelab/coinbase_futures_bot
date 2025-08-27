@@ -6,10 +6,6 @@ if defined?(Slack)
     config.token = ENV["SLACK_BOT_TOKEN"]
     config.logger = Rails.logger
 
-    # Set timeout values
-    config.timeout = 10
-    config.open_timeout = 5
-
     # Enable request/response logging in development
     if Rails.env.development?
       config.logger.level = Logger::DEBUG
@@ -23,7 +19,12 @@ Rails.application.configure do
     if defined?(Rails::Health) && ENV["SLACK_ENABLED"]&.downcase == "true"
       Rails::Health.add_check :slack do
         if ENV["SLACK_BOT_TOKEN"].present?
-          client = Slack::Web::Client.new(token: ENV["SLACK_BOT_TOKEN"])
+          # Configure timeouts on the client instance
+          client = Slack::Web::Client.new(
+            token: ENV["SLACK_BOT_TOKEN"],
+            timeout: 10,
+            open_timeout: 5
+          )
           response = client.auth_test
           if response["ok"]
             "Slack API connection healthy"
