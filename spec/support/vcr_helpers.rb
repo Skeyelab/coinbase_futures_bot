@@ -24,7 +24,7 @@ module VCRTestHelpers
     options = {
       record: :none,
       allow_playback_repeats: true,
-      match_requests_on: [:method, :uri]
+      match_requests_on: %i[method uri]
     }
     with_vcr_cassette(name, options, &block)
   end
@@ -33,7 +33,7 @@ module VCRTestHelpers
   def with_integration_vcr(name = nil, &block)
     options = {
       record: :new_episodes,
-      match_requests_on: [:method, :uri, :body],
+      match_requests_on: %i[method uri body],
       allow_playback_repeats: false
     }
     with_vcr_cassette(name, options, &block)
@@ -43,7 +43,7 @@ module VCRTestHelpers
   def with_api_vcr(name = nil, trim_responses: true, &block)
     options = {
       record: VCRHelpers.record_mode,
-      match_requests_on: [:method, :uri, :body]
+      match_requests_on: %i[method uri body]
     }
 
     # Note: before_record is not supported in newer VCR versions
@@ -124,11 +124,11 @@ module VCRHelpers
         reason = "unhealthy"
       end
 
-      if should_remove
-        File.delete(cassette_path)
-        removed_count += 1
-        Rails.logger.info "Removed #{reason} VCR cassette: #{cassette_path}"
-      end
+      next unless should_remove
+
+      File.delete(cassette_path)
+      removed_count += 1
+      Rails.logger.info "Removed #{reason} VCR cassette: #{cassette_path}"
     end
 
     Rails.logger.info "VCR cleanup complete: removed #{removed_count} cassettes"

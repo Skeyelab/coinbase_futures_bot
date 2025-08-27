@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+description: Always run standardrb --fix before committing Ruby code changes to ensure consistent formatting and style compliance
+---
+
+# StandardRB Code Formatting
+
+Always run `bin/standardrb --fix` before committing code changes to ensure consistent code formatting and style compliance.
+
+## When to run StandardRB
+- Before every commit that includes Ruby files (`.rb`)
+- After making changes to Ruby code
+- When working with Ruby files in any capacity
+
+## How to apply formatting
+```bash
+bin/standardrb --fix
+```
+
+## What StandardRB does
+- Enforces consistent Ruby style guidelines
+- Converts double quotes to single quotes where appropriate
+- Ensures proper indentation and spacing
+- Applies consistent formatting across the codebase
+- Helps maintain code quality and readability
+
+## Integration with commit process
+StandardRB formatting should be applied as part of the pre-commit workflow, ensuring all Ruby code meets the project's style standards before being committed.

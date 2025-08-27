@@ -16,31 +16,17 @@ module VCRHelpers
     #   interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, '<ISO8601_TIMESTAMP>')
     # end
 
-    # config.filter_sensitive_data('<UNIX_TIMESTAMP>') do |interaction|
-    #   interaction.response.body.gsub(/\b\d{10,13}\b/, '<UNIX_TIMESTAMP>')
-    # end
-
-    # Remove JWT token filtering from response bodies - this was causing test failures
+    # JWT tokens - disabled due to response body corruption issues
+    # TODO: Re-enable with more careful filtering that doesn't corrupt JSON responses
     # config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
-    #   interaction.response.body.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>")
+    #   interaction.request.headers["Authorization"]&.first&.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>") || ""
     # end
   end
 
-  # Trim large candle response bodies for faster tests
+  # Trim large response bodies for faster tests
   def self.setup_response_trimming(config)
     config.before_record do |interaction|
-      if interaction.request.uri.include?("/candles") && interaction.response.body
-        begin
-          parsed = JSON.parse(interaction.response.body)
-          if parsed.is_a?(Array) && parsed.length > 10
-            # Keep only first 5 and last 5 candles for testing
-            trimmed = parsed.first(5) + parsed.last(5)
-            interaction.response.body = trimmed.to_json
-          end
-        rescue JSON::ParserError
-          # Keep original if not valid JSON
-        end
-      end
+      VCRHelpers.trim_large_responses(interaction)
     end
   end
 

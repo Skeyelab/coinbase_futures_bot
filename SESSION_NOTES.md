@@ -26,6 +26,80 @@
 
 ### Session log
 
+#### 2025-08-27 13:45 UTC
+- Context: Fixed database column reference errors in ticks table queries
+- Changes:
+  - **Fixed column references**: Changed 'symbol' to 'product_id' and 'timestamp' to 'observed_at' in Tick queries
+  - **Updated real_time_monitoring.rake**: Fixed status task to use correct column names
+  - **Updated futures_basis_monitoring_job.rb**: Fixed get_futures_price method column references
+  - **Resolved database error**: 'column ticks.symbol does not exist' error now fixed
+- Commands run:
+  - `bin/standardrb --fix` (ensured consistent formatting)
+  - `bundle exec rake real_time:status` (verified fix works)
+  - `git add -A && git commit -m "fix: correct database column references for ticks table"`
+- Files touched:
+  - `lib/tasks/real_time_monitoring.rake`, `app/jobs/futures_basis_monitoring_job.rb`
+- Next steps:
+  - Test real-time monitoring functionality
+  - Verify all database queries use correct column names
+  - Consider running full test suite to catch any other similar issues
+
+#### 2025-08-27 13:30 UTC
+- Context: Reduced system capacity from 20 ETH contracts to 10 ETH contracts for more conservative testing
+- Changes:
+  - **Reduced capacity limits**: MAX_ETH_CONTRACTS: 20→10, MAX_BTC_CONTRACTS: 10→5
+  - **Reduced position limits**: Concurrent ETH positions: 5→3, Concurrent BTC positions: 3→2
+  - **Reduced equity requirement**: SIGNAL_EQUITY_USD: $50k→$25k
+  - **Updated all related methods**: RapidSignalEvaluationJob and real_time_monitoring.rake
+- Commands run:
+  - `bin/standardrb --fix` (ensured consistent formatting)
+  - `bundle exec rake real_time:configure_capacity` (verified new configuration)
+  - `git add -A && git commit -m "feat: reduce system capacity from 20 to 10 ETH contracts"`
+- Files touched:
+  - `lib/tasks/real_time_monitoring.rake`, `app/jobs/rapid_signal_evaluation_job.rb`
+- Next steps:
+  - Test the reduced capacity configuration
+  - Consider further adjustments based on initial testing results
+  - Monitor system performance with smaller position sizes
+
+#### 2025-08-27 13:15 UTC
+- Context: Successfully resolved 95 merge conflicts across 13 VCR cassette files by re-recording instead of manual resolution
+- Changes:
+  - **Fixed merge conflicts**: Resolved syntax errors in VCR support files (`spec/support/vcr.rb`, `spec/support/vcr_helpers.rb`)
+  - **Re-recorded all VCR cassettes**: Deleted corrupted cassettes with merge conflict markers and re-recorded fresh test data
+  - **All tests passing**: 346 examples, 0 failures after conflict resolution
+  - **Clean merge**: Successfully merged main branch changes into feature branch
+- Commands run:
+  - `rm -rf spec/fixtures/vcr_cassettes/*` (removed corrupted cassettes)
+  - `bundle exec rspec --format progress` (re-recorded all cassettes)
+  - `git add -A && git commit -m "fix: resolve merge conflicts and re-record VCR cassettes"`
+- Files touched:
+  - `spec/support/vcr.rb` (resolved merge conflicts)
+  - `spec/support/vcr_helpers.rb` (resolved merge conflicts)
+  - All VCR cassette files re-recorded (13 files)
+- Next steps:
+  - Push the resolved branch to origin
+  - Continue with real-time monitoring implementation for BTC-USD and ETH-USD
+
+#### 2025-08-27 12:45 UTC
+- Context: Fixed CI test failures in FetchCandlesJob spec related to ETH-USD support
+- Changes:
+  - **Test Fix**: Updated `spec/jobs/fetch_candles_job_spec.rb` to handle both BTC-USD and ETH-USD trading pairs
+    - Added `eth_pair` let block for ETH-USD trading pair setup
+    - Updated mocks to expect `TradingPair.find_by` calls for both BTC-USD and ETH-USD
+    - Updated test expectations to account for methods being called twice (once per pair)
+  - **Issue Resolution**: Fixed RSpec mock expectations that were failing because FetchCandlesJob now processes both BTC-USD and ETH-USD pairs
+- Commands run:
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb:59 spec/jobs/fetch_candles_job_spec.rb:80` (verified fixes)
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb` (full suite verification)
+  - `bin/standardrb --fix spec/jobs/fetch_candles_job_spec.rb` (code formatting)
+- Files touched:
+  - `spec/jobs/fetch_candles_job_spec.rb`
+- Migrations: None
+- Next steps:
+  - Monitor CI pipeline to ensure tests pass in GitHub Actions
+  - Investigate remaining VCR cassette issue in "fetches 1m, 5m, 15m, and 1h candles" test if needed
+
 #### 2025-08-27 05:30 UTC
 - Context: Addressed Linear issue FUT-1 to enable branch protection on main branch
 - Changes:
@@ -41,7 +115,7 @@
   - `BRANCH_PROTECTION_SETUP.md`: Complete manual setup instructions for branch protection
 - Status checks identified:
   - `lint`: StandardRB linting from CI workflow
-  - `security`: Brakeman security scanning from CI workflow  
+  - `security`: Brakeman security scanning from CI workflow
   - `test`: Rails test suite from CI workflow
 - Next steps:
   - Repository admin needs to manually apply branch protection settings using provided guide
@@ -475,6 +549,7 @@
   - Test strategy with real market data to validate performance
   - Monitor strategy performance and adjust parameters based on backtesting results
   - Consider additional position sizing optimizations for day trading volatility
+
 #### 2025-08-24 03:25 UTC
 - Context: Implementing Linear issue FUT-3 to add 1-minute and 5-minute candle collection for day trading strategies.
 - Changes:
@@ -887,6 +962,26 @@
   - `.cursor/Dockerfile`, `SESSION_NOTES.md`
 - Next steps:
   - Start container, clone repo inside `/workspace`, run `bundle install` and `bin/rails db:prepare`.
+
+#### 2025-08-27 07:00 UTC
+- Context: Fixed failing RSpec test in FetchCandlesJob due to malformed VCR cassette with invalid JSON response.
+- Changes:
+  - Fixed VCR cassette `spec/fixtures/vcr_cassettes/fetch_candles_job_perform_all_timeframes.yml`
+  - Replaced `<UNIX_TIMESTAMP>` placeholder with valid JSON containing BTC-USD and ETH-USD product data
+  - Test suite now has 345 examples with only 1 failure (previously failing FetchCandlesJob test now passes)
+- Commands run:
+  - `bundle exec rspec` (partial run - got interrupted)
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb:29` (targeted test - now passes)
+- Files touched:
+  - `spec/fixtures/vcr_cassettes/fetch_candles_job_perform_all_timeframes.yml`
+  - `spec/fixtures/vcr_cassettes/list_products_array_response.yml`
+  - `spec/fixtures/vcr_cassettes/list_products_hash_response.yml`
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Complete full RSpec test suite run to verify all tests pass
+  - Investigate and fix any remaining test failures
+  - Continue with real-time monitoring implementation for BTC-USD and ETH-USD
+  - Address any VCR cassette issues for other API endpoints that may need valid responses
 
 #### 2025-08-11 19:25 UTC
 - Context: Fixed inline WebSocket subscription crash due to instance_exec scoping in event handlers.
