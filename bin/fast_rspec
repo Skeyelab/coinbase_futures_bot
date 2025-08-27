@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # Fast RSpec runner
 
-require "bundler/setup"
+require 'bundler/setup'
 
 # Regular RSpec execution
-exec "bundle", "exec", "rspec", "spec/"
+exec 'bundle', 'exec', 'rspec', 'spec/'

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # Super-fast RSpec runner
 
-require "bundler/setup"
+require 'bundler/setup'
 
 # Regular RSpec execution with fail-fast option
-exec "bundle", "exec", "rspec", "--fail-fast", "spec/"
+exec 'bundle', 'exec', 'rspec', '--fail-fast', 'spec/'
