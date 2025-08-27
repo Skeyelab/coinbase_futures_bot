@@ -50,10 +50,9 @@ class RealTimeMonitoringJob < ApplicationJob
   def create_tick_record(product_id, price, timestamp)
     # Store recent ticks for rapid analysis
     Tick.create!(
-      symbol: product_id,
+      product_id: product_id,
       price: price,
-      timestamp: parse_timestamp(timestamp),
-      volume: 0 # Volume not provided in ticker feed
+      observed_at: parse_timestamp(timestamp)
     )
   rescue => e
     @logger.warn("[RTM] Failed to store tick for #{product_id}: #{e.message}")

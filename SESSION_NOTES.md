@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-08-27 13:45 UTC
+- Context: Fixed database column reference errors in ticks table queries
+- Changes:
+  - **Fixed column references**: Changed 'symbol' to 'product_id' and 'timestamp' to 'observed_at' in Tick queries
+  - **Updated real_time_monitoring.rake**: Fixed status task to use correct column names
+  - **Updated futures_basis_monitoring_job.rb**: Fixed get_futures_price method column references
+  - **Resolved database error**: 'column ticks.symbol does not exist' error now fixed
+- Commands run:
+  - `bin/standardrb --fix` (ensured consistent formatting)
+  - `bundle exec rake real_time:status` (verified fix works)
+  - `git add -A && git commit -m "fix: correct database column references for ticks table"`
+- Files touched:
+  - `lib/tasks/real_time_monitoring.rake`, `app/jobs/futures_basis_monitoring_job.rb`
+- Next steps:
+  - Test real-time monitoring functionality
+  - Verify all database queries use correct column names
+  - Consider running full test suite to catch any other similar issues
+
 #### 2025-08-27 13:30 UTC
 - Context: Reduced system capacity from 20 ETH contracts to 10 ETH contracts for more conservative testing
 - Changes:
