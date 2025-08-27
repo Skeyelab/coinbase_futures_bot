@@ -2,68 +2,60 @@
 
 class SlackController < ApplicationController
   # Disable CSRF protection for webhook endpoints
-  skip_before_action :verify_authenticity_token, only: [:commands, :events]
+  skip_before_action :verify_authenticity_token, only: %i[commands events]
 
   # Handle Slack slash commands
   def commands
     # Verify request comes from Slack
-    unless verify_slack_request(request)
-      render json: {error: "Unauthorized"}, status: :unauthorized and return
-    end
+    render json: { error: 'Unauthorized' }, status: :unauthorized and return unless verify_slack_request(request)
 
     # Handle URL verification challenge
-    if params[:type] == "url_verification"
-      render json: {challenge: params[:challenge]} and return
-    end
+    render json: { challenge: params[:challenge] } and return if params[:type] == 'url_verification'
 
     # Process command
     response = SlackCommandHandler.handle_command(slack_command_params)
 
     render json: response
-  rescue => e
+  rescue StandardError => e
     Rails.logger.error("[SlackController] Error handling command: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
 
     render json: {
-      text: "❌ Error processing command. Please try again.",
-      response_type: "ephemeral"
+      text: '❌ Error processing command. Please try again.',
+      response_type: 'ephemeral'
     }
   end
 
   # Handle Slack Events API (for interactive components, etc.)
   def events
     # Verify request comes from Slack
-    unless verify_slack_request(request)
-      render json: {error: "Unauthorized"}, status: :unauthorized and return
-    end
+    render json: { error: 'Unauthorized' }, status: :unauthorized and return unless verify_slack_request(request)
 
     # Handle URL verification challenge
-    if params[:type] == "url_verification"
-      render json: {challenge: params[:challenge]} and return
-    end
+    render json: { challenge: params[:challenge] } and return if params[:type] == 'url_verification'
 
     # Handle other event types if needed
     case params[:type]
-    when "event_callback"
+    when 'event_callback'
       handle_event_callback
     else
       Rails.logger.info("[SlackController] Unhandled event type: #{params[:type]}")
     end
 
-    render json: {ok: true}
-  rescue => e
+    render json: { ok: true }
+  rescue StandardError => e
     Rails.logger.error("[SlackController] Error handling event: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
 
-    render json: {ok: false}
+    render json: { ok: false }
   end
 
   # Health check endpoint specifically for Slack integration
   def health
     health_status = {
-      slack_enabled: ENV["SLACK_ENABLED"]&.downcase == "true",
-      bot_token_configured: ENV["SLACK_BOT_TOKEN"].present?,
-      signing_secret_configured: ENV["SLACK_SIGNING_SECRET"].present?,
+      slack_enabled: ENV['SLACK_ENABLED']&.downcase == 'true',
+      bot_token_configured: ENV['SLACK_BOT_TOKEN'].present?,
+      signing_secret_configured: ENV['SLACK_SIGNING_SECRET'].present?,
       timestamp: Time.current.iso8601
     }
 
@@ -71,21 +63,21 @@ class SlackController < ApplicationController
       # Test Slack API connection
       begin
         client = Slack::Web::Client.new(
-          token: ENV["SLACK_BOT_TOKEN"],
+          token: ENV['SLACK_BOT_TOKEN'],
           timeout: 10,
           open_timeout: 5
         )
         auth_test = client.auth_test
         health_status[:api_connection] = true
-        health_status[:bot_user_id] = auth_test["user_id"]
-        health_status[:team_name] = auth_test["team"]
-      rescue => e
+        health_status[:bot_user_id] = auth_test['user_id']
+        health_status[:team_name] = auth_test['team']
+      rescue StandardError => e
         health_status[:api_connection] = false
         health_status[:api_error] = e.message
       end
     else
       health_status[:api_connection] = false
-      health_status[:api_error] = "Slack not properly configured"
+      health_status[:api_error] = 'Slack not properly configured'
     end
 
     status_code = health_status[:api_connection] ? :ok : :service_unavailable
@@ -111,16 +103,16 @@ class SlackController < ApplicationController
   end
 
   def verify_slack_request(request)
-    return true unless ENV["SLACK_SIGNING_SECRET"].present?
+    return true unless ENV['SLACK_SIGNING_SECRET'].present?
 
     begin
-      slack_signing_secret = ENV["SLACK_SIGNING_SECRET"]
-      timestamp = request.headers["X-Slack-Request-Timestamp"]
-      signature = request.headers["X-Slack-Signature"]
+      slack_signing_secret = ENV['SLACK_SIGNING_SECRET']
+      timestamp = request.headers['X-Slack-Request-Timestamp']
+      signature = request.headers['X-Slack-Signature']
 
       # Check if request is too old (replay attack protection)
       if Time.current.to_i - timestamp.to_i > 300 # 5 minutes
-        Rails.logger.warn("[SlackController] Request timestamp too old")
+        Rails.logger.warn('[SlackController] Request timestamp too old')
         return false
       end
 
@@ -131,11 +123,11 @@ class SlackController < ApplicationController
       sig_basestring = "v0:#{timestamp}:#{body}"
 
       # Calculate expected signature
-      expected_signature = "v0=" + OpenSSL::HMAC.hexdigest("SHA256", slack_signing_secret, sig_basestring)
+      expected_signature = 'v0=' + OpenSSL::HMAC.hexdigest('SHA256', slack_signing_secret, sig_basestring)
 
       # Compare signatures
       ActiveSupport::SecurityUtils.secure_compare(expected_signature, signature)
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackController] Error verifying Slack request: #{e.message}")
       false
     end
@@ -145,10 +137,10 @@ class SlackController < ApplicationController
     event = params[:event]
 
     case event[:type]
-    when "message"
+    when 'message'
       # Handle direct messages to the bot if needed
-      handle_direct_message(event) if event[:channel_type] == "im"
-    when "app_mention"
+      handle_direct_message(event) if event[:channel_type] == 'im'
+    when 'app_mention'
       # Handle @bot mentions
       handle_app_mention(event)
     else
@@ -162,7 +154,7 @@ class SlackController < ApplicationController
 
     begin
       client = Slack::Web::Client.new(
-        token: ENV["SLACK_BOT_TOKEN"],
+        token: ENV['SLACK_BOT_TOKEN'],
         timeout: 10,
         open_timeout: 5
       )
@@ -171,7 +163,7 @@ class SlackController < ApplicationController
         text: "👋 Hi! I'm the Coinbase Futures Trading Bot. Use slash commands like `/bot-status` or `/bot-help` to interact with me.",
         as_user: true
       )
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackController] Error responding to DM: #{e.message}")
     end
   end
@@ -182,21 +174,21 @@ class SlackController < ApplicationController
 
     text = event[:text].to_s.downcase
 
-    response_text = if text.include?("help")
-      "Hi! 👋 Use these slash commands to interact with me:\n" \
-                      "• `/bot-status` - Bot status\n" \
-                      "• `/bot-positions` - Current positions\n" \
-                      "• `/bot-pnl` - PnL report\n" \
-                      "• `/bot-help` - Full command list"
-    elsif text.include?("status")
-      "Use `/bot-status` to get the current bot status with detailed information."
-    else
-      "I'm here! Use `/bot-help` to see all available commands."
-    end
+    response_text = if text.include?('help')
+                      "Hi! 👋 Use these slash commands to interact with me:\n" \
+                                      "• `/bot-status` - Bot status\n" \
+                                      "• `/bot-positions` - Current positions\n" \
+                                      "• `/bot-pnl` - PnL report\n" \
+                                      '• `/bot-help` - Full command list'
+                    elsif text.include?('status')
+                      'Use `/bot-status` to get the current bot status with detailed information.'
+                    else
+                      "I'm here! Use `/bot-help` to see all available commands."
+                    end
 
     begin
       client = Slack::Web::Client.new(
-        token: ENV["SLACK_BOT_TOKEN"],
+        token: ENV['SLACK_BOT_TOKEN'],
         timeout: 10,
         open_timeout: 5
       )
@@ -205,7 +197,7 @@ class SlackController < ApplicationController
         text: response_text,
         thread_ts: event[:ts] # Reply in thread
       )
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackController] Error responding to mention: #{e.message}")
     end
   end
