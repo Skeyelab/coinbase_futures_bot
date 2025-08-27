@@ -15,9 +15,10 @@ RSpec.describe MarketData::CoinbaseFuturesSubscriber, type: :service do
   it "logs ticker messages" do
     io = StringIO.new
     logger = build_logger(io)
-    service = described_class.new(product_ids: "BTC-USD-PERP", logger: logger)
+    service = described_class.new(product_ids: "BTC-USD", logger: logger)
 
-    message = OpenStruct.new(data: {type: "ticker", product_id: "BTC-USD-PERP", price: "123.45", time: "2024-01-01T00:00:00Z"}.to_json)
+    message = OpenStruct.new(data: {type: "ticker", product_id: "BTC-USD", price: "123.45",
+                                    time: "2024-01-01T00:00:00Z"}.to_json)
     service.send(:handle_message, message)
 
     io.rewind
@@ -49,7 +50,7 @@ RSpec.describe MarketData::CoinbaseFuturesSubscriber, type: :service do
   it "ignores non-json messages" do
     io = StringIO.new
     logger = build_logger(io)
-    service = described_class.new(product_ids: "BTC-USD-PERP", logger: logger)
+    service = described_class.new(product_ids: "BTC-USD", logger: logger)
 
     message = OpenStruct.new(data: "not json")
     service.send(:handle_message, message)

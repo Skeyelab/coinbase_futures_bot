@@ -24,7 +24,7 @@ module Strategy
       slippage: 0.0002,
       risk_fraction: 0.005,
       # Futures-specific settings
-      contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD-PERP)
+      contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD)
       max_position_size: 5, # Maximum contracts to open
       min_position_size: 1 # Minimum contracts to open
     }.freeze
@@ -37,7 +37,7 @@ module Strategy
     # Returns:
     #   { side:, price:, quantity:, tp:, sl:, confidence: } or nil
     def signal(symbol:, equity_usd: 10_000.0)
-      # Support both perpetual and current month contracts
+      # Support current month contracts only
       # For current month contracts, use the symbol directly
       # For asset symbols (BTC, ETH), find the current month contract
       @current_symbol = resolve_trading_symbol(symbol)

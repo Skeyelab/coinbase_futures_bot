@@ -50,6 +50,7 @@ module Sentiment
           results.concat(normalized) if normalized.any?
         end
         break unless body["next"]
+
         page += 1
       end
       results
@@ -98,12 +99,12 @@ module Sentiment
     end
 
     def map_currencies_to_symbols(codes)
-      Array(codes).map do |code|
+      Array(codes).filter_map do |code|
         case code
-        when "BTC" then "BTC-USD-PERP"
-        when "ETH" then "ETH-USD-PERP"
+        when "BTC" then "BTC-USD"
+        when "ETH" then "ETH-USD"
         end
-      end.compact.uniq
+      end.uniq
     end
   end
 end

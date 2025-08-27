@@ -16,7 +16,7 @@ RSpec.describe Sentiment::CryptoPanicClient, type: :service do
     results = client.send(:normalize_item, item)
     expect(results.size).to eq(1)
     r = results.first
-    expect(r[:symbol]).to eq("BTC-USD-PERP")
+    expect(r[:symbol]).to eq("BTC-USD")
     expect(r[:source]).to eq("cryptopanic")
     expect(r[:url]).to eq("https://example.com/etf")
     expect(r[:title]).to include("ETF")

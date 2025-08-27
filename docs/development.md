@@ -172,7 +172,7 @@ GoodJob::Job.where.not(error: nil).delete_all
 #### Market Data Commands
 ```bash
 # Subscribe to market data
-bin/rake market_data:subscribe[BTC-USD-PERP]
+bin/rake market_data:subscribe[BTC-USD]
 
 # Backfill candle data
 bin/rake market_data:backfill_candles[7]
@@ -320,7 +320,7 @@ end
 **Parallel Execution Options:**
 ```bash
 # Standard parallel execution (12 processes)
-bundle exec parallel_rspec spec/
+bundle exec rspec spec/
 
 # Optimized execution (6 processes, runtime-based grouping)
 bin/fast_rspec
@@ -492,7 +492,7 @@ end
 # db/seeds.rb
 TradingPair.create!([
   {
-    product_id: 'BTC-USD-PERP',
+    product_id: 'BTC-USD',
     base_currency: 'BTC',
     quote_currency: 'USD',
     enabled: true
@@ -508,12 +508,12 @@ TradingPair.create!([
 curl http://localhost:3000/up
 
 # Sentiment aggregates
-curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD-PERP&limit=5"
+curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 
 # Position management
 curl -X POST http://localhost:3000/positions \
   -H "Content-Type: application/json" \
-  -d '{"product_id": "BTC-USD-PERP"}'
+  -d '{"product_id": "BTC-USD"}'
 ```
 
 #### Postman Collections

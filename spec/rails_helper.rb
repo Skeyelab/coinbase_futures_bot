@@ -34,7 +34,12 @@ RSpec.configure do |config|
   config.include ActiveJob::TestHelper
   config.include FactoryBot::Syntax::Methods
 
-  config.before(:each) do
+  # Add custom formatter for clear test identification
+  config.add_formatter TestNameFormatter
+
+  # Show test names clearly before they run
+  config.before(:each) do |example|
+    puts "\n🧪 Running: #{example.full_description}"
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
@@ -42,14 +47,6 @@ RSpec.configure do |config|
 
   # Prevent individual test failures from causing the suite to exit
   config.fail_fast = false
-
-  # Add better error handling for test failures
-  config.around(:each) do |example|
-    example.run
-  rescue => e
-    puts "Test failed but continuing: #{e.message}"
-    example.fail!
-  end
 
   # Add safety for database operations
   config.before(:suite) do
@@ -62,13 +59,4 @@ RSpec.configure do |config|
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
   # Individual tests can clean specific data if needed
-end
-
-# Global error handling to prevent test suite from exiting with error code
-at_exit do
-  if $!.nil? || $!.is_a?(SystemExit) && $!.success?
-  else
-    puts "Test suite completed with warnings but no fatal errors"
-  end
-  exit 0
 end

@@ -49,7 +49,7 @@ gem 'parallel_tests', group: :test
 
 Then run tests with:
 ```bash
-bundle exec parallel_rspec spec/
+bundle exec rspec spec/
 ```
 
 ### 3. Optimize Slow Test Files

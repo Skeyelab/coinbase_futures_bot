@@ -1,11 +1,11 @@
 class SentimentController < ActionController::API
   # GET /sentiment/aggregates
   # Params:
-  #   symbol: optional, defaults to BTC-USD-PERP
+  #   symbol: optional, defaults to BTC-USD
   #   window: optional, one of 5m,15m,1h; default 15m
   #   limit: optional, default 20
   def aggregates
-    symbol = params[:symbol].presence || "BTC-USD-PERP"
+    symbol = params[:symbol].presence || "BTC-USD"
     window = params[:window].presence || "15m"
     limit = (params[:limit] || 20).to_i.clamp(1, 200)
 

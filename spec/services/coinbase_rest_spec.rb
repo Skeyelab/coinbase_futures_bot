@@ -6,8 +6,9 @@ require "json"
 RSpec.describe MarketData::CoinbaseRest, type: :service do
   let(:rest) { described_class.new }
   let(:product_id) { "BTC-USD" }
-  let(:start_time) { 1.day.ago }
-  let(:end_time) { Time.now.utc }
+  # Use fixed timestamps for VCR cassette matching
+  let(:start_time) { Time.parse("2025-08-26T00:00:00Z") }
+  let(:end_time) { Time.parse("2025-08-27T00:00:00Z") }
 
   before do
     @original_api_key = ENV["COINBASE_API_KEY"]

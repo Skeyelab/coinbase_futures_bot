@@ -13,7 +13,7 @@ class GenerateSignalsJob < ApplicationJob
       order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
       if order
         puts "[Signal] #{pair.product_id} side=#{order[:side]} price=#{order[:price].round(2)} qty=#{order[:quantity]} tp=#{order[:tp].round(2)} sl=#{order[:sl].round(2)} conf=#{order[:confidence]}%"
-        # TODO: hand off to a real executor once implemented for PERP
+        # TODO: hand off to a real executor once implemented for futures
       else
         puts "[Signal] #{pair.product_id} no-entry"
       end

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "webmock/rspec"
 
 RSpec.describe "CoinbasePositions Integration with Position Model" do
   let(:service) { Trading::CoinbasePositions.new }
@@ -19,13 +18,33 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
 
     # Mock the current market price for PnL calculations (close price of 51,000)
     allow_any_instance_of(Trading::CoinbasePositions).to receive(:get_current_market_price).and_return(51_000.0)
+
+    # Mock all HTTP requests to prevent real API calls
+    # Create mock response objects that have .body method returning JSON strings
+    mock_post_response = double("Response", body: {
+      "order_id" => "test-order-123",
+      "status" => "FILLED",
+      "success" => true
+    }.to_json)
+
+    mock_get_response = double("Response", body: {
+      "positions" => [
+        {
+          "product_id" => "BIT-29AUG25-CDE",
+          "side" => "LONG",
+          "size" => "1.0",
+          "number_of_contracts" => "1.0",
+          "entry_price" => "50000.0",
+          "unrealized_pnl" => "1000.0"
+        }
+      ]
+    }.to_json)
+
+    allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_post).and_return(mock_post_response)
+    allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_get).and_return(mock_get_response)
   end
 
   describe "position creation integration" do
-    before do
-      stub_coinbase_orders_api
-    end
-
     it "creates local Position record when opening a position" do
       expect do
         service.open_position(
@@ -71,11 +90,6 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
         status: "OPEN",
         day_trading: true
       )
-    end
-
-    before do
-      stub_coinbase_positions_api
-      stub_coinbase_orders_api
     end
 
     it "updates local Position record when closing a position" do
@@ -178,10 +192,6 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
   end
 
   describe "day trading specific behavior" do
-    before do
-      stub_coinbase_orders_api
-    end
-
     it "creates positions with day_trading flag set to true by default" do
       service.open_position(
         product_id: product_id,
@@ -206,42 +216,5 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
       position = Position.last
       expect(position.day_trading).to be false
     end
-  end
-
-  private
-
-  def stub_coinbase_orders_api
-    # Stub successful order placement
-    stub_request(:post, "https://api.coinbase.com/api/v3/brokerage/orders")
-      .to_return(
-        status: 200,
-        body: {
-          "order_id" => "test-order-123",
-          "status" => "FILLED",
-          "success" => true
-        }.to_json,
-        headers: {"Content-Type" => "application/json"}
-      )
-  end
-
-  def stub_coinbase_positions_api
-    # Stub positions endpoint with a position that can be closed
-    stub_request(:get, "https://api.coinbase.com/api/v3/brokerage/cfm/positions")
-      .to_return(
-        status: 200,
-        body: {
-          "positions" => [
-            {
-              "product_id" => product_id,
-              "side" => "LONG",
-              "size" => "1.0",
-              "number_of_contracts" => "1.0",
-              "entry_price" => "50000.0",
-              "unrealized_pnl" => "1000.0"
-            }
-          ]
-        }.to_json,
-        headers: {"Content-Type" => "application/json"}
-      )
   end
 end

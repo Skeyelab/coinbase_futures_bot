@@ -92,11 +92,9 @@ end
 ```ruby
 def perform(product_ids)
   product_ids = Array(product_ids)
-  if product_ids.any? { |p| p.end_with?("-PERP") }
-    MarketData::CoinbaseFuturesSubscriber.new(product_ids: product_ids).start
-  else
-    MarketData::CoinbaseSpotSubscriber.new(product_ids: product_ids).start
-  end
+  # No need to check for PERP suffix since we don't support perpetual contracts
+  MarketData::CoinbaseFuturesSubscriber.new(product_ids: product_ids).start
+  MarketData::CoinbaseSpotSubscriber.new(product_ids: product_ids).start
 end
 ```
 
@@ -127,7 +125,7 @@ end
 
 **Data Processing**:
 - Deduplication via `raw_text_hash`
-- Symbol mapping (BTC → BTC-USD-PERP)
+- Symbol mapping (BTC → BTC-USD)
 - Metadata extraction from news articles
 
 #### ScoreSentimentJob
@@ -484,7 +482,7 @@ PaperTradingJob.perform_now
 
 # Schedule jobs for later
 FetchCandlesJob.perform_later(backfill_days: 30)
-MarketDataSubscribeJob.perform_later(["BTC-USD-PERP"])
+MarketDataSubscribeJob.perform_later(["BTC-USD"])
 ```
 
 ### Rake Tasks
@@ -495,8 +493,8 @@ bin/rake market_data:backfill_candles[7]
 bin/rake market_data:backfill_1h_candles[30]
 
 # Market data subscription
-bin/rake market_data:subscribe[BTC-USD-PERP]
-PRODUCT_IDS=BTC-USD-PERP,ETH-USD-PERP bin/rake market_data:subscribe
+bin/rake market_data:subscribe[BTC-USD]
+PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
 
 # Paper trading
 bin/rake paper:step

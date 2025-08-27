@@ -133,7 +133,7 @@ SENTIMENT_ENABLE=true|false  # default: false
 SENTIMENT_Z_THRESHOLD=1.2    # default: 1.2
 
 # Sentiment processing settings
-SENTIMENT_SYMBOLS=BTC-USD-PERP,ETH-USD-PERP  # default symbols
+SENTIMENT_SYMBOLS=BTC-USD,ETH-USD  # default symbols
 ```
 
 #### Trading Features

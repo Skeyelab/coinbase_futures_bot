@@ -192,7 +192,7 @@ end
 This strategy serves as a framework for spot-to-futures arbitrage and sentiment-based trading:
 
 ```ruby
-def generate_signals(product_ids: ["BTC-USD-PERP", "ETH-USD-PERP"])
+def generate_signals(product_ids: ["BTC-USD", "ETH-USD"])
   signals = {}
   product_ids.each do |product_id|
     z_score = latest_sentiment_z(product_id, window: "15m")
@@ -748,10 +748,10 @@ end
 # Test strategy in console
 bin/rails console
 strategy = Strategy::MultiTimeframeSignal.new
-signal = strategy.signal(symbol: 'BTC-USD-PERP', equity_usd: 10_000)
+signal = strategy.signal(symbol: 'BTC-USD', equity_usd: 10_000)
 
 # Check data availability
-Candle.where(symbol: 'BTC-USD-PERP').group(:timeframe).count
+Candle.where(symbol: 'BTC-USD').group(:timeframe).count
 
 # Generate signals for all pairs
 GenerateSignalsJob.perform_now(equity_usd: 5_000)
