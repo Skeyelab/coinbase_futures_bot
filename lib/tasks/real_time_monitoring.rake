@@ -175,17 +175,17 @@ namespace :real_time do
     puts "✓ Test completed"
   end
 
-  desc "Configure real-time monitoring capacity for ~20 ETH contracts"
+  desc "Configure real-time monitoring capacity for ~10 ETH contracts"
   task configure_capacity: :environment do
-    puts "Configuring system for ~20 ETH contracts trading capacity..."
+    puts "Configuring system for ~10 ETH contracts trading capacity..."
 
     # Update environment configuration
     capacity_config = {
-      "SIGNAL_EQUITY_USD" => "50000",           # $50k equity for ~20 ETH contracts
-      "MAX_ETH_CONTRACTS" => "20",              # Target ETH capacity
-      "MAX_BTC_CONTRACTS" => "10",              # Equivalent BTC capacity
-      "MAX_CONCURRENT_ETH_POSITIONS" => "5",    # Max concurrent ETH positions
-      "MAX_CONCURRENT_BTC_POSITIONS" => "3",    # Max concurrent BTC positions
+      "SIGNAL_EQUITY_USD" => "25000",           # $25k equity for ~10 ETH contracts
+      "MAX_ETH_CONTRACTS" => "10",              # Target ETH capacity (reduced from 20)
+      "MAX_BTC_CONTRACTS" => "5",               # Equivalent BTC capacity (reduced from 10)
+      "MAX_CONCURRENT_ETH_POSITIONS" => "3",    # Max concurrent ETH positions (reduced from 5)
+      "MAX_CONCURRENT_BTC_POSITIONS" => "2",    # Max concurrent BTC positions (reduced from 3)
       "BASIS_ARBITRAGE_THRESHOLD_BPS" => "50",  # 50 bps arbitrage threshold
       "BASIS_EXTREME_THRESHOLD_BPS" => "200",   # 200 bps extreme basis threshold
       "MAX_ARBITRAGE_POSITIONS" => "2"          # Max arbitrage positions
@@ -209,6 +209,6 @@ namespace :real_time do
 
     max_risk = equity * risk_fraction
     contracts_per_trade = (max_risk / (eth_price * 0.003)).floor # 30 bps stop loss
-    [contracts_per_trade * 5, 20].min # 5 concurrent positions, max 20
+    [contracts_per_trade * 3, 10].min # 3 concurrent positions, max 10 (reduced from 5 and 20)
   end
 end

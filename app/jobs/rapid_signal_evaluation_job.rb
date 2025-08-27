@@ -124,16 +124,16 @@ class RapidSignalEvaluationJob < ApplicationJob
 
   def max_contracts_for_asset(asset)
     case asset
-    when "BTC" then 10     # Max 10 BTC contracts
-    when "ETH" then 20     # Max 20 ETH contracts (target capacity)
+    when "BTC" then 5      # Max 5 BTC contracts (reduced from 10)
+    when "ETH" then 10     # Max 10 ETH contracts (reduced from 20)
     else 5
     end
   end
 
   def max_concurrent_positions_for_asset(asset)
     case asset
-    when "BTC" then 3      # Max 3 concurrent BTC positions
-    when "ETH" then 5      # Max 5 concurrent ETH positions
+    when "BTC" then 2      # Max 2 concurrent BTC positions (reduced from 3)
+    when "ETH" then 3      # Max 3 concurrent ETH positions (reduced from 5)
     else 2
     end
   end
@@ -141,7 +141,7 @@ class RapidSignalEvaluationJob < ApplicationJob
   def sufficient_buying_power?(quantity)
     # Simple check - in production this would check actual account balance
     # For now, assume we have sufficient buying power if quantity is reasonable
-    quantity <= 20 # Max 20 contracts per signal
+    quantity <= 10 # Max 10 contracts per signal (reduced from 20)
   end
 
   def send_position_alert(action, contract_id, signal)
