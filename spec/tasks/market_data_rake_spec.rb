@@ -130,23 +130,22 @@ RSpec.describe "market_data rake tasks", type: :task do
     expect { Rake::Task["market_data:backfill_5m_candles"].invoke(1) }.not_to raise_error
   end
 
-  it "runs backfill_5m_candles with real API call" do
-    with_integration_vcr("rake_task_backfill_5m_candles") do
-      # Clear existing candles to avoid conflicts
-      Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
+  it "runs backfill_5m_candles with mocked service" do
+    # Mock the CoinbaseRest service to avoid real API calls
+    mock_rest = instance_double(MarketData::CoinbaseRest)
+    allow(mock_rest).to receive(:upsert_5m_candles)
+    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
 
-      # Run the actual rake task
-      expect do
-        Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-      end.not_to raise_error
+    # Clear existing candles to avoid conflicts
+    Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
 
-      # Verify that 5m candles were created
-      candles = Candle.where(timeframe: "5m", symbol: "BTC-USD")
-      if candles.any?
-        expect(candles.first.timeframe).to eq("5m")
-        expect(candles.first.symbol).to eq("BTC-USD")
-      end
-    end
+    # Run the actual rake task
+    expect do
+      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
+    end.not_to raise_error
+
+    # Verify that the mock was called
+    expect(mock_rest).to have_received(:upsert_5m_candles)
   end
 
   it "runs test_1h_candles and calls rest" do
