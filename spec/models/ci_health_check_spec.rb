@@ -19,10 +19,10 @@ RSpec.describe "CI Health Check", type: :model do
       size_increment: 0.001,
       status: "online"
     )
-    
+
     expect(test_pair).to be_persisted
     expect(TradingPair.find_by(product_id: "TEST-USD")).to eq(test_pair)
-    
+
     # Clean up
     test_pair.destroy
   end
