@@ -40,18 +40,14 @@ module MarketData
           subscriber.__send__(:mark_ws_as_closed)
         end
 
-        # Wait for connection with timeout
-        timeout = 10 # 10 seconds timeout
-        start_time = Time.current
+        # Keep the connection alive - don't exit the method
+        # The WebSocket will run in its own thread
+        @logger.info("[MD-Spot] WebSocket connection established, monitoring for messages...")
 
-        while @ws && (Time.current - start_time) < timeout
-          sleep 0.1
-        end
-
-        if @ws && (Time.current - start_time) >= timeout
-          @logger.error("[MD-Spot] Connection timeout after #{timeout} seconds")
-          @ws.close if @ws.respond_to?(:close) && @ws.open?
-          @ws = nil
+        # Simple keep-alive loop that doesn't block
+        loop do
+          break unless @ws&.open?
+          sleep 1
         end
       rescue => e
         @logger.error("[MD-Spot] Failed to establish WebSocket connection: #{e.message}")
@@ -67,7 +63,7 @@ module MarketData
     end
 
     def ws_connected?
-      @ws && @ws.ready_state == WebSocket::Client::Simple::STATE_OPEN
+      @ws&.open?
     end
 
     def subscribe
@@ -76,7 +72,7 @@ module MarketData
         channel: "ticker",
         product_ids: @product_ids
       }
-      @ws.send(msg.to_json)
+      @ws&.send(msg.to_json)
       @logger.info("[MD-Spot] subscribed: #{msg}")
     end
 

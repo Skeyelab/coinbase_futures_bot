@@ -73,10 +73,10 @@ namespace :real_time do
     # Start real-time monitoring job
     if ENV["INLINE"] == "1"
       puts "Starting inline real-time monitoring..."
-      RealTimeMonitoringJob.perform_now(product_ids: ["BTC-USD", "ETH-USD"])
+      RealTimeMonitoringJob.perform_now(product_ids: %w[BTC-USD ETH-USD])
     else
       puts "Enqueueing real-time monitoring job..."
-      RealTimeMonitoringJob.perform_later(product_ids: ["BTC-USD", "ETH-USD"])
+      RealTimeMonitoringJob.perform_later(product_ids: %w[BTC-USD ETH-USD])
       puts "✓ Real-time monitoring job enqueued"
     end
   end
@@ -153,22 +153,22 @@ namespace :real_time do
 
     # Create sample tick data
     sample_ticks = [
-      {symbol: "BTC-USD", price: 45000.00, timestamp: Time.current},
-      {symbol: "ETH-USD", price: 3200.00, timestamp: Time.current},
-      {symbol: "BTC-USD", price: 45050.00, timestamp: Time.current + 1.minute},
-      {symbol: "ETH-USD", price: 3210.00, timestamp: Time.current + 1.minute}
+      {product_id: "BTC-USD", price: 45_000.00, observed_at: Time.current},
+      {product_id: "ETH-USD", price: 3200.00, observed_at: Time.current},
+      {product_id: "BTC-USD", price: 45_050.00, observed_at: Time.current + 1.minute},
+      {product_id: "ETH-USD", price: 3210.00, observed_at: Time.current + 1.minute}
     ]
 
     sample_ticks.each do |tick_data|
-      Tick.create!(tick_data.merge(volume: 100))
-      puts "✓ Created sample tick: #{tick_data[:symbol]} at $#{tick_data[:price]}"
+      Tick.create!(tick_data)
+      puts "✓ Created sample tick: #{tick_data[:product_id]} at $#{tick_data[:price]}"
     end
 
     # Test rapid signal evaluation
     puts "\nTesting rapid signal evaluation..."
     RapidSignalEvaluationJob.perform_now(
       product_id: "BTC-USD",
-      current_price: 45050.00,
+      current_price: 45_050.00,
       asset: "BTC"
     )
 
