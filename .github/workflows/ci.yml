@@ -91,7 +91,12 @@ jobs:
           bin/rails db:create db:migrate db:test:prepare
 
       - name: Run tests
-        run: bundle exec rspec
+        timeout-minutes: 10
+        run: |
+          set -e  # Exit on any error
+          echo "Starting test suite..."
+          bundle exec rspec --verbose --format documentation --backtrace
+          echo "Test suite completed with exit code: $?"
         env:
           # Ensure VCR uses cached cassettes in CI
           VCR_RECORD_MODE: none
