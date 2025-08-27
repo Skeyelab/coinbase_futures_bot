@@ -754,6 +754,26 @@
 - Next steps:
   - Start container, clone repo inside `/workspace`, run `bundle install` and `bin/rails db:prepare`.
 
+#### 2025-08-27 07:00 UTC
+- Context: Fixed failing RSpec test in FetchCandlesJob due to malformed VCR cassette with invalid JSON response.
+- Changes:
+  - Fixed VCR cassette `spec/fixtures/vcr_cassettes/fetch_candles_job_perform_all_timeframes.yml`
+  - Replaced `<UNIX_TIMESTAMP>` placeholder with valid JSON containing BTC-USD and ETH-USD product data
+  - Test suite now has 345 examples with only 1 failure (previously failing FetchCandlesJob test now passes)
+- Commands run:
+  - `bundle exec rspec` (partial run - got interrupted)
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb:29` (targeted test - now passes)
+- Files touched:
+  - `spec/fixtures/vcr_cassettes/fetch_candles_job_perform_all_timeframes.yml`
+  - `spec/fixtures/vcr_cassettes/list_products_array_response.yml`
+  - `spec/fixtures/vcr_cassettes/list_products_hash_response.yml`
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Complete full RSpec test suite run to verify all tests pass
+  - Investigate and fix any remaining test failures
+  - Continue with real-time monitoring implementation for BTC-USD and ETH-USD
+  - Address any VCR cassette issues for other API endpoints that may need valid responses
+
 #### 2025-08-11 19:25 UTC
 - Context: Fixed inline WebSocket subscription crash due to instance_exec scoping in event handlers.
 - Changes:

@@ -1,0 +1,121 @@
+---
+http_interactions:
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Date:
+      - Wed, 27 Aug 2025 06:39:43 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - public, max-age=5, must-revalidate
+      Etag:
+      - W/"5704-2u5bZIPy0C/s7yeoAD84wB+DBfo"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - HIT
+      Age:
+      - '4'
+      Set-Cookie:
+      - __cf_bm=upbXghrQK5dQeeNB5kPzU717PDJeE2gR_xEITEyxXdE-1756276783-1.0.1.1-ko4Zxzf8TI5TSVxvjFJE0IrEA.5VC2i8RlkI0Lx3YQhDH66dS1nNxSJ_GlLnKkrbxJADOIV4zz7y2jnDt6OPfprN7NF.Gwdy1V5C0U8M.sY;
+        path=/; expires=Wed, 27-Aug-25 07:09:43 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=L15wCFCkYIB4Sat4PS%2FKDeTPQNuyyrrT5pSyom6nAm74XvDyqQfMEfZVpK4b%2BbrhpYM%2F974rTR9Obl%2FcgnXcmuotXjOUEKZb0kQdi0C8a8mUn0Kq36E9Im5lovS%2F0etR%2Fe9oZdNt9yCHHk4%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 975992c7ddc20046-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: |
+        {
+          "products": [
+            {
+              "id": "BTC-USD",
+              "base_currency": "BTC",
+              "quote_currency": "USD",
+              "base_min_size": "0.00000001",
+              "base_max_size": "1500",
+              "quote_increment": "0.01",
+              "base_increment": "0.00000001",
+              "display_name": "BTC/USD",
+              "min_market_funds": "1",
+              "max_market_funds": "10000000",
+              "margin_enabled": false,
+              "post_only": false,
+              "limit_only": false,
+              "cancel_only": false,
+              "trading_disabled": false,
+              "status": "online",
+              "status_message": "",
+              "auction_mode": false
+            },
+            {
+              "id": "ETH-USD",
+              "base_currency": "ETH",
+              "quote_currency": "USD",
+              "base_min_size": "0.00000001",
+              "base_max_size": "2400",
+              "quote_increment": "0.01",
+              "base_increment": "0.00000001",
+              "display_name": "ETH/USD",
+              "min_market_funds": "1",
+              "max_market_funds": "10000000",
+              "margin_enabled": false,
+              "post_only": false,
+              "limit_only": false,
+              "cancel_only": false,
+              "trading_disabled": false,
+              "status": "online",
+              "status_message": "",
+              "auction_mode": false
+            }
+          ]
+        }
+  recorded_at: Wed, 27 Aug 2025 06:39:43 GMT
+recorded_with: VCR 6.3.1

@@ -19,7 +19,7 @@ http_interactions:
       message: OK
     headers:
       Date:
-      - Wed, 27 Aug 2025 06:36:35 GMT
+      - Wed, 27 Aug 2025 06:39:43 GMT
       Content-Type:
       - application/json; charset=utf-8
       Transfer-Encoding:
@@ -39,7 +39,7 @@ http_interactions:
       Cache-Control:
       - public, max-age=5, must-revalidate
       Etag:
-      - W/"5739-th+lLj/adPcpYFnNEiDHT2/Huxc"
+      - W/"5704-2u5bZIPy0C/s7yeoAD84wB+DBfo"
       Strict-Transport-Security:
       - max-age=15552000; includeSubDomains
       X-Content-Type-Options:
@@ -55,13 +55,13 @@ http_interactions:
       Cf-Cache-Status:
       - HIT
       Age:
-      - '1'
+      - '4'
       Set-Cookie:
-      - __cf_bm=v35dMi88nFNUVGqPgUSCsAV.DnMXu6ierq74yuwcFAc-1756276595-1.0.1.1-Yb5iegMdTa_LAiC0.qZrsHyrkm0wESJanvh1cQTf7Q.2NHyKLMhVs7u2sjU7LfFeOa_uiabS0ZZT6ilmT.DCUqgDhiK2HiAc7ovlada4BgE;
-        path=/; expires=Wed, 27-Aug-25 07:06:35 GMT; domain=.exchange.coinbase.com;
+      - __cf_bm=wPyOouAKA6Dc25So3PV6AGuu_Zrf43FWF_vLlBcCNMw-1756276783-1.0.1.1-Dqj35.7DjtA3FlyiNlp.HfefHwW.2oTqOhddUB9laS6TWkxxH1X6VPggPlyeC0_aOpnnYgnHInH5ErMwPYZZQTk_RmCQnUIoFaXOGgpZQOw;
+        path=/; expires=Wed, 27-Aug-25 07:09:43 GMT; domain=.exchange.coinbase.com;
         HttpOnly; Secure; SameSite=None
       Report-To:
-      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=c6FpMt2DUmQa2PAO3YNTGTOE7ikJbdb7YxY%2FSixOBPyNBjbu8XiTN2y7q3idApnqkf1Ptx%2FekEmZMbxWUYHt%2BOtzxVmvDGdK%2Fbfvif3vUl2H%2FHHcvaKTyLA44UTaZRJugKs%2FIn5Uxz1zC%2F0%3D"}],"group":"cf-nel","max_age":604800}'
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=m6EzPN7lTqo0QtXfvzuHMa3t3JWp5p9mL3XXZSsy%2BWJQU0cn%2BhfOF%2BBrN6brBxX2XmvDwQr7yOLJR97s75woa4J6drJHrGb8Rn%2B1NOHcjwi7vweFY0J2Ya0T9qj2oGSWC8G%2FA9rsGm5Mddw%3D"}],"group":"cf-nel","max_age":604800}'
       Nel:
       - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
       Vary:
@@ -69,7 +69,7 @@ http_interactions:
       Server:
       - cloudflare
       Cf-Ray:
-      - 97598e2e19b722f7-ORD
+      - 975992c62c35eacc-ORD
     body:
       encoding: ASCII-8BIT
       string: |
@@ -115,5 +115,5 @@ http_interactions:
             "auction_mode": false
           }
         ]
-  recorded_at: Wed, 27 Aug 2025 06:36:35 GMT
+  recorded_at: Wed, 27 Aug 2025 06:39:43 GMT
 recorded_with: VCR 6.3.1
