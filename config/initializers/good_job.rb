@@ -59,6 +59,5 @@ Rails.application.configure do
       cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
       class: "HealthCheckJob"
     }
-    }
   }
 end

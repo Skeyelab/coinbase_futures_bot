@@ -618,7 +618,7 @@ class SlackCommandHandler
       # Get memory usage information
       if File.readable?("/proc/meminfo")
         meminfo = File.read("/proc/meminfo")
-        if match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/)
+        if (match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/))
           available_kb = match[1].to_i
           available_mb = available_kb / 1024
           "#{available_mb} MB available"
