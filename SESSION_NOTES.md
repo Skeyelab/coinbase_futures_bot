@@ -26,6 +26,25 @@
 
 ### Session log
 
+#### 2025-08-27 12:45 UTC
+- Context: Fixed CI test failures in FetchCandlesJob spec related to ETH-USD support
+- Changes:
+  - **Test Fix**: Updated `spec/jobs/fetch_candles_job_spec.rb` to handle both BTC-USD and ETH-USD trading pairs
+    - Added `eth_pair` let block for ETH-USD trading pair setup
+    - Updated mocks to expect `TradingPair.find_by` calls for both BTC-USD and ETH-USD
+    - Updated test expectations to account for methods being called twice (once per pair)
+  - **Issue Resolution**: Fixed RSpec mock expectations that were failing because FetchCandlesJob now processes both BTC-USD and ETH-USD pairs
+- Commands run:
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb:59 spec/jobs/fetch_candles_job_spec.rb:80` (verified fixes)
+  - `bundle exec rspec spec/jobs/fetch_candles_job_spec.rb` (full suite verification)
+  - `bin/standardrb --fix spec/jobs/fetch_candles_job_spec.rb` (code formatting)
+- Files touched:
+  - `spec/jobs/fetch_candles_job_spec.rb`
+- Migrations: None
+- Next steps:
+  - Monitor CI pipeline to ensure tests pass in GitHub Actions
+  - Investigate remaining VCR cassette issue in "fetches 1m, 5m, 15m, and 1h candles" test if needed
+
 #### 2025-08-25 06:30 UTC
 - Context: Successfully completed comprehensive VCR improvements to resolve Linear issue FUT-12
 - Changes:
