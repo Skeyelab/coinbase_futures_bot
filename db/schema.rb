@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_27_033727) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -181,6 +181,26 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_24_191313) do
     t.index ["source", "raw_text_hash"], name: "index_sentiment_events_on_source_and_raw_text_hash", unique: true
     t.index ["symbol"], name: "index_sentiment_events_on_symbol"
     t.index ["url"], name: "index_sentiment_events_on_url"
+  end
+
+  create_table "signal_alerts", force: :cascade do |t|
+    t.string "symbol"
+    t.string "side"
+    t.string "signal_type"
+    t.string "strategy_name"
+    t.decimal "confidence"
+    t.decimal "entry_price"
+    t.decimal "stop_loss"
+    t.decimal "take_profit"
+    t.integer "quantity"
+    t.string "timeframe"
+    t.string "alert_status"
+    t.datetime "alert_timestamp"
+    t.datetime "expires_at"
+    t.jsonb "metadata"
+    t.jsonb "strategy_data"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "ticks", force: :cascade do |t|

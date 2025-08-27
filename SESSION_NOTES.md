@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-01-27 16:45 UTC
+- Context: Fixed GoodJob dashboard routing errors for multiple job actions (POST vs PUT method mismatch)
+- Changes:
+  - **Added POST route workarounds** for GoodJob dashboard actions that expect PUT but send POST requests
+  - **Routes added**: `force_discard`, `discard`, `reschedule`, `retry`, `mass_update` as POST endpoints that delegate to GoodJob controller
+  - **Root cause**: GoodJob dashboard forms use method="post" but Rails routes expect PUT for these actions
+  - **Solution**: Added duplicate POST routes that point to same controller actions, avoiding complex CSRF configuration
+  - **Fixed middleware error**: Removed faulty CSRF initializer that was causing Rails startup failures
+- Commands run:
+  - `bin/rails routes | grep -E "(mass_update|force_discard)"` (verified route availability)
+  - `bin/rails restart` (applied route changes)
+  - `rm config/initializers/good_job_csrf.rb` (removed faulty middleware)
+- Files touched:
+  - `config/routes.rb` (added POST route workarounds for GoodJob actions)
+- Next steps:
+  - Test GoodJob dashboard functionality for all job management actions
+  - Monitor for other similar POST vs PUT routing issues
+
 #### 2025-08-27 03:45 UTC
 - Context: Fixed CI test failures that were causing GitHub Actions to fail with exit code 1
 - Changes:
