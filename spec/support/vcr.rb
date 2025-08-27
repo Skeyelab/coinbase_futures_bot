@@ -60,6 +60,23 @@ module VCRHelpers
     base_name = "#{test_class.name.gsub("::", "_")}/#{test_method}"
     variant ? "#{base_name}/#{variant}" : base_name
   end
+
+  # Custom request matcher that ignores timestamp parameters
+  def self.uri_without_timestamps(uri)
+    return uri unless uri.is_a?(String)
+
+    # Parse the URI and remove timestamp-related query parameters
+    parsed_uri = URI.parse(uri)
+    return uri unless parsed_uri.query
+
+    params = URI.decode_www_form(parsed_uri.query)
+    filtered_params = params.reject do |key, _value|
+      key.downcase.include?("start") || key.downcase.include?("end") || key.downcase.include?("time")
+    end
+
+    parsed_uri.query = URI.encode_www_form(filtered_params) unless filtered_params.empty?
+    parsed_uri.to_s
+  end
 end
 
 VCR.configure do |config|
@@ -111,10 +128,15 @@ VCR.configure do |config|
   # Allow real HTTP connections in development if needed
   config.allow_http_connections_when_no_cassette = false
 
+  # Custom request matcher that ignores timestamp parameters
+  config.register_request_matcher :uri_without_timestamps do |request1, request2|
+    VCRHelpers.uri_without_timestamps(request1.uri) == VCRHelpers.uri_without_timestamps(request2.uri)
+  end
+
   # Environment-specific record mode
   config.default_cassette_options = {
-    record: :none,  # Force :none to prevent new recordings
-    match_requests_on: %i[method uri],  # More lenient matching
+    record: VCRHelpers.record_mode,
+    match_requests_on: [:method, :uri_without_timestamps],
     allow_playback_repeats: true,
     preserve_exact_body_bytes: false,  # Allow some flexibility
     update_content_length_header: false  # Prevent hanging on content length issues

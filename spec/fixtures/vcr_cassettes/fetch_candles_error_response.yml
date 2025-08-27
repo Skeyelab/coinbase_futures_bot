@@ -432,4 +432,76 @@ http_interactions:
       encoding: ASCII-8BIT
       string: '{"message":"NotFound"}'
   recorded_at: Wed, 27 Aug 2025 02:26:54 GMT
+- request:
+    method: get
+    uri: https://api.exchange.coinbase.com/products/INVALID-PRODUCT/candles?end=2025-08-27T00:00:00Z&granularity=3600&start=2025-08-26T00:00:00Z
+    body:
+      encoding: US-ASCII
+      string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 404
+      message: Not Found
+    headers:
+      Date:
+      - Wed, 27 Aug 2025 03:10:17 GMT
+      Content-Type:
+      - application/json; charset=utf-8
+      Content-Length:
+      - '22'
+      Connection:
+      - keep-alive
+      Access-Control-Allow-Headers:
+      - Content-Type, Accept, cb-session, cb-fp, cb-form-factor
+      Access-Control-Allow-Methods:
+      - GET,POST,DELETE,PUT
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Expose-Headers:
+      - cb-before, cb-after, cb-gdpr
+      Access-Control-Max-Age:
+      - '7200'
+      Cache-Control:
+      - no-store
+      Etag:
+      - W/"32-UTsiuoTZ0Q5sotaDON9YrAZQhbE"
+      Strict-Transport-Security:
+      - max-age=15552000; includeSubDomains
+      X-Content-Type-Options:
+      - nosniff
+      X-Dns-Prefetch-Control:
+      - 'off'
+      X-Download-Options:
+      - noopen
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-Xss-Protection:
+      - 1; mode=block
+      Cf-Cache-Status:
+      - MISS
+      Set-Cookie:
+      - __cf_bm=Yq8OjlKOQ8dZIYiJvs6Ub_PKIGcbemU7uC3RDK5li68-1756264217-1.0.1.1-pe7j1v1GkC_UaXQromBh_3SYAIxSZ_D4EXLUGjBYP53q2qaWeenR7iqDfRiiJUltFrFMv2JQpat605_Nma4OM0aJanehRhv3lB.yz19WSaY;
+        path=/; expires=Wed, 27-Aug-25 03:40:17 GMT; domain=.exchange.coinbase.com;
+        HttpOnly; Secure; SameSite=None
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=cNwAavlVs1tFIvcGFqGG5GZ0lUrQfobTKR8rlCaoGnGaa11yVBwJIPT6mO%2Bpdb9SvZ%2BFsZeq2gbgl0EIg5rLlp8Ho2WZZXVpPf2TC%2BNUEFI6MAGvtfln2Dz1zfYLKFp7tADtt7WSKDb6nLc%3D"}],"group":"cf-nel","max_age":604800}'
+      Nel:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Vary:
+      - Accept-Encoding
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 97585ffe996645e6-ORD
+    body:
+      encoding: ASCII-8BIT
+      string: '{"message":"NotFound"}'
+  recorded_at: Wed, 27 Aug 2025 03:10:17 GMT
 recorded_with: VCR 6.3.1
