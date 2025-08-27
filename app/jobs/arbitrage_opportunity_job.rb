@@ -9,18 +9,18 @@ class ArbitrageOpportunityJob < ApplicationJob
     @basis_bps = basis_bps.to_f
     @direction = direction
     @logger = Rails.logger
-    
+
     @logger.info("[ARB] Evaluating arbitrage: #{@direction} #{@basis_bps} bps between #{@spot_product_id} and #{@futures_product_id}")
-    
+
     # Check if arbitrage is still valid (basis might have moved)
     return unless arbitrage_still_valid?
-    
+
     # Check risk limits for arbitrage trading
     return unless within_arbitrage_risk_limits?
-    
+
     # Log the opportunity for analysis
     log_arbitrage_opportunity
-    
+
     # In a full implementation, this would execute the arbitrage strategy
     # For now, we just log and monitor
     @logger.info("[ARB] Arbitrage opportunity logged for analysis")
@@ -32,11 +32,11 @@ class ArbitrageOpportunityJob < ApplicationJob
     # Re-check basis to ensure opportunity is still valid
     current_basis = calculate_current_basis
     return false unless current_basis
-    
+
     # Opportunity is valid if basis is still above threshold and in same direction
     threshold = ENV.fetch("BASIS_ARBITRAGE_THRESHOLD_BPS", "50").to_f
-    current_direction = current_basis > 0 ? "POSITIVE" : "NEGATIVE"
-    
+    current_direction = (current_basis > 0) ? "POSITIVE" : "NEGATIVE"
+
     current_basis.abs > threshold && current_direction == @direction
   end
 
@@ -44,12 +44,12 @@ class ArbitrageOpportunityJob < ApplicationJob
     # Check if we're within risk limits for arbitrage positions
     max_arbitrage_positions = ENV.fetch("MAX_ARBITRAGE_POSITIONS", "2").to_i
     current_arbitrage_positions = count_active_arbitrage_positions
-    
+
     if current_arbitrage_positions >= max_arbitrage_positions
       @logger.info("[ARB] Skipping arbitrage - at max positions (#{current_arbitrage_positions}/#{max_arbitrage_positions})")
       return false
     end
-    
+
     true
   end
 
@@ -57,9 +57,9 @@ class ArbitrageOpportunityJob < ApplicationJob
     # Get current prices for both spot and futures
     spot_data = Rails.cache.read("last_price_#{@spot_product_id}")
     futures_data = Rails.cache.read("basis_#{@futures_product_id}_latest")
-    
+
     return nil unless spot_data && futures_data
-    
+
     futures_price = futures_data[:futures_price]
     basis = futures_price - spot_data
     (basis / spot_data * 10000).round(2) # basis points
@@ -81,24 +81,24 @@ class ArbitrageOpportunityJob < ApplicationJob
       direction: @direction,
       opportunity_score: calculate_opportunity_score
     }
-    
+
     Rails.cache.write(
       "arbitrage_opportunity_#{Time.current.to_i}",
       opportunity_data,
       expires_in: 1.day
     )
-    
+
     @logger.info("[ARB] Opportunity logged: #{opportunity_data}")
   end
 
   def calculate_opportunity_score
     # Calculate a score based on basis magnitude and market conditions
     base_score = [@basis_bps.abs / 10, 10].min # 0-10 based on basis
-    
+
     # Adjust for market volatility and liquidity
     volatility_adjustment = calculate_volatility_adjustment
     liquidity_adjustment = calculate_liquidity_adjustment
-    
+
     (base_score * volatility_adjustment * liquidity_adjustment).round(2)
   end
 

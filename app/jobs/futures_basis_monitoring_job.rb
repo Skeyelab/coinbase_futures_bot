@@ -8,23 +8,23 @@ class FuturesBasisMonitoringJob < ApplicationJob
     @futures_product_id = futures_product_id
     @spot_price = spot_price.to_f
     @logger = Rails.logger
-    
+
     # Get current futures price from recent ticks or market data
     futures_price = get_futures_price(@futures_product_id)
     return unless futures_price
-    
+
     # Calculate basis (futures - spot)
     basis = futures_price - @spot_price
     basis_bps = (basis / @spot_price * 10000).round(2) # basis points
-    
+
     @logger.debug("[FBM] #{@futures_product_id} basis: #{basis_bps} bps (F: $#{futures_price}, S: $#{@spot_price})")
-    
+
     # Store basis data for analysis
     store_basis_data(basis, basis_bps)
-    
+
     # Check for arbitrage opportunities
     check_arbitrage_opportunities(basis_bps)
-    
+
     # Monitor for extreme basis situations
     monitor_basis_extremes(basis_bps)
   end
@@ -34,10 +34,10 @@ class FuturesBasisMonitoringJob < ApplicationJob
   def get_futures_price(futures_product_id)
     # Try to get recent tick data first
     recent_tick = Tick.where(symbol: futures_product_id)
-                     .where("timestamp > ?", 5.minutes.ago)
-                     .order(timestamp: :desc)
-                     .first
-    
+      .where("timestamp > ?", 5.minutes.ago)
+      .order(timestamp: :desc)
+      .first
+
     if recent_tick
       recent_tick.price.to_f
     else
@@ -71,11 +71,11 @@ class FuturesBasisMonitoringJob < ApplicationJob
   def check_arbitrage_opportunities(basis_bps)
     # Define arbitrage thresholds
     arbitrage_threshold = ENV.fetch("BASIS_ARBITRAGE_THRESHOLD_BPS", "50").to_f
-    
+
     if basis_bps.abs > arbitrage_threshold
-      direction = basis_bps > 0 ? "POSITIVE" : "NEGATIVE"
+      direction = (basis_bps > 0) ? "POSITIVE" : "NEGATIVE"
       @logger.info("[FBM] Arbitrage opportunity detected: #{direction} basis #{basis_bps} bps on #{@futures_product_id}")
-      
+
       # In production, this could trigger arbitrage strategy
       ArbitrageOpportunityJob.perform_later(
         spot_product_id: @spot_product_id,
@@ -89,10 +89,10 @@ class FuturesBasisMonitoringJob < ApplicationJob
   def monitor_basis_extremes(basis_bps)
     # Monitor for extremely wide basis that might indicate market stress
     extreme_threshold = ENV.fetch("BASIS_EXTREME_THRESHOLD_BPS", "200").to_f
-    
+
     if basis_bps.abs > extreme_threshold
       @logger.warn("[FBM] EXTREME BASIS DETECTED: #{basis_bps} bps on #{@futures_product_id}")
-      
+
       # This could trigger risk management actions
       send_extreme_basis_alert(basis_bps)
     end
@@ -100,7 +100,7 @@ class FuturesBasisMonitoringJob < ApplicationJob
 
   def send_extreme_basis_alert(basis_bps)
     @logger.warn("[ALERT] EXTREME BASIS: #{@futures_product_id} at #{basis_bps} bps - potential market stress")
-    
+
     # In production, this could trigger:
     # - Position size reductions
     # - Stop loss tightening

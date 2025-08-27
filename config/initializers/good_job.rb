@@ -58,7 +58,7 @@ Rails.application.configure do
     real_time_monitoring: {
       cron: ENV.fetch("REAL_TIME_MONITORING_CRON", "*/5 13-20 * * 1-5"), # every 5 min during trading hours
       class: "RealTimeMonitoringJob",
-      args: [{ product_ids: ["BTC-USD", "ETH-USD"] }]
+      args: [{product_ids: ["BTC-USD", "ETH-USD"]}]
     }
   }
 end

@@ -8,9 +8,9 @@ class RapidSignalEvaluationJob < ApplicationJob
     @product_id = product_id
     @current_price = current_price.to_f
     @asset = asset
-    
+
     @logger.debug("[RSE] Evaluating rapid signals for #{@product_id} at $#{@current_price}")
-    
+
     # Use multi-timeframe strategy with emphasis on shorter timeframes for day trading
     strategy = Strategy::MultiTimeframeSignal.new(
       ema_1h_short: 21,
@@ -28,23 +28,23 @@ class RapidSignalEvaluationJob < ApplicationJob
       max_position_size: max_contracts_for_asset(@asset),
       min_position_size: 1
     )
-    
+
     # Get current month contract for execution
     contract_manager = MarketData::FuturesContractManager.new(logger: @logger)
     target_contract = contract_manager.current_month_contract(@asset)
-    
+
     unless target_contract
       @logger.warn("[RSE] No current month contract found for #{@asset}")
       return
     end
-    
+
     # Generate signal using spot price as reference
     equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "50000").to_f # Increased for ~20 ETH capacity
     signal = strategy.signal(symbol: @product_id, equity_usd: equity_usd)
-    
+
     if signal && should_execute_signal?(signal)
       @logger.info("[RSE] Rapid signal generated for #{@product_id}: #{signal[:side]} #{signal[:quantity]} contracts")
-      
+
       # Execute signal on futures contract
       execute_futures_signal(target_contract, signal)
     else
@@ -56,28 +56,28 @@ class RapidSignalEvaluationJob < ApplicationJob
 
   def should_execute_signal?(signal)
     return false unless signal
-    
+
     # Only execute high-confidence signals (>75%) for rapid execution
     return false if signal[:confidence] < 75
-    
+
     # Check if we already have positions in this asset
     existing_positions = Position.open.by_asset(@asset).count
     max_positions = max_concurrent_positions_for_asset(@asset)
-    
+
     if existing_positions >= max_positions
       @logger.info("[RSE] Skipping signal - already at max positions (#{existing_positions}/#{max_positions}) for #{@asset}")
       return false
     end
-    
+
     # Check if we have sufficient buying power
     return false unless sufficient_buying_power?(signal[:quantity])
-    
+
     true
   end
 
   def execute_futures_signal(contract_id, signal)
     positions_service = Trading::CoinbasePositions.new(logger: @logger)
-    
+
     # Execute the trade on the futures contract
     result = positions_service.open_position(
       product_id: contract_id,
@@ -88,10 +88,10 @@ class RapidSignalEvaluationJob < ApplicationJob
       take_profit: signal[:tp],
       stop_loss: signal[:sl]
     )
-    
+
     if result[:success]
       @logger.info("[RSE] Successfully opened #{signal[:side]} position: #{signal[:quantity]} contracts of #{contract_id}")
-      
+
       # Create position tracking record
       Position.create!(
         product_id: contract_id,
@@ -104,7 +104,7 @@ class RapidSignalEvaluationJob < ApplicationJob
         take_profit: signal[:tp],
         stop_loss: signal[:sl]
       )
-      
+
       # Send alert
       send_position_alert("OPENED", contract_id, signal)
     else
@@ -146,7 +146,7 @@ class RapidSignalEvaluationJob < ApplicationJob
 
   def send_position_alert(action, contract_id, signal)
     @logger.info("[ALERT] #{action}: #{signal[:side]} #{signal[:quantity]} contracts of #{contract_id} at $#{signal[:price]} (TP: $#{signal[:tp]}, SL: $#{signal[:sl]})")
-    
+
     # In production, this could send Slack/Discord/email alerts
     # For now, just log the alert
   end

@@ -14,7 +14,7 @@ class FetchCandlesJob < ApplicationJob
       next unless pair&.enabled?
 
       Rails.logger.info("[Candles] Fetching candles for #{product_id}")
-      
+
       # Fetch all supported timeframes: 1m, 5m, 15m, and 1h
       fetch_1m_candles(rest, pair, backfill_days)
       fetch_5m_candles(rest, pair, backfill_days)

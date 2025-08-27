@@ -7,19 +7,19 @@ class PositionCloseJob < ApplicationJob
     @position = Position.find(position_id)
     @reason = reason
     @logger = Rails.logger
-    
+
     @logger.info("[PCJ] Closing position #{position_id} (#{@position.product_id}) - Reason: #{reason}")
-    
+
     return unless @position.open?
-    
+
     positions_service = Trading::CoinbasePositions.new(logger: @logger)
-    
+
     # Close the position
     result = positions_service.close_position(
       product_id: @position.product_id,
       size: @position.size
     )
-    
+
     if result[:success]
       # Update position record
       @position.update!(
@@ -27,12 +27,12 @@ class PositionCloseJob < ApplicationJob
         close_time: Time.current,
         pnl: calculate_pnl(result)
       )
-      
+
       @logger.info("[PCJ] Successfully closed position #{position_id}: #{@reason}")
       send_closure_alert
     else
       @logger.error("[PCJ] Failed to close position #{position_id}: #{result[:error]}")
-      
+
       # Retry if it's a critical closure (stop loss, take profit)
       if %w[stop_loss take_profit time_limit].include?(@reason)
         @logger.info("[PCJ] Retrying critical position closure in 30 seconds")
@@ -47,7 +47,7 @@ class PositionCloseJob < ApplicationJob
     @logger.warn("[PCJ] Position #{position_id} not found - may have been closed already")
   rescue => e
     @logger.error("[PCJ] Error closing position #{position_id}: #{e.message}")
-    
+
     # Retry critical closures
     if %w[stop_loss take_profit time_limit].include?(@reason)
       @logger.info("[PCJ] Retrying critical position closure due to error")
@@ -68,9 +68,9 @@ class PositionCloseJob < ApplicationJob
   end
 
   def send_closure_alert
-    asset = extract_asset_from_product_id(@position.product_id)
-    pnl_status = @position.pnl && @position.pnl > 0 ? "PROFIT" : "LOSS"
-    
+    extract_asset_from_product_id(@position.product_id)
+    pnl_status = (@position.pnl && @position.pnl > 0) ? "PROFIT" : "LOSS"
+
     @logger.info("[ALERT] CLOSED: #{@position.side} #{@position.size} contracts of #{@position.product_id} - #{@reason.upcase} - #{pnl_status}: $#{@position.pnl || 0}")
   end
 
