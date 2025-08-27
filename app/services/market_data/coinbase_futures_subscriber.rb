@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'websocket-client-simple'
+require "websocket-client-simple"
 
 module MarketData
   class CoinbaseFuturesSubscriber
@@ -13,7 +13,7 @@ module MarketData
     end
 
     def start
-      url = ENV.fetch('COINBASE_WS_URL', 'wss://advanced-trade-ws.coinbase.com')
+      url = ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com")
       socket = WebSocket::Client::Simple.connect(url)
       @ws = socket
 
@@ -26,7 +26,7 @@ module MarketData
       socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
       socket.on(:error) { |e| log.error("[MD] error: #{e}") }
       socket.on(:close) do
-        log.info('[MD] closed')
+        log.info("[MD] closed")
         subscriber.__send__(:mark_ws_as_closed)
       end
 
@@ -42,8 +42,8 @@ module MarketData
 
     def subscribe
       msg = {
-        type: 'subscribe',
-        channel: 'ticker',
+        type: "subscribe",
+        channel: "ticker",
         product_ids: @product_ids
       }
       @ws.send(msg.to_json)
@@ -59,16 +59,16 @@ module MarketData
       return unless data
 
       # Advanced Trade schema (channel/events)
-      if data['channel'] == 'ticker' && data['events'].is_a?(Array)
-        data['events'].each do |event|
-          Array(event['tickers']).each do |t|
-            tick_time = t['time'] || t['ts'] || t['timestamp']
+      if data["channel"] == "ticker" && data["events"].is_a?(Array)
+        data["events"].each do |event|
+          Array(event["tickers"]).each do |t|
+            tick_time = t["time"] || t["ts"] || t["timestamp"]
             normalized = {
-              'product_id' => t['product_id'],
-              'price' => t['price'],
-              'time' => tick_time
+              "product_id" => t["product_id"],
+              "price" => t["price"],
+              "time" => tick_time
             }
-            @logger.debug("[MD] ticker: #{normalized.slice('product_id', 'price', 'time')}")
+            @logger.debug("[MD] ticker: #{normalized.slice("product_id", "price", "time")}")
 
             # Update real-time candles
             @candle_aggregator&.process_tick(normalized)
@@ -80,14 +80,14 @@ module MarketData
       end
 
       # Legacy schema (flat type)
-      return unless data['type'] == 'ticker'
+      return unless data["type"] == "ticker"
 
       normalized = {
-        'product_id' => data['product_id'],
-        'price' => data['price'],
-        'time' => data['time'] || data['ts'] || data['timestamp']
+        "product_id" => data["product_id"],
+        "price" => data["price"],
+        "time" => data["time"] || data["ts"] || data["timestamp"]
       }
-      @logger.debug("[MD] ticker: #{normalized.slice('product_id', 'price', 'time')}")
+      @logger.debug("[MD] ticker: #{normalized.slice("product_id", "price", "time")}")
 
       # Update real-time candles
       @candle_aggregator&.process_tick(normalized)

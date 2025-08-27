@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-01-27 17:30 UTC
+- Context: Removed pull request template files to simplify workflow
+- Changes:
+  - Removed .github/PULL_REQUEST_TEMPLATE.md and .github/pull_request_template.md files
+  - Eliminates PR template requirements that were complicating the development workflow
+- Commands run:
+  - `rm /Users/edahl/Documents/GitHub/coinbase_futures_bot/.github/PULL_REQUEST_TEMPLATE.md`
+  - `rm /Users/edahl/Documents/GitHub/coinbase_futures_bot/.github/pull_request_template.md`
+  - `git add .github/PULL_REQUEST_TEMPLATE.md .github/pull_request_template.md`
+  - `git commit -m "chore: remove pull request template files"`
+- Files touched:
+  - `.github/PULL_REQUEST_TEMPLATE.md` (deleted)
+  - `.github/pull_request_template.md` (deleted)
+- Next steps:
+  - PR workflow is now simplified without template requirements
+  - Consider if any other GitHub workflow files need review
+
 #### 2025-01-27 16:45 UTC
 - Context: Fixed GoodJob dashboard routing errors for multiple job actions (POST vs PUT method mismatch)
 - Changes:

@@ -12,9 +12,9 @@ class HealthController < ApplicationController
 
     # Check if we can get a connection (basic connectivity test)
     connection_ok = begin
-      ActiveRecord::Base.connection.execute('SELECT 1')
+      ActiveRecord::Base.connection.execute("SELECT 1")
       true
-    rescue StandardError => e
+    rescue => e
       Rails.logger.error("Database health check failed: #{e.message}")
       false
     end
@@ -26,13 +26,13 @@ class HealthController < ApplicationController
         running: GoodJob::Job.where.not(performed_at: nil).where(finished_at: nil).count,
         failed: GoodJob::Job.where.not(error: nil).count
       }
-    rescue StandardError => e
+    rescue => e
       Rails.logger.warn("GoodJob stats unavailable: #{e.message}")
       nil
     end
 
     health_data = {
-      status: connection_ok ? 'healthy' : 'unhealthy',
+      status: connection_ok ? "healthy" : "unhealthy",
       timestamp: Time.current.utc.iso8601,
       database: {
         connection_ok: connection_ok,

@@ -3,24 +3,24 @@
 # Configuration for Real-Time Signal System
 Rails.application.config.real_time_signals = {
   # Signal evaluation settings
-  evaluation_interval: ENV.fetch('REALTIME_SIGNAL_EVALUATION_INTERVAL', '30').to_i, # seconds
+  evaluation_interval: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i, # seconds
 
   # Signal filtering settings
-  min_confidence_threshold: ENV.fetch('REALTIME_SIGNAL_MIN_CONFIDENCE', '60').to_f,
-  max_signals_per_hour: ENV.fetch('REALTIME_SIGNAL_MAX_PER_HOUR', '10').to_i,
-  deduplication_window: ENV.fetch('REALTIME_SIGNAL_DEDUPE_WINDOW', '300').to_i, # seconds
+  min_confidence_threshold: ENV.fetch("REALTIME_SIGNAL_MIN_CONFIDENCE", "60").to_f,
+  max_signals_per_hour: ENV.fetch("REALTIME_SIGNAL_MAX_PER_HOUR", "10").to_i,
+  deduplication_window: ENV.fetch("REALTIME_SIGNAL_DEDUPE_WINDOW", "300").to_i, # seconds
 
   # Broadcasting settings
-  broadcast_enabled: ENV.fetch('SIGNAL_BROADCAST_ENABLED', 'true').to_s.casecmp('true').zero?,
-  websocket_channel: 'signals',
+  broadcast_enabled: ENV.fetch("SIGNAL_BROADCAST_ENABLED", "true").to_s.casecmp("true").zero?,
+  websocket_channel: "signals",
 
   # Candle aggregation settings
-  candle_aggregation_enabled: ENV.fetch('CANDLE_AGGREGATION_ENABLED', 'true').to_s.casecmp('true').zero?,
+  candle_aggregation_enabled: ENV.fetch("CANDLE_AGGREGATION_ENABLED", "true").to_s.casecmp("true").zero?,
   supported_timeframes: %w[1m 5m 15m 1h],
 
   # Strategy settings
   strategies: {
-    'MultiTimeframeSignal' => {
+    "MultiTimeframeSignal" => {
       ema_1h_short: 21,
       ema_1h_long: 50,
       ema_15m: 21,
@@ -40,12 +40,12 @@ Rails.application.config.real_time_signals = {
   },
 
   # API settings
-  api_key: ENV['SIGNALS_API_KEY'],
-  cors_origins: ENV.fetch('SIGNALS_CORS_ORIGINS', '*').split(','),
+  api_key: ENV["SIGNALS_API_KEY"],
+  cors_origins: ENV.fetch("SIGNALS_CORS_ORIGINS", "*").split(","),
 
   # Logging settings
-  log_level: ENV.fetch('REALTIME_SIGNAL_LOG_LEVEL', 'info'),
-  enable_debug_logging: ENV.fetch('REALTIME_SIGNAL_DEBUG', 'false').to_s.casecmp('true').zero?
+  log_level: ENV.fetch("REALTIME_SIGNAL_LOG_LEVEL", "info"),
+  enable_debug_logging: ENV.fetch("REALTIME_SIGNAL_DEBUG", "false").to_s.casecmp("true").zero?
 }
 
 # Validate configuration on startup
@@ -63,7 +63,7 @@ Rails.application.config.after_initialize do
   end
 
   # Log configuration
-  Rails.logger.info('[RTS] Real-time signals configuration loaded:')
+  Rails.logger.info("[RTS] Real-time signals configuration loaded:")
   Rails.logger.info("[RTS]   Evaluation interval: #{config[:evaluation_interval]}s")
   Rails.logger.info("[RTS]   Min confidence: #{config[:min_confidence_threshold]}%")
   Rails.logger.info("[RTS]   Max signals/hour: #{config[:max_signals_per_hour]}")

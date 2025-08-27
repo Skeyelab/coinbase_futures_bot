@@ -9,8 +9,8 @@ class SignalController < ApplicationController
   # GET /signals - List all active signals
   def index
     signals = SignalAlert.includes(:trading_pair)
-                         .active
-                         .order(confidence: :desc, alert_timestamp: :desc)
+      .active
+      .order(confidence: :desc, alert_timestamp: :desc)
 
     # Apply filters
     signals = filter_signals(signals)
@@ -34,7 +34,7 @@ class SignalController < ApplicationController
     signal = SignalAlert.find(params[:id])
     render json: signal.to_api_response
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # POST /signals/evaluate - Trigger real-time signal evaluation
@@ -46,22 +46,22 @@ class SignalController < ApplicationController
       trading_pair = TradingPair.find_by(product_id: params[:symbol])
       if trading_pair
         evaluator.evaluate_pair(trading_pair)
-        render json: { message: "Evaluated signals for #{params[:symbol]}" }
+        render json: {message: "Evaluated signals for #{params[:symbol]}"}
       else
-        render json: { error: "Trading pair not found: #{params[:symbol]}" }, status: :not_found
+        render json: {error: "Trading pair not found: #{params[:symbol]}"}, status: :not_found
       end
     else
       # Evaluate all pairs
       evaluator.evaluate_all_pairs
-      render json: { message: 'Evaluated signals for all enabled trading pairs' }
+      render json: {message: "Evaluated signals for all enabled trading pairs"}
     end
   end
 
   # GET /signals/active - Get active signals only
   def active
     signals = SignalAlert.active
-                         .order(confidence: :desc, alert_timestamp: :desc)
-                         .limit(params[:limit] || 100)
+      .order(confidence: :desc, alert_timestamp: :desc)
+      .limit(params[:limit] || 100)
 
     signals = filter_signals(signals)
 
@@ -75,9 +75,9 @@ class SignalController < ApplicationController
   def high_confidence
     threshold = params[:threshold] || 70
     signals = SignalAlert.active
-                         .high_confidence(threshold)
-                         .order(confidence: :desc, alert_timestamp: :desc)
-                         .limit(params[:limit] || 50)
+      .high_confidence(threshold)
+      .order(confidence: :desc, alert_timestamp: :desc)
+      .limit(params[:limit] || 50)
 
     signals = filter_signals(signals)
 
@@ -92,8 +92,8 @@ class SignalController < ApplicationController
   def recent
     hours = params[:hours] || 1
     signals = SignalAlert.recent(hours)
-                         .order(alert_timestamp: :desc)
-                         .limit(params[:limit] || 100)
+      .order(alert_timestamp: :desc)
+      .limit(params[:limit] || 100)
 
     signals = filter_signals(signals)
 
@@ -111,18 +111,18 @@ class SignalController < ApplicationController
 
     stats = {
       active_signals: SignalAlert.active.count,
-      recent_signals: SignalAlert.where('alert_timestamp >= ?', start_time).count,
-      triggered_signals: SignalAlert.where('alert_timestamp >= ? AND alert_status = ?', start_time, 'triggered').count,
-      expired_signals: SignalAlert.where('alert_timestamp >= ? AND alert_status = ?', start_time, 'expired').count,
-      high_confidence_signals: SignalAlert.where('alert_timestamp >= ? AND confidence >= ?', start_time, 70).count,
-      signals_by_symbol: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                    .group(:symbol)
-                                    .count,
-      signals_by_strategy: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                      .group(:strategy_name)
-                                      .count,
-      average_confidence: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                     .average(:confidence)&.to_f&.round(2),
+      recent_signals: SignalAlert.where("alert_timestamp >= ?", start_time).count,
+      triggered_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time, "triggered").count,
+      expired_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time, "expired").count,
+      high_confidence_signals: SignalAlert.where("alert_timestamp >= ? AND confidence >= ?", start_time, 70).count,
+      signals_by_symbol: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .group(:symbol)
+        .count,
+      signals_by_strategy: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .group(:strategy_name)
+        .count,
+      average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .average(:confidence)&.to_f&.round(2),
       time_range_hours: time_range
     }
 
@@ -135,11 +135,11 @@ class SignalController < ApplicationController
     signal.trigger!
 
     render json: {
-      message: 'Signal marked as triggered',
+      message: "Signal marked as triggered",
       signal: signal.to_api_response
     }
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # POST /signals/:id/cancel - Cancel signal
@@ -148,20 +148,20 @@ class SignalController < ApplicationController
     signal.cancel!
 
     render json: {
-      message: 'Signal cancelled',
+      message: "Signal cancelled",
       signal: signal.to_api_response
     }
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # GET /signals/health - Health check for signal system
   def health
     last_signal = SignalAlert.order(:alert_timestamp).last
-    recent_signals_count = SignalAlert.where('alert_timestamp >= ?', 1.hour.ago).count
+    recent_signals_count = SignalAlert.where("alert_timestamp >= ?", 1.hour.ago).count
 
     render json: {
-      status: 'healthy',
+      status: "healthy",
       last_signal_timestamp: last_signal&.alert_timestamp,
       recent_signals_count: recent_signals_count,
       active_signals_count: SignalAlert.active.count,
@@ -185,27 +185,27 @@ class SignalController < ApplicationController
     signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type]
 
     # Filter by minimum confidence
-    signals = signals.where('confidence >= ?', params[:min_confidence]) if params[:min_confidence]
+    signals = signals.where("confidence >= ?", params[:min_confidence]) if params[:min_confidence]
 
     # Filter by maximum confidence
-    signals = signals.where('confidence <= ?', params[:max_confidence]) if params[:max_confidence]
+    signals = signals.where("confidence <= ?", params[:max_confidence]) if params[:max_confidence]
 
     signals
   end
 
   def authenticate_request
     # Simple API key authentication
-    api_key = request.headers['X-API-Key'] || params[:api_key]
-    expected_key = ENV['SIGNALS_API_KEY']
+    api_key = request.headers["X-API-Key"] || params[:api_key]
+    expected_key = ENV["SIGNALS_API_KEY"]
 
     return unless expected_key && api_key != expected_key
 
-    render json: { error: 'Unauthorized' }, status: :unauthorized
+    render json: {error: "Unauthorized"}, status: :unauthorized
   end
 
   def set_cors_headers
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key'
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
   end
 end

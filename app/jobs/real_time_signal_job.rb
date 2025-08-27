@@ -52,6 +52,7 @@ class RealTimeSignalJob < ApplicationJob
     # Schedule new job to run every interval
     set(wait: interval_seconds.seconds).perform_later
   end
+  private_class_method :schedule_realtime_evaluation
 
   def self.start_realtime_evaluation(interval_seconds: 30)
     Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
@@ -67,4 +68,5 @@ class RealTimeSignalJob < ApplicationJob
       end
     end
   end
+  private_class_method :start_realtime_evaluation
 end

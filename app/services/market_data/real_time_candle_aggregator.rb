@@ -16,14 +16,14 @@ module MarketData
 
     # Process a new tick and update relevant candles
     def process_tick(tick_data)
-      symbol = tick_data['product_id']
-      price = tick_data['price'].to_f
-      timestamp = parse_timestamp(tick_data['time'] || tick_data['ts'] || tick_data['timestamp'])
+      symbol = tick_data["product_id"]
+      price = tick_data["price"].to_f
+      timestamp = parse_timestamp(tick_data["time"] || tick_data["ts"] || tick_data["timestamp"])
 
       return unless symbol && price && timestamp
 
       # Buffer ticks for processing
-      @tick_buffer[symbol] << { price: price, timestamp: timestamp }
+      @tick_buffer[symbol] << {price: price, timestamp: timestamp}
 
       # Process buffered ticks every 100ms or when buffer gets large
       process_buffered_ticks(symbol) if should_process_buffer?(symbol)
@@ -110,15 +110,15 @@ module MarketData
       return unless candle_data[:tick_count] > 0
 
       Candle.upsert({
-                      symbol: candle_data[:symbol],
-                      timeframe: candle_data[:timeframe],
-                      timestamp: candle_data[:timestamp],
-                      open: candle_data[:open],
-                      high: candle_data[:high],
-                      low: candle_data[:low],
-                      close: candle_data[:close],
-                      volume: candle_data[:volume]
-                    }, unique_by: :index_candles_on_symbol_and_timeframe_and_timestamp)
+        symbol: candle_data[:symbol],
+        timeframe: candle_data[:timeframe],
+        timestamp: candle_data[:timestamp],
+        open: candle_data[:open],
+        high: candle_data[:high],
+        low: candle_data[:low],
+        close: candle_data[:close],
+        volume: candle_data[:volume]
+      }, unique_by: :index_candles_on_symbol_and_timeframe_and_timestamp)
 
       @logger.debug("[RTC] Saved #{candle_data[:symbol]} #{candle_data[:timeframe]} candle at #{candle_data[:timestamp]}: O:#{candle_data[:open]} H:#{candle_data[:high]} L:#{candle_data[:low]} C:#{candle_data[:close]}")
     end
@@ -139,17 +139,17 @@ module MarketData
       else
         Time.current.utc
       end
-    rescue StandardError => e
+    rescue => e
       @logger.warn("[RTC] Failed to parse timestamp #{time_value}: #{e.message}")
       Time.current.utc
     end
 
     def timeframes
       {
-        '1m' => 60,
-        '5m' => 300,
-        '15m' => 900,
-        '1h' => 3600
+        "1m" => 60,
+        "5m" => 300,
+        "15m" => 900,
+        "1h" => 3600
       }
     end
   end

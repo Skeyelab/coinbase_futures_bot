@@ -14,6 +14,7 @@ class CreateSignalAlerts < ActiveRecord::Migration[8.0]
       t.string :alert_status
       t.datetime :alert_timestamp
       t.datetime :expires_at
+      t.datetime :triggered_at
       t.jsonb :metadata
       t.jsonb :strategy_data
 

@@ -24,8 +24,8 @@ class RealTimeSignalEvaluator
     enabled_pairs = TradingPair.enabled
 
     if enabled_pairs.empty?
-      @logger.warn('[RTSE] No enabled trading pairs found. Run market data sync first.')
-      @logger.info('[RTSE] To sync products: bin/rake market_data:sync_products')
+      @logger.warn("[RTSE] No enabled trading pairs found. Run market data sync first.")
+      @logger.info("[RTSE] To sync products: bin/rake market_data:sync_products")
       return
     end
 
@@ -41,7 +41,7 @@ class RealTimeSignalEvaluator
   # Evaluate a specific trading pair for signals
   def evaluate_pair(trading_pair)
     symbol = resolve_symbol(trading_pair.product_id)
-    equity_usd = ENV.fetch('SIGNAL_EQUITY_USD', '10000').to_f
+    equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
 
     @strategies.each do |strategy_name, strategy|
       evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
@@ -62,10 +62,10 @@ class RealTimeSignalEvaluator
 
   def load_strategies
     config = Rails.application.config.real_time_signals
-    strategy_config = config[:strategies]['MultiTimeframeSignal']
+    strategy_config = config[:strategies]["MultiTimeframeSignal"]
 
     {
-      'MultiTimeframeSignal' => Strategy::MultiTimeframeSignal.new(
+      "MultiTimeframeSignal" => Strategy::MultiTimeframeSignal.new(
         ema_1h_short: strategy_config[:ema_1h_short],
         ema_1h_long: strategy_config[:ema_1h_long],
         ema_15m: strategy_config[:ema_15m],
@@ -91,7 +91,7 @@ class RealTimeSignalEvaluator
     signal = strategy.signal(symbol: symbol, equity_usd: equity_usd)
 
     create_signal_alert(strategy_name, symbol, signal) if signal && valid_signal?(signal)
-  rescue StandardError => e
+  rescue => e
     @logger.error("[RTSE] Error evaluating #{strategy_name} for #{symbol}: #{e.message}")
     @logger.error(e.backtrace.join("\n"))
   end
@@ -108,8 +108,8 @@ class RealTimeSignalEvaluator
     # Check if we have recent candle data for all required timeframes
     required_timeframes = %w[1h 15m 5m 1m]
     required_timeframes.all? do |timeframe|
-      recent_candle = Candle.for_symbol(symbol).where(timeframe: timeframe)
-                            .where('timestamp >= ?', 2.hours.ago).exists?
+      Candle.for_symbol(symbol).where(timeframe: timeframe)
+        .where("timestamp >= ?", 2.hours.ago).exists?
     end
   end
 
@@ -134,7 +134,7 @@ class RealTimeSignalEvaluator
 
     # Broadcast the signal if broadcaster is available
     broadcast_signal(signal) if defined?(SignalBroadcaster)
-  rescue StandardError => e
+  rescue => e
     @logger.error("[RTSE] Failed to create signal alert: #{e.message}")
   end
 
@@ -150,8 +150,8 @@ class RealTimeSignalEvaluator
 
   def signal_rate_limited?(strategy_name, symbol)
     recent_signals = SignalAlert.where(strategy_name: strategy_name, symbol: symbol)
-                                .where('alert_timestamp >= ?', 1.hour.ago)
-                                .count
+      .where("alert_timestamp >= ?", 1.hour.ago)
+      .count
 
     if recent_signals >= @max_signals_per_hour
       @logger.debug("[RTSE] Rate limited: #{recent_signals} signals in last hour for #{strategy_name}:#{symbol}")
@@ -167,22 +167,22 @@ class RealTimeSignalEvaluator
       strategy_name: strategy_name,
       symbol: symbol,
       side: signal[:side],
-      signal_type: 'entry',
-      alert_status: 'active'
-    ).where('alert_timestamp >= ?', @deduplication_window.ago)
-               .where('confidence >= ?', signal[:confidence].to_f - 10) # Allow 10% confidence difference
-               .exists?
+      signal_type: "entry",
+      alert_status: "active"
+    ).where("alert_timestamp >= ?", @deduplication_window.ago)
+      .where("confidence >= ?", signal[:confidence].to_f - 10) # Allow 10% confidence difference
+      .exists?
   end
 
   def detect_timeframe(signal)
     # Try to detect timeframe from strategy data or signal metadata
-    signal[:timeframe] || signal.dig(:strategy_data, :timeframe) || '15m'
+    signal[:timeframe] || signal.dig(:strategy_data, :timeframe) || "15m"
   end
 
   def build_metadata(signal)
     {
       evaluation_timestamp: Time.current.utc.iso8601,
-      strategy_version: '1.0',
+      strategy_version: "1.0",
       market_conditions: analyze_market_conditions(signal),
       risk_metrics: calculate_risk_metrics(signal)
     }
@@ -198,7 +198,7 @@ class RealTimeSignalEvaluator
     # Check volatility across timeframes
     %w[1h 15m 5m 1m].each do |timeframe|
       candles = Candle.for_symbol(symbol).where(timeframe: timeframe)
-                      .order(:timestamp).last(20)
+        .order(:timestamp).last(20)
       next unless candles.size >= 10
 
       prices = candles.map(&:close)
@@ -262,7 +262,7 @@ class RealTimeSignalEvaluator
 
   def broadcast_signal(signal)
     SignalBroadcaster.broadcast(signal)
-  rescue StandardError => e
+  rescue => e
     @logger.error("[RTSE] Failed to broadcast signal: #{e.message}")
   end
 end

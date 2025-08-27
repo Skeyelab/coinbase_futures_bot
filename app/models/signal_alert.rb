@@ -3,7 +3,7 @@
 class SignalAlert < ApplicationRecord
   validates :symbol, :side, :signal_type, :strategy_name, :confidence, presence: true
   validates :symbol, format: { with: /\A[A-Z0-9-]+\z/, message: 'must be valid trading symbol' }
-  validates :side, inclusion: { in: %w[long short buy sell] }
+  validates :side, inclusion: { in: %w[long short buy sell unknown] }
   validates :signal_type, inclusion: { in: %w[entry exit stop_loss take_profit] }
   validates :alert_status, inclusion: { in: %w[active triggered expired cancelled] }, allow_nil: true
   validates :confidence, numericality: { greater_than: 0, less_than_or_equal_to: 100 }
@@ -130,14 +130,6 @@ class SignalAlert < ApplicationRecord
     }
   end
 
-  private
-
-  def set_defaults
-    self.alert_status ||= 'active'
-    self.alert_timestamp ||= Time.current.utc
-    self.expires_at ||= calculate_expiry(strategy_name, timeframe)
-  end
-
   def self.calculate_expiry(strategy_name, timeframe)
     # Default expiry based on strategy and timeframe
     case strategy_name
@@ -159,9 +151,15 @@ class SignalAlert < ApplicationRecord
     when 'stop_loss', 'take_profit'
       # For exit signals, side depends on original position
       # This would need to be determined from position context
-      'unknown'
-    else
-      'unknown'
     end
+    'unknown'
+  end
+
+  private
+
+  def set_defaults
+    self.alert_status ||= 'active'
+    self.alert_timestamp ||= Time.current.utc
+    self.expires_at ||= self.class.calculate_expiry(strategy_name, timeframe)
   end
 end
