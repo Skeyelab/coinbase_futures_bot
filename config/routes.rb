@@ -13,6 +13,13 @@ Rails.application.routes.draw do
     get "/boom", to: ->(_env) { raise "Sentry smoke test" }
   end
 
+  # Slack webhook endpoints
+  namespace :slack do
+    post :commands
+    post :events
+    get :health
+  end
+
   # Defines the root path route ("/")
   # root "posts#index"
   resources :positions, only: [:index, :new, :create, :edit, :update], param: :product_id do

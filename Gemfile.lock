@@ -114,11 +114,18 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
+    faraday-mashify (1.0.0)
+      faraday (~> 2.0)
+      hashie
+    faraday-multipart (1.1.1)
+      multipart-post (~> 2.0)
     faraday-net_http (3.4.1)
       net-http (>= 0.5.0)
     fugit (1.11.2)
       et-orbi (~> 1, >= 1.2.11)
       raabro (~> 1.4)
+    gli (2.22.2)
+      ostruct
     globalid (1.2.1)
       activesupport (>= 6.1)
     good_job (4.11.2)
@@ -129,6 +136,7 @@ GEM
       railties (>= 6.1.0)
       thor (>= 1.0.0)
     hashdiff (1.2.0)
+    hashie (5.0.0)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     io-console (0.8.1)
@@ -154,6 +162,7 @@ GEM
     mini_mime (1.1.5)
     minitest (5.25.5)
     msgpack (1.8.0)
+    multipart-post (2.4.1)
     mutex_m (0.3.0)
     net-http (0.6.0)
       uri
@@ -183,6 +192,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.18.9-x86_64-linux-musl)
       racc (~> 1.4)
+    ostruct (0.6.3)
     parallel (1.27.0)
     parallel_tests (5.4.0)
       parallel
@@ -301,6 +311,13 @@ GEM
     sentry-ruby (5.26.0)
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
+    slack-ruby-client (2.7.0)
+      faraday (>= 2.0.1)
+      faraday-mashify
+      faraday-multipart
+      gli
+      hashie
+      logger
     standard (1.50.0)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.0)
@@ -371,6 +388,7 @@ DEPENDENCIES
   rspec-rails (~> 8.0)
   sentry-rails
   sentry-ruby
+  slack-ruby-client (~> 2.4)
   standard (>= 1.35.1)
   tzinfo-data
   vcr

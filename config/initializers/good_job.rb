@@ -54,11 +54,11 @@ Rails.application.configure do
       cron: ENV.fetch("EMERGENCY_CLOSURE_CRON", "0 0 * * *"), # midnight UTC daily
       class: "EndOfDayPositionClosureJob"
     },
-    # Real-time monitoring - continuous during trading hours (9 AM - 4 PM ET = 1 PM - 8 PM UTC)
-    real_time_monitoring: {
-      cron: ENV.fetch("REAL_TIME_MONITORING_CRON", "*/5 13-20 * * 1-5"), # every 5 min during trading hours
-      class: "RealTimeMonitoringJob",
-      args: [{product_ids: ["BTC-USD", "ETH-USD"]}]
+    # Health check - run every hour during trading hours
+    health_check: {
+      cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
+      class: "HealthCheckJob"
+    }
     }
   }
 end
