@@ -50,7 +50,7 @@ module MarketData
 
         if @ws && (Time.current - start_time) >= timeout
           @logger.error("[MD-Spot] Connection timeout after #{timeout} seconds")
-          @ws.close if @ws.ready_state == WebSocket::Client::Simple::STATE_OPEN
+          @ws.close if @ws.respond_to?(:close) && @ws.open?
           @ws = nil
         end
       rescue => e
@@ -62,9 +62,7 @@ module MarketData
     private
 
     def mark_ws_as_closed
-      if @ws && @ws.ready_state == WebSocket::Client::Simple::STATE_OPEN
-        @ws.close
-      end
+      @ws&.close if @ws&.open?
       @ws = nil
     end
 
