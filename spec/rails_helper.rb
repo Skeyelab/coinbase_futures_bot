@@ -1,5 +1,37 @@
 # frozen_string_literal: true
 
+# Configure SimpleCov for code coverage
+require "simplecov"
+SimpleCov.start "rails" do
+  # Add any files or directories you want to exclude from coverage
+  add_filter "/spec/"
+  add_filter "/config/"
+  add_filter "/db/"
+  add_filter "/vendor/"
+  add_filter "/app/mailers/"
+
+  # Groups to organize coverage results
+  add_group "Controllers", "app/controllers"
+  add_group "Models", "app/models"
+  add_group "Services", "app/services"
+  add_group "Jobs", "app/jobs"
+  add_group "Channels", "app/channels"
+  add_group "Libraries", "lib"
+
+  # Minimum coverage thresholds
+  minimum_coverage 80
+  minimum_coverage_by_file 70
+
+  # Enable branch coverage
+  enable_coverage :branch
+end
+
+# Upload to Codecov when running in CI
+if ENV["CI"] || ENV["COVERAGE"]
+  require "codecov"
+  SimpleCov.formatter = SimpleCov::Formatter::Codecov
+end
+
 ENV["RAILS_ENV"] ||= "test"
 require File.expand_path("../config/environment", __dir__)
 abort("The Rails environment is running in production mode!") if Rails.env.production?

@@ -50,8 +50,10 @@ end
 
 group :test do
   gem "climate_control"
+  gem "codecov", require: false
   gem "factory_bot_rails", "~> 6.2"
   gem "rails-controller-testing"
+  gem "simplecov", require: false
   gem "vcr"
   gem "webmock"
 end

@@ -1,6 +1,7 @@
 # Coinbase Futures Bot
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
+[![codecov](https://codecov.io/gh/Skeyelab/coinbase_futures_bot/branch/main/graph/badge.svg)](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
 
 An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
@@ -26,6 +27,48 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 - **Jobs**: GoodJob with cron scheduling
 - **Testing**: RSpec with comprehensive coverage
 - **APIs**: Coinbase Advanced Trade, Exchange API, CryptoPanic
+
+## Testing & Code Coverage
+
+This project maintains a comprehensive test suite with **141 test examples** covering all critical functionality.
+
+### Coverage Reports
+
+- **Online**: [Codecov Dashboard](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
+- **Local**: Generated automatically when running tests with coverage
+
+### Running Tests with Coverage
+
+```bash
+# Run tests with coverage reporting
+COVERAGE=true bundle exec rspec
+
+# View local HTML coverage report
+open coverage/index.html
+
+# Or use the provided script
+./bin/view-coverage
+```
+
+### Coverage Scope
+
+The test suite focuses on the most critical components:
+
+- **Real-time Signal System**: WebSocket broadcasting, signal evaluation, and background processing
+- **Background Jobs**: Comprehensive testing of all scheduled jobs and error handling
+- **API Controllers**: Full REST API endpoint testing with authentication
+- **Market Data Integration**: WebSocket subscriber testing with VCR-recorded API responses
+- **Risk Management**: Position sizing, stop losses, and trade execution validation
+
+### Codecov Setup
+
+To enable Codecov uploads in CI:
+
+1. Sign up at [codecov.io](https://codecov.io)
+2. Add your repository
+3. Get your repository token
+4. Add `CODECOV_TOKEN` to GitHub repository secrets
+5. CI will automatically upload coverage reports
 
 ## Prerequisites
 - Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
