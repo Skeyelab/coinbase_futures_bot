@@ -1,71 +1,71 @@
 # frozen_string_literal: true
 
-require 'rails_helper'
-require 'json'
+require "rails_helper"
+require "json"
 
 RSpec.describe MarketData::CoinbaseRest, type: :service do
   let(:rest) { described_class.new }
-  let(:product_id) { 'BTC-USD' }
+  let(:product_id) { "BTC-USD" }
   # Use fixed timestamps for VCR cassette matching
-  let(:start_time) { Time.parse('2025-08-26T00:00:00Z') }
-  let(:end_time) { Time.parse('2025-08-27T00:00:00Z') }
+  let(:start_time) { Time.parse("2025-08-26T00:00:00Z") }
+  let(:end_time) { Time.parse("2025-08-27T00:00:00Z") }
 
   before do
-    @original_api_key = ENV['COINBASE_API_KEY']
-    @original_api_secret = ENV['COINBASE_API_SECRET']
-    ENV.delete('COINBASE_API_KEY')
-    ENV.delete('COINBASE_API_SECRET')
+    @original_api_key = ENV["COINBASE_API_KEY"]
+    @original_api_secret = ENV["COINBASE_API_SECRET"]
+    ENV.delete("COINBASE_API_KEY")
+    ENV.delete("COINBASE_API_SECRET")
   end
 
   after do
-    ENV['COINBASE_API_KEY'] = @original_api_key if @original_api_key
-    ENV['COINBASE_API_SECRET'] = @original_api_secret if @original_api_secret
+    ENV["COINBASE_API_KEY"] = @original_api_key if @original_api_key
+    ENV["COINBASE_API_SECRET"] = @original_api_secret if @original_api_secret
   end
 
-  describe 'initialization' do
-    it 'initializes with default base url' do
-      expect(rest.instance_variable_get(:@conn).url_prefix.to_s).to eq('https://api.exchange.coinbase.com/')
+  describe "initialization" do
+    it "initializes with default base url" do
+      expect(rest.instance_variable_get(:@conn).url_prefix.to_s).to eq("https://api.exchange.coinbase.com/")
     end
 
-    it 'initializes with custom base url' do
-      custom_rest = described_class.new(base_url: 'https://custom.example.com')
-      expect(custom_rest.instance_variable_get(:@conn).url_prefix.to_s).to eq('https://custom.example.com/')
+    it "initializes with custom base url" do
+      custom_rest = described_class.new(base_url: "https://custom.example.com")
+      expect(custom_rest.instance_variable_get(:@conn).url_prefix.to_s).to eq("https://custom.example.com/")
     end
 
-    it 'initializes without api credentials' do
+    it "initializes without api credentials" do
       ClimateControl.modify(COINBASE_API_KEY: nil, COINBASE_API_SECRET: nil) do
         rest = described_class.new
         expect(rest.instance_variable_get(:@authenticated)).to be false
       end
     end
 
-    it 'initializes with api credentials' do
-      ClimateControl.modify(COINBASE_API_KEY: 'test_key', COINBASE_API_SECRET: 'test_secret') do
+    it "initializes with api credentials" do
+      ClimateControl.modify(COINBASE_API_KEY: "test_key", COINBASE_API_SECRET: "test_secret") do
         rest = described_class.new
         expect(rest.instance_variable_get(:@authenticated)).to be true
       end
     end
   end
 
-  describe 'API calls' do
-    it 'list_products handles array response' do
-      with_api_vcr('list_products_array_response') do
+  describe "API calls" do
+    it "list_products handles array response" do
+      with_api_vcr("list_products_array_response") do
         products = rest.list_products
         expect(products).to be_an(Array)
-        expect(products.first).to have_key('id')
+        expect(products.first).to have_key("id")
       end
     end
 
-    it 'list_products handles hash response' do
-      with_api_vcr('list_products_hash_response') do
+    it "list_products handles hash response" do
+      with_api_vcr("list_products_hash_response") do
         products = rest.list_products
         expect(products).to be_an(Array)
-        expect(products.first).to have_key('id')
+        expect(products.first).to have_key("id")
       end
     end
 
-    it 'fetch_candles handles array response' do
-      with_api_vcr('fetch_candles_array_response', trim_responses: true) do
+    it "fetch_candles handles array response" do
+      with_api_vcr("fetch_candles_array_response", trim_responses: true) do
         candles = rest.fetch_candles(
           product_id: product_id,
           start_iso8601: start_time.iso8601,
@@ -77,8 +77,8 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
 
-    it 'fetch_candles handles hash response' do
-      with_api_vcr('fetch_candles_hash_response', trim_responses: true) do
+    it "fetch_candles handles hash response" do
+      with_api_vcr("fetch_candles_hash_response", trim_responses: true) do
         candles = rest.fetch_candles(
           product_id: product_id,
           start_iso8601: start_time.iso8601,
@@ -90,13 +90,13 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
 
-    it 'fetch_candles handles error response' do
-      with_api_vcr('fetch_candles_error_response') do
+    it "fetch_candles handles error response" do
+      with_api_vcr("fetch_candles_error_response") do
         # This test might fail if the API doesn't return an error for invalid parameters
         # We'll handle it gracefully
 
         rest.fetch_candles(
-          product_id: 'INVALID-PRODUCT',
+          product_id: "INVALID-PRODUCT",
           start_iso8601: start_time.iso8601,
           end_iso8601: end_time.iso8601,
           granularity: 3600
@@ -105,12 +105,12 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
         # Expected error for invalid product
         expect(e.response[:status]).to eq(404)
       rescue RuntimeError => e
-        expect(e.message).to include('API Error')
+        expect(e.message).to include("API Error")
       end
     end
 
-    it 'fetch_candles passes parameters' do
-      with_api_vcr('fetch_candles_with_parameters', trim_responses: true) do
+    it "fetch_candles passes parameters" do
+      with_api_vcr("fetch_candles_with_parameters", trim_responses: true) do
         # Use a supported granularity (300s for 5m instead of 1800s for 30m)
         candles = rest.fetch_candles(
           product_id: product_id,
@@ -122,21 +122,21 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
 
-    it 'upsert_1h_candles creates candles' do
-      with_integration_vcr('upsert_1h_candles_integration') do
+    it "upsert_1h_candles creates candles" do
+      with_integration_vcr("upsert_1h_candles_integration") do
         # Clear existing candles to avoid conflicts
-        Candle.where(timeframe: '1h', symbol: product_id).destroy_all
+        Candle.where(timeframe: "1h", symbol: product_id).destroy_all
 
         # May not create new ones if they exist
         expect do
           rest.upsert_1h_candles(product_id: product_id, start_time: start_time, end_time: end_time)
         end.to change { Candle.count }.by_at_least(0)
         # Verify candles exist and have correct format
-        candles = Candle.where(timeframe: '1h', symbol: product_id)
+        candles = Candle.where(timeframe: "1h", symbol: product_id)
         if candles.any?
           candle = candles.first
           expect(candle.symbol).to eq(product_id)
-          expect(candle.timeframe).to eq('1h')
+          expect(candle.timeframe).to eq("1h")
           expect(candle.open).to be_a(BigDecimal)
           expect(candle.high).to be_a(BigDecimal)
           expect(candle.low).to be_a(BigDecimal)
@@ -146,47 +146,47 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
 
-    it 'upsert_15m_candles creates 15m candles' do
-      with_integration_vcr('upsert_15m_candles_integration') do
+    it "upsert_15m_candles creates 15m candles" do
+      with_integration_vcr("upsert_15m_candles_integration") do
         # Clear existing candles to avoid conflicts
-        Candle.where(timeframe: '15m', symbol: product_id).destroy_all
+        Candle.where(timeframe: "15m", symbol: product_id).destroy_all
 
         expect do
           rest.upsert_15m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
         end.to change { Candle.count }.by_at_least(0)
 
-        candles = Candle.where(timeframe: '15m', symbol: product_id)
+        candles = Candle.where(timeframe: "15m", symbol: product_id)
         if candles.any?
           candle = candles.first
-          expect(candle.timeframe).to eq('15m')
+          expect(candle.timeframe).to eq("15m")
           expect(candle.symbol).to eq(product_id)
         end
       end
     end
 
-    it 'upsert_15m_candles uses chunked fetching for large ranges' do
+    it "upsert_15m_candles uses chunked fetching for large ranges" do
       large_start = 10.days.ago
       large_end = Time.now.utc
       expect_any_instance_of(described_class).not_to receive(:upsert_15m_candles_chunked) # sanity default
       expect(rest).to receive(:upsert_15m_candles_chunked).with(product_id: product_id, start_time: large_start,
-                                                                end_time: large_end)
+        end_time: large_end)
       rest.upsert_15m_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
 
-    it 'upsert_5m_candles creates 5m candles' do
-      with_integration_vcr('upsert_5m_candles_integration') do
+    it "upsert_5m_candles creates 5m candles" do
+      with_integration_vcr("upsert_5m_candles_integration") do
         # Clear existing candles to avoid conflicts
-        Candle.where(timeframe: '5m', symbol: product_id).destroy_all
+        Candle.where(timeframe: "5m", symbol: product_id).destroy_all
 
         expect do
           rest.upsert_5m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
         end.to change { Candle.count }.by_at_least(0)
 
-        candles = Candle.where(timeframe: '5m', symbol: product_id)
+        candles = Candle.where(timeframe: "5m", symbol: product_id)
         if candles.any?
           candle = candles.first
           expect(candle.symbol).to eq(product_id)
-          expect(candle.timeframe).to eq('5m')
+          expect(candle.timeframe).to eq("5m")
           expect(candle.open).to be_a(BigDecimal)
           expect(candle.high).to be_a(BigDecimal)
           expect(candle.low).to be_a(BigDecimal)
@@ -196,16 +196,16 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
 
-    it 'upsert_5m_candles uses chunked fetching for large ranges' do
+    it "upsert_5m_candles uses chunked fetching for large ranges" do
       large_start = 5.days.ago
       large_end = Time.now.utc
       expect_any_instance_of(described_class).not_to receive(:upsert_5m_candles_chunked) # sanity default
       expect(rest).to receive(:upsert_5m_candles_chunked).with(product_id: product_id, start_time: large_start,
-                                                               end_time: large_end)
+        end_time: large_end)
       rest.upsert_5m_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
 
-    it 'upsert_5m_candles_chunked processes chunks correctly' do
+    it "upsert_5m_candles_chunked processes chunks correctly" do
       mock_candles = [
         [1_754_930_700, 119_911.55, 120_177.23, 119_968.18, 120_069.34, 23.20361858],
         [1_754_931_000, 120_069.34, 120_200.00, 120_000.00, 120_150.00, 45.12345678]
@@ -214,27 +214,27 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       allow(rest).to receive(:fetch_candles).and_return(mock_candles)
       expect do
         rest.upsert_5m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time,
-                                       chunk_days: 1)
+          chunk_days: 1)
       end.to change { Candle.count }.by(2)
 
-      candle = Candle.find_by(timeframe: '5m')
-      expect(candle.timeframe).to eq('5m')
+      candle = Candle.find_by(timeframe: "5m")
+      expect(candle.timeframe).to eq("5m")
       expect(candle.symbol).to eq(product_id)
     end
 
-    it 'upsert_5m_candles_chunked handles API errors gracefully' do
-      allow(rest).to receive(:fetch_candles).and_raise('API Error')
+    it "upsert_5m_candles_chunked handles API errors gracefully" do
+      allow(rest).to receive(:fetch_candles).and_raise("API Error")
 
       expect do
         rest.upsert_5m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time,
-                                       chunk_days: 1)
+          chunk_days: 1)
       end.not_to raise_error
 
       # Should not create any candles due to error
-      expect(Candle.where(timeframe: '5m')).to be_empty
+      expect(Candle.where(timeframe: "5m")).to be_empty
     end
 
-    it '5m candle integration test - complete workflow' do
+    it "5m candle integration test - complete workflow" do
       # Mock API response with realistic 5m candle data
       mock_candles = [
         [1_754_930_700, 119_911.55, 120_177.23, 119_968.18, 120_069.34, 23.20361858],
@@ -245,50 +245,50 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       allow(rest).to receive(:fetch_candles).and_return(mock_candles)
 
       # Verify no 5m candles exist initially
-      expect(Candle.where(timeframe: '5m')).to be_empty
+      expect(Candle.where(timeframe: "5m")).to be_empty
 
       # Call the 5m candle upsert method
       rest.upsert_5m_candles(product_id: product_id, start_time: start_time, end_time: end_time)
 
       # Verify candles were created
-      candles = Candle.where(timeframe: '5m').order(:timestamp)
+      candles = Candle.where(timeframe: "5m").order(:timestamp)
       expect(candles.count).to eq(3)
 
       # Verify first candle data
       first_candle = candles.first
-      expect(first_candle.symbol).to eq('BTC-USD')
-      expect(first_candle.timeframe).to eq('5m')
+      expect(first_candle.symbol).to eq("BTC-USD")
+      expect(first_candle.timeframe).to eq("5m")
       expect(first_candle.timestamp).to eq(Time.at(1_754_930_700).utc)
-      expect(first_candle.open).to eq(BigDecimal('119968.18'))
-      expect(first_candle.high).to eq(BigDecimal('120177.23'))
-      expect(first_candle.low).to eq(BigDecimal('119911.55'))
-      expect(first_candle.close).to eq(BigDecimal('120069.34'))
-      expect(first_candle.volume).to eq(BigDecimal('23.20361858'))
+      expect(first_candle.open).to eq(BigDecimal("119968.18"))
+      expect(first_candle.high).to eq(BigDecimal("120177.23"))
+      expect(first_candle.low).to eq(BigDecimal("119911.55"))
+      expect(first_candle.close).to eq(BigDecimal("120069.34"))
+      expect(first_candle.volume).to eq(BigDecimal("23.20361858"))
 
       # Verify second candle data
       second_candle = candles.second
       expect(second_candle.timestamp).to eq(Time.at(1_754_931_000).utc)
-      expect(second_candle.open).to eq(BigDecimal('120000.00'))
-      expect(second_candle.high).to eq(BigDecimal('120200.00'))
-      expect(second_candle.low).to eq(BigDecimal('120069.34'))
-      expect(second_candle.close).to eq(BigDecimal('120150.00'))
-      expect(second_candle.volume).to eq(BigDecimal('45.12345678'))
+      expect(second_candle.open).to eq(BigDecimal("120000.00"))
+      expect(second_candle.high).to eq(BigDecimal("120200.00"))
+      expect(second_candle.low).to eq(BigDecimal("120069.34"))
+      expect(second_candle.close).to eq(BigDecimal("120150.00"))
+      expect(second_candle.volume).to eq(BigDecimal("45.12345678"))
 
       # Verify third candle data
       third_candle = candles.third
       expect(third_candle.timestamp).to eq(Time.at(1_754_931_300).utc)
-      expect(third_candle.open).to eq(BigDecimal('120100.00'))
-      expect(third_candle.high).to eq(BigDecimal('120300.00'))
-      expect(third_candle.low).to eq(BigDecimal('120150.00'))
-      expect(third_candle.close).to eq(BigDecimal('120250.00'))
-      expect(third_candle.volume).to eq(BigDecimal('67.89012345'))
+      expect(third_candle.open).to eq(BigDecimal("120100.00"))
+      expect(third_candle.high).to eq(BigDecimal("120300.00"))
+      expect(third_candle.low).to eq(BigDecimal("120150.00"))
+      expect(third_candle.close).to eq(BigDecimal("120250.00"))
+      expect(third_candle.volume).to eq(BigDecimal("67.89012345"))
     end
 
-    it 'upsert_1h_candles uses chunked fetching for large ranges' do
+    it "upsert_1h_candles uses chunked fetching for large ranges" do
       large_start = 10.days.ago
       large_end = Time.now.utc
       expect(rest).to receive(:upsert_1h_candles_chunked).with(product_id: product_id, start_time: large_start,
-                                                               end_time: large_end)
+        end_time: large_end)
       rest.upsert_1h_candles(product_id: product_id, start_time: large_start, end_time: large_end)
     end
   end
