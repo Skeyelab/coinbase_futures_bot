@@ -96,10 +96,6 @@ jobs:
           echo "Starting test suite..."
           echo "Running: bundle exec rspec --format documentation --backtrace"
           bundle exec rspec --format documentation --backtrace
-          rspec_exit_code=$?
-          echo "RSpec completed with exit code: $rspec_exit_code"
-          echo "Test suite completed with exit code: $rspec_exit_code"
-          exit $rspec_exit_code
         env:
           # Ensure VCR uses cached cassettes in CI
           VCR_RECORD_MODE: none
