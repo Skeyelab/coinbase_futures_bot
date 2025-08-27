@@ -24,10 +24,8 @@ RSpec.describe "day_trading:check_positions", type: :task do
     }
     allow(manager).to receive(:get_position_summary).and_return(summary)
 
-    expect { task.execute }.to output(/Open positions: 3/).to_stdout
-    expect { task.execute }.to output(/Closed today: 2/).to_stdout
-    expect { task.execute }.to output(/Total PnL: 250\.0/).to_stdout
-    expect { task.execute }.to output(/Positions needing closure: 1/).to_stdout
+    # Capture all output from a single task execution
+    expect { task.execute }.to output(/Open positions: 3.*Closed today: 2.*Total PnL: 250\.0.*Positions needing closure: 1/m).to_stdout
   end
 
   it "handles empty positions gracefully" do
@@ -131,9 +129,8 @@ RSpec.describe "day_trading:check_tp_sl", type: :task do
     # Mock user input
     allow($stdin).to receive(:gets).and_return("yes\n")
 
-    expect { task.execute }.to output(%r{Found 1 positions with triggered TP/SL}).to_stdout
-    expect { task.execute }.to output(/Position 1: LONG 1\.0 BIT-29AUG25-CDE/).to_stdout
-    expect { task.execute }.to output(%r{✅ Closed 1 TP/SL positions}).to_stdout
+    # Capture all output from a single task execution
+    expect { task.execute }.to output(/Found 1 positions with triggered TP\/SL.*Position 1: LONG 1\.0 BIT-29AUG25-CDE.*✅ Closed 1 TP\/SL positions/m).to_stdout
   end
 
   it "shows no triggers message when none exist" do
@@ -181,9 +178,8 @@ RSpec.describe "day_trading:pnl", type: :task do
     allow(position1).to receive(:calculate_pnl).with(51_000.0).and_return(100.0)
     allow(position2).to receive(:calculate_pnl).with(2900.0).and_return(150.0)
 
-    expect { task.execute }.to output(/Current PnL for open day trading positions: 250\.0/).to_stdout
-    expect { task.execute }.to output(/BIT-29AUG25-CDE: LONG 1\.0 - PnL: 100\.0/).to_stdout
-    expect { task.execute }.to output(/ET-29AUG25-CDE: SHORT 2\.0 - PnL: 150\.0/).to_stdout
+    # Capture all output from a single task execution
+    expect { task.execute }.to output(/Current PnL for open day trading positions: 250\.0.*BIT-29AUG25-CDE: LONG 1\.0 - PnL: 100\.0.*ET-29AUG25-CDE: SHORT 2\.0 - PnL: 150\.0/m).to_stdout
   end
 
   it "handles positions without price data" do
