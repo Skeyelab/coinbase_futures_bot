@@ -22,25 +22,25 @@ class RealTimeSignalJob < ApplicationJob
   private
 
   def cleanup_expired_signals
-    expired_count = SignalAlert.where('expires_at < ?', Time.current.utc)
-                               .where(alert_status: 'active')
-                               .update_all(alert_status: 'expired', updated_at: Time.current.utc)
+    expired_count = SignalAlert.where("expires_at < ?", Time.current.utc)
+      .where(alert_status: "active")
+      .update_all(alert_status: "expired", updated_at: Time.current.utc)
 
     Rails.logger.info("[RTSJ] Cleaned up #{expired_count} expired signal alerts") if expired_count > 0
-  rescue StandardError => e
+  rescue => e
     Rails.logger.error("[RTSJ] Error cleaning up expired signals: #{e.message}")
   end
 
   def log_signal_stats
     stats = {
       active_signals: SignalAlert.active.count,
-      triggered_signals: SignalAlert.triggered.where('alert_timestamp >= ?', 1.hour.ago).count,
-      high_confidence_signals: SignalAlert.high_confidence.where('alert_timestamp >= ?', 1.hour.ago).count,
-      expired_signals: SignalAlert.expired.where('updated_at >= ?', 1.hour.ago).count
+      triggered_signals: SignalAlert.triggered.where("alert_timestamp >= ?", 1.hour.ago).count,
+      high_confidence_signals: SignalAlert.high_confidence.where("alert_timestamp >= ?", 1.hour.ago).count,
+      expired_signals: SignalAlert.expired.where("updated_at >= ?", 1.hour.ago).count
     }
 
     Rails.logger.info("[RTSJ] Signal stats: #{stats.inspect}")
-  rescue StandardError => e
+  rescue => e
     Rails.logger.error("[RTSJ] Error logging signal stats: #{e.message}")
   end
 
