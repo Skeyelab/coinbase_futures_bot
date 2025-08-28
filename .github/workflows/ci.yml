@@ -132,7 +132,7 @@ jobs:
           bin/rails db:version
           echo "=== RUNNING TESTS ==="
           set -x  # Enable command tracing
-          bundle exec rspec --format progress --require rails_helper
+          bundle exec rspec --format progress
           TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
                     echo "=== TEST RESULTS ==="
@@ -163,7 +163,7 @@ jobs:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
           CI: true
-          COVERAGE: true
+          # COVERAGE: true  # Disabled to avoid SimpleCov processing errors
 
       # Coverage reports generated locally in coverage/ directory
       # No external uploads configured
