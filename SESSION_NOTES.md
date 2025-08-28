@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-01-27 17:00 UTC
+- Context: Enhanced CI debugging to identify root cause of exit code 1 despite tests passing
+- Changes:
+  - **Added comprehensive environment debugging**: New step to log environment variables, paths, and system info
+  - **Enabled command tracing**: Added `set -x` to show exact commands being executed
+  - **Enhanced test step debugging**: Added Ruby version, bundle version, and working directory info
+  - **Added database status check**: Verify database connection and version before tests
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m "ci: enhance debugging with environment info and command tracing"`
+  - `git push origin feat/realtime-signals-system`
+- Files touched:
+  - `.github/workflows/ci.yml` (added environment debug step and enhanced test debugging)
+- Next steps:
+  - Monitor next CI run for comprehensive debugging output
+  - Identify environment or configuration issues causing exit code 1
+  - Fix underlying issue once root cause is determined
+
 #### 2025-01-27 16:45 UTC
 - Context: CI tests passing but still exiting with error code 1, investigating root cause
 - Changes:
