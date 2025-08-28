@@ -26,6 +26,26 @@
 
 ### Session log
 
+#### 2025-01-27 17:15 UTC
+- Context: Fixed critical CI workflow issue - workflow was not running on feature branches!
+- Changes:
+  - **Added feature branch triggers**: Updated workflow to run on `feat/**` branches (was only `main`)
+  - **Added version identifier**: Added timestamp comment to force workflow cache refresh
+  - **Enhanced debugging**: Added comprehensive environment variable logging and command tracing
+  - **Explicit exit code handling**: Added proper exit code capture and reporting
+- Root cause identified:
+  - **Workflow trigger issue**: CI was only configured for `main` branch, so changes on `feat/realtime-signals-system` weren't triggering workflow updates
+  - **Cache issue**: GitHub Actions was using cached version of workflow
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m "ci: fix workflow triggers and enhance debugging"`
+  - `git push origin feat/realtime-signals-system`
+- Files touched:
+  - `.github/workflows/ci.yml` (added feature branch triggers, version identifier, enhanced debugging)
+- Next steps:
+  - Monitor next CI run for comprehensive debugging output
+  - Should now see environment debug step and enhanced test logging
+  - Identify the actual cause of exit code 1
+
 #### 2025-01-27 17:00 UTC
 - Context: Enhanced CI debugging to identify root cause of exit code 1 despite tests passing
 - Changes:
