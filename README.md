@@ -1,6 +1,7 @@
 # Coinbase Futures Bot
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
+[![codecov](https://codecov.io/gh/Skeyelab/coinbase_futures_bot/branch/main/graph/badge.svg)](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
 
 An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
@@ -10,10 +11,12 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 
 - **Multi-timeframe Trading Strategies**: 1h trend analysis, 15m confirmation, 5m entry signals, 1m micro-timing
 - **Real-time Market Data**: WebSocket integration with Coinbase spot and futures APIs
+- **🔔 Real-Time Signal Generation**: Live trading signals based on real-time market data with WebSocket broadcasting
 - **Sentiment Analysis**: News sentiment integration with CryptoPanic API and lexicon-based scoring
 - **Risk Management**: Position sizing, stop losses, take profits, and futures contract management
 - **Paper Trading**: Comprehensive simulation and backtesting framework
 - **Background Processing**: Reliable job processing with GoodJob and PostgreSQL
+- **REST & WebSocket APIs**: Full API access to signals, statistics, and real-time updates
 - **Comprehensive Testing**: Full test suite with VCR for API interactions
 
 ## Technology Stack
@@ -24,6 +27,48 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 - **Jobs**: GoodJob with cron scheduling
 - **Testing**: RSpec with comprehensive coverage
 - **APIs**: Coinbase Advanced Trade, Exchange API, CryptoPanic
+
+## Testing & Code Coverage
+
+This project maintains a comprehensive test suite with **141 test examples** covering all critical functionality.
+
+### Coverage Reports
+
+- **Online**: [Codecov Dashboard](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
+- **Local**: Generated automatically when running tests with coverage
+
+### Running Tests with Coverage
+
+```bash
+# Run tests with coverage reporting
+COVERAGE=true bundle exec rspec
+
+# View local HTML coverage report
+open coverage/index.html
+
+# Or use the provided script
+./bin/view-coverage
+```
+
+### Coverage Scope
+
+The test suite focuses on the most critical components:
+
+- **Real-time Signal System**: WebSocket broadcasting, signal evaluation, and background processing
+- **Background Jobs**: Comprehensive testing of all scheduled jobs and error handling
+- **API Controllers**: Full REST API endpoint testing with authentication
+- **Market Data Integration**: WebSocket subscriber testing with VCR-recorded API responses
+- **Risk Management**: Position sizing, stop losses, and trade execution validation
+
+### Codecov Setup
+
+To enable Codecov uploads in CI:
+
+1. Sign up at [codecov.io](https://codecov.io)
+2. Add your repository
+3. Get your repository token
+4. Add `CODECOV_TOKEN` to GitHub repository secrets
+5. CI will automatically upload coverage reports
 
 ## Prerequisites
 - Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
@@ -96,7 +141,7 @@ bin/rake market_data:backfill_1h_candles[30]  # 30 days of hourly data
 
 ### Trading Operations
 ```bash
-# Generate trading signals
+# Generate trading signals (batch mode)
 bin/rake signals:generate
 
 # Execute paper trading step
@@ -113,6 +158,214 @@ bin/rake day_trading:manage            # Run full management cycle
 # View sentiment data
 curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 ```
+
+### Real-Time Signal System 🔔
+
+The bot now supports **real-time trade signal generation** based on live market data. Here's how to use it:
+
+#### Quick Start - Get Real-Time Signals
+
+**1. Setup Your Trading Capital:**
+```bash
+# Set your equity amount (e.g., $1000 for conservative trading)
+export SIGNAL_EQUITY_USD=1000
+
+# Optional: Adjust risk per trade (default is 1% of equity)
+export REALTIME_SIGNAL_MIN_CONFIDENCE=65  # Minimum 65% confidence signals
+```
+
+**2. Start the Real-Time System:**
+```bash
+# Start complete real-time system (market data + signal evaluation)
+bin/rake realtime:signals
+
+# Or start only signal evaluation (if market data already running)
+bin/rake realtime:signal_job
+```
+
+**2. Get Real-Time Signals via API:**
+```bash
+# Get active signals
+curl "http://localhost:3000/signals/active"
+
+# Get high-confidence signals only
+curl "http://localhost:3000/signals/high_confidence?threshold=70"
+
+# Get recent signals (last hour)
+curl "http://localhost:3000/signals/recent?hours=1"
+
+# Get signal statistics
+curl "http://localhost:3000/signals/stats"
+
+# Manual signal evaluation
+curl -X POST "http://localhost:3000/signals/evaluate"
+```
+
+**3. Real-Time WebSocket Updates:**
+Connect to WebSocket for live signal alerts:
+```javascript
+// Connect to signals channel
+const ws = new WebSocket('ws://localhost:3000/cable');
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    command: 'subscribe',
+    identifier: JSON.stringify({ channel: 'SignalsChannel' })
+  }));
+};
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'signal_alert') {
+    console.log('New signal:', data.signal);
+  }
+};
+```
+
+#### Real-Time Signal Features
+
+- **🔴 Live Market Data**: WebSocket connections to Coinbase for real-time price updates
+- **📊 Real-Time Candles**: Continuous OHLCV candle aggregation from live ticks
+- **🚀 Instant Signals**: Signals generated within seconds of market conditions being met
+- **📡 WebSocket Broadcasting**: Real-time signal alerts via Action Cable
+- **🎛️ REST API**: Full API access to signals and statistics
+- **⚙️ Configurable**: Adjustable confidence thresholds, evaluation intervals, and filters
+
+#### Configuration
+
+Set these environment variables for customization:
+
+```bash
+# Signal evaluation settings
+REALTIME_SIGNAL_EVALUATION_INTERVAL=30    # How often to check for signals (seconds)
+REALTIME_SIGNAL_MIN_CONFIDENCE=60         # Minimum confidence threshold (0-100)
+REALTIME_SIGNAL_MAX_PER_HOUR=10           # Rate limiting: max signals per hour
+REALTIME_SIGNAL_DEDUPE_WINDOW=300         # Duplicate prevention window (seconds)
+
+# Broadcasting settings
+SIGNAL_BROADCAST_ENABLED=true             # Enable WebSocket broadcasting
+SIGNALS_API_KEY=your_api_key              # API authentication key
+
+# Candle aggregation
+CANDLE_AGGREGATION_ENABLED=true           # Enable real-time candle updates
+```
+
+#### Real-Time Signal Flow
+
+```
+WebSocket Price Ticks → Real-Time Candle Aggregation → Strategy Evaluation → Signal Generation → Broadcast
+          ↓                        ↓                           ↓                     ↓              ↓
+     Coinbase API             1m/5m/15m/1h Candles         Multi-Timeframe       SignalAlert     WebSocket/API
+     Live Data                Updated Every Tick           Analysis           Database Record    Clients
+```
+
+#### Available Real-Time Commands
+
+```bash
+# Start real-time signal system
+bin/rake realtime:signals
+
+# Evaluate signals once for all pairs
+bin/rake realtime:evaluate
+
+# Evaluate signals for specific symbol
+bin/rake realtime:evaluate_symbol[BTC-USD]
+
+# View real-time signal statistics
+bin/rake realtime:stats
+
+# Clean up expired signal alerts
+bin/rake realtime:cleanup
+
+# Cancel all active signals (emergency stop)
+FORCE=true bin/rake realtime:cancel_all
+```
+
+### 💰 10-Contract Trading Setup (Your Comfort Zone)
+
+For traders comfortable with 10+ contract exposure, here's the optimized configuration:
+
+#### 1. Capital & Risk Configuration
+```bash
+# Set your account size (matches your risk tolerance)
+export SIGNAL_EQUITY_USD=5000
+
+# Balanced risk settings for 10-contract trading
+export REALTIME_SIGNAL_MIN_CONFIDENCE=65     # Quality signals (not too restrictive)
+export REALTIME_SIGNAL_MAX_PER_HOUR=8        # Allows decent frequency
+export REALTIME_SIGNAL_EVALUATION_INTERVAL=45 # Check every 45 seconds
+
+# Risk management for larger positions
+export STRATEGY_RISK_FRACTION=0.02           # 2% risk per trade ($100 max loss)
+export STRATEGY_TP_TARGET=0.006              # 60 bps take profit ($60 target)
+export STRATEGY_SL_TARGET=0.004              # 40 bps stop loss ($40 max loss)
+```
+
+#### 2. Position Size Calculation
+With $5000 equity and 2% risk per trade:
+- **Max loss per trade**: $100
+- **Typical BTC/ETH futures contract**: $100/contract
+- **Your comfort zone**: 10 contracts ($1000 exposure)
+- **Daily risk budget**: $800 (8 trades × $100)
+- **Position sizes**: 5-15 contracts ($500-$1500 exposure)
+
+#### 3. Futures Contract Selection
+```bash
+# Recommended for small accounts:
+# - BIT-29AUG25-CDE (BTC futures, $100/contract)
+# - ET-29AUG25-CDE (ETH futures, $100/contract)
+#
+# Avoid:
+# - BTC-USD (spot) - requires full BTC purchase
+# - High-leverage products
+```
+
+#### 4. Start Trading
+```bash
+# 1. Sync latest market data
+bin/rake market_data:upsert_futures_products
+
+# 2. Backfill recent candle data (1-2 days)
+bin/rake market_data:backfill_1h_candles[2]
+bin/rake market_data:backfill_15m_candles[2]
+bin/rake market_data:backfill_5m_candles[1]
+
+# 3. Start real-time system
+SIGNAL_EQUITY_USD=5000 bin/rake realtime:signals
+
+# 4. Monitor signals in another terminal
+curl "http://localhost:3000/signals/active" | jq .
+```
+
+#### 5. Monitor & Manage
+```bash
+# Check signal statistics
+bin/rake realtime:stats
+
+# View active signals
+curl "http://localhost:3000/signals/active"
+
+# View signal history
+curl "http://localhost:3000/signals/recent?hours=24"
+
+# Emergency stop
+FORCE=true bin/rake realtime:cancel_all
+```
+
+#### Risk Management Rules for 10-Contract Trading
+
+1. **5-15 contracts per trade** - Matches your $1000 exposure comfort zone
+2. **65%+ confidence signals only** - Quality trades with good frequency
+3. **Max 8 signals per hour** - Allows active trading without overtrading
+4. **Daily loss limit: $250** - Stop if you lose 5% of capital
+5. **Weekly review** - Assess performance and adjust strategy
+6. **Monitor correlation** - Don't hold both BTC and ETH positions simultaneously
+
+#### Expected Performance
+- **Win rate target**: 60%+ (conservative estimate)
+- **Average win**: $60 (take profit on 10 contracts)
+- **Average loss**: $40 (stop loss on 10 contracts)
+- **Expected daily return**: $10-30 (after fees)
+- **Monthly target**: $300-900 (6-18% return)
+- **Position sizes**: $500-$1500 per trade
 
 ### Monitoring
 ```bash

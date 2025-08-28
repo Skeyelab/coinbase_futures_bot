@@ -4,11 +4,12 @@ require "websocket-client-simple"
 
 module MarketData
   class CoinbaseSpotSubscriber
-    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil)
+    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true)
       @product_ids = Array(product_ids)
       @logger = logger
       @on_ticker = on_ticker
       @ws = nil
+      @candle_aggregator = enable_candle_aggregation ? RealTimeCandleAggregator.new(logger: logger) : nil
     end
 
     def start
@@ -95,6 +96,10 @@ module MarketData
               "time" => tick_time
             }
             @logger.debug("[MD-Spot] ticker: #{normalized.slice("product_id", "price", "time")}")
+
+            # Update real-time candles
+            @candle_aggregator&.process_tick(normalized)
+
             @on_ticker&.call(normalized)
           end
         end
@@ -102,15 +107,19 @@ module MarketData
       end
 
       # Legacy schema (flat type)
-      if data["type"] == "ticker"
-        normalized = {
-          "product_id" => data["product_id"],
-          "price" => data["price"],
-          "time" => data["time"] || data["ts"] || data["timestamp"]
-        }
-        @logger.debug("[MD-Spot] ticker: #{normalized.slice("product_id", "price", "time")}")
-        @on_ticker&.call(normalized)
-      end
+      return unless data["type"] == "ticker"
+
+      normalized = {
+        "product_id" => data["product_id"],
+        "price" => data["price"],
+        "time" => data["time"] || data["ts"] || data["timestamp"]
+      }
+      @logger.debug("[MD-Spot] ticker: #{normalized.slice("product_id", "price", "time")}")
+
+      # Update real-time candles
+      @candle_aggregator&.process_tick(normalized)
+
+      @on_ticker&.call(normalized)
     end
   end
 end

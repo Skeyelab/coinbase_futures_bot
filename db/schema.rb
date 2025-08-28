@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_27_033727) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_28_044757) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -201,6 +201,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_27_033727) do
     t.jsonb "strategy_data"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "triggered_at"
   end
 
   create_table "ticks", force: :cascade do |t|

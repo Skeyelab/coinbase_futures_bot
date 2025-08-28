@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Script to view local coverage report
+# Usage: ./bin/view-coverage
+
+if [ ! -f "coverage/index.html" ]; then
+  echo "❌ Coverage report not found. Run tests with coverage first:"
+  echo "   COVERAGE=true bundle exec rspec"
+  exit 1
+fi
+
+echo "📊 Opening coverage report..."
+if command -v open &> /dev/null; then
+  open coverage/index.html
+elif command -v xdg-open &> /dev/null; then
+  xdg-open coverage/index.html
+else
+  echo "🌐 Coverage report available at: file://$(pwd)/coverage/index.html"
+fi

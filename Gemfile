@@ -50,6 +50,7 @@ end
 
 group :test do
   gem "climate_control"
+  # Codecov integration removed - no external uploads needed
   gem "factory_bot_rails", "~> 6.2"
   gem "rails-controller-testing"
   gem "vcr"

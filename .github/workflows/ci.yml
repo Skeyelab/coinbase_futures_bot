@@ -1,10 +1,15 @@
 name: CI
 
 on:
+  pull_request:
+    branches: [ main, feat/** ]
+    types: [opened, synchronize, reopened]
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+
+# Force workflow refresh - v20250127-1745
+# This is a completely new workflow file to force cache refresh
+# UNIQUE_CACHE_BREAKER_ID: WORKFLOW_REFRESH_ATTEMPT_4_1745
 
 env:
   RAILS_ENV: test
@@ -77,7 +82,6 @@ jobs:
           path: |
             tmp/
             .rspec_status
-            coverage/
             spec/fixtures/vcr_cassettes/
           key: ${{ runner.os }}-test-cache-${{ hashFiles('db/**/*', 'spec/**/*', 'Gemfile.lock') }}
           restore-keys: |
@@ -92,18 +96,75 @@ jobs:
           bin/rails db:test:prepare
           echo "Database setup complete"
 
-      - name: Run tests
+      - name: Debug environment
+        run: |
+          echo "=== WORKFLOW CACHE TEST - If you see this, cache is refreshed! ==="
+          echo "Current timestamp: $(date +%s)"
+          echo "Workflow file hash: $(sha256sum .github/workflows/ci.yml | cut -d' ' -f1)"
+          echo "=== Environment Debug Info ==="
+          echo "RAILS_ENV: $RAILS_ENV"
+          echo "DATABASE_URL: $DATABASE_URL"
+          echo "BUNDLE_GEMFILE: $BUNDLE_GEMFILE"
+          echo "GEM_HOME: $GEM_HOME"
+          echo "PATH: $PATH"
+          echo "Current working directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          echo "Rails version:"
+          bin/rails --version
+          echo "Database status:"
+          bin/rails db:version
+          echo "=== End Environment Debug ==="
+
+      - name: Run tests with enhanced debugging
         timeout-minutes: 15
         run: |
-          echo "Starting test suite..."
+          # Disable 'exit on error' for this block; we'll control exit codes manually
+          set +e
+          echo "=== STARTING TEST SUITE WITH ENHANCED DEBUGGING ==="
           echo "Database URL: $DATABASE_URL"
           echo "Rails env: $RAILS_ENV"
-          echo "Running: bundle exec rspec --format documentation --backtrace"
-          bundle exec rspec --format documentation --backtrace
+          echo "Current directory: $(pwd)"
+          echo "Ruby version: $(ruby --version)"
+          echo "Bundle version: $(bundle --version)"
+          echo "=== ENVIRONMENT VARIABLES ==="
+          env | grep -E "(DATABASE|RAILS|BUNDLE|PATH)" | sort
+          echo "=== CHECKING DATABASE CONNECTION ==="
+          bin/rails db:version
+          echo "=== RUNNING TESTS ==="
+          set -x  # Enable command tracing
+          bundle exec rspec --format progress
+          TEST_EXIT_CODE=$?
+          set +x  # Disable command tracing
+                    echo "=== TEST RESULTS ==="
+          echo "Test exit code: $TEST_EXIT_CODE"
+          echo "Tests completed"
+
+          # Check for any background processes or cleanup issues
+          echo "=== CHECKING FOR BACKGROUND PROCESSES ==="
+          ps aux | grep -E "(ruby|rspec|rails)" | grep -v grep || echo "No Ruby processes found"
+          echo "=== CHECKING FOR DATABASE CONNECTIONS ==="
+          bin/rails db:version 2>/dev/null && echo "Database still accessible" || echo "Database connection closed"
+          echo "=== CHECKING FOR FILE DESCRIPTORS ==="
+          lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
+
+          # Check if there were any errors in the test output
+          echo "=== CHECKING FOR ERRORS IN TEST OUTPUT ==="
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
+            exit $TEST_EXIT_CODE
+          else
+            echo "✅ Tests passed successfully"
+            exit 0
+          fi
         env:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
           CI: true
+          # COVERAGE: true  # Disabled to avoid SimpleCov processing errors
+
+      # Coverage reports generated locally in coverage/ directory
+      # No external uploads configured
 
   # Optional: Add a job that runs only when tests pass
   success:
