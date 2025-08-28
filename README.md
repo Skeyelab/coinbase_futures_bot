@@ -50,6 +50,23 @@ open coverage/index.html
 ./bin/view-coverage
 ```
 
+### Random Test Execution
+
+Tests are configured to run in random order to catch hidden dependencies and ensure test independence:
+
+```bash
+# Tests run in random order by default
+bundle exec rspec
+
+# Run with specific seed for debugging
+bundle exec rspec --seed 12345
+
+# Run without randomization (for debugging)
+bundle exec rspec --order defined
+```
+
+For detailed information about random test execution, see [docs/RANDOM_TEST_EXECUTION.md](docs/RANDOM_TEST_EXECUTION.md).
+
 ### Coverage Scope
 
 The test suite focuses on the most critical components:

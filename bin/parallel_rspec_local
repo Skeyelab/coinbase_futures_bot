@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Parallel RSpec runner optimized for local development
+# Uses 8 processes for maximum local performance
+
+require 'bundler/setup'
+
+# Copy local config to active config
+system('cp .parallel_rspec_config.local .parallel_rspec_config')
+
+# Run parallel tests with local optimization
+exec 'bundle', 'exec', 'parallel_rspec', 'spec/'

@@ -10,4 +10,10 @@ RSpec.configure do |config|
   end
 
   config.shared_context_metadata_behavior = :apply_to_host_groups
+
+  # Configure random order execution with seed reporting
+  config.order = :random
+
+  # Print the seed for reproducible test runs
+  Kernel.srand config.seed
 end
