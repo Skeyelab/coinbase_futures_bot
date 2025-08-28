@@ -8,6 +8,9 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 require "rspec/rails"
 require "factory_bot_rails"
 
+# Require rails-controller-testing for Rails 8 compatibility
+require "rails-controller-testing"
+
 # Test profiling (only load when needed to avoid overhead)
 if ENV["SAMPLE"] || ENV["RPROF"] || ENV["STACKPROF"] || ENV["TAG_PROF"]
   require "test_prof"
@@ -40,6 +43,9 @@ RSpec.configure do |config|
 
   config.include ActiveJob::TestHelper
   config.include FactoryBot::Syntax::Methods
+
+  # Enable controller testing features for Rails 8
+  Rails::Controller::Testing.install
 
   # Add custom formatter for clear test identification
   config.add_formatter TestNameFormatter
