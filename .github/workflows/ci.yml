@@ -91,6 +91,23 @@ jobs:
           bin/rails db:migrate
           bin/rails db:test:prepare
           echo "Database setup complete"
+          
+      - name: Debug environment
+        run: |
+          echo "=== Environment Debug Info ==="
+          echo "RAILS_ENV: $RAILS_ENV"
+          echo "DATABASE_URL: $DATABASE_URL"
+          echo "BUNDLE_GEMFILE: $BUNDLE_GEMFILE"
+          echo "GEM_HOME: $GEM_HOME"
+          echo "PATH: $PATH"
+          echo "Current working directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          echo "Rails version:"
+          bin/rails --version
+          echo "Database status:"
+          bin/rails db:version
+          echo "=== End Environment Debug ==="
 
       - name: Run tests
         timeout-minutes: 15
@@ -98,10 +115,15 @@ jobs:
           echo "Starting test suite..."
           echo "Database URL: $DATABASE_URL"
           echo "Rails env: $RAILS_ENV"
+          echo "Current directory: $(pwd)"
+          echo "Ruby version: $(ruby --version)"
+          echo "Bundle version: $(bundle --version)"
           echo "Running: bundle exec rspec --format progress"
+          set -x  # Enable command tracing
           bundle exec rspec --format progress
           echo "Test exit code: $?"
           echo "Tests completed successfully"
+          set +x  # Disable command tracing
         env:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
