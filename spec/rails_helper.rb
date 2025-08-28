@@ -43,7 +43,7 @@ RSpec.configure do |config|
 
   config.include ActiveJob::TestHelper
   config.include FactoryBot::Syntax::Methods
-  
+
   # Enable controller testing features for Rails 8
   Rails::Controller::Testing.install
 

@@ -58,7 +58,7 @@ group :test do
 
   # Test profiling and optimization
   gem "test-prof", "~> 1.2", require: false
-  
+
   # JUnit XML output for CI systems
   gem "rspec_junit_formatter", "~> 0.6"
 end
