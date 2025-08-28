@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/** ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, feat/** ]
+
+# Force workflow refresh - v20250127-1700
 
 env:
   RAILS_ENV: test
@@ -109,21 +111,28 @@ jobs:
           bin/rails db:version
           echo "=== End Environment Debug ==="
 
-      - name: Run tests
+      - name: Run tests with enhanced debugging
         timeout-minutes: 15
         run: |
-          echo "Starting test suite..."
+          echo "=== STARTING TEST SUITE WITH ENHANCED DEBUGGING ==="
           echo "Database URL: $DATABASE_URL"
           echo "Rails env: $RAILS_ENV"
           echo "Current directory: $(pwd)"
           echo "Ruby version: $(ruby --version)"
           echo "Bundle version: $(bundle --version)"
-          echo "Running: bundle exec rspec --format progress"
+          echo "=== ENVIRONMENT VARIABLES ==="
+          env | grep -E "(DATABASE|RAILS|BUNDLE|PATH)" | sort
+          echo "=== CHECKING DATABASE CONNECTION ==="
+          bin/rails db:version
+          echo "=== RUNNING TESTS ==="
           set -x  # Enable command tracing
-          bundle exec rspec --format progress
-          echo "Test exit code: $?"
-          echo "Tests completed successfully"
+          bundle exec rspec --format progress --require rails_helper
+          TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
+          echo "=== TEST RESULTS ==="
+          echo "Test exit code: $TEST_EXIT_CODE"
+          echo "Tests completed"
+          exit $TEST_EXIT_CODE
         env:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
