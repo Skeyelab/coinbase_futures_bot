@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [ main, feat/** ]
 
-# Force workflow refresh - v20250127-1700
+# Force workflow refresh - v20250127-1730
+# This is a completely new workflow file to force cache refresh
 
 env:
   RAILS_ENV: test
@@ -93,7 +94,7 @@ jobs:
           bin/rails db:migrate
           bin/rails db:test:prepare
           echo "Database setup complete"
-
+          
       - name: Debug environment
         run: |
           echo "=== Environment Debug Info ==="
