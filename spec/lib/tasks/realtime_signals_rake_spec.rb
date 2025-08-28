@@ -2,10 +2,6 @@
 
 require 'rails_helper'
 
-# INTENTIONAL BREAKING CHANGE FOR CI TESTING
-# This syntax error will definitely cause the test to fail
-def this will break the ruby syntax parser
-
 RSpec.describe 'Realtime Signals Rake Tasks' do
   describe 'Rake task file validation' do
     let(:rake_file_path) { Rails.root.join('lib/tasks/realtime_signals.rake') }
