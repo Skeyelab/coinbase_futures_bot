@@ -393,9 +393,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
             .where(alert_status: "active")
             .update_all(alert_status: "expired", updated_at: Time.current.utc)
 
-          if expired_count > 0
-            Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
-          end
+          Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.") if expired_count > 0
         end
 
         it "does not log when no alerts are cleaned up" do
@@ -404,9 +402,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           expect(logger).not_to receive(:info)
 
           expired_count = 0
-          if expired_count > 0
-            Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
-          end
+          Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.") if expired_count > 0
         end
       end
     end

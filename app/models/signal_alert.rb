@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class SignalAlert < ApplicationRecord
+  belongs_to :trading_pair, foreign_key: :symbol, primary_key: :product_id, optional: true
+
   validates :symbol, :side, :signal_type, :strategy_name, :confidence, presence: true
   validates :symbol, format: {with: /\A[A-Z0-9-]+\z/, message: "must be valid trading symbol"}
   validates :side, inclusion: {in: %w[long short buy sell unknown]}
