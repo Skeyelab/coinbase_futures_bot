@@ -26,6 +26,27 @@
 
 ### Session log
 
+#### 2025-08-28 12:45 UTC
+- Context: Testing CI pipeline by pushing intentional breaking change
+- Changes:
+  - Added syntax error to `spec/lib/tasks/realtime_signals_rake_spec.rb` to verify CI catches failures
+  - Pushed breaking change to `feat/realtime-signals-system` branch
+  - Reverted breaking change after confirming CI works properly
+- Commands run:
+  - `git add spec/lib/tasks/realtime_signals_rake_spec.rb`
+  - `git commit -m "feat: add intentional breaking change to test CI"`
+  - `git push origin feat/realtime-signals-system`
+  - `bundle exec rake ci:fetch_logs WAIT=1 WAIT_FOR_COMPLETION=1`
+  - `git add spec/lib/tasks/realtime_signals_rake_spec.rb`
+  - `git commit -m "revert: remove intentional breaking change after CI test"`
+- Results:
+  - ✅ CI successfully caught syntax error in StandardRB lint job
+  - ✅ Pipeline failed appropriately with exit code 1
+  - ✅ Brakeman and Rails tests jobs did not run (correct dependency behavior)
+  - ✅ CI pipeline is working correctly and catches breaking changes
+- Next steps:
+  - CI pipeline confirmed working - can proceed with normal development
+
 #### 2025-08-28 06:40 UTC
 - Context: Add programmatic access to GitHub Actions logs post-push for Cursor automation
 - Changes:
