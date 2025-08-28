@@ -28,12 +28,12 @@ FactoryBot.define do
     end
 
     trait :yesterday do
-      entry_time { 1.day.ago }
+      entry_time { 30.hours.ago } # Within the 24-48 hour range for opened_yesterday scope
       status { "OPEN" }
     end
 
     trait :approaching_closure do
-      entry_time { 24.hours.ago }
+      entry_time { 23.5.hours.ago } # Older than 23 hours ago for approaching_closure scope
     end
 
     trait :needing_closure do

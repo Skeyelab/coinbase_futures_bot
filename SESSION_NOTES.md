@@ -26,6 +26,32 @@
 
 ### Session log
 
+#### 2025-01-27 15:30 UTC
+- Context: Test suite optimization work for Linear issue FUT-23
+- Changes:
+  - Optimized database interactions by replacing direct `create!` calls with factory methods
+  - Enhanced factory system with comprehensive traits (`:yesterday`, `:approaching_closure`, `:with_tp_sl`, etc.)
+  - Added `test-prof` gem for performance profiling and bottleneck identification
+  - Implemented parallel test execution using `parallel_tests` gem (4 processes)
+  - Fixed Position model factory traits to align with scope timing requirements
+  - Optimized spec helper to reduce startup overhead and noise in parallel mode
+- Commands run:
+  - `bundle install` (added test-prof gem)
+  - `time bundle exec rspec --format progress` (baseline: ~49 seconds)
+  - `time bundle exec parallel_test -n 4 --type rspec` (optimized: ~30 seconds)
+  - `bundle exec rspec spec/services/trading/day_trading_position_manager_spec.rb` (verified fixes)
+  - `bin/standardrb --fix`
+- Files touched:
+  - `Gemfile`, `spec/factories/positions.rb`, `spec/rails_helper.rb`, `config/environments/test.rb`
+  - `spec/services/trading/day_trading_position_manager_spec.rb`
+  - `config/initializers/disable_host_authorization_in_test.rb`
+  - `TEST_OPTIMIZATION_REPORT.md`
+- Migrations: None
+- Next steps:
+  - Address remaining host authorization issue for request specs (35 failing tests)
+  - Consider implementing database fixtures for shared test data
+  - Configure CI/CD parallel execution for additional performance gains
+
 #### 2025-08-27 13:45 UTC
 - Context: Fixed database column reference errors in ticks table queries
 - Changes:

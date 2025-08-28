@@ -64,4 +64,9 @@ RSpec.configure do |config|
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
   # Individual tests can clean specific data if needed
+
+  # Configure request specs to use a default host
+  config.before(:each, type: :request) do
+    host! "test.example.com"
+  end
 end

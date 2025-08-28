@@ -44,9 +44,8 @@ Rails.application.configure do
   # incoming request so you'll need to provide the :host parameter yourself.
   config.action_mailer.default_url_options = {host: "www.example.com"}
 
-  # Allow test host for request specs
-  config.hosts << "www.example.com"
-  config.hosts << "test.host"
+  # Disable host authorization middleware completely in test environment
+  config.middleware.delete ActionDispatch::HostAuthorization
 
   # Print deprecation notices to the stderr.
   config.active_support.deprecation = :stderr
