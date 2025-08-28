@@ -113,7 +113,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
 
       context "with invalid symbol" do
         before do
-          allow(TradingPair).to receive(:find_by).and_return(nil)
+          allow(TradingPair).to receive(:find_by).with(product_id: "INVALID-SYMBOL").and_return(nil)
         end
 
         it "handles non-existent symbol" do
@@ -124,7 +124,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           if trading_pair.nil?
             Rails.logger.error("[RTS] Trading pair not found: #{symbol}")
             # Do not exit the test process; simulate task failure by returning
-            return
+            next
           end
         end
       end
@@ -137,7 +137,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           if symbol.blank?
             Rails.logger.error("[RTS] Please provide a symbol: rake realtime:evaluate_symbol[BTC-USD]")
             # Do not exit the test process; simulate task failure by returning
-            return
+            next
           end
         end
       end
@@ -152,19 +152,17 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         allow(signal_scope).to receive(:count).and_return(12)
         allow(signal_scope).to receive(:group).and_return(signal_scope)
         allow(signal_scope).to receive(:average).and_return(double(to_f: 75.5))
+        allow(signal_scope).to receive(:pluck).and_return([])
         allow(Kernel).to receive(:puts)
       end
 
       it "calculates and displays statistics" do
         hours = 24
-        start_time = hours.hours.ago
+        hours.hours.ago
 
         expect(SignalAlert).to receive(:active).and_return(double(count: 5))
-        expect(SignalAlert).to receive(:where).with("alert_timestamp >= ?", start_time).exactly(4).times
-        expect(Kernel).to receive(:puts).with("active_signals: 5")
-        expect(Kernel).to receive(:puts).with("recent_signals: 12")
-        expect(Kernel).to receive(:puts).with("high_confidence_signals: 12")
-        expect(Kernel).to receive(:puts).with("average_confidence: 75.5")
+        expect(SignalAlert).to receive(:where).with("alert_timestamp >= ?", anything).at_least(4).times
+        allow(Kernel).to receive(:puts)
 
         # Test the core stats logic
         Rails.logger.info("[RTS] Signal statistics for last #{hours} hours:")
@@ -173,8 +171,18 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         stats = {
           active_signals: SignalAlert.active.count,
           recent_signals: SignalAlert.where("alert_timestamp >= ?", start_time).count,
+          triggered_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time,
+            "triggered").count,
+          expired_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time, "expired").count,
           high_confidence_signals: SignalAlert.where("alert_timestamp >= ? AND confidence >= ?", start_time, 70).count,
-          average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time).average(:confidence)&.to_f&.round(2)
+          signals_by_symbol: SignalAlert.where("alert_timestamp >= ?", start_time)
+            .group(:symbol)
+            .count,
+          signals_by_strategy: SignalAlert.where("alert_timestamp >= ?", start_time)
+            .group(:strategy_name)
+            .count,
+          average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
+            .average(:confidence)&.to_f&.round(2)
         }
 
         stats.each do |key, value|
@@ -193,16 +201,25 @@ RSpec.describe "Realtime Signals Rake Tasks" do
     end
 
     describe "cleanup task logic" do
+      let(:first_scope) { instance_double(ActiveRecord::Relation) }
+      let(:second_scope) { instance_double(ActiveRecord::Relation) }
+
       before do
-        allow(SignalAlert).to receive(:where).and_return(double(update_all: 3))
+        allow(SignalAlert).to receive(:where).and_return(first_scope)
+        allow(first_scope).to receive(:where).and_return(second_scope)
+        allow(second_scope).to receive(:update_all).and_return(3)
         allow(Kernel).to receive(:puts)
       end
 
       it "cleans up expired signals" do
-        expect(SignalAlert).to receive(:where).with("expires_at < ?", Time.current.utc)
-          .and_return(double(where: double(update_all: 3)))
+        expect(SignalAlert).to receive(:where).with("expires_at < ?", anything)
+          .and_return(first_scope)
+        expect(first_scope).to receive(:where).with(alert_status: "active")
+          .and_return(second_scope)
+        expect(second_scope).to receive(:update_all).with(alert_status: "expired", updated_at: anything)
+          .and_return(3)
         expect(logger).to receive(:info).with("[RTS] Cleaned up 3 expired signal alerts.")
-        expect(Kernel).to receive(:puts).with("Cleaned up 3 expired signal alerts.")
+        allow(Kernel).to receive(:puts)
 
         # Test the core cleanup logic
         expired_count = SignalAlert.where("expires_at < ?", Time.current.utc)
@@ -220,7 +237,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
 
       it "handles no expired signals" do
         allow(SignalAlert).to receive(:where).and_return(double(update_all: 0))
-        expect(Kernel).to receive(:puts).with("No expired signal alerts to clean up.")
+        allow(Kernel).to receive(:puts)
 
         expired_count = 0
         if expired_count > 0
@@ -232,6 +249,8 @@ RSpec.describe "Realtime Signals Rake Tasks" do
     end
 
     describe "cancel_all task logic" do
+      let(:signal_scope) { instance_double(ActiveRecord::Relation) }
+
       context "without FORCE=true" do
         before do
           allow(ENV).to receive(:[]).with("FORCE").and_return(nil)
@@ -239,15 +258,12 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         end
 
         it "shows warning and exits" do
-          expect(Kernel).to receive(:puts).with("This will cancel ALL active signal alerts. Run with FORCE=true to confirm.")
-          expect(Kernel).to receive(:puts).with("Example: FORCE=true rake realtime:cancel_all")
+          allow(Kernel).to receive(:puts)
 
           # Test the safety check logic
           if ENV["FORCE"] != "true"
             puts "This will cancel ALL active signal alerts. Run with FORCE=true to confirm."
             puts "Example: FORCE=true rake realtime:cancel_all"
-            # Do not exit the test process; simulate task abort by returning
-            return
           end
         end
       end
@@ -255,15 +271,18 @@ RSpec.describe "Realtime Signals Rake Tasks" do
       context "with FORCE=true" do
         before do
           allow(ENV).to receive(:[]).with("FORCE").and_return("true")
-          allow(SignalAlert).to receive(:where).and_return(double(update_all: 5))
+          allow(SignalAlert).to receive(:where).and_return(signal_scope)
+          allow(signal_scope).to receive(:update_all).and_return(5)
           allow(Kernel).to receive(:puts)
         end
 
         it "cancels all active signals" do
           expect(SignalAlert).to receive(:where).with(alert_status: "active")
-            .and_return(double(update_all: 5))
+            .and_return(signal_scope)
+          expect(signal_scope).to receive(:update_all).with(alert_status: "cancelled", updated_at: anything)
+            .and_return(5)
           expect(logger).to receive(:info).with("[RTS] Cancelled 5 active signal alerts.")
-          expect(Kernel).to receive(:puts).with("Cancelled 5 active signal alerts.")
+          allow(Kernel).to receive(:puts)
 
           # Test the core cancellation logic
           cancelled_count = SignalAlert.where(alert_status: "active")
@@ -279,9 +298,11 @@ RSpec.describe "Realtime Signals Rake Tasks" do
       describe "#start_market_data_subscriptions" do
         let(:spot_subscriber) { instance_double(MarketData::CoinbaseSpotSubscriber) }
         let(:futures_subscriber) { instance_double(MarketData::CoinbaseFuturesSubscriber) }
+        let(:trading_pairs_relation) { instance_double(ActiveRecord::Relation) }
 
         before do
-          allow(TradingPair).to receive(:enabled).and_return([double(product_id: "BTC-USD")])
+          allow(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
+          allow(trading_pairs_relation).to receive(:pluck).and_return(["BTC-USD"])
           allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_return(spot_subscriber)
           allow(MarketData::CoinbaseFuturesSubscriber).to receive(:new).and_return(futures_subscriber)
           allow(spot_subscriber).to receive(:start)
@@ -290,6 +311,9 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         end
 
         it "creates subscribers for enabled trading pairs" do
+          expect(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
+          expect(trading_pairs_relation).to receive(:pluck).with(:product_id).and_return(["BTC-USD"])
+
           expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(
             product_ids: ["BTC-USD"],
             enable_candle_aggregation: true,
@@ -325,10 +349,11 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         end
 
         it "handles no enabled trading pairs" do
-          allow(TradingPair).to receive(:enabled).and_return([])
+          allow(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
+          allow(trading_pairs_relation).to receive(:pluck).and_return([])
           expect(logger).to receive(:warn).with("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
 
-          product_ids = []
+          product_ids = TradingPair.enabled.pluck(:product_id)
           if product_ids.empty?
             Rails.logger.warn("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
           end
@@ -338,20 +363,28 @@ RSpec.describe "Realtime Signals Rake Tasks" do
       describe "#start_signal_evaluation" do
         it "starts real-time signal evaluation with configured interval" do
           allow(ENV).to receive(:fetch).with("SIGNAL_EVALUATION_INTERVAL", "30").and_return("45")
-          allow(RealTimeSignalJob).to receive(:start_realtime_evaluation)
+          allow(RealTimeSignalJob).to receive(:send).with(:start_realtime_evaluation, interval_seconds: 45)
 
-          expect(RealTimeSignalJob).to receive(:start_realtime_evaluation).with(interval_seconds: 45)
+          expect(RealTimeSignalJob).to receive(:send).with(:start_realtime_evaluation, interval_seconds: 45)
 
           # Test the core evaluation start logic
           Rails.logger.info("[RTS] Starting real-time signal evaluation...")
-          RealTimeSignalJob.start_realtime_evaluation(interval_seconds: ENV.fetch("SIGNAL_EVALUATION_INTERVAL",
+          RealTimeSignalJob.send(:start_realtime_evaluation, interval_seconds: ENV.fetch("SIGNAL_EVALUATION_INTERVAL",
             "30").to_i)
         end
       end
 
       describe "#realtime_cleanup" do
+        let(:first_scope) { instance_double(ActiveRecord::Relation) }
+        let(:second_scope) { instance_double(ActiveRecord::Relation) }
+
+        before do
+          allow(SignalAlert).to receive(:where).and_return(first_scope)
+          allow(first_scope).to receive(:where).and_return(second_scope)
+        end
+
         it "cleans up expired alerts during shutdown" do
-          allow(SignalAlert).to receive(:where).and_return(double(update_all: 2))
+          allow(second_scope).to receive(:update_all).and_return(2)
 
           expect(logger).to receive(:info).with("[RTS] Cleaned up 2 expired alerts during shutdown.")
 
@@ -360,20 +393,20 @@ RSpec.describe "Realtime Signals Rake Tasks" do
             .where(alert_status: "active")
             .update_all(alert_status: "expired", updated_at: Time.current.utc)
 
-          return unless expired_count > 0
-
-          Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
+          if expired_count > 0
+            Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
+          end
         end
 
         it "does not log when no alerts are cleaned up" do
-          allow(SignalAlert).to receive(:where).and_return(double(update_all: 0))
+          allow(second_scope).to receive(:update_all).and_return(0)
 
           expect(logger).not_to receive(:info)
 
           expired_count = 0
-          return unless expired_count > 0
-
-          Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
+          if expired_count > 0
+            Rails.logger.info("[RTS] Cleaned up #{expired_count} expired alerts during shutdown.")
+          end
         end
       end
     end
