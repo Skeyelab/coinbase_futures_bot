@@ -9,10 +9,11 @@ module Sentiment
   class CryptoPanicClient
     API_BASE = "https://cryptopanic.com/api/v1"
 
-    def initialize(token: ENV["CRYPTOPANIC_TOKEN"], logger: Rails.logger)
+    def initialize(token: ENV["CRYPTOPANIC_TOKEN"], base_url: ENV["CRYPTOPANIC_BASE_URL"], logger: Rails.logger)
       @token = token
       @logger = logger
-      @conn = Faraday.new(url: API_BASE) do |f|
+      base_url = API_BASE if base_url.blank?
+      @conn = Faraday.new(url: base_url) do |f|
         # Optional retry middleware; requires faraday-retry gem. Skip if unavailable.
         begin
           begin
@@ -30,7 +31,9 @@ module Sentiment
     end
 
     def enabled?
-      @token.to_s.strip != ""
+      token_present = @token.to_s.strip != ""
+      @logger.warn("CryptoPanic token not configured - set CRYPTOPANIC_TOKEN environment variable") unless token_present
+      token_present
     end
 
     # Fetch recent posts (1-2 pages) and normalize to internal event hashes
@@ -38,24 +41,41 @@ module Sentiment
     def fetch_recent(max_pages: 2, public_only: true)
       return [] unless enabled?
 
+      @logger.debug("CryptoPanic: Fetching up to #{max_pages} pages from #{@conn.url_prefix}")
+
       results = []
       page = 1
       while page <= max_pages
         params = {auth_token: @token, page: page}
         params[:public] = true if public_only
+
+        @logger.debug("CryptoPanic: Requesting page #{page} with params: #{params.except(:auth_token).merge(auth_token: "[REDACTED]")}")
+
         resp = @conn.get("/posts/", params)
         body = JSON.parse(resp.body)
+
+        if body["status"] == "api_error"
+          @logger.error("CryptoPanic API error: #{body["info"]}")
+          return []
+        end
+
         Array(body["results"]).each do |item|
           normalized = normalize_item(item)
           results.concat(normalized) if normalized.any?
         end
+
+        @logger.debug("CryptoPanic: Page #{page} returned #{Array(body["results"]).size} items")
         break unless body["next"]
 
         page += 1
       end
+
+      @logger.info("CryptoPanic: Successfully fetched #{results.size} events from #{page - 1} pages")
       results
     rescue => e
       @logger.error("CryptoPanic fetch failed: #{e.class} #{e.message}")
+      @logger.error("Request URL: #{@conn.url_prefix}/posts/")
+      @logger.debug("Full error: #{e.backtrace.first(5).join('\n')}")
       []
     end
 
