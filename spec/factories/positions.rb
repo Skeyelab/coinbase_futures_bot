@@ -29,14 +29,39 @@ FactoryBot.define do
 
     trait :yesterday do
       entry_time { 1.day.ago }
+      status { "OPEN" }
     end
 
     trait :approaching_closure do
-      entry_time { 23.hours.ago }
+      entry_time { 24.hours.ago }
     end
 
     trait :needing_closure do
       entry_time { 25.hours.ago }
+    end
+
+    trait :with_tp_sl do
+      take_profit { 51000.0 }
+      stop_loss { 49000.0 }
+    end
+
+    trait :triggered_tp do
+      take_profit { 49000.0 } # Below entry price for LONG - triggers TP
+      stop_loss { 48000.0 }
+    end
+
+    trait :triggered_sl do
+      take_profit { 52000.0 }
+      stop_loss { 51000.0 } # Above entry price for LONG - triggers SL
+    end
+
+    trait :eth do
+      product_id { "ET-29AUG25-CDE" }
+      entry_price { 3000.0 }
+    end
+
+    trait :recent do
+      entry_time { 12.hours.ago }
     end
   end
 end
