@@ -25,7 +25,7 @@ module TestEffectiveness
     return unless critical_methods.include?(method_name.to_sym)
 
     puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
-    puts "   Consider using integration testing instead of mocking core business logic"
+    puts '   Consider using integration testing instead of mocking core business logic'
   end
 
   # Validate that a test actually exercises real code paths
@@ -39,8 +39,8 @@ module TestEffectiveness
     return unless mock_count > 5
 
     puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
-    puts "   Mocked methods: #{mocked_methods.join(", ")}"
-    puts "   This test may not be validating actual behavior"
+    puts "   Mocked methods: #{mocked_methods.join(', ')}"
+    puts '   This test may not be validating actual behavior'
   end
 
   # Mark a test as an integration test
@@ -49,24 +49,8 @@ module TestEffectiveness
   end
 end
 
-# Monkey patch RSpec to track mocking
-module RSpec
-  module Mocks
-    class Proxy
-      alias_method :original_add_stub, :add_stub
-
-      def add_stub(method_name, *args, &block)
-        # Track mock usage
-        if @object&.respond_to?(:example)
-          example = @object.example
-          TestEffectiveness.track_mock_usage(example, @object, method_name)
-        end
-
-        original_add_stub(method_name, *args, &block)
-      end
-    end
-  end
-end
+# NOTE: Monkey patching removed due to CI compatibility issues
+# The test effectiveness tracking will rely on the existing hooks in rails_helper.rb
 
 # Add helper methods to RSpec configuration
 RSpec.configure do |config|
