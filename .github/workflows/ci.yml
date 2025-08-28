@@ -119,6 +119,8 @@ jobs:
       - name: Run tests with enhanced debugging
         timeout-minutes: 15
         run: |
+          # Disable 'exit on error' for this block; we'll control exit codes manually
+          set +e
           echo "=== STARTING TEST SUITE WITH ENHANCED DEBUGGING ==="
           echo "Database URL: $DATABASE_URL"
           echo "Rails env: $RAILS_ENV"
@@ -153,9 +155,6 @@ jobs:
             exit $TEST_EXIT_CODE
           else
             echo "✅ Tests passed successfully"
-            # Try to run a simple Rails command to check if Rails is still working
-            echo "=== CHECKING RAILS HEALTH ==="
-            timeout 10 bin/rails runner "puts 'Rails is healthy'" 2>/dev/null && echo "Rails health check passed" || echo "Rails health check failed"
             exit 0
           fi
         env:
