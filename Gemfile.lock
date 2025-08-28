@@ -84,9 +84,6 @@ GEM
       racc
     builder (3.3.0)
     climate_control (1.2.0)
-    codecov (0.2.12)
-      json
-      simplecov
     concurrent-ruby (1.3.5)
     connection_pool (2.5.3)
     crack (1.0.0)
@@ -385,7 +382,6 @@ DEPENDENCIES
   bootsnap
   brakeman
   climate_control
-  codecov
   debug
   dotenv-rails
   factory_bot_rails (~> 6.2)

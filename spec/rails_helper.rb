@@ -26,10 +26,10 @@ SimpleCov.start "rails" do
   enable_coverage :branch
 end
 
-# Upload to Codecov when running in CI
-if ENV["CI"] || ENV["COVERAGE"]
-  require "codecov"
-  SimpleCov.formatter = SimpleCov::Formatter::Codecov
+# Generate coverage reports locally when needed
+if ENV["COVERAGE"]
+  # Coverage reports will be generated in coverage/ directory
+  # No external uploads configured
 end
 
 ENV["RAILS_ENV"] ||= "test"

@@ -106,13 +106,8 @@ jobs:
           CI: true
           COVERAGE: true
 
-      - name: Upload coverage to Codecov
-        if: success()
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-          verbose: true
+      # Coverage reports generated locally in coverage/ directory
+      # No external uploads configured
 
   # Optional: Add a job that runs only when tests pass
   success:

@@ -50,7 +50,7 @@ end
 
 group :test do
   gem "climate_control"
-  gem "codecov", require: false
+  # Codecov integration removed - no external uploads needed
   gem "factory_bot_rails", "~> 6.2"
   gem "rails-controller-testing"
   gem "simplecov", require: false
