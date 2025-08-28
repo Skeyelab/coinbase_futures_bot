@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'vcr'
-require 'json'
+require "vcr"
+require "json"
 
 # VCR Helper Module for common patterns and utilities
 module VCRHelpers
@@ -32,10 +32,10 @@ module VCRHelpers
 
   # Environment-specific record modes
   def self.record_mode
-    if ENV['CI'] == 'true'
+    if ENV["CI"] == "true"
       :none # Never record in CI
-    elsif ENV['VCR_RECORD_MODE']
-      ENV['VCR_RECORD_MODE'].to_sym
+    elsif ENV["VCR_RECORD_MODE"]
+      ENV["VCR_RECORD_MODE"].to_sym
     else
       :new_episodes # Default for development
     end
@@ -43,7 +43,7 @@ module VCRHelpers
 
   # Standard cassette naming convention
   def self.cassette_name(test_class, test_method, variant = nil)
-    base_name = "#{test_class.name.gsub('::', '_')}/#{test_method}"
+    base_name = "#{test_class.name.gsub("::", "_")}/#{test_method}"
     variant ? "#{base_name}/#{variant}" : base_name
   end
 
@@ -57,7 +57,7 @@ module VCRHelpers
 
     params = URI.decode_www_form(parsed_uri.query)
     filtered_params = params.reject do |key, _value|
-      key.downcase.include?('start') || key.downcase.include?('end') || key.downcase.include?('time')
+      key.downcase.include?("start") || key.downcase.include?("end") || key.downcase.include?("time")
     end
 
     parsed_uri.query = URI.encode_www_form(filtered_params) unless filtered_params.empty?
@@ -66,13 +66,13 @@ module VCRHelpers
 end
 
 VCR.configure do |config|
-  config.cassette_library_dir = 'spec/fixtures/vcr_cassettes'
+  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
   config.hook_into :webmock
   config.configure_rspec_metadata!
 
   # Filter out sensitive data
-  config.filter_sensitive_data('<COINBASE_API_KEY>') { ENV['COINBASE_API_KEY'] }
-  config.filter_sensitive_data('<COINBASE_API_SECRET>') { ENV['COINBASE_API_SECRET'] }
+  config.filter_sensitive_data("<COINBASE_API_KEY>") { ENV["COINBASE_API_KEY"] }
+  config.filter_sensitive_data("<COINBASE_API_SECRET>") { ENV["COINBASE_API_SECRET"] }
 
   # Setup smart filtering
   VCRHelpers.setup_timestamp_filters(config)
@@ -80,8 +80,8 @@ VCR.configure do |config|
   # Response trimming is handled differently in newer versions
 
   # Filter Authorization headers
-  config.filter_sensitive_data('<AUTHORIZATION>') do |interaction|
-    interaction.request.headers['Authorization']&.first
+  config.filter_sensitive_data("<AUTHORIZATION>") do |interaction|
+    interaction.request.headers["Authorization"]&.first
   end
 
   # Filter CB-ACCESS headers
@@ -92,11 +92,11 @@ VCR.configure do |config|
   end
 
   # Filter out JWT tokens in Authorization headers (they contain timestamps)
-  config.filter_sensitive_data('<JWT_TOKEN>') do |interaction|
-    if interaction.request.headers['Authorization']
+  config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
+    if interaction.request.headers["Authorization"]
       # Extract just the JWT part after "Bearer "
-      auth_header = interaction.request.headers['Authorization'].first
-      auth_header.sub('Bearer ', '') if auth_header&.start_with?('Bearer ')
+      auth_header = interaction.request.headers["Authorization"].first
+      auth_header.sub("Bearer ", "") if auth_header&.start_with?("Bearer ")
     end
   end
 
@@ -106,11 +106,11 @@ VCR.configure do |config|
 
   # Ignore external service requests
   config.ignore_request do |request|
-    request.uri.include?('glitchtip.ger.ericdahl.dev') ||
-      request.uri.include?('sentry.io') ||
-      request.uri.include?('sentry') ||
-      request.uri.include?('slack.com') ||
-      request.uri.include?('hooks.slack.com')
+    request.uri.include?("glitchtip.ger.ericdahl.dev") ||
+      request.uri.include?("sentry.io") ||
+      request.uri.include?("sentry") ||
+      request.uri.include?("slack.com") ||
+      request.uri.include?("hooks.slack.com")
   end
 
   # Allow real HTTP connections in development if needed
