@@ -6,28 +6,17 @@ RSpec.describe Trading::DayTradingPositionManager do
   let(:manager) { described_class.new }
 
   describe "#positions_needing_closure" do
-    let!(:yesterday_position) do
-      Position.create!(
-        product_id: "BIT-29AUG25-CDE",
-        side: "LONG",
-        size: 1.0,
-        entry_price: 50000.0,
-        entry_time: 1.day.ago,
-        status: "OPEN",
-        day_trading: true
-      )
+    let(:yesterday_position) do
+      create(:position, :yesterday)
     end
 
-    let!(:today_position) do
-      Position.create!(
+    let(:today_position) do
+      create(:position,
         product_id: "ET-29AUG25-CDE",
         side: "SHORT",
-        size: 1.0,
         entry_price: 3000.0,
         entry_time: Time.current,
-        status: "OPEN",
-        day_trading: true
-      )
+        status: "OPEN")
     end
 
     it "returns positions opened yesterday that are still open" do
@@ -44,28 +33,12 @@ RSpec.describe Trading::DayTradingPositionManager do
   end
 
   describe "#positions_approaching_closure" do
-    let!(:old_position) do
-      Position.create!(
-        product_id: "BIT-29AUG25-CDE",
-        side: "LONG",
-        size: 1.0,
-        entry_price: 50000.0,
-        entry_time: 24.hours.ago,
-        status: "OPEN",
-        day_trading: true
-      )
+    let(:old_position) do
+      create(:position, :approaching_closure)
     end
 
-    let!(:recent_position) do
-      Position.create!(
-        product_id: "ET-29AUG25-CDE",
-        side: "SHORT",
-        size: 1.0,
-        entry_price: 3000.0,
-        entry_time: 12.hours.ago,
-        status: "OPEN",
-        day_trading: true
-      )
+    let(:recent_position) do
+      create(:position, :eth, :short, :recent)
     end
 
     it "returns positions older than 23 hours" do
