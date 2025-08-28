@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-01-27 18:30 UTC
+- Context: Added comprehensive exit code handling to identify the root cause of exit code 1 despite passing tests
+- Changes:
+  - **Enhanced exit code handling**: Added proper error checking before exit to distinguish between test failures and post-test issues
+  - **Rails health check**: Added timeout-protected Rails runner command to verify Rails is still functional after tests
+  - **Conditional exit logic**: Only exit with code 0 if tests pass AND Rails health check passes
+  - **Better error isolation**: Now we can distinguish between test failures vs post-test cleanup issues
+- Root cause analysis:
+  - **SimpleCov error detection**: \"Stopped processing SimpleCov as a previous error not related to SimpleCov has been detected\"
+  - **Post-test issues**: Something happening after tests complete but before final exit
+  - **Database/process cleanup**: Potential issues with background processes or database connections
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m \"ci: add comprehensive exit code handling...\"`
+- Next steps:
+  - Monitor next CI run to see if exit code handling reveals the issue
+  - Check if Rails health check identifies any post-test problems
+  - If still failing, may need to disable SimpleCov error detection or investigate database cleanup
+
 #### 2025-01-27 18:15 UTC
 - Context: Fixed workflow duplication issue by implementing PR-first CI approach
 - Changes:
