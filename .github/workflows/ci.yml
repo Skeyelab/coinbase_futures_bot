@@ -95,7 +95,7 @@ jobs:
           bin/rails db:migrate
           bin/rails db:test:prepare
           echo "Database setup complete"
-          
+
       - name: Debug environment
         run: |
           echo "=== WORKFLOW CACHE TEST - If you see this, cache is refreshed! ==="
@@ -137,6 +137,15 @@ jobs:
           echo "=== TEST RESULTS ==="
           echo "Test exit code: $TEST_EXIT_CODE"
           echo "Tests completed"
+
+          # Check for any background processes or cleanup issues
+          echo "=== CHECKING FOR BACKGROUND PROCESSES ==="
+          ps aux | grep -E "(ruby|rspec|rails)" | grep -v grep || echo "No Ruby processes found"
+          echo "=== CHECKING FOR DATABASE CONNECTIONS ==="
+          bin/rails db:version 2>/dev/null && echo "Database still accessible" || echo "Database connection closed"
+          echo "=== CHECKING FOR FILE DESCRIPTORS ==="
+          lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
+
           exit $TEST_EXIT_CODE
         env:
           # Use VCR cassettes in CI but ensure real database testing
