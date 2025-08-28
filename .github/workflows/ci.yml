@@ -8,6 +8,7 @@ on:
 
 # Force workflow refresh - v20250127-1745
 # This is a completely new workflow file to force cache refresh
+# UNIQUE_CACHE_BREAKER_ID: WORKFLOW_REFRESH_ATTEMPT_4_1745
 
 env:
   RAILS_ENV: test
