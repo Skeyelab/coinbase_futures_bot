@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -e
+
+# Test script for GitHub Actions compatibility
+# Sets up environment and runs the full test suite
+
+echo "🧪 Running Coinbase Futures Bot Test Suite"
+echo "==========================================="
+
+# Set environment variables for tests (GitHub Actions compatible)
+export RAILS_ENV=test
+export POSITIONS_UI_USERNAME=admin
+export POSITIONS_UI_PASSWORD=password123
+export SLACK_BOT_TOKEN=xoxb-test-token-fake
+export SLACK_VERIFICATION_TOKEN=test-verification-token-fake
+export SLACK_AUTHORIZED_USERS=U1234567890
+export COINBASE_API_KEY=test-api-key
+export COINBASE_API_SECRET=test-api-secret
+export CRYPTOPANIC_API_KEY=test-cryptopanic-key
+export SENTRY_DSN=""
+
+# Use test database URL if not set
+export DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/coinbase_futures_bot_test}"
+
+echo "✅ Environment variables configured"
+
+# Run linting first
+echo "🔍 Running StandardRB (linting)..."
+bundle exec standardrb
+
+echo "🔒 Running Brakeman (security)..."
+bundle exec brakeman --quiet
+
+# Setup database if needed
+echo "🗄️  Preparing test database..."
+bundle exec rails db:test:prepare
+
+# Run tests
+echo "🧪 Running RSpec test suite..."
+bundle exec rspec \
+  --format progress \
+  --color \
+  --order random
+
+echo "✅ Test suite completed!"
