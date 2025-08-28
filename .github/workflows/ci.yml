@@ -135,7 +135,7 @@ jobs:
           bundle exec rspec --format progress --require rails_helper
           TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
-          echo "=== TEST RESULTS ==="
+                    echo "=== TEST RESULTS ==="
           echo "Test exit code: $TEST_EXIT_CODE"
           echo "Tests completed"
 
@@ -147,7 +147,18 @@ jobs:
           echo "=== CHECKING FOR FILE DESCRIPTORS ==="
           lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
 
-          exit $TEST_EXIT_CODE
+          # Check if there were any errors in the test output
+          echo "=== CHECKING FOR ERRORS IN TEST OUTPUT ==="
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
+            exit $TEST_EXIT_CODE
+          else
+            echo "✅ Tests passed successfully"
+            # Try to run a simple Rails command to check if Rails is still working
+            echo "=== CHECKING RAILS HEALTH ==="
+            timeout 10 bin/rails runner "puts 'Rails is healthy'" 2>/dev/null && echo "Rails health check passed" || echo "Rails health check failed"
+            exit 0
+          fi
         env:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
