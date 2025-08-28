@@ -98,11 +98,12 @@ class SlackNotificationService
       )
     end
 
-    def send_message(message, channel:)
+    def send_message(message, channel:, retries: 0)
       return unless message.present?
 
-      retries = 0
       max_retries = 3
+
+      Rails.logger.debug("[Slack] Starting send_message with retries=#{retries}")
 
       begin
         client.chat_postMessage(
@@ -112,19 +113,18 @@ class SlackNotificationService
           blocks: message[:blocks]
         )
         Rails.logger.info("[Slack] Message sent to #{channel}")
+        true
       rescue Slack::Web::Api::Errors::SlackError => e
         Rails.logger.error("[Slack] API Error: #{e.message}")
 
-        retries += 1
-        if retries <= max_retries
-          sleep(2**retries) # Exponential backoff
-          retry
+        if retries < max_retries
+          Rails.logger.debug("[Slack] Retrying in #{2**(retries + 1)} seconds (attempt #{retries + 1}/#{max_retries})")
+          sleep(2**(retries + 1)) # Exponential backoff
+          send_message(message, channel: channel, retries: retries + 1)
         else
           Rails.logger.error("[Slack] Failed to send message after #{max_retries} retries")
+          false
         end
-      rescue StandardError => e
-        Rails.logger.error("[Slack] Unexpected error: #{e.message}")
-        Rails.logger.error(e.backtrace.join("\n"))
       end
     end
 

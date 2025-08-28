@@ -1,0 +1,31 @@
+---
+alwaysApply: true
+globs: *.rb,*.rake
+description: Automatically enforce StandardRB formatting for Ruby files
+---
+# StandardRB Automatic Enforcement
+
+## Automated Formatting
+
+When working with Ruby files, StandardRB formatting must be applied automatically:
+
+**Always run before committing:**
+```bash
+bin/standardrb --fix
+```
+
+**Integration with development workflow:**
+- Apply StandardRB formatting before any commit containing Ruby files
+- Use the project's existing `bin/standardrb` script for consistent formatting
+- Ensure all team members follow the same formatting standards
+
+## Scope
+
+This rule applies to:
+- All Ruby files (`*.rb`)
+- Rake files (`*.rake`)
+- Any file containing Ruby code
+
+## Enforcement
+
+The workspace rules already define comprehensive StandardRB guidelines. This Cursor rule ensures automated enforcement of those standards during development.

@@ -256,8 +256,8 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
 
     describe ".get_positions" do
-      let!(:open_position) { create(:position, product_id: "BTC-USD", status: "open") }
-      let!(:closed_position) { create(:position, product_id: "ETH-USD", status: "closed") }
+      let!(:open_position) { create(:position, product_id: "BTC-USD", status: "OPEN") }
+      let!(:closed_position) { create(:position, product_id: "ETH-USD", status: "CLOSED") }
 
       it "filters positions by status" do
         positions = described_class.send(:get_positions, "open")
