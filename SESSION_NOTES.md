@@ -26,6 +26,26 @@
 
 ### Session log
 
+#### 2025-01-27 17:45 UTC
+- Context: GitHub Actions cache still not refreshing despite multiple attempts - added unique cache breaker ID
+- Changes:
+  - **Added UNIQUE_CACHE_BREAKER_ID**: Added unique identifier to force workflow cache refresh
+  - **Attempt 4 at cache invalidation**: Multiple approaches tried (comment changes, file recreation, version identifiers)
+  - **Enhanced debugging ready**: All debugging steps in place waiting for cache refresh
+- Root cause analysis:
+  - **GitHub Actions caching issue**: Extremely stubborn workflow cache not updating
+  - **Multiple attempts failed**: Comments, file recreation, version identifiers all ineffective
+  - **Feature branch workflow trigger working**: CI runs but uses cached version
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m "ci: add unique cache breaker ID to force workflow refresh"`
+  - `git push origin feat/realtime-signals-system`
+- Files touched:
+  - `.github/workflows/ci.yml` (added UNIQUE_CACHE_BREAKER_ID for cache refresh)
+- Next steps:
+  - Monitor next CI run for unique cache breaker message
+  - If still cached, consider creating new workflow file or using manual dispatch
+  - Enhanced debugging will show if cache refresh finally works
+
 #### 2025-01-27 17:30 UTC
 - Context: GitHub Actions still using cached workflow despite our changes - completely rewrote workflow file
 - Changes:
