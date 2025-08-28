@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main, feat/** ]
 
-# Force workflow refresh - v20250127-1730
+# Force workflow refresh - v20250127-1745
 # This is a completely new workflow file to force cache refresh
 
 env:
@@ -97,6 +97,9 @@ jobs:
           
       - name: Debug environment
         run: |
+          echo "=== WORKFLOW CACHE TEST - If you see this, cache is refreshed! ==="
+          echo "Current timestamp: $(date +%s)"
+          echo "Workflow file hash: $(sha256sum .github/workflows/ci.yml | cut -d' ' -f1)"
           echo "=== Environment Debug Info ==="
           echo "RAILS_ENV: $RAILS_ENV"
           echo "DATABASE_URL: $DATABASE_URL"
