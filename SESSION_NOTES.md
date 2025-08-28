@@ -26,6 +26,27 @@
 
 ### Session log
 
+#### 2025-01-27 18:15 UTC
+- Context: Fixed workflow duplication issue by implementing PR-first CI approach
+- Changes:
+  - **Eliminated duplicate workflow runs**: Changed trigger strategy to avoid push+PR duplication
+  - **PR-first approach**: CI now runs on pull requests against both main and feature branches
+  - **Main branch push protection**: CI still runs on direct pushes to main for protection
+  - **Feature branch workflow**: Only runs when PR is opened/updated, not on every push
+- Root cause:
+  - **Dual triggers**: Previous setup ran on both push and PR events, causing duplication
+  - **GitHub behavior**: Pushing to a branch with open PR triggers both push and PR:synchronize events
+- Solution implemented:
+  - **Pull Requests**: Run on PRs against `main` and `feat/**` branches (opened, synchronize, reopened)
+  - **Push**: Only run on direct pushes to `main` branch
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m "ci: fix workflow duplication..."`
+  - `git push origin feat/realtime-signals-system`
+- Result:
+  - ✅ **No more duplicates**: Each change triggers exactly one CI run
+  - ✅ **Feature branch CI**: Still runs when PR opened/updated
+  - ✅ **Main branch protection**: Direct pushes to main still trigger CI
+
 #### 2025-01-27 18:00 UTC
 - Context: Added comprehensive post-test debugging to identify exit code 1 root cause
 - Changes:
