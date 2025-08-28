@@ -131,9 +131,11 @@ jobs:
           env | grep -E "(DATABASE|RAILS|BUNDLE|PATH)" | sort
           echo "=== CHECKING DATABASE CONNECTION ==="
           bin/rails db:version
-          echo "=== RUNNING TESTS ==="
+          echo "=== RUNNING TESTS IN PARALLEL ==="
+          echo "Using parallel_rspec with 4 processes (optimized for CI)"
+          echo "Slow tests (CoinbaseRest, TradingPair, MarketDataRake) run in isolation"
           set -x  # Enable command tracing
-          bundle exec rspec --format progress --order random --seed $RANDOM
+          bundle exec parallel_rspec spec/
           TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
                     echo "=== TEST RESULTS ==="
