@@ -3,37 +3,45 @@
 class HealthCheckJob < ApplicationJob
   queue_as :default
 
+  private
+
+  def logger
+    @logger ||= Rails.logger
+  end
+
+  public
+
   def perform(send_slack_notification: false)
     @logger = Rails.logger
-    @logger.info("Starting health check job")
+    logger.info('Starting health check job')
 
     health_data = gather_health_data
 
     # Log health status
-    @logger.info("Health check results: #{health_data}")
+    logger.info("Health check results: #{health_data}")
 
     # Send Slack notification if requested or if there are issues
-    if send_slack_notification || health_data[:overall_health] != "healthy"
+    if send_slack_notification || health_data[:overall_health] != 'healthy'
       SlackNotificationService.health_check(health_data)
     end
 
     # Store health data for status endpoint
-    Rails.cache.write("last_health_check", {
-      timestamp: Time.current,
-      data: health_data
-    }, expires_in: 1.hour)
+    Rails.cache.write('last_health_check', {
+                        timestamp: Time.current,
+                        data: health_data
+                      }, expires_in: 1.hour)
 
-    @logger.info("Completed health check job")
+    logger.info('Completed health check job')
 
     health_data
-  rescue => e
-    @logger.error("Health check job failed: #{e.message}")
-    @logger.error(e.backtrace.join("\n"))
+  rescue StandardError => e
+    logger.error("Health check job failed: #{e.message}")
+    logger.error(e.backtrace.join("\n"))
 
     # Send error notification
     SlackNotificationService.alert(
-      "error",
-      "Health Check Failed",
+      'error',
+      'Health Check Failed',
       "Health check job encountered an error: #{e.message}"
     )
 
@@ -77,7 +85,7 @@ class HealthCheckJob < ApplicationJob
 
   def check_database_health
     ActiveRecord::Base.connection.active?
-  rescue
+  rescue StandardError
     false
   end
 
@@ -85,8 +93,8 @@ class HealthCheckJob < ApplicationJob
     client = Coinbase::Client.new
     result = client.test_auth
     result[:advanced_trade][:ok] == true && result[:exchange][:ok] == true
-  rescue => e
-    @logger.warn("Coinbase API health check failed: #{e.message}")
+  rescue StandardError => e
+    logger.warn("Coinbase API health check failed: #{e.message}")
     false
   end
 
@@ -101,13 +109,13 @@ class HealthCheckJob < ApplicationJob
       FetchCandlesJob
     ]
 
-    scheduled_jobs = GoodJob::CronEntry.all.select { |entry|
+    scheduled_jobs = GoodJob::CronEntry.all.select do |entry|
       critical_job_classes.include?(entry.job_class)
-    }
+    end
 
     recent_jobs && scheduled_jobs.any?
-  rescue => e
-    @logger.warn("Background jobs health check failed: #{e.message}")
+  rescue StandardError => e
+    logger.warn("Background jobs health check failed: #{e.message}")
     false
   end
 
@@ -118,8 +126,8 @@ class HealthCheckJob < ApplicationJob
   end
 
   def get_memory_usage
-    if File.readable?("/proc/meminfo")
-      meminfo = File.read("/proc/meminfo")
+    if File.readable?('/proc/meminfo')
+      meminfo = File.read('/proc/meminfo')
 
       total_match = meminfo.match(/MemTotal:\s+(\d+)\s+kB/)
       available_match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/)
@@ -132,25 +140,25 @@ class HealthCheckJob < ApplicationJob
 
         "#{used_percent}% used (#{used_kb / 1024} MB / #{total_kb / 1024} MB)"
       else
-        "Unable to parse /proc/meminfo"
+        'Unable to parse /proc/meminfo'
       end
     else
-      "Memory info not available"
+      'Memory info not available'
     end
-  rescue => e
-    @logger.warn("Memory usage check failed: #{e.message}")
-    "Error reading memory info"
+  rescue StandardError => e
+    logger.warn("Memory usage check failed: #{e.message}")
+    'Error reading memory info'
   end
 
   def check_trading_status
     # Check if trading is active (not paused)
-    Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+    Rails.cache.fetch('trading_active', expires_in: 1.hour) { true }
   end
 
   def check_recent_signals
     # Check if signals have been generated recently
     recent_signal_job = GoodJob::Job.where(
-      job_class: "GenerateSignalsJob",
+      job_class: 'GenerateSignalsJob',
       finished_at: 2.hours.ago..Time.current
     ).order(finished_at: :desc).first
 
@@ -159,12 +167,12 @@ class HealthCheckJob < ApplicationJob
 
   def count_open_positions
     Position.open.day_trading.count
-  rescue
+  rescue StandardError
     0
   end
 
   def calculate_overall_health(checks)
-    critical_checks = [:database, :background_jobs]
+    critical_checks = %i[database background_jobs]
     important_checks = [:coinbase_api]
 
     # All critical checks must pass
@@ -174,11 +182,11 @@ class HealthCheckJob < ApplicationJob
     important_healthy = important_checks.any? { |check| checks[check] == true }
 
     if critical_healthy && important_healthy
-      "healthy"
+      'healthy'
     elsif critical_healthy
-      "warning"
+      'warning'
     else
-      "unhealthy"
+      'unhealthy'
     end
   end
 end

@@ -1,36 +1,38 @@
 # frozen_string_literal: true
 
 class SlackCommandHandler
-  AUTHORIZED_USERS = ENV["SLACK_AUTHORIZED_USERS"]&.split(",") || []
+  def self.authorized_users
+    ENV['SLACK_AUTHORIZED_USERS']&.split(',') || []
+  end
 
   class << self
     def handle_command(params)
       return unauthorized_response unless authorized?(params[:user_id])
 
       command = params[:command]
-      text = params[:text]&.strip || ""
+      text = params[:text]&.strip || ''
 
       case command
-      when "/bot-status"
+      when '/bot-status'
         handle_status_command
-      when "/bot-pause"
+      when '/bot-pause'
         handle_pause_command
-      when "/bot-resume"
+      when '/bot-resume'
         handle_resume_command
-      when "/bot-positions"
+      when '/bot-positions'
         handle_positions_command(text)
-      when "/bot-pnl"
+      when '/bot-pnl'
         handle_pnl_command(text)
-      when "/bot-health"
+      when '/bot-health'
         handle_health_command
-      when "/bot-stop"
+      when '/bot-stop'
         handle_emergency_stop_command
-      when "/bot-help"
+      when '/bot-help'
         handle_help_command
       else
         unknown_command_response(command)
       end
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackCommand] Error handling command #{params[:command]}: #{e.message}")
       Rails.logger.error(e.backtrace.join("\n"))
       error_response(e.message)
@@ -39,15 +41,15 @@ class SlackCommandHandler
     private
 
     def authorized?(user_id)
-      return true if AUTHORIZED_USERS.empty? # If no users configured, allow all
+      return true if authorized_users.empty? # If no users configured, allow all
 
-      AUTHORIZED_USERS.include?(user_id)
+      authorized_users.include?(user_id)
     end
 
     def unauthorized_response
       {
-        text: "❌ You are not authorized to use this command.",
-        response_type: "ephemeral"
+        text: '❌ You are not authorized to use this command.',
+        response_type: 'ephemeral'
       }
     end
 
@@ -56,40 +58,40 @@ class SlackCommandHandler
       status_data = get_bot_status
 
       {
-        text: "🤖 Bot Status",
-        response_type: "in_channel",
+        text: '🤖 Bot Status',
+        response_type: 'in_channel',
         attachments: [
           {
-            color: status_data[:healthy] ? "good" : "danger",
+            color: status_data[:healthy] ? 'good' : 'danger',
             fields: [
               {
-                title: "Trading Status",
-                value: status_data[:trading_active] ? "🟢 Active" : "🔴 Paused",
+                title: 'Trading Status',
+                value: status_data[:trading_active] ? '🟢 Active' : '🔴 Paused',
                 short: true
               },
               {
-                title: "Open Positions",
+                title: 'Open Positions',
                 value: status_data[:open_positions].to_s,
                 short: true
               },
               {
-                title: "Daily PnL",
-                value: status_data[:daily_pnl] ? "$#{status_data[:daily_pnl].round(2)}" : "N/A",
+                title: 'Daily PnL',
+                value: status_data[:daily_pnl] ? "$#{status_data[:daily_pnl].round(2)}" : 'N/A',
                 short: true
               },
               {
-                title: "Last Signal",
-                value: status_data[:last_signal_time] || "N/A",
+                title: 'Last Signal',
+                value: status_data[:last_signal_time] || 'N/A',
                 short: true
               },
               {
-                title: "Health Status",
-                value: status_data[:health_status] || "Unknown",
+                title: 'Health Status',
+                value: status_data[:health_status] || 'Unknown',
                 short: true
               },
               {
-                title: "Uptime",
-                value: status_data[:uptime] || "N/A",
+                title: 'Uptime',
+                value: status_data[:uptime] || 'N/A',
                 short: true
               }
             ]
@@ -103,14 +105,14 @@ class SlackCommandHandler
       set_trading_status(false)
 
       SlackNotificationService.bot_status({
-        status: "paused",
-        trading_active: false,
-        healthy: true
-      })
+                                            status: 'paused',
+                                            trading_active: false,
+                                            healthy: true
+                                          })
 
       {
-        text: "⏸️ Trading has been paused. The bot will stop generating new signals and opening positions.",
-        response_type: "in_channel"
+        text: '⏸️ Trading has been paused. The bot will stop generating new signals and opening positions.',
+        response_type: 'in_channel'
       }
     end
 
@@ -119,61 +121,61 @@ class SlackCommandHandler
       set_trading_status(true)
 
       SlackNotificationService.bot_status({
-        status: "active",
-        trading_active: true,
-        healthy: true
-      })
+                                            status: 'active',
+                                            trading_active: true,
+                                            healthy: true
+                                          })
 
       {
-        text: "▶️ Trading has been resumed. The bot will continue normal operations.",
-        response_type: "in_channel"
+        text: '▶️ Trading has been resumed. The bot will continue normal operations.',
+        response_type: 'in_channel'
       }
     end
 
-    def handle_positions_command(filter = "")
+    def handle_positions_command(filter = '')
       positions = get_positions(filter)
 
       if positions.empty?
         return {
-          text: "📊 No positions found#{filter.present? ? " for filter: #{filter}" : ""}",
-          response_type: "ephemeral"
+          text: "📊 No positions found#{filter.present? ? " for filter: #{filter}" : ''}",
+          response_type: 'ephemeral'
         }
       end
 
       attachments = positions.map do |position|
-        pnl_color = position.pnl&.positive? ? "good" : "danger"
+        pnl_color = position.pnl&.positive? ? 'good' : 'danger'
 
         {
           color: pnl_color,
           fields: [
             {
-              title: "Symbol",
+              title: 'Symbol',
               value: position.product_id,
               short: true
             },
             {
-              title: "Side",
+              title: 'Side',
               value: position.side.upcase,
               short: true
             },
             {
-              title: "Size",
+              title: 'Size',
               value: position.size.to_s,
               short: true
             },
             {
-              title: "Entry Price",
+              title: 'Entry Price',
               value: "$#{position.entry_price&.round(2)}",
               short: true
             },
             {
-              title: "Current PnL",
-              value: position.pnl ? "$#{position.pnl.round(2)}" : "N/A",
+              title: 'Current PnL',
+              value: position.pnl ? "$#{position.pnl.round(2)}" : 'N/A',
               short: true
             },
             {
-              title: "Duration",
-              value: position.entry_time ? duration_since(position.entry_time) : "N/A",
+              title: 'Duration',
+              value: position.entry_time ? duration_since(position.entry_time) : 'N/A',
               short: true
             }
           ]
@@ -182,52 +184,52 @@ class SlackCommandHandler
 
       {
         text: "📊 Current Positions (#{positions.count})",
-        response_type: "in_channel",
+        response_type: 'in_channel',
         attachments: attachments
       }
     end
 
-    def handle_pnl_command(period = "today")
+    def handle_pnl_command(period = 'today')
       pnl_data = get_pnl_data(period)
 
-      color = pnl_data[:total_pnl]&.positive? ? "good" : "danger"
-      emoji = pnl_data[:total_pnl]&.positive? ? "📈" : "📉"
+      color = pnl_data[:total_pnl]&.positive? ? 'good' : 'danger'
+      emoji = pnl_data[:total_pnl]&.positive? ? '📈' : '📉'
 
       {
         text: "#{emoji} PnL Report (#{period.capitalize})",
-        response_type: "in_channel",
+        response_type: 'in_channel',
         attachments: [
           {
             color: color,
             fields: [
               {
-                title: "Total PnL",
+                title: 'Total PnL',
                 value: "$#{pnl_data[:total_pnl]&.round(2)}",
                 short: true
               },
               {
-                title: "Realized PnL",
+                title: 'Realized PnL',
                 value: "$#{pnl_data[:realized_pnl]&.round(2)}",
                 short: true
               },
               {
-                title: "Unrealized PnL",
+                title: 'Unrealized PnL',
                 value: "$#{pnl_data[:unrealized_pnl]&.round(2)}",
                 short: true
               },
               {
-                title: "Trades Completed",
+                title: 'Trades Completed',
                 value: pnl_data[:completed_trades].to_s,
                 short: true
               },
               {
-                title: "Win Rate",
-                value: pnl_data[:win_rate] ? "#{pnl_data[:win_rate].round(1)}%" : "N/A",
+                title: 'Win Rate',
+                value: pnl_data[:win_rate] ? "#{pnl_data[:win_rate].round(1)}%" : 'N/A',
                 short: true
               },
               {
-                title: "Best Trade",
-                value: pnl_data[:best_trade] ? "$#{pnl_data[:best_trade].round(2)}" : "N/A",
+                title: 'Best Trade',
+                value: pnl_data[:best_trade] ? "$#{pnl_data[:best_trade].round(2)}" : 'N/A',
                 short: true
               }
             ]
@@ -241,58 +243,58 @@ class SlackCommandHandler
 
       overall_health = health_data[:overall_health]
       color = case overall_health
-      when "healthy"
-        "good"
-      when "warning"
-        "warning"
-      else
-        "danger"
-      end
+              when 'healthy'
+                'good'
+              when 'warning'
+                'warning'
+              else
+                'danger'
+              end
 
       emoji = case overall_health
-      when "healthy"
-        "✅"
-      when "warning"
-        "⚠️"
-      else
-        "❌"
-      end
+              when 'healthy'
+                '✅'
+              when 'warning'
+                '⚠️'
+              else
+                '❌'
+              end
 
       {
         text: "#{emoji} Health Check Report",
-        response_type: "in_channel",
+        response_type: 'in_channel',
         attachments: [
           {
             color: color,
             fields: [
               {
-                title: "Overall Health",
+                title: 'Overall Health',
                 value: overall_health.to_s.capitalize,
                 short: true
               },
               {
-                title: "Database",
-                value: health_data[:database] ? "✅ Connected" : "❌ Disconnected",
+                title: 'Database',
+                value: health_data[:database] ? '✅ Connected' : '❌ Disconnected',
                 short: true
               },
               {
-                title: "Coinbase API",
-                value: health_data[:coinbase_api] ? "✅ Connected" : "❌ Disconnected",
+                title: 'Coinbase API',
+                value: health_data[:coinbase_api] ? '✅ Connected' : '❌ Disconnected',
                 short: true
               },
               {
-                title: "Background Jobs",
-                value: health_data[:background_jobs] ? "✅ Running" : "❌ Stopped",
+                title: 'Background Jobs',
+                value: health_data[:background_jobs] ? '✅ Running' : '❌ Stopped',
                 short: true
               },
               {
-                title: "WebSocket Connections",
+                title: 'WebSocket Connections',
                 value: "#{health_data[:websocket_connections] || 0} active",
                 short: true
               },
               {
-                title: "Memory Usage",
-                value: health_data[:memory_usage] || "N/A",
+                title: 'Memory Usage',
+                value: health_data[:memory_usage] || 'N/A',
                 short: true
               }
             ]
@@ -306,36 +308,36 @@ class SlackCommandHandler
       emergency_stop_result = execute_emergency_stop
 
       SlackNotificationService.alert(
-        "critical",
-        "Emergency Stop Executed",
+        'critical',
+        'Emergency Stop Executed',
         "All trading activities stopped via Slack command. #{emergency_stop_result[:message]}"
       )
 
       {
         text: "🚨 EMERGENCY STOP EXECUTED 🚨\n\nAll trading activities have been immediately stopped.\n\n#{emergency_stop_result[:message]}",
-        response_type: "in_channel",
+        response_type: 'in_channel',
         attachments: [
           {
-            color: "danger",
+            color: 'danger',
             fields: [
               {
-                title: "Positions Closed",
+                title: 'Positions Closed',
                 value: emergency_stop_result[:positions_closed].to_s,
                 short: true
               },
               {
-                title: "Orders Cancelled",
+                title: 'Orders Cancelled',
                 value: emergency_stop_result[:orders_cancelled].to_s,
                 short: true
               },
               {
-                title: "Trading Status",
-                value: "🔴 DISABLED",
+                title: 'Trading Status',
+                value: '🔴 DISABLED',
                 short: true
               },
               {
-                title: "Executed At",
-                value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                title: 'Executed At',
+                value: Time.current.strftime('%Y-%m-%d %H:%M:%S UTC'),
                 short: true
               }
             ]
@@ -346,50 +348,50 @@ class SlackCommandHandler
 
     def handle_help_command
       {
-        text: "🤖 Bot Commands Help",
-        response_type: "ephemeral",
+        text: '🤖 Bot Commands Help',
+        response_type: 'ephemeral',
         attachments: [
           {
-            color: "good",
+            color: 'good',
             fields: [
               {
-                title: "/bot-status",
-                value: "Show current bot status and statistics",
+                title: '/bot-status',
+                value: 'Show current bot status and statistics',
                 short: false
               },
               {
-                title: "/bot-pause",
-                value: "Pause trading (stop new signals and positions)",
+                title: '/bot-pause',
+                value: 'Pause trading (stop new signals and positions)',
                 short: false
               },
               {
-                title: "/bot-resume",
-                value: "Resume trading operations",
+                title: '/bot-resume',
+                value: 'Resume trading operations',
                 short: false
               },
               {
-                title: "/bot-positions [filter]",
+                title: '/bot-positions [filter]',
                 value: "Show current positions. Optional filter: 'open', 'closed', symbol name",
                 short: false
               },
               {
-                title: "/bot-pnl [period]",
+                title: '/bot-pnl [period]',
                 value: "Show PnL report. Period: 'today' (default), 'week', 'month'",
                 short: false
               },
               {
-                title: "/bot-health",
-                value: "Show system health status",
+                title: '/bot-health',
+                value: 'Show system health status',
                 short: false
               },
               {
-                title: "/bot-stop",
-                value: "🚨 EMERGENCY STOP - Immediately stop all trading",
+                title: '/bot-stop',
+                value: '🚨 EMERGENCY STOP - Immediately stop all trading',
                 short: false
               },
               {
-                title: "/bot-help",
-                value: "Show this help message",
+                title: '/bot-help',
+                value: 'Show this help message',
                 short: false
               }
             ]
@@ -401,14 +403,14 @@ class SlackCommandHandler
     def unknown_command_response(command)
       {
         text: "❓ Unknown command: #{command}\n\nUse `/bot-help` to see available commands.",
-        response_type: "ephemeral"
+        response_type: 'ephemeral'
       }
     end
 
     def error_response(error_message)
       {
         text: "❌ Error executing command: #{error_message}",
-        response_type: "ephemeral"
+        response_type: 'ephemeral'
       }
     end
 
@@ -418,58 +420,58 @@ class SlackCommandHandler
       positions = Position.open.day_trading.count
       daily_pnl = Position.where(entry_time: Date.current.beginning_of_day..Time.current).sum(:pnl)
       last_signal = GenerateSignalsJob.where(finished_at: Date.current.beginning_of_day..Time.current)
-        .order(finished_at: :desc)
-        .first
+                                      .order(finished_at: :desc)
+                                      .first
 
       {
         trading_active: trading_active?,
         open_positions: positions,
         daily_pnl: daily_pnl,
-        last_signal_time: last_signal&.finished_at&.strftime("%H:%M UTC"),
+        last_signal_time: last_signal&.finished_at&.strftime('%H:%M UTC'),
         health_status: overall_health_status,
         uptime: application_uptime,
         healthy: true
       }
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackCommand] Error getting bot status: #{e.message}")
       {
         trading_active: false,
         open_positions: 0,
         healthy: false,
-        health_status: "error"
+        health_status: 'error'
       }
     end
 
-    def get_positions(filter = "")
+    def get_positions(filter = '')
       positions = Position.includes(:trading_pair)
 
       positions = case filter.downcase
-      when "open"
-        positions.open
-      when "closed"
-        positions.closed
-      when ""
-        positions.open # Default to open positions
-      else
-        # Assume it's a symbol filter
-        positions.joins(:trading_pair).where("trading_pairs.product_id ILIKE ?", "%#{filter}%")
-      end
+                  when 'open'
+                    positions.open
+                  when 'closed'
+                    positions.closed
+                  when ''
+                    positions.open # Default to open positions
+                  else
+                    # Assume it's a symbol filter
+                    positions.joins(:trading_pair).where('trading_pairs.product_id ILIKE ?', "%#{filter}%")
+                  end
 
       positions.order(entry_time: :desc).limit(10)
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackCommand] Error getting positions: #{e.message}")
       []
     end
 
     def get_pnl_data(period)
       start_time = case period.downcase
-      when "week"
-        1.week.ago
-      when "month"
-        1.month.ago
-      else
-        Date.current.beginning_of_day
-      end
+                   when 'week'
+                     1.week.ago
+                   when 'month'
+                     1.month.ago
+                   else
+                     Date.current.beginning_of_day
+                   end
 
       positions = Position.where(entry_time: start_time..Time.current)
       closed_positions = positions.closed
@@ -478,9 +480,9 @@ class SlackCommandHandler
       realized_pnl = closed_positions.sum(:pnl) || 0
       unrealized_pnl = total_pnl - realized_pnl
 
-      winning_trades = closed_positions.where("pnl > 0").count
+      winning_trades = closed_positions.where('pnl > 0').count
       total_trades = closed_positions.count
-      win_rate = (total_trades > 0) ? (winning_trades.to_f / total_trades * 100) : 0
+      win_rate = total_trades > 0 ? (winning_trades.to_f / total_trades * 100) : 0
 
       best_trade = closed_positions.maximum(:pnl)
 
@@ -492,7 +494,7 @@ class SlackCommandHandler
         win_rate: win_rate,
         best_trade: best_trade
       }
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackCommand] Error getting PnL data: #{e.message}")
       {
         total_pnl: 0,
@@ -512,12 +514,12 @@ class SlackCommandHandler
       memory_usage = get_memory_usage
 
       overall_health = if database_healthy && coinbase_api_healthy && background_jobs_healthy
-        "healthy"
-      elsif database_healthy && (coinbase_api_healthy || background_jobs_healthy)
-        "warning"
-      else
-        "unhealthy"
-      end
+                         'healthy'
+                       elsif database_healthy && (coinbase_api_healthy || background_jobs_healthy)
+                         'warning'
+                       else
+                         'unhealthy'
+                       end
 
       {
         overall_health: overall_health,
@@ -527,15 +529,15 @@ class SlackCommandHandler
         websocket_connections: websocket_connections,
         memory_usage: memory_usage
       }
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("[SlackCommand] Error getting health status: #{e.message}")
       {
-        overall_health: "error",
+        overall_health: 'error',
         database: false,
         coinbase_api: false,
         background_jobs: false,
         websocket_connections: 0,
-        memory_usage: "N/A"
+        memory_usage: 'N/A'
       }
     end
 
@@ -560,11 +562,11 @@ class SlackCommandHandler
 
         {
           success: true,
-          message: "Emergency stop completed successfully.",
+          message: 'Emergency stop completed successfully.',
           positions_closed: positions_closed,
           orders_cancelled: orders_cancelled
         }
-      rescue => e
+      rescue StandardError => e
         Rails.logger.error("[SlackCommand] Error during emergency stop: #{e.message}")
         {
           success: false,
@@ -578,18 +580,18 @@ class SlackCommandHandler
     def set_trading_status(active, emergency: false)
       # This would set a flag in Redis or database to control trading
       # For now, we'll use Rails cache
-      Rails.cache.write("trading_active", active)
-      Rails.cache.write("emergency_stop", emergency) if emergency
-      Rails.logger.info("[SlackCommand] Trading status set to: #{active ? "active" : "inactive"}#{emergency ? " (EMERGENCY)" : ""}")
+      Rails.cache.write('trading_active', active)
+      Rails.cache.write('emergency_stop', emergency) if emergency
+      Rails.logger.info("[SlackCommand] Trading status set to: #{active ? 'active' : 'inactive'}#{emergency ? ' (EMERGENCY)' : ''}")
     end
 
     def trading_active?
-      Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+      Rails.cache.fetch('trading_active', expires_in: 1.hour) { true }
     end
 
     def database_connected?
       ActiveRecord::Base.connection.active?
-    rescue
+    rescue StandardError
       false
     end
 
@@ -598,14 +600,14 @@ class SlackCommandHandler
       client = Coinbase::Client.new
       result = client.test_auth
       result[:advanced_trade][:ok] == true
-    rescue
+    rescue StandardError
       false
     end
 
     def background_jobs_running?
       # Check if GoodJob is processing jobs
       GoodJob::Job.where(finished_at: 1.hour.ago..Time.current).exists?
-    rescue
+    rescue StandardError
       false
     end
 
@@ -617,16 +619,16 @@ class SlackCommandHandler
 
     def get_memory_usage
       # Get memory usage information
-      if File.readable?("/proc/meminfo")
-        meminfo = File.read("/proc/meminfo")
+      if File.readable?('/proc/meminfo')
+        meminfo = File.read('/proc/meminfo')
         if (match = meminfo.match(/MemAvailable:\s+(\d+)\s+kB/))
           available_kb = match[1].to_i
           available_mb = available_kb / 1024
           "#{available_mb} MB available"
         end
       end
-    rescue
-      "N/A"
+    rescue StandardError
+      'N/A'
     end
 
     def overall_health_status
@@ -643,14 +645,14 @@ class SlackCommandHandler
         "#{hours}h #{minutes}m"
       else
         @@start_time = Time.current
-        "Just started"
+        'Just started'
       end
-    rescue
-      "N/A"
+    rescue StandardError
+      'N/A'
     end
 
     def duration_since(start_time)
-      return "N/A" unless start_time
+      return 'N/A' unless start_time
 
       duration_seconds = Time.current - start_time
       hours = (duration_seconds / 3600).to_i
