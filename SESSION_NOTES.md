@@ -26,6 +26,22 @@
 
 ### Session log
 
+#### 2025-01-27 16:45 UTC
+- Context: CI tests passing but still exiting with error code 1, investigating root cause
+- Changes:
+  - **Added CI debugging**: Modified GitHub Actions workflow to capture test exit codes and add debugging output
+  - **Simplified test format**: Changed from `--format documentation --backtrace` to `--format progress` for CI stability
+  - **Added exit code logging**: Added `echo "Test exit code: $?"` to identify why CI is failing despite tests passing
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m "ci: add debugging to test step to identify exit code issue"`
+  - `git push origin feat/realtime-signals-system`
+- Files touched:
+  - `.github/workflows/ci.yml` (added debugging and simplified test format)
+- Next steps:
+  - Monitor next CI run to see exit code debugging output
+  - Identify why tests pass but CI still fails
+  - Fix underlying issue once root cause is determined
+
 #### 2025-01-27 16:30 UTC
 - Context: Fixed Codecov integration issue that was causing CI failures in GitHub Actions
 - Changes:
