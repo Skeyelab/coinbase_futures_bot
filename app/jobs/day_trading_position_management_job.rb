@@ -60,28 +60,32 @@ class DayTradingPositionManagementJob < ApplicationJob
     @logger.info("Day trading position summary: #{summary}")
 
     # Send periodic PnL update if significant activity
-    if summary[:total_pnl] && (summary[:closed_today] > 0 || summary[:open_count] > 5)
+    closed_today_count = summary[:closed_today_count] || 0
+    open_count = summary[:open_count] || 0
+
+    if summary[:total_pnl] && (closed_today_count > 0 || open_count > 5)
       SlackNotificationService.pnl_update({
         total_pnl: summary[:total_pnl],
-        daily_pnl: summary[:daily_pnl],
-        open_positions: summary[:open_count],
-        closed_today: summary[:closed_today],
-        win_rate: summary[:win_rate]
+        daily_pnl: nil, # daily_pnl not available in position summary
+        open_positions: open_count,
+        closed_today: closed_today_count,
+        win_rate: nil # win_rate not available in position summary
       })
     end
 
     # Log any remaining open positions
-    if summary[:open_count] > 0
-      @logger.info("Remaining open day trading positions: #{summary[:open_count]}")
-      @logger.info("Positions needing closure: #{summary[:positions_needing_closure]}")
-      @logger.info("Positions approaching closure: #{summary[:positions_approaching_closure]}")
+    if open_count > 0
+      @logger.info("Remaining open day trading positions: #{open_count}")
+      @logger.info("Positions needing closure: #{summary[:positions_needing_closure] || 0}")
+      @logger.info("Positions approaching closure: #{summary[:positions_approaching_closure] || 0}")
 
       # Alert if too many positions approaching closure
-      if summary[:positions_approaching_closure] > 3
+      approaching_closure_count = summary[:positions_approaching_closure] || 0
+      if approaching_closure_count > 3
         SlackNotificationService.alert(
           "warning",
           "Multiple Positions Approaching Closure",
-          "#{summary[:positions_approaching_closure]} positions are approaching the 24-hour day trading limit."
+          "#{approaching_closure_count} positions are approaching the 24-hour day trading limit."
         )
       end
     end
