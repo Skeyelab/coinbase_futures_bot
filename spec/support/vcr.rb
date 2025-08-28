@@ -16,31 +16,17 @@ module VCRHelpers
     #   interaction.response.body.gsub(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/, '<ISO8601_TIMESTAMP>')
     # end
 
-    # config.filter_sensitive_data('<UNIX_TIMESTAMP>') do |interaction|
-    #   interaction.response.body.gsub(/\b\d{10,13}\b/, '<UNIX_TIMESTAMP>')
-    # end
-
-    # Remove JWT token filtering from response bodies - this was causing test failures
+    # JWT tokens - disabled due to response body corruption issues
+    # TODO: Re-enable with more careful filtering that doesn't corrupt JSON responses
     # config.filter_sensitive_data("<JWT_TOKEN>") do |interaction|
-    #   interaction.response.body.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>")
+    #   interaction.request.headers["Authorization"]&.first&.gsub(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, "<JWT_TOKEN>") || ""
     # end
   end
 
-  # Trim large candle response bodies for faster tests
+  # Trim large response bodies for faster tests
   def self.setup_response_trimming(config)
     config.before_record do |interaction|
-      if interaction.request.uri.include?("/candles") && interaction.response.body
-        begin
-          parsed = JSON.parse(interaction.response.body)
-          if parsed.is_a?(Array) && parsed.length > 10
-            # Keep only first 5 and last 5 candles for testing
-            trimmed = parsed.first(5) + parsed.last(5)
-            interaction.response.body = trimmed.to_json
-          end
-        rescue JSON::ParserError
-          # Keep original if not valid JSON
-        end
-      end
+      VCRHelpers.trim_large_responses(interaction)
     end
   end
 
@@ -118,11 +104,13 @@ VCR.configure do |config|
   # Note: before_record is not supported in VCR 6+
   # UUID filtering is handled in the global configuration
 
-  # Ignore Sentry requests
+  # Ignore external service requests
   config.ignore_request do |request|
     request.uri.include?("glitchtip.ger.ericdahl.dev") ||
       request.uri.include?("sentry.io") ||
-      request.uri.include?("sentry")
+      request.uri.include?("sentry") ||
+      request.uri.include?("slack.com") ||
+      request.uri.include?("hooks.slack.com")
   end
 
   # Allow real HTTP connections in development if needed
@@ -136,9 +124,9 @@ VCR.configure do |config|
   # Environment-specific record mode
   config.default_cassette_options = {
     record: VCRHelpers.record_mode,
-    match_requests_on: [:method, :uri_without_timestamps],
+    match_requests_on: %i[method uri_without_timestamps],
     allow_playback_repeats: true,
-    preserve_exact_body_bytes: false,  # Allow some flexibility
-    update_content_length_header: false  # Prevent hanging on content length issues
+    preserve_exact_body_bytes: false, # Allow some flexibility
+    update_content_length_header: false # Prevent hanging on content length issues
   }
 end

@@ -56,6 +56,9 @@ group :test do
   gem "simplecov", require: false
   gem "vcr"
   gem "webmock"
+
+  # Test profiling and optimization
+  gem "test-prof", "~> 1.2", require: false
 end
 
 gem "good_job", "~> 4.11"
@@ -64,3 +67,6 @@ gem "sentry-ruby"
 
 # JWT for Coinbase App (Advanced Trade) ES256 authentication
 gem "jwt", "~> 3.1"
+
+# Slack integration for notifications and bot control
+gem "slack-ruby-client", "~> 2.4"

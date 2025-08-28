@@ -1,0 +1,50 @@
+{
+  "display_information": {
+    "name": "Coinbase Futures Bot",
+    "description": "Trading bot for Coinbase futures with real-time monitoring and control",
+    "background_color": "#4A90E2"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Futures Bot",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "channels:read",
+        "chat:write",
+        "chat:write.public",
+        "commands",
+        "im:read",
+        "im:write",
+        "users:read",
+        "groups:read",
+        "groups:history",
+        "mpim:read",
+          "mpim:history",
+          "im:history",
+          "app_mentions:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": " https://skeyelab.ngrok.io/slack/events",
+      "bot_events": [
+        "app_mention",
+        "message.im",
+        "message.groups",
+        "message.mpim"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": " https://skeyelab.ngrok.io/slack/commands"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}

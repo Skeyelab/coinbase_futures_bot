@@ -3,17 +3,26 @@
 require "rails_helper"
 
 RSpec.describe FetchCandlesJob, type: :job do
-  let(:btc_pair) {
-    TradingPair.find_or_create_by(product_id: "BTC-USD") { |tp|
+  let(:btc_pair) do
+    TradingPair.find_or_create_by(product_id: "BTC-USD") do |tp|
       tp.base_currency = "BTC"
       tp.quote_currency = "USD"
       tp.status = "online"
       tp.enabled = true
-    }
-  }
+    end
+  end
+
+  let(:eth_pair) do
+    TradingPair.find_or_create_by(product_id: "ETH-USD") do |tp|
+      tp.base_currency = "ETH"
+      tp.quote_currency = "USD"
+      tp.status = "online"
+      tp.enabled = true
+    end
+  end
 
   after do
-    # Don't destroy the BTC pair as it might be used by other tests
+    # Don't destroy the BTC and ETH pairs as they might be used by other tests
   end
 
   describe "#perform" do
@@ -32,7 +41,7 @@ RSpec.describe FetchCandlesJob, type: :job do
         if total_candles > 0
           # Verify we have candles in different timeframes
           timeframes = Candle.where(symbol: "BTC-USD").distinct.pluck(:timeframe)
-          # Note: VCR cassette may not have all timeframes, so we check what's available
+          # NOTE: VCR cassette may not have all timeframes, so we check what's available
           expect(timeframes).to include("5m", "15m", "1h")
           # Log what timeframes we actually got for debugging
           puts "Available timeframes in VCR cassette: #{timeframes.join(", ")}"
@@ -66,15 +75,17 @@ RSpec.describe FetchCandlesJob, type: :job do
       allow(mock_rest).to receive(:upsert_15m_candles)
       allow(mock_rest).to receive(:upsert_1h_candles)
 
-      # Ensure the job can find the trading pair
+      # Ensure the job can find the trading pairs
       allow(TradingPair).to receive(:find_by).with(product_id: "BTC-USD").and_return(btc_pair)
+      allow(TradingPair).to receive(:find_by).with(product_id: "ETH-USD").and_return(eth_pair)
 
       described_class.perform_now(backfill_days: 7)
 
-      expect(mock_rest).to have_received(:upsert_1m_candles)
-      expect(mock_rest).to have_received(:upsert_5m_candles)
-      expect(mock_rest).to have_received(:upsert_15m_candles)
-      expect(mock_rest).to have_received(:upsert_1h_candles)
+      # Each method should be called twice (once for BTC-USD, once for ETH-USD)
+      expect(mock_rest).to have_received(:upsert_1m_candles).twice
+      expect(mock_rest).to have_received(:upsert_5m_candles).twice
+      expect(mock_rest).to have_received(:upsert_15m_candles).twice
+      expect(mock_rest).to have_received(:upsert_1h_candles).twice
     end
 
     it "handles errors gracefully for individual candle types" do
@@ -87,16 +98,17 @@ RSpec.describe FetchCandlesJob, type: :job do
       allow(mock_rest).to receive(:upsert_15m_candles)
       allow(mock_rest).to receive(:upsert_1h_candles)
 
-      # Ensure the job can find the trading pair
+      # Ensure the job can find the trading pairs
       allow(TradingPair).to receive(:find_by).with(product_id: "BTC-USD").and_return(btc_pair)
+      allow(TradingPair).to receive(:find_by).with(product_id: "ETH-USD").and_return(eth_pair)
 
       # Should not raise error, should continue with other candle types
       expect { described_class.perform_now(backfill_days: 7) }.not_to raise_error
 
-      # Should still call the other methods
-      expect(mock_rest).to have_received(:upsert_5m_candles)
-      expect(mock_rest).to have_received(:upsert_15m_candles)
-      expect(mock_rest).to have_received(:upsert_1h_candles)
+      # Should still call the other methods (twice for each pair, even though 1m fails)
+      expect(mock_rest).to have_received(:upsert_5m_candles).twice
+      expect(mock_rest).to have_received(:upsert_15m_candles).twice
+      expect(mock_rest).to have_received(:upsert_1h_candles).twice
     end
   end
 end

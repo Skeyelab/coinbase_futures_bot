@@ -12,6 +12,8 @@ RSpec.describe DayTradingPositionManagementJob, type: :job do
     allow(Rails).to receive(:logger).and_return(logger)
     allow(logger).to receive(:info)
     allow(logger).to receive(:error)
+    allow(logger).to receive(:debug)
+    allow(SlackNotificationService).to receive(:alert)
   end
 
   describe "#perform" do
@@ -66,8 +68,8 @@ RSpec.describe DayTradingPositionManagementJob, type: :job do
       trigger_info = {
         position: instance_double(Position, id: 1, product_id: "BIT-29AUG25-CDE"),
         trigger: "take_profit",
-        current_price: 51000.0,
-        target_price: 50000.0
+        current_price: 51_000.0,
+        target_price: 50_000.0
       }
       allow(manager).to receive(:positions_need_closure?).and_return(false)
       allow(manager).to receive(:positions_approaching_closure?).and_return(false)
@@ -79,8 +81,8 @@ RSpec.describe DayTradingPositionManagementJob, type: :job do
         positions_approaching_closure: 0
       })
 
-      expect(Rails.logger).to receive(:info).with(/Found 1 positions with triggered TP\/SL/)
-      expect(Rails.logger).to receive(:info).with(/Closed 1 TP\/SL positions/)
+      expect(Rails.logger).to receive(:info).with(%r{Found 1 positions with triggered TP/SL})
+      expect(Rails.logger).to receive(:info).with(%r{Closed 1 TP/SL positions})
 
       job.perform
     end

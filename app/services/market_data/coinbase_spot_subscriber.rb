@@ -14,28 +14,57 @@ module MarketData
 
     def start
       url = ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com")
-      socket = WebSocket::Client::Simple.connect(url)
-      @ws = socket
+      @logger.info("[MD-Spot] Connecting to #{url}...")
 
-      # Preserve self inside event handlers
-      subscriber = self
-      log = @logger
+      begin
+        socket = WebSocket::Client::Simple.connect(url)
+        @ws = socket
 
-      socket.on(:open) { subscriber.__send__(:subscribe) }
-      socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
-      socket.on(:error) { |e| log.error("[MD-Spot] error: #{e}") }
-      socket.on(:close) do
-        log.info("[MD-Spot] closed")
-        subscriber.__send__(:mark_ws_as_closed)
+        # Preserve self inside event handlers
+        subscriber = self
+        log = @logger
+
+        socket.on(:open) do
+          log.info("[MD-Spot] WebSocket connected successfully")
+          subscriber.__send__(:subscribe)
+        end
+
+        socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
+
+        socket.on(:error) do |e|
+          log.error("[MD-Spot] WebSocket error: #{e}")
+          subscriber.__send__(:mark_ws_as_closed)
+        end
+
+        socket.on(:close) do
+          log.info("[MD-Spot] WebSocket closed")
+          subscriber.__send__(:mark_ws_as_closed)
+        end
+
+        # Keep the connection alive - don't exit the method
+        # The WebSocket will run in its own thread
+        @logger.info("[MD-Spot] WebSocket connection established, monitoring for messages...")
+
+        # Simple keep-alive loop that doesn't block
+        loop do
+          break unless @ws&.open?
+          sleep 1
+        end
+      rescue => e
+        @logger.error("[MD-Spot] Failed to establish WebSocket connection: #{e.message}")
+        @ws = nil
       end
-
-      sleep 0.1 while @ws
     end
 
     private
 
     def mark_ws_as_closed
+      @ws&.close if @ws&.open?
       @ws = nil
+    end
+
+    def ws_connected?
+      @ws&.open?
     end
 
     def subscribe
@@ -44,7 +73,7 @@ module MarketData
         channel: "ticker",
         product_ids: @product_ids
       }
-      @ws.send(msg.to_json)
+      @ws&.send(msg.to_json)
       @logger.info("[MD-Spot] subscribed: #{msg}")
     end
 

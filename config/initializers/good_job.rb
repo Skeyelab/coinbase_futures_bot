@@ -53,6 +53,11 @@ Rails.application.configure do
     emergency_closure: {
       cron: ENV.fetch("EMERGENCY_CLOSURE_CRON", "0 0 * * *"), # midnight UTC daily
       class: "EndOfDayPositionClosureJob"
+    },
+    # Health check - run every hour during trading hours
+    health_check: {
+      cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
+      class: "HealthCheckJob"
     }
   }
 end
