@@ -1,36 +1,25 @@
 # frozen_string_literal: true
 
-require "faraday"
+require "net/http"
+require "uri"
 require "json"
 require "digest"
 require "time"
 
 module Sentiment
   class CryptoPanicClient
-    API_BASE = "https://cryptopanic.com/api/v1"
+    API_BASE = "https://cryptopanic.com/api/developer/v2"
 
-    def initialize(token: ENV["CRYPTOPANIC_TOKEN"], logger: Rails.logger)
+    def initialize(token: ENV["CRYPTOPANIC_TOKEN"], base_url: ENV["CRYPTOPANIC_BASE_URL"], logger: Rails.logger)
       @token = token
       @logger = logger
-      @conn = Faraday.new(url: API_BASE) do |f|
-        # Optional retry middleware; requires faraday-retry gem. Skip if unavailable.
-        begin
-          begin
-            require "faraday/retry"
-          rescue LoadError
-            # ignore if gem not present
-          end
-          f.request :retry, max: 3, interval: 0.2, interval_randomness: 0.3, backoff_factor: 2
-        rescue
-          # retry middleware not available; proceed without it
-        end
-        f.response :raise_error
-        f.adapter Faraday.default_adapter
-      end
+      @base_url = base_url.presence || API_BASE
     end
 
     def enabled?
-      @token.to_s.strip != ""
+      token_present = @token.to_s.strip != ""
+      @logger.warn("CryptoPanic token not configured - set CRYPTOPANIC_TOKEN environment variable") unless token_present
+      token_present
     end
 
     # Fetch recent posts (1-2 pages) and normalize to internal event hashes
@@ -38,24 +27,63 @@ module Sentiment
     def fetch_recent(max_pages: 2, public_only: true)
       return [] unless enabled?
 
+      @logger.debug("CryptoPanic: Fetching up to #{max_pages} pages from #{@base_url}")
+
       results = []
       page = 1
       while page <= max_pages
         params = {auth_token: @token, page: page}
         params[:public] = true if public_only
-        resp = @conn.get("/posts/", params)
-        body = JSON.parse(resp.body)
+
+        @logger.debug("CryptoPanic: Requesting page #{page} with params: #{params.except(:auth_token).merge(auth_token: "[REDACTED]")}")
+
+        # Build the full URL with query parameters
+        query_string = URI.encode_www_form(params)
+        full_url = "#{@base_url}/posts/?#{query_string}"
+        uri = URI(full_url)
+
+        @logger.debug("CryptoPanic: Full URL: #{full_url}")
+
+        # Make the HTTP request
+        response = Net::HTTP.get_response(uri)
+
+        @logger.debug("CryptoPanic: Response status: #{response.code}, body length: #{response.body.length}")
+
+        unless response.is_a?(Net::HTTPSuccess)
+          @logger.error("CryptoPanic: HTTP error #{response.code}: #{response.message}")
+          @logger.debug("CryptoPanic: Response body start: #{response.body[0..200]}")
+          return []
+        end
+
+        unless response.content_type&.include?("application/json")
+          @logger.error("CryptoPanic: Expected JSON response, got #{response.content_type}")
+          @logger.debug("CryptoPanic: Response body start: #{response.body[0..200]}")
+          return []
+        end
+
+        body = JSON.parse(response.body)
+
+        if body["status"] == "api_error"
+          @logger.error("CryptoPanic API error: #{body["info"]}")
+          return []
+        end
+
         Array(body["results"]).each do |item|
           normalized = normalize_item(item)
           results.concat(normalized) if normalized.any?
         end
+
+        @logger.debug("CryptoPanic: Page #{page} returned #{Array(body["results"]).size} items")
         break unless body["next"]
 
         page += 1
       end
+
+      @logger.info("CryptoPanic: Successfully fetched #{results.size} events from #{page - 1} pages")
       results
     rescue => e
       @logger.error("CryptoPanic fetch failed: #{e.class} #{e.message}")
+      @logger.debug("Full error: #{e.backtrace.first(5).join('\n')}")
       []
     end
 
