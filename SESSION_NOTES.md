@@ -32,6 +32,7 @@
   - Added `lib/tasks/ci_logs.rake` with `ci:fetch_logs` task using GitHub REST API
   - Supports detecting latest run by HEAD SHA, or `RUN_ID`, and saving under `log/ci/`
   - Added options to wait for run appearance and/or completion: `WAIT`, `WAIT_FOR_COMPLETION`, `WAIT_TIMEOUT`, `WAIT_INTERVAL`
+  - Added `ci:after_push` convenience task: push current branch, wait for CI, fetch logs
 - Commands run:
   - `bin/standardrb --fix`
 - Files touched:
@@ -39,6 +40,7 @@
 - Next steps:
   - Ensure `GITHUB_TOKEN` is set (Actions: Read) in Cursor environment
   - Use: `bundle exec rake ci:fetch_logs WAIT=1 WAIT_FOR_COMPLETION=1`
+  - Or: `bundle exec rake ci:after_push`
   - Optionally wire into post-push automation to pull logs automatically
 
 #### 2025-01-27 19:00 UTC

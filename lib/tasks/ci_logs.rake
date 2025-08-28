@@ -17,7 +17,7 @@ namespace :ci do
   #   CI_WORKFLOW:  Workflow file name or ID (default: "ci.yml")
   #   RUN_ID:       Specific run ID to download (default: detect by HEAD SHA)
   desc "Download GitHub Actions logs for the latest run of the CI workflow into log/ci/"
-  task :fetch_logs, [:workflow, :run_id, :repo] => :environment do |_t, args|
+  task :fetch_logs, %i[workflow run_id repo] => :environment do |_t, args|
     token = ENV["GITHUB_TOKEN"] || ENV["GH_TOKEN"] || ENV["GH_PAT"]
     abort "GITHUB_TOKEN (or GH_TOKEN) is required" unless token && !token.strip.empty?
 
@@ -50,6 +50,7 @@ namespace :ci do
         run = locate_workflow_run(connection, repo, workflow, head_sha)
         break if run || !wait_for_run
         break if Time.now >= deadline
+
         sleep wait_interval
       end
       abort "No workflow runs found for #{workflow} in #{repo}" unless run
@@ -84,6 +85,7 @@ namespace :ci do
           break
         end
         break if Time.now >= deadline
+
         sleep wait_interval
       end
     end
@@ -106,8 +108,41 @@ namespace :ci do
     puts "All logs saved under #{dest_dir}"
   end
 
+  # Convenience: push current branch (or specified) then wait for CI and fetch logs
+  # Usage:
+  #   bundle exec rake ci:after_push                  # push current branch to origin, wait, fetch
+  #   bundle exec rake ci:after_push[upstream,feat/x] # push feat/x to upstream, wait, fetch
+  # Env vars honored:
+  #   SKIP_PUSH=1                 # do not push, only wait+fetch
+  #   CI_WORKFLOW / GITHUB_REPO   # passed to ci:fetch_logs
+  #   WAIT_TIMEOUT / WAIT_INTERVAL
+  desc "Push branch then wait for CI run and fetch logs (into log/ci/)"
+  task :after_push, %i[remote branch] => :environment do |_t, args|
+    remote = (args[:remote] || ENV["GIT_REMOTE"] || "origin").to_s
+    branch = (args[:branch] || ENV["GIT_BRANCH"] || current_branch).to_s
+    abort "Unable to determine git branch" if branch.to_s.strip.empty?
+
+    if truthy_env?(ENV["SKIP_PUSH"])
+      puts "SKIP_PUSH=1 set; skipping git push"
+    else
+      puts "Pushing #{branch} to #{remote}..."
+      success = system("git", "push", remote, branch)
+      abort "git push failed for #{remote} #{branch}" unless success
+    end
+
+    # Ensure we wait for the run to appear and complete
+    ENV["WAIT"] = "1"
+    ENV["WAIT_FOR_RUN"] = "1"
+    ENV["WAIT_FOR_COMPLETION"] = "1"
+
+    # Re-enable in case it was invoked before
+    Rake::Task["ci:fetch_logs"].reenable
+    Rake::Task["ci:fetch_logs"].invoke
+  end
+
   def truthy_env?(value)
     return false if value.nil?
+
     %w[1 true yes on y].include?(value.to_s.strip.downcase)
   end
 
@@ -117,7 +152,7 @@ namespace :ci do
 
     # Handle SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git)
     if origin =~ %r{github.com[/:]([^/]+)/([^/.]+)(?:\.git)?$}
-      "#{$1}/#{$2}"
+      "#{Regexp.last_match(1)}/#{Regexp.last_match(2)}"
     else
       ""
     end
@@ -125,6 +160,10 @@ namespace :ci do
 
   def current_head_sha
     `git rev-parse HEAD 2>/dev/null`.strip
+  end
+
+  def current_branch
+    `git rev-parse --abbrev-ref HEAD 2>/dev/null`.strip
   end
 
   def fetch_json(connection, path)
