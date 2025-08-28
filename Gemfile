@@ -53,7 +53,6 @@ group :test do
   # Codecov integration removed - no external uploads needed
   gem "factory_bot_rails", "~> 6.2"
   gem "rails-controller-testing"
-  gem "simplecov", require: false
   gem "vcr"
   gem "webmock"
 

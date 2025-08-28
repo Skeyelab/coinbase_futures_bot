@@ -82,7 +82,6 @@ jobs:
           path: |
             tmp/
             .rspec_status
-            coverage/
             spec/fixtures/vcr_cassettes/
           key: ${{ runner.os }}-test-cache-${{ hashFiles('db/**/*', 'spec/**/*', 'Gemfile.lock') }}
           restore-keys: |
