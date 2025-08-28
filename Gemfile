@@ -54,6 +54,9 @@ group :test do
   gem "rails-controller-testing"
   gem "vcr"
   gem "webmock"
+
+  # Test profiling and optimization
+  gem "test-prof", "~> 1.2", require: false
 end
 
 gem "good_job", "~> 4.11"

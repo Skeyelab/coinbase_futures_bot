@@ -6,6 +6,11 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 require "rspec/rails"
 require "factory_bot_rails"
 
+# Test profiling (only load when needed to avoid overhead)
+if ENV["SAMPLE"] || ENV["RPROF"] || ENV["STACKPROF"] || ENV["TAG_PROF"]
+  require "test_prof"
+end
+
 # Maintain test schema with better error handling
 begin
   ActiveRecord::Migration.maintain_test_schema!
@@ -37,9 +42,9 @@ RSpec.configure do |config|
   # Add custom formatter for clear test identification
   config.add_formatter TestNameFormatter
 
-  # Show test names clearly before they run
+  # Show test names clearly before they run (only in non-parallel mode to reduce noise)
   config.before(:each) do |example|
-    puts "\n🧪 Running: #{example.full_description}"
+    puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
@@ -59,4 +64,6 @@ RSpec.configure do |config|
 
   # Removed expensive delete_all operations - transactional fixtures handle cleanup
   # Individual tests can clean specific data if needed
+
+  # Host authorization is disabled in test environment via config.hosts = nil
 end
