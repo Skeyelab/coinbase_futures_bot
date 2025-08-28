@@ -104,11 +104,13 @@ VCR.configure do |config|
   # Note: before_record is not supported in VCR 6+
   # UUID filtering is handled in the global configuration
 
-  # Ignore Sentry requests
+  # Ignore external service requests
   config.ignore_request do |request|
     request.uri.include?("glitchtip.ger.ericdahl.dev") ||
       request.uri.include?("sentry.io") ||
-      request.uri.include?("sentry")
+      request.uri.include?("sentry") ||
+      request.uri.include?("slack.com") ||
+      request.uri.include?("hooks.slack.com")
   end
 
   # Allow real HTTP connections in development if needed
@@ -122,9 +124,9 @@ VCR.configure do |config|
   # Environment-specific record mode
   config.default_cassette_options = {
     record: VCRHelpers.record_mode,
-    match_requests_on: [:method, :uri_without_timestamps],
+    match_requests_on: %i[method uri_without_timestamps],
     allow_playback_repeats: true,
-    preserve_exact_body_bytes: false,  # Allow some flexibility
-    update_content_length_header: false  # Prevent hanging on content length issues
+    preserve_exact_body_bytes: false, # Allow some flexibility
+    update_content_length_header: false # Prevent hanging on content length issues
   }
 end
