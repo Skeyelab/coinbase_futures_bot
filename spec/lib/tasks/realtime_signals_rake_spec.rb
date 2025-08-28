@@ -123,7 +123,8 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           trading_pair = TradingPair.find_by(product_id: symbol)
           if trading_pair.nil?
             Rails.logger.error("[RTS] Trading pair not found: #{symbol}")
-            exit 1
+            # Do not exit the test process; simulate task failure by returning
+            return
           end
         end
       end
@@ -135,7 +136,8 @@ RSpec.describe "Realtime Signals Rake Tasks" do
 
           if symbol.blank?
             Rails.logger.error("[RTS] Please provide a symbol: rake realtime:evaluate_symbol[BTC-USD]")
-            exit 1
+            # Do not exit the test process; simulate task failure by returning
+            return
           end
         end
       end
@@ -244,7 +246,8 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           if ENV["FORCE"] != "true"
             puts "This will cancel ALL active signal alerts. Run with FORCE=true to confirm."
             puts "Example: FORCE=true rake realtime:cancel_all"
-            exit 1
+            # Do not exit the test process; simulate task abort by returning
+            return
           end
         end
       end
