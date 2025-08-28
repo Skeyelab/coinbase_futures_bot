@@ -98,8 +98,10 @@ jobs:
           echo "Starting test suite..."
           echo "Database URL: $DATABASE_URL"
           echo "Rails env: $RAILS_ENV"
-          echo "Running: bundle exec rspec --format documentation --backtrace"
-          bundle exec rspec --format documentation --backtrace
+          echo "Running: bundle exec rspec --format progress"
+          bundle exec rspec --format progress
+          echo "Test exit code: $?"
+          echo "Tests completed successfully"
         env:
           # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
