@@ -26,6 +26,30 @@
 
 ### Session log
 
+#### 2025-08-28 17:50 UTC
+- Context: **FUT-29 COMPLETED** - Fully resolved CryptoPanic API 404 error with v2 API migration
+- Changes:
+  - **MAJOR**: Migrated from deprecated `/api/v1` to current `/api/developer/v2` endpoint per official documentation
+  - **MAJOR**: Replaced Faraday with Net::HTTP for reliable API communication (Faraday was incompatible with CryptoPanic server)
+  - Updated `API_BASE` constant from `https://cryptopanic.com/api/v1` to `https://cryptopanic.com/api/developer/v2`
+  - Simplified HTTP client implementation using Ruby's built-in Net::HTTP library
+  - Enhanced error handling for HTTP status codes and content-type validation
+  - Improved debug logging with full URL and response details
+- Commands run:
+  - `curl -v` - Verified v2 developer endpoint returns JSON 200 while Faraday was getting HTML 404
+  - `bin/rails runner` - Tested and verified successful v2 API integration (20+ news items fetched)
+  - `FetchCryptopanicJob.perform_now` - Confirmed end-to-end job functionality
+  - `bundle exec rspec` - All service and job tests pass
+  - `bin/standardrb --fix` - Applied code formatting
+- Files touched:
+  - `app/services/sentiment/crypto_panic_client.rb` - Complete HTTP client rewrite for v2 compatibility
+- Migrations:
+  - None required
+- Next steps:
+  - **Issue fully resolved**: CryptoPanic service now works reliably with v2 API
+  - Production deployment ready with proper error handling and logging
+  - Consider removing faraday dependency if not used elsewhere
+
 #### 2025-08-28 17:26 UTC
 - Context: **FUT-29 RESOLVED** - Fixed CryptoPanic API 404 error in FetchCryptopanicJob
 - Changes:

@@ -1,33 +1,19 @@
 # frozen_string_literal: true
 
-require "faraday"
+require "net/http"
+require "uri"
 require "json"
 require "digest"
 require "time"
 
 module Sentiment
   class CryptoPanicClient
-    API_BASE = "https://cryptopanic.com/api/v1"
+    API_BASE = "https://cryptopanic.com/api/developer/v2"
 
     def initialize(token: ENV["CRYPTOPANIC_TOKEN"], base_url: ENV["CRYPTOPANIC_BASE_URL"], logger: Rails.logger)
       @token = token
       @logger = logger
-      base_url = API_BASE if base_url.blank?
-      @conn = Faraday.new(url: base_url) do |f|
-        # Optional retry middleware; requires faraday-retry gem. Skip if unavailable.
-        begin
-          begin
-            require "faraday/retry"
-          rescue LoadError
-            # ignore if gem not present
-          end
-          f.request :retry, max: 3, interval: 0.2, interval_randomness: 0.3, backoff_factor: 2
-        rescue
-          # retry middleware not available; proceed without it
-        end
-        f.response :raise_error
-        f.adapter Faraday.default_adapter
-      end
+      @base_url = base_url.presence || API_BASE
     end
 
     def enabled?
@@ -41,7 +27,7 @@ module Sentiment
     def fetch_recent(max_pages: 2, public_only: true)
       return [] unless enabled?
 
-      @logger.debug("CryptoPanic: Fetching up to #{max_pages} pages from #{@conn.url_prefix}")
+      @logger.debug("CryptoPanic: Fetching up to #{max_pages} pages from #{@base_url}")
 
       results = []
       page = 1
@@ -51,8 +37,31 @@ module Sentiment
 
         @logger.debug("CryptoPanic: Requesting page #{page} with params: #{params.except(:auth_token).merge(auth_token: "[REDACTED]")}")
 
-        resp = @conn.get("/posts/", params)
-        body = JSON.parse(resp.body)
+        # Build the full URL with query parameters
+        query_string = URI.encode_www_form(params)
+        full_url = "#{@base_url}/posts/?#{query_string}"
+        uri = URI(full_url)
+
+        @logger.debug("CryptoPanic: Full URL: #{full_url}")
+
+        # Make the HTTP request
+        response = Net::HTTP.get_response(uri)
+
+        @logger.debug("CryptoPanic: Response status: #{response.code}, body length: #{response.body.length}")
+
+        unless response.is_a?(Net::HTTPSuccess)
+          @logger.error("CryptoPanic: HTTP error #{response.code}: #{response.message}")
+          @logger.debug("CryptoPanic: Response body start: #{response.body[0..200]}")
+          return []
+        end
+
+        unless response.content_type&.include?("application/json")
+          @logger.error("CryptoPanic: Expected JSON response, got #{response.content_type}")
+          @logger.debug("CryptoPanic: Response body start: #{response.body[0..200]}")
+          return []
+        end
+
+        body = JSON.parse(response.body)
 
         if body["status"] == "api_error"
           @logger.error("CryptoPanic API error: #{body["info"]}")
@@ -74,7 +83,6 @@ module Sentiment
       results
     rescue => e
       @logger.error("CryptoPanic fetch failed: #{e.class} #{e.message}")
-      @logger.error("Request URL: #{@conn.url_prefix}/posts/")
       @logger.debug("Full error: #{e.backtrace.first(5).join('\n')}")
       []
     end
