@@ -25,7 +25,7 @@ module TestEffectiveness
     return unless critical_methods.include?(method_name.to_sym)
 
     puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
-    puts '   Consider using integration testing instead of mocking core business logic'
+    puts "   Consider using integration testing instead of mocking core business logic"
   end
 
   # Validate that a test actually exercises real code paths
@@ -39,8 +39,8 @@ module TestEffectiveness
     return unless mock_count > 5
 
     puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
-    puts "   Mocked methods: #{mocked_methods.join(', ')}"
-    puts '   This test may not be validating actual behavior'
+    puts "   Mocked methods: #{mocked_methods.join(", ")}"
+    puts "   This test may not be validating actual behavior"
   end
 
   # Mark a test as an integration test
@@ -53,7 +53,7 @@ end
 module RSpec
   module Mocks
     class Proxy
-      alias original_add_stub add_stub
+      alias_method :original_add_stub, :add_stub
 
       def add_stub(method_name, *args, &block)
         # Track mock usage

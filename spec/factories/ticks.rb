@@ -2,7 +2,7 @@
 
 FactoryBot.define do
   factory :tick do
-    product_id { 'BTC-USD' }
+    product_id { "BTC-USD" }
     price { 50_000.0 }
     observed_at { Time.current.utc }
 
