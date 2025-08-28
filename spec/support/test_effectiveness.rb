@@ -12,20 +12,20 @@ module TestEffectiveness
     example.metadata[:mocked_methods] << "#{object.class.name}##{method_name}"
 
     # Warn about mocking critical business logic methods
-    critical_methods = [
-      :calculate_total_pnl,
-      :get_current_prices,
-      :check_tp_sl_triggers,
-      :close_positions,
-      :fetch_candles,
-      :list_open_positions,
-      :execute_trade
+    critical_methods = %i[
+      calculate_total_pnl
+      get_current_prices
+      check_tp_sl_triggers
+      close_positions
+      fetch_candles
+      list_open_positions
+      execute_trade
     ]
 
-    if critical_methods.include?(method_name.to_sym)
-      puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
-      puts "   Consider using integration testing instead of mocking core business logic"
-    end
+    return unless critical_methods.include?(method_name.to_sym)
+
+    puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
+    puts '   Consider using integration testing instead of mocking core business logic'
   end
 
   # Validate that a test actually exercises real code paths
@@ -36,11 +36,11 @@ module TestEffectiveness
     mocked_methods = example.metadata[:mocked_methods] || []
 
     # Flag tests that mock too many methods
-    if mock_count > 5
-      puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
-      puts "   Mocked methods: #{mocked_methods.join(", ")}"
-      puts "   This test may not be validating actual behavior"
-    end
+    return unless mock_count > 5
+
+    puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
+    puts "   Mocked methods: #{mocked_methods.join(', ')}"
+    puts '   This test may not be validating actual behavior'
   end
 
   # Mark a test as an integration test
@@ -53,7 +53,7 @@ end
 module RSpec
   module Mocks
     class Proxy
-      alias_method :original_add_stub, :add_stub
+      alias original_add_stub add_stub
 
       def add_stub(method_name, *args, &block)
         # Track mock usage

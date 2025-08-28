@@ -2,42 +2,40 @@
 
 # SimpleCov removed entirely
 
-ENV["RAILS_ENV"] ||= "test"
-require File.expand_path("../config/environment", __dir__)
-abort("The Rails environment is running in production mode!") if Rails.env.production?
-require "rspec/rails"
-require "factory_bot_rails"
+ENV['RAILS_ENV'] ||= 'test'
+require File.expand_path('../config/environment', __dir__)
+abort('The Rails environment is running in production mode!') if Rails.env.production?
+require 'rspec/rails'
+require 'factory_bot_rails'
 
 # Require rails-controller-testing for Rails 8 compatibility
-require "rails-controller-testing"
+require 'rails-controller-testing'
 
 # Test profiling (only load when needed to avoid overhead)
-if ENV["SAMPLE"] || ENV["RPROF"] || ENV["STACKPROF"] || ENV["TAG_PROF"]
-  require "test_prof"
-end
+require 'test_prof' if ENV['SAMPLE'] || ENV['RPROF'] || ENV['STACKPROF'] || ENV['TAG_PROF']
 
 # Maintain test schema with strict error handling
 begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   puts "ERROR: Pending migrations detected: #{e.message}"
-  puts "Run `rails db:migrate` before running tests"
+  puts 'Run `rails db:migrate` before running tests'
   exit 1
 rescue ActiveRecord::ConnectionNotEstablished => e
   puts "ERROR: Database connection failed: #{e.message}"
-  puts "Ensure database is running and properly configured"
+  puts 'Ensure database is running and properly configured'
   exit 1
-rescue => e
+rescue StandardError => e
   puts "ERROR: Schema maintenance failed: #{e.message}"
-  puts "Check database configuration and migrations"
+  puts 'Check database configuration and migrations'
   exit 1
 end
 
 # Require support files
-Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
+Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
 
 # Load test effectiveness validation
-require Rails.root.join("spec/support/test_effectiveness.rb")
+require Rails.root.join('spec/support/test_effectiveness.rb')
 
 RSpec.configure do |config|
   # Use database transactions for fast test isolation instead of expensive delete_all
@@ -58,7 +56,7 @@ RSpec.configure do |config|
 
   # Test effectiveness validation
   config.before(:each) do |example|
-    puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
+    puts "\n🧪 Running: #{example.full_description}" unless ENV['TEST_ENV_NUMBER']
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
@@ -82,10 +80,10 @@ RSpec.configure do |config|
   # Add safety for database operations
   config.before(:suite) do
     # Ensure database is available before starting tests
-    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-  rescue => e
+    ActiveRecord::Base.connection.execute('SELECT 1') if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue StandardError => e
     puts "ERROR: Database health check failed: #{e.message}"
-    puts "Tests cannot continue with database issues"
+    puts 'Tests cannot continue with database issues'
     exit 1
   end
 
