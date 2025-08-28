@@ -91,7 +91,7 @@ jobs:
           bin/rails db:migrate
           bin/rails db:test:prepare
           echo "Database setup complete"
-          
+
       - name: Debug environment
         run: |
           echo "=== Environment Debug Info ==="
