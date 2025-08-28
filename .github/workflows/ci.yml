@@ -133,7 +133,7 @@ jobs:
           bin/rails db:version
           echo "=== RUNNING TESTS ==="
           set -x  # Enable command tracing
-          bundle exec rspec --format progress
+          bundle exec rspec --format progress --order random --seed $RANDOM
           TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
                     echo "=== TEST RESULTS ==="

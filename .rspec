@@ -4,3 +4,4 @@
 --backtrace
 --color
 --tty
+--order random
