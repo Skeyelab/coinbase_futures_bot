@@ -31,8 +31,8 @@ RSpec.describe SlackNotificationService, type: :service do
   let(:missing_config_env) do
     {
       "SLACK_ENABLED" => "true",
-      "SLACK_BOT_TOKEN" => nil,
-      "SLACK_SIGNALS_CHANNEL" => nil
+      "SLACK_BOT_TOKEN" => "",
+      "SLACK_SIGNALS_CHANNEL" => ""
     }
   end
 
@@ -41,7 +41,7 @@ RSpec.describe SlackNotificationService, type: :service do
       "SLACK_ENABLED" => "true",
       "SLACK_BOT_TOKEN" => "xoxb-test-token",
       "SLACK_SIGNALS_CHANNEL" => "",
-      "SLACK_POSITIONS_CHANNEL" => nil
+      "SLACK_POSITIONS_CHANNEL" => ""
     }
   end
 
