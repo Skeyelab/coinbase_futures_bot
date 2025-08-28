@@ -1,10 +1,11 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, feat/** ]
   pull_request:
     branches: [ main, feat/** ]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main ]
 
 # Force workflow refresh - v20250127-1745
 # This is a completely new workflow file to force cache refresh
