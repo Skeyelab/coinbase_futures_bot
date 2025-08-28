@@ -9,11 +9,11 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
   def create_candle_data(symbol:, base_price: 100.0, trend: :up)
     candle_data = []
     base_time = Time.parse("2025-08-27T12:00:00Z")
-    
+
     # 1h candles - establish primary trend
     80.times do |i|
       timestamp = base_time - (80 - i).hours
-      price_adj = trend == :up ? (i * 0.1) : -(i * 0.1)
+      price_adj = (trend == :up) ? (i * 0.1) : -(i * 0.1)
       price = base_price + price_adj
       candle_data << {
         symbol: symbol, timeframe: "1h", timestamp: timestamp,
@@ -25,7 +25,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     # 15m candles - intraday confirmation
     120.times do |i|
       timestamp = base_time - (120 - i) * 15.minutes
-      price_adj = trend == :up ? (i * 0.05) : -(i * 0.05)
+      price_adj = (trend == :up) ? (i * 0.05) : -(i * 0.05)
       price = base_price + 2.0 + price_adj
       candle_data << {
         symbol: symbol, timeframe: "15m", timestamp: timestamp,
@@ -45,7 +45,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           created_at: Time.current, updated_at: Time.current
         }
       else
-        price_adj = trend == :up ? (i * 0.02) : -(i * 0.02)
+        price_adj = (trend == :up) ? (i * 0.02) : -(i * 0.02)
         price = base_price + 2.0 + price_adj
         candle_data << {
           symbol: symbol, timeframe: "5m", timestamp: timestamp,
@@ -58,7 +58,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     # 1m candles - micro-timing precision
     60.times do |i|
       timestamp = base_time - (60 - i).minutes
-      price_adj = trend == :up ? (i * 0.01) : -(i * 0.01)
+      price_adj = (trend == :up) ? (i * 0.01) : -(i * 0.01)
       price = base_price + 2.5 + price_adj
       candle_data << {
         symbol: symbol, timeframe: "1m", timestamp: timestamp,
@@ -72,80 +72,80 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
   describe "EMA Calculation Validation" do
     let(:strategy) { described_class.new }
-    
+
     describe "#ema" do
       it "calculates EMA correctly for single period" do
         values = [100.0]
         result = strategy.send(:ema, values, 1)
         expect(result).to eq(100.0)
       end
-      
+
       it "calculates EMA correctly for simple values" do
         values = [100, 102, 104, 103, 105]
         period = 3
         result = strategy.send(:ema, values, period)
-        
+
         # Manual calculation verification
         k = 2.0 / (period + 1)  # 0.5
         expected = 100.0  # Start with first value
         values.each do |v|
           expected = v * k + expected * (1 - k)
         end
-        
+
         expect(result).to be_within(0.01).of(expected)
       end
-      
+
       it "handles edge cases properly" do
         # Empty array
         expect(strategy.send(:ema, [], 10)).to eq(0.0)
-        
+
         # Period of 0
         expect(strategy.send(:ema, [100, 102], 0)).to eq(102.0)
-        
+
         # Period greater than values length
         values = [100, 102]
         result = strategy.send(:ema, values, 10)
         expect(result).to be_a(Float)
       end
-      
+
       it "validates 1-hour EMA accuracy for trend detection" do
         # Create realistic price series for 1h timeframe
         prices = Array.new(50) { |i| 50000 + (i * 100) }  # Uptrend
         ema_short = strategy.send(:ema, prices, 12)
         ema_long = strategy.send(:ema, prices, 26)
-        
+
         # In uptrend, short EMA should be higher than long EMA
         expect(ema_short).to be > ema_long
         expect(ema_short).to be > prices.first
         expect(ema_short).to be < prices.last
       end
-      
+
       it "validates 15-minute EMA accuracy for intraday confirmation" do
         # Create choppy but overall bullish 15m data
         prices = []
         50.times { |i| prices << (100 + Math.sin(i * 0.1) * 2 + i * 0.05) }
-        
+
         ema = strategy.send(:ema, prices, 21)
         expect(ema).to be_between(prices.min, prices.max)
         expect(ema).to be > prices.first  # Should trend up
       end
-      
+
       it "validates 5-minute EMA accuracy for entry signals" do
         # Create realistic 5m pullback pattern
         prices = Array.new(30) { |i| 100 + i * 0.1 }  # Uptrend
         prices += [99.5, 99.8, 100.2, 100.5]  # Pullback and recovery
-        
+
         ema = strategy.send(:ema, prices, 13)
         expect(ema).to be_between(99.0, 102.0)
       end
-      
+
       it "validates 1-minute EMA accuracy for micro-timing" do
         # Create high-frequency micro movements
         base_price = 100.0
         prices = Array.new(30) do |i|
           base_price + Math.sin(i * 0.5) * 0.1 + (i * 0.01)
         end
-        
+
         ema = strategy.send(:ema, prices, 8)
         expect(ema).to be_within(0.5).of(base_price)
         expect(ema).to be > base_price  # Should trend slightly up
@@ -155,92 +155,92 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
   describe "Trend Analysis" do
     let(:strategy) { described_class.new }
-    
+
     describe "bullish trend detection" do
       before do
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
       end
-      
+
       it "detects bullish trend when short EMA > long EMA" do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
-        
+
         ema_short = strategy.send(:ema, closes_1h, 12)
         ema_long = strategy.send(:ema, closes_1h, 26)
         trend = (ema_short > ema_long) ? :up : :down
-        
+
         expect(trend).to eq(:up)
         expect(ema_short).to be > ema_long
       end
-      
+
       it "confirms bullish alignment across all timeframes" do
-        candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
+        Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         candles_15m = Candle.for_symbol("BTC-USD").fifteen_minute.order(:timestamp).last(120)
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
-        
+
         # Calculate EMAs for each timeframe
         ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
         ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
-        
+
         # Check alignment
         last_15m = candles_15m.last
         last_5m = candles_5m.last
         last_1m = candles_1m.last
-        
+
         aligned = strategy.send(:confirm_trend_alignment, :up, ema15, ema5, ema1, last_15m, last_5m, last_1m)
         expect(aligned).to be true
       end
     end
-    
+
     describe "bearish trend detection" do
       before do
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :down)
         Candle.insert_all(candle_data)
       end
-      
+
       it "detects bearish trend when short EMA < long EMA" do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
-        
+
         ema_short = strategy.send(:ema, closes_1h, 12)
         ema_long = strategy.send(:ema, closes_1h, 26)
         trend = (ema_short > ema_long) ? :up : :down
-        
+
         expect(trend).to eq(:down)
         expect(ema_short).to be < ema_long
       end
-      
+
       it "confirms bearish alignment across all timeframes" do
-        candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
+        Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         candles_15m = Candle.for_symbol("BTC-USD").fifteen_minute.order(:timestamp).last(120)
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
-        
+
         # Calculate EMAs for each timeframe
         ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
         ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
-        
+
         # Check alignment for downtrend
         last_15m = candles_15m.last
         last_5m = candles_5m.last
         last_1m = candles_1m.last
-        
+
         aligned = strategy.send(:confirm_trend_alignment, :down, ema15, ema5, ema1, last_15m, last_5m, last_1m)
         expect(aligned).to be true
       end
     end
-    
+
     describe "sideways market handling" do
       before do
         # Create sideways market data
         candle_data = []
         base_time = Time.parse("2025-08-27T12:00:00Z")
         base_price = 100.0
-        
+
         # Sideways 1h candles with no clear trend
         80.times do |i|
           timestamp = base_time - (80 - i).hours
@@ -251,45 +251,45 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
             created_at: Time.current, updated_at: Time.current
           }
         end
-        
+
         Candle.insert_all(candle_data)
       end
-      
+
       it "handles sideways markets without false signals" do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
-        
+
         ema_short = strategy.send(:ema, closes_1h, 12)
         ema_long = strategy.send(:ema, closes_1h, 26)
-        
+
         # In sideways market, EMAs should be close to each other
         spread_percentage = ((ema_short - ema_long).abs / ema_long) * 100
         expect(spread_percentage).to be < 5.0  # Less than 5% spread indicates sideways
       end
     end
-    
+
     describe "trend strength calculation" do
       let(:strategy) { described_class.new }
-      
+
       it "calculates strong trend strength correctly" do
         # Strong trend scenario
         ema1h_s = 52000.0
         ema1h_l = 50000.0
-        
+
         strength = ((ema1h_s - ema1h_l).abs / [ema1h_l.abs, 1e-9].max)
         score = (strength.clamp(0, 0.05) / 0.05) * 40
-        
+
         expect(score).to be > 30  # Strong trend should score high
       end
-      
+
       it "calculates weak trend strength correctly" do
         # Weak trend scenario
         ema1h_s = 50100.0
         ema1h_l = 50000.0
-        
+
         strength = ((ema1h_s - ema1h_l).abs / [ema1h_l.abs, 1e-9].max)
         score = (strength.clamp(0, 0.05) / 0.05) * 40
-        
+
         expect(score).to be < 10  # Weak trend should score low
       end
     end
@@ -298,25 +298,25 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
   describe "Entry/Exit Conditions" do
     describe "Long Entry Signals" do
       let(:strategy) { described_class.new }
-      
+
       before do
         # Create optimal conditions for long entry
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
-        
+
         # Add positive sentiment
         SentimentAggregate.create!(
           symbol: "BTC-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
           avg_score: 0.3, z_score: 2.5
         )
-        
+
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
       end
-      
+
       it "generates long signal with multi-timeframe alignment" do
         signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
-        
+
         if signal
           expect(signal[:side]).to eq(:buy)
           expect(signal[:price]).to be > 0
@@ -326,69 +326,69 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           expect(signal[:confidence]).to be_between(0, 100)
         end
       end
-      
+
       it "validates pullback detection for long entries" do
         # Test pullback detection logic
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
-        
+
         recent_5m = candles_5m.last(8)
         interacted_with_ema = recent_5m.any? do |c|
           ema5.between?(c.low.to_f, c.high.to_f) || (c.close.to_f - ema5).abs / ema5 < 0.002
         end
-        
+
         expect(interacted_with_ema).to be true
       end
-      
+
       it "validates volume confirmation for long entries" do
         volume_score = strategy.send(:volume_confidence_score)
         expect(volume_score).to be_between(0, 20)
       end
-      
+
       it "validates sentiment gating for long entries" do
         sentiment_allowed = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :buy)
         expect(sentiment_allowed).to be true
       end
-      
+
       it "validates take-profit and stop-loss configuration" do
         config = strategy.instance_variable_get(:@config)
-        
+
         # Test configuration values are reasonable
         expect(config[:tp_target]).to eq(0.004)  # 40 bps
         expect(config[:sl_target]).to eq(0.003)  # 30 bps
         expect(config[:tp_target]).to be > config[:sl_target]  # TP should be larger than SL
-        
+
         # Test the calculation logic with mock values
         entry_price = 50000.0
         tp_price = entry_price * (1.0 + config[:tp_target])
         sl_price = entry_price * (1.0 - config[:sl_target])
-        
+
         expect(tp_price).to be > entry_price
         expect(sl_price).to be < entry_price
       end
     end
-    
+
     describe "Short Entry Signals" do
       let(:strategy) { described_class.new }
-      
+
       before do
         # Create optimal conditions for short entry
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :down)
         Candle.insert_all(candle_data)
-        
+
         # Add negative sentiment
         SentimentAggregate.create!(
           symbol: "BTC-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
           avg_score: -0.3, z_score: -2.5
         )
-        
+
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
       end
-      
+
       it "generates short signal with multi-timeframe alignment" do
         signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
-        
+
         if signal
           expect(signal[:side]).to eq(:sell)
           expect(signal[:price]).to be > 0
@@ -398,260 +398,260 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           expect(signal[:confidence]).to be_between(0, 100)
         end
       end
-      
+
       it "validates rejection pattern detection for short entries" do
         # Test rejection pattern at resistance (5m EMA)
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
-        
+
         # In downtrend, last close should be below EMA
         expect(last_5m.close.to_f).to be < ema5
       end
-      
+
       it "validates risk management integration for short entries" do
         entry_price = 50000.0
         sl_price = entry_price * 1.003  # 30 bps stop loss
         risk_per_unit = (sl_price - entry_price).abs
-        
+
         expect(risk_per_unit).to be > 0
         expect(risk_per_unit / entry_price).to be_within(0.0001).of(0.003)
       end
     end
-    
+
     describe "Exit Conditions" do
       let(:strategy) { described_class.new }
-      
+
       it "sets appropriate take-profit triggers" do
         config = strategy.instance_variable_get(:@config)
         expect(config[:tp_target]).to eq(0.004)  # 40 bps for day trading
         expect(config[:tp_target]).to be < 0.01   # Less than 1% for quick profits
       end
-      
+
       it "sets appropriate stop-loss execution" do
         config = strategy.instance_variable_get(:@config)
         expect(config[:sl_target]).to eq(0.003)  # 30 bps for day trading
         expect(config[:sl_target]).to be < config[:tp_target]  # SL tighter than TP
       end
-      
+
       it "handles time-based exits through position size limits" do
         config = strategy.instance_variable_get(:@config)
         expect(config[:max_position_size]).to eq(5)
         expect(config[:min_position_size]).to eq(1)
       end
-      
+
       it "detects signal reversal through trend alignment" do
         # Test trend reversal detection
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
-        
+
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
-        
+
         ema_short = strategy.send(:ema, closes_1h, 12)
         ema_long = strategy.send(:ema, closes_1h, 26)
-        
+
         # Current trend
         current_trend = (ema_short > ema_long) ? :up : :down
         expect(current_trend).to eq(:up)
-        
+
         # Reversal would be detected when this changes
         expect(ema_short).to be > ema_long
       end
     end
   end
-  
+
   describe "Strategy Parameters" do
     describe "Parameter Validation" do
       it "validates risk percentage within acceptable bounds" do
         strategy = described_class.new(risk_fraction: 0.01)
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:risk_fraction]).to eq(0.01)
         expect(config[:risk_fraction]).to be_between(0.001, 0.02)  # 0.1% to 2%
       end
-      
+
       it "validates position size limits" do
         strategy = described_class.new(max_position_size: 10, min_position_size: 2)
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:max_position_size]).to eq(10)
         expect(config[:min_position_size]).to eq(2)
         expect(config[:min_position_size]).to be <= config[:max_position_size]
       end
-      
+
       it "validates stop-loss distances" do
         strategy = described_class.new(sl_target: 0.002)
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:sl_target]).to eq(0.002)
         expect(config[:sl_target]).to be_between(0.001, 0.01)  # 10bps to 100bps
       end
-      
+
       it "validates take-profit targets" do
         strategy = described_class.new(tp_target: 0.005)
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:tp_target]).to eq(0.005)
         expect(config[:tp_target]).to be_between(0.002, 0.02)  # 20bps to 200bps
       end
-      
+
       it "validates EMA periods are reasonable" do
         strategy = described_class.new(ema_1h_short: 8, ema_1h_long: 21, ema_15m: 13, ema_5m: 8, ema_1m: 5)
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:ema_1h_short]).to be < config[:ema_1h_long]
         expect(config[:ema_15m]).to be_between(5, 50)
         expect(config[:ema_5m]).to be_between(3, 30)
         expect(config[:ema_1m]).to be_between(2, 20)
       end
-      
+
       it "validates minimum candle requirements" do
         strategy = described_class.new
         config = strategy.instance_variable_get(:@config)
-        
+
         expect(config[:min_1h_candles]).to be >= config[:ema_1h_long] * 2
         expect(config[:min_15m_candles]).to be >= config[:ema_15m] * 3
         expect(config[:min_5m_candles]).to be >= config[:ema_5m] * 5
         expect(config[:min_1m_candles]).to be >= config[:ema_1m] * 5
       end
     end
-    
+
     describe "Dynamic Parameter Adjustment" do
       let(:strategy) { described_class.new }
-      
+
       it "adjusts for volatility-based position sizing" do
         # High volatility scenario
         equity = 10_000.0
         entry = 50_000.0
         sl_tight = entry * 0.995  # Tight SL for high volatility
         sl_wide = entry * 0.99    # Wide SL for low volatility
-        
+
         size_tight = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl_tight, risk_fraction: 0.005)
         size_wide = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl_wide, risk_fraction: 0.005)
-        
+
         # Tighter SL should allow larger position
         expect(size_tight).to be >= size_wide
       end
-      
+
       it "adapts to market condition via sentiment filtering" do
         # Test sentiment threshold adaptation
         strategy = described_class.new
-        
+
         # High threshold for volatile markets
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("2.0")
-        
+
         # Enable sentiment filtering for the test
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
-        
+
         # Low sentiment should be filtered out
         SentimentAggregate.create!(
           symbol: "BTC-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
           avg_score: 0.1, z_score: 1.5
         )
-        
+
         result = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :buy)
         expect(result).to be false
       end
-      
+
       it "implements risk management overrides" do
         # Test position size limits override risk calculation
         strategy = described_class.new(max_position_size: 3)
-        
+
         equity = 100_000.0  # Large equity
         entry = 50_000.0
         sl = entry * 0.999  # Tight SL
-        
+
         size = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl, risk_fraction: 0.01)
-        
+
         # Should be capped at max_position_size despite large equity
         expect(size).to eq(3)
       end
     end
   end
-  
+
   describe "Multi-Timeframe Coordination" do
     describe "Multi-Timeframe Signal Alignment" do
       let(:strategy) { described_class.new }
-      
+
       before do
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
       end
-      
+
       it "coordinates 1h + 15m signal alignment" do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         candles_15m = Candle.for_symbol("BTC-USD").fifteen_minute.order(:timestamp).last(120)
-        
+
         # 1h trend
         closes_1h = candles_1h.map { |c| c.close.to_f }
         ema1h_s = strategy.send(:ema, closes_1h, 12)
         ema1h_l = strategy.send(:ema, closes_1h, 26)
         trend_1h = (ema1h_s > ema1h_l) ? :up : :down
-        
+
         # 15m confirmation
         closes_15m = candles_15m.map { |c| c.close.to_f }
         ema15 = strategy.send(:ema, closes_15m, 21)
         last_15m = candles_15m.last
-        
+
         # Both should align for uptrend
         expect(trend_1h).to eq(:up)
         expect(last_15m.close.to_f).to be > ema15
       end
-      
+
       it "coordinates 15m + 5m entry timing" do
         candles_15m = Candle.for_symbol("BTC-USD").fifteen_minute.order(:timestamp).last(120)
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
-        
+
         # 15m trend confirmation
         ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
         last_15m = candles_15m.last
-        
+
         # 5m entry trigger
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
-        
+
         # Both should be above their respective EMAs in uptrend
         expect(last_15m.close.to_f).to be > ema15
         expect(last_5m.close.to_f).to be > ema5
       end
-      
+
       it "coordinates 5m + 1m execution precision" do
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
-        
+
         # 5m entry conditions
         ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
-        
+
         # 1m micro-timing
         ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
         last_1m = candles_1m.last
-        
+
         # Micro-timing validation
         micro_timing_ok = (last_1m.close.to_f - ema1).abs / ema1 < 0.0015
-        
+
         expect(last_5m.close.to_f).to be > ema5
         expect(micro_timing_ok).to be true
       end
     end
-    
+
     describe "External Data Integration" do
       let(:strategy) { described_class.new }
-      
+
       it "validates candle data accuracy across timeframes" do
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
-        
+
         # Verify data integrity
         %w[1h 15m 5m 1m].each do |timeframe|
           candles = Candle.where(symbol: "BTC-USD", timeframe: timeframe).order(:timestamp)
           expect(candles.count).to be > 0
-          
+
           # Verify timestamps are in order
           timestamps = candles.pluck(:timestamp)
           expect(timestamps).to eq(timestamps.sort)
-          
+
           # Verify OHLCV data is valid
           candles.each do |candle|
             expect(candle.high).to be >= candle.open
@@ -662,41 +662,41 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           end
         end
       end
-      
+
       it "validates market data timeliness" do
         candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
         Candle.insert_all(candle_data)
-        
+
         latest_1m = Candle.where(symbol: "BTC-USD", timeframe: "1m").order(:timestamp).last
         latest_5m = Candle.where(symbol: "BTC-USD", timeframe: "5m").order(:timestamp).last
-        
+
         # 1m data should be more recent than 5m data for real-time trading
         expect(latest_1m.timestamp).to be >= latest_5m.timestamp - 5.minutes
       end
-      
+
       it "handles API response scenarios" do
         # Test with insufficient data
         expect(strategy.signal(symbol: "INVALID-SYMBOL")).to be_nil
-        
+
         # Test with partial data
         Candle.create!(
           symbol: "PARTIAL-USD", timeframe: "1h", timestamp: 1.hour.ago,
           open: 100, high: 101, low: 99, close: 100.5, volume: 1000
         )
-        
+
         expect(strategy.signal(symbol: "PARTIAL-USD")).to be_nil
       end
     end
   end
-  
+
   describe "Confidence Scoring" do
     let(:strategy) { described_class.new }
-    
+
     before do
       candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
       Candle.insert_all(candle_data)
     end
-    
+
     it "calculates comprehensive confidence score" do
       # Setup test data
       trend = :up
@@ -706,78 +706,77 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       ema5 = 51800.0
       ema1 = 51900.0
       last_price = 51950.0
-      
-      score = strategy.send(:confidence_score, 
-        trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, 
-        ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_price
-      )
-      
+
+      score = strategy.send(:confidence_score,
+        trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l,
+        ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_price)
+
       expect(score).to be_between(0, 100)
       expect(score).to be >= 40  # Should be confident in strong uptrend (adjusted for realistic scoring)
     end
-    
+
     it "validates alignment score calculation" do
       ema15 = 50000.0
       ema5 = 50050.0  # Slightly higher
       ema1 = 50100.0   # Highest
       last_price = 50120.0
-      
+
       alignment_score = strategy.send(:calculate_alignment_score, ema15, ema5, ema1, last_price)
-      
+
       expect(alignment_score).to be_between(0, 25)
       expect(alignment_score).to be > 15  # Good alignment should score well
     end
-    
+
     it "validates volume confidence scoring" do
       volume_score = strategy.send(:volume_confidence_score)
       expect(volume_score).to be_between(0, 20)
     end
-    
+
     it "validates momentum confidence scoring" do
       momentum_score = strategy.send(:momentum_confidence_score)
       expect(momentum_score).to be_between(0, 15)
     end
   end
-  
+
   describe "Position Sizing" do
     let(:strategy) { described_class.new }
-    
+
     it "calculates position size based on risk management" do
       equity = 10_000.0
       entry = 50_000.0
       sl = 49_500.0  # 1% stop loss
       risk_fraction = 0.01  # 1% of equity at risk
-      
+
       size = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl, risk_fraction: risk_fraction)
-      
+
       # Risk budget: $100 (1% of $10,000)
       # Risk per unit: $500 (50,000 - 49,500)
       # BTC quantity: 0.2 BTC
       # Contract quantity: (0.2 * 50,000) / 100 = 100 contracts
       # Capped at max_position_size: 5
-      
+
       expect(size).to eq(5)  # Should be capped at max_position_size
     end
-    
+
     it "enforces minimum position size" do
       equity = 100.0  # Very small equity
       entry = 50_000.0
       sl = 49_500.0
       risk_fraction = 0.01
-      
+
       size = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl, risk_fraction: risk_fraction)
-      
+
       expect(size).to eq(1)  # Should enforce minimum position size
     end
-    
+
     it "handles zero risk scenarios" do
       equity = 10_000.0
       entry = 50_000.0
       sl = 50_000.0  # Same as entry (no risk)
       risk_fraction = 0.01
-      
+
       size = strategy.send(:position_size, equity_usd: equity, entry: entry, sl: sl, risk_fraction: risk_fraction)
-      
+
       expect(size).to eq(0)
     end
   end
@@ -1383,25 +1382,25 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       end
     end
   end
-  
+
   describe "Contract Resolution" do
     let(:strategy) { described_class.new }
-    
+
     it "resolves BTC symbol to futures contract" do
       # Mock the contract manager
       mock_manager = instance_double(MarketData::FuturesContractManager)
       allow(MarketData::FuturesContractManager).to receive(:new).and_return(mock_manager)
       allow(mock_manager).to receive(:best_available_contract).with("BTC").and_return("BIT-29AUG25-CDE")
-      
+
       # Mock TradingPair lookup
       mock_pair = instance_double(TradingPair)
       allow(TradingPair).to receive(:find_by).and_return(mock_pair)
       allow(mock_pair).to receive(:current_month?).and_return(true)
-      
+
       result = strategy.send(:resolve_trading_symbol, "BTC")
       expect(result).to eq("BIT-29AUG25-CDE")
     end
-    
+
     it "extracts asset from various symbol formats" do
       expect(strategy.send(:extract_asset_from_symbol, "BTC")).to eq("BTC")
       expect(strategy.send(:extract_asset_from_symbol, "BTC-USD")).to eq("BTC")
@@ -1409,13 +1408,13 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       expect(strategy.send(:extract_asset_from_symbol, "ET-29AUG25-CDE")).to eq("ETH")
     end
   end
-  
+
   describe "Order Hash Generation" do
     let(:strategy) { described_class.new }
-    
+
     it "generates valid order hash for buy signal" do
       order = strategy.send(:order_hash, :buy, 50_000.0, 2, 50_200.0, 49_800.0, 85.5)
-      
+
       expect(order).to include(
         side: :buy,
         price: 50_000.0,
@@ -1425,10 +1424,10 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         confidence: 85.5
       )
     end
-    
+
     it "generates valid order hash for sell signal" do
       order = strategy.send(:order_hash, :sell, 50_000.0, 3, 49_800.0, 50_200.0, 75.2)
-      
+
       expect(order).to include(
         side: :sell,
         price: 50_000.0,
@@ -1438,33 +1437,33 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         confidence: 75.2
       )
     end
-    
+
     it "returns nil for zero quantity" do
       order = strategy.send(:order_hash, :buy, 50_000.0, 0, 50_200.0, 49_800.0, 85.5)
       expect(order).to be_nil
     end
   end
-  
+
   describe "Integration Scenarios" do
     let(:strategy) { described_class.new }
-    
+
     it "handles complete signal generation workflow" do
       # Setup complete market scenario
       candle_data = create_candle_data(symbol: "BTC-USD", trend: :up, base_price: 50_000)
       Candle.insert_all(candle_data)
-      
+
       # Setup sentiment
       SentimentAggregate.create!(
         symbol: "BTC-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
         avg_score: 0.3, z_score: 2.0
       )
-      
+
       allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
       allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
-      
+
       # Generate signal
       signal = strategy.signal(symbol: "BTC-USD", equity_usd: 25_000)
-      
+
       if signal
         # Validate complete signal structure
         expect(signal).to have_key(:side)
@@ -1473,13 +1472,13 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         expect(signal).to have_key(:tp)
         expect(signal).to have_key(:sl)
         expect(signal).to have_key(:confidence)
-        
+
         # Validate signal logic
         expect([:buy, :sell]).to include(signal[:side])
         expect(signal[:price]).to be > 40_000  # Reasonable BTC price
         expect(signal[:quantity]).to be_between(1, 5)  # Within position limits
         expect(signal[:confidence]).to be_between(0, 100)
-        
+
         if signal[:side] == :buy
           expect(signal[:tp]).to be > signal[:price]
           expect(signal[:sl]).to be < signal[:price]
@@ -1489,24 +1488,24 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         end
       end
     end
-    
+
     it "handles edge cases gracefully" do
       # Test with no candles
       expect(strategy.signal(symbol: "NONEXISTENT")).to be_nil
-      
+
       # Test with insufficient candles
       Candle.create!(
         symbol: "INSUFFICIENT", timeframe: "1h", timestamp: 1.hour.ago,
         open: 100, high: 101, low: 99, close: 100, volume: 1000
       )
       expect(strategy.signal(symbol: "INSUFFICIENT")).to be_nil
-      
+
       # Test with disabled sentiment when required
       allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("false")
-      
+
       candle_data = create_candle_data(symbol: "BTC-USD", trend: :up)
       Candle.insert_all(candle_data)
-      
+
       signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
       # Should work without sentiment when disabled
       expect(signal).to be_nil.or be_a(Hash)
