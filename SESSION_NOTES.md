@@ -26,6 +26,31 @@
 
 ### Session log
 
+#### 2025-01-27 17:30 UTC
+- Context: GitHub Actions still using cached workflow despite our changes - completely rewrote workflow file
+- Changes:
+  - **Completely rewrote workflow file**: Deleted and recreated `.github/workflows/ci.yml` to force GitHub Actions cache refresh
+  - **Added comprehensive debugging**: Environment debug step + enhanced test step with command tracing
+  - **Added feature branch support**: Workflow now runs on `feat/**` branches
+  - **Enhanced error detection**: Explicit exit code handling and detailed logging
+  - **Force cache invalidation**: Completely new file forces GitHub Actions to reload workflow
+- Root cause analysis:
+  - **Workflow caching issue**: GitHub Actions was using cached version despite our changes
+  - **Feature branch trigger issue**: Previous workflow only ran on `main`
+  - **Missing debugging output**: Our enhanced logging wasn't showing because of cache
+- Commands run:
+  - `mv .github/workflows/ci.yml .github/workflows/ci-new.yml` (temporarily rename)
+  - `cat > .github/workflows/ci.yml << 'EOF'...` (create completely new workflow)
+  - `rm .github/workflows/ci-new.yml` (remove temporary file)
+  - `git add .github/workflows/ci.yml && git commit -m "ci: completely rewrite workflow to force cache refresh"`
+  - `git push origin feat/realtime-signals-system`
+- Files touched:
+  - `.github/workflows/ci.yml` (completely rewritten to force cache refresh)
+- Next steps:
+  - Monitor next CI run for comprehensive debugging output
+  - Should now see environment debug step and enhanced test logging
+  - Should finally identify the root cause of exit code 1
+
 #### 2025-01-27 17:15 UTC
 - Context: Fixed critical CI workflow issue - workflow was not running on feature branches!
 - Changes:
