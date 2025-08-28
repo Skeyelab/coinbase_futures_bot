@@ -26,6 +26,26 @@
 
 ### Session log
 
+#### 2025-01-27 18:00 UTC
+- Context: Added comprehensive post-test debugging to identify exit code 1 root cause
+- Changes:
+  - **Background process detection**: Added `ps aux` check for lingering Ruby/rspec/rails processes
+  - **Database connection verification**: Added `bin/rails db:version` check after tests complete
+  - **File descriptor leak detection**: Added `lsof` check for potential file descriptor issues
+  - **Process exit code preservation**: Maintained proper exit code handling while adding debugging
+- Root cause candidates:
+  - **Background processes**: Tests might spawn processes not properly cleaned up
+  - **Database connection issues**: Database might close unexpectedly causing failures
+  - **File descriptor leaks**: Unclosed file descriptors causing resource issues
+  - **SimpleCov processing**: Coverage processing might be failing silently
+- Commands run:
+  - `git add .github/workflows/ci.yml && git commit -m \"ci: add post-test debugging...\"`
+  - `git push origin feat/realtime-signals-system`
+- Next steps:
+  - Monitor next CI run for detailed post-test debugging output
+  - Analyze background processes, database status, and file descriptors
+  - Identify which component is causing the exit code 1
+
 #### 2025-01-27 17:45 UTC
 - Context: GitHub Actions cache still not refreshing despite multiple attempts - added unique cache breaker ID
 - Changes:
