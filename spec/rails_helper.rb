@@ -35,6 +35,30 @@ if ENV["CI"]
   puts "Rails environment: #{Rails.env}"
   puts "Database URL: #{ENV["DATABASE_URL"]}"
 
+  # Debug database connection pooling
+  puts "=== DATABASE DEBUG ==="
+  if ActiveRecord::Base.connected?
+    puts "Database connected: #{ActiveRecord::Base.connection.current_database}"
+    puts "Connection pool size: #{ActiveRecord::Base.connection_pool.size}"
+    puts "Connection pool connections: #{ActiveRecord::Base.connection_pool.connections.size}"
+  end
+
+  # Debug Rails cache status
+  puts "=== RAILS CACHE DEBUG ==="
+  puts "Rails cache store: #{Rails.cache.class.name}"
+  puts "Rails cache enabled: #{Rails.cache.respond_to?(:enabled?) ? Rails.cache.enabled? : "unknown"}"
+
+  # Debug FactoryBot status
+  puts "=== FACTORYBOT DEBUG ==="
+  puts "FactoryBot defined: #{defined?(FactoryBot)}"
+  if defined?(FactoryBot)
+    puts "FactoryBot factories count: #{FactoryBot.factories.count}"
+  end
+
+  # Debug if any parallel processing is happening
+  puts "=== PROCESS DEBUG ==="
+  puts "Ruby process ID: #{Process.pid}"
+
   # Ensure test effectiveness is loaded
   require_relative "support/test_effectiveness"
   puts "Test effectiveness module loaded: #{defined?(TestEffectiveness)}"
@@ -94,6 +118,13 @@ RSpec.configure do |config|
       expect(defined?(TestEffectiveness)).to be_truthy
       puts "✅ Test effectiveness module verified"
 
+      # Debug database query count tracking
+      if defined?(ActiveRecord::Base)
+        puts "=== DATABASE QUERY COUNT DEBUG ==="
+        puts "ActiveRecord query cache enabled: #{ActiveRecord::Base.connection.query_cache_enabled}"
+        puts "ActiveRecord prepared statements: #{ActiveRecord::Base.connection.supports_prepared_statements?}"
+      end
+
       # Verify we can perform real operations
       puts "Verifying real database operations..."
       TestEffectiveness.verify_real_execution
@@ -103,6 +134,14 @@ RSpec.configure do |config|
       puts "=== CI TEST SUITE COMPLETED ==="
       puts "Total tests run: #{RSpec.world.example_count}"
       puts "Total failures: #{RSpec.world.all_examples.count(&:exception)}"
+
+      # Debug final database state
+      if defined?(ActiveRecord::Base) && ActiveRecord::Base.connected?
+        puts "=== FINAL DATABASE STATE ==="
+        puts "Connection pool size: #{ActiveRecord::Base.connection_pool.size}"
+        puts "Active connections: #{ActiveRecord::Base.connection_pool.connections.size}"
+      end
+
       TestEffectiveness.ci_verification_summary
     end
   end
