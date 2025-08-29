@@ -25,7 +25,7 @@ module TestEffectiveness
     return unless critical_methods.include?(method_name.to_sym)
 
     puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
-    puts '   Consider using integration testing instead of mocking core business logic'
+    puts "   Consider using integration testing instead of mocking core business logic"
   end
 
   # Validate that a test actually exercises real code paths
@@ -39,8 +39,8 @@ module TestEffectiveness
     return unless mock_count > 5
 
     puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
-    puts "   Mocked methods: #{mocked_methods.join(', ')}"
-    puts '   This test may not be validating actual behavior'
+    puts "   Mocked methods: #{mocked_methods.join(", ")}"
+    puts "   This test may not be validating actual behavior"
   end
 
   # Mark a test as an integration test
@@ -50,11 +50,11 @@ module TestEffectiveness
 
   # CI-specific logging and verification methods
   def self.log_execution_environment
-    puts '=== TEST EXECUTION ENVIRONMENT ==='
+    puts "=== TEST EXECUTION ENVIRONMENT ==="
     puts "Rails env: #{Rails.env}"
     puts "Database: #{ActiveRecord::Base.connection.current_database}"
-    puts "Test files: #{Dir.glob('spec/**/*_spec.rb').count}"
-    puts "CI detected: #{ENV['CI']}"
+    puts "Test files: #{Dir.glob("spec/**/*_spec.rb").count}"
+    puts "CI detected: #{ENV["CI"]}"
     puts "Test effectiveness loaded: #{defined?(TestEffectiveness)}"
     puts "RSpec loaded: #{defined?(RSpec)}"
   end
@@ -75,40 +75,40 @@ module TestEffectiveness
 
     # Verify database tables exist
     tables = ActiveRecord::Base.connection.tables
-    puts "Database tables: #{tables.join(', ')}"
+    puts "Database tables: #{tables.join(", ")}"
 
     # Verify we can perform real operations
     begin
       if defined?(Position)
         test_pos = Position.create!(
-          product_id: 'VERIFY-TEST',
-          side: 'LONG',
+          product_id: "VERIFY-TEST",
+          side: "LONG",
           size: 1.0,
           entry_price: 100.0,
           entry_time: Time.current,
-          status: 'OPEN',
+          status: "OPEN",
           day_trading: true
         )
         puts "✅ Real Position creation verified (ID: #{test_pos.id})"
         test_pos.destroy
-        puts '✅ Real Position deletion verified'
+        puts "✅ Real Position deletion verified"
       end
-    rescue StandardError => e
+    rescue => e
       puts "❌ Real database operations failed: #{e.message}"
       raise e
     end
   end
 
   def self.ci_verification_summary
-    return unless ENV['CI']
+    return unless ENV["CI"]
 
-    puts '=== CI VERIFICATION SUMMARY ==='
+    puts "=== CI VERIFICATION SUMMARY ==="
     puts "Environment: #{Rails.env}"
     puts "Database: #{ActiveRecord::Base.connection.current_database}"
-    puts "Test files found: #{Dir.glob('spec/**/*_spec.rb').count}"
-    puts "Test effectiveness module: #{defined?(TestEffectiveness) ? 'LOADED' : 'MISSING'}"
-    puts "RSpec configuration: #{defined?(RSpec) ? 'LOADED' : 'MISSING'}"
-    puts "ActiveRecord connection: #{ActiveRecord::Base.connected? ? 'ACTIVE' : 'INACTIVE'}"
+    puts "Test files found: #{Dir.glob("spec/**/*_spec.rb").count}"
+    puts "Test effectiveness module: #{defined?(TestEffectiveness) ? "LOADED" : "MISSING"}"
+    puts "RSpec configuration: #{defined?(RSpec) ? "LOADED" : "MISSING"}"
+    puts "ActiveRecord connection: #{ActiveRecord::Base.connected? ? "ACTIVE" : "INACTIVE"}"
   end
 end
 
@@ -122,14 +122,14 @@ RSpec.configure do |config|
   end
 
   # CI-specific configuration
-  if ENV['CI']
+  if ENV["CI"]
     config.before(:suite) do
-      puts '=== CI TEST SUITE STARTING ==='
+      puts "=== CI TEST SUITE STARTING ==="
       TestEffectiveness.verify_real_execution
     end
 
     config.after(:suite) do
-      puts '=== CI TEST SUITE COMPLETED ==='
+      puts "=== CI TEST SUITE COMPLETED ==="
       puts "Total tests run: #{RSpec.world.example_count}"
       puts "Total failures: #{RSpec.world.all_examples.count(&:exception)}"
       TestEffectiveness.ci_verification_summary
