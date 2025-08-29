@@ -1,0 +1,38 @@
+---
+alwaysApply: true
+---
+# Test Runner Selection Guide
+
+## When to Use `rspec`
+Use `rspec` for:
+- **Single test files**: `bundle exec rspec spec/services/slack_notification_service_spec.rb`
+- **Specific test methods**: `bundle exec rspec spec/services/slack_notification_service_spec.rb -e "handles critical alerts"`
+- **Debugging individual tests**: When you need to focus on one test file and see detailed output
+- **CI debugging**: When troubleshooting specific test failures in CI
+
+## When to Use `parallel_rspec`
+Use `parallel_rspec` for:
+- **Full test suite**: `bundle exec parallel_rspec` - runs all tests across multiple processes
+- **CI/CD pipelines**: Significantly faster execution for comprehensive test runs
+- **Large test suites**: When you have many test files and want parallel execution
+- **Performance testing**: When measuring overall test suite performance
+
+## Key Differences
+- `rspec` provides detailed, sequential output perfect for debugging
+- `parallel_rspec` provides faster execution but less detailed per-test output
+- `parallel_rspec` cannot run single test files (use `rspec` instead)
+
+## Examples
+```bash
+# Run specific test file with detailed output
+bundle exec rspec spec/services/slack_notification_service_spec.rb
+
+# Run full suite with parallel execution
+bundle exec parallel_rspec
+
+# Run with specific formatting
+bundle exec rspec spec/services/slack_notification_service_spec.rb --format documentation
+```
+
+## Note
+`parallel_rspec` cannot be used with single test files or specific test methods. Always use `rspec` for targeted test execution.
