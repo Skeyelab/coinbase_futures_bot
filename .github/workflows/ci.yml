@@ -299,7 +299,7 @@ jobs:
                 # Branch coverage structure is different - it's nested under each file
                 total_branches = 0
                 covered_branches = 0
-                
+
                 data['RSpec']['coverage'].each do |file_path, coverage_data|
                   if coverage_data['branches']
                     coverage_data['branches'].each do |branch_id, branch_data|
@@ -310,7 +310,7 @@ jobs:
                     end
                   end
                 end
-                
+
                 percentage = total_branches > 0 ? (covered_branches.to_f / total_branches * 100).round(2) : 0
                 puts percentage
               else
