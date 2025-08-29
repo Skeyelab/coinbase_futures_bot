@@ -266,10 +266,10 @@ jobs:
         if: success()
         run: |
           echo "=== COVERAGE THRESHOLD CHECK ==="
-          
+
           if [ -f "coverage/.resultset.json" ]; then
             echo "Coverage data found, checking thresholds..."
-            
+
             # Extract coverage percentages from JSON
             LINE_COVERAGE=$(ruby -rjson -e "
               data = JSON.parse(File.read('coverage/.resultset.json'))
@@ -283,7 +283,7 @@ jobs:
                 puts '0'
               end
             ")
-            
+
             BRANCH_COVERAGE=$(ruby -rjson -e "
               data = JSON.parse(File.read('coverage/.resultset.json'))
               if data['RSpec']
@@ -296,10 +296,10 @@ jobs:
                 puts '0'
               end
             ")
-            
+
             echo "Line coverage: ${LINE_COVERAGE}% (threshold: 90%)"
             echo "Branch coverage: ${BRANCH_COVERAGE}% (threshold: 80%)"
-            
+
             # Check if thresholds are met
             if (( $(echo "$LINE_COVERAGE >= 90" | bc -l) )); then
               echo "✅ Line coverage threshold met"
@@ -307,14 +307,14 @@ jobs:
               echo "❌ Line coverage below threshold (90%)"
               exit 1
             fi
-            
+
             if (( $(echo "$BRANCH_COVERAGE >= 80" | bc -l) )); then
               echo "✅ Branch coverage threshold met"
             else
               echo "❌ Branch coverage below threshold (80%)"
               exit 1
             fi
-            
+
             echo "🎉 All coverage thresholds met!"
           else
             echo "❌ Coverage data not found"

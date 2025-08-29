@@ -1,5 +1,7 @@
 # VCR Best Practices for Coinbase Futures Bot
 
+> **📝 NOTE** - This file has been moved from `doc/` to `docs/` folder as part of documentation consolidation.
+
 This guide outlines best practices for using VCR (Video Cassette Recorder) in our test suite to ensure fast, reliable, and maintainable API integration tests.
 
 ## Overview

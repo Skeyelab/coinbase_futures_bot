@@ -16,7 +16,7 @@ jobs:
     name: Coverage Analysis
     runs-on: ubuntu-latest
     # No dependencies - runs independently
-    
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -54,14 +54,14 @@ jobs:
         run: |
           echo "Running tests with SimpleCov coverage..."
           bundle exec rspec --format progress
-          
+
           echo "Coverage files generated:"
           ls -la coverage/
 
       - name: Generate coverage report
         run: |
           echo "=== COVERAGE SUMMARY ==="
-          
+
           if [ -f "coverage/.resultset.json" ]; then
             # Extract and display coverage statistics
             ruby -rjson -e "
@@ -69,35 +69,35 @@ jobs:
               if data['RSpec']
                 puts 'Coverage Report:'
                 puts '================'
-                
+
                 # Line coverage
                 line_coverage = data['RSpec']['coverage'].values.map { |v| v['lines'] }.flatten.compact
                 covered_lines = line_coverage.count { |v| v && v > 0 }
                 total_lines = line_coverage.count { |v| v }
                 line_percentage = total_lines > 0 ? (covered_lines.to_f / total_lines * 100).round(2) : 0
-                
+
                 puts \"Line Coverage: #{covered_lines}/#{total_lines} (#{line_percentage}%)\"
-                
+
                 # Branch coverage
                 branch_coverage = data['RSpec']['coverage'].values.map { |v| v['branches'] }.flatten.compact
                 covered_branches = branch_coverage.count { |v| v && v > 0 }
                 total_branches = branch_coverage.count { |v| v }
                 branch_percentage = total_branches > 0 ? (covered_branches.to_f / total_branches * 100).round(2) : 0
-                
+
                 puts \"Branch Coverage: #{covered_branches}/#{total_branches} (#{branch_percentage}%)\"
-                
+
                 # File coverage
                 file_coverage = data['RSpec']['coverage'].keys
                 puts \"Files Covered: #{file_coverage.length}\"
-                
+
                 # Check thresholds
                 line_threshold = 90.0
                 branch_threshold = 80.0
-                
+
                 puts \"\\nThresholds:\"
                 puts \"Line Coverage: #{line_percentage >= line_threshold ? '✅' : '❌'} #{line_percentage}% (>= #{line_threshold}%)\"
                 puts \"Branch Coverage: #{branch_percentage >= branch_threshold ? '✅' : '❌'} #{branch_percentage}% (>= #{branch_threshold}%)\"
-                
+
                 # Exit with error if thresholds not met
                 if line_percentage < line_threshold || branch_percentage < branch_threshold
                   puts \"\\n❌ Coverage thresholds not met!\"
@@ -132,35 +132,35 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            
+
             try {
               const coverageData = JSON.parse(fs.readFileSync('coverage/.resultset.json', 'utf8'));
-              
+
               if (coverageData.RSpec) {
                 const lineCoverage = coverageData.RSpec.coverage;
                 const lineValues = Object.values(lineCoverage).map(v => v.lines).flat().filter(v => v !== null);
                 const coveredLines = lineValues.filter(v => v > 0).length;
                 const totalLines = lineValues.length;
                 const linePercentage = totalLines > 0 ? Math.round((coveredLines / totalLines) * 10000) / 100 : 0;
-                
+
                 const branchValues = Object.values(lineCoverage).map(v => v.branches).flat().filter(v => v !== null);
                 const coveredBranches = branchValues.filter(v => v > 0).length;
                 const totalBranches = branchValues.length;
                 const branchPercentage = totalBranches > 0 ? Math.round((coveredBranches / totalBranches) * 10000) / 100 : 0;
-                
+
                 const comment = `## 📊 Coverage Report
-                
+
                 **Line Coverage:** ${coveredLines}/${totalLines} (${linePercentage}%)
                 **Branch Coverage:** ${coveredBranches}/${totalBranches} (${branchPercentage}%)
-                
+
                 **Thresholds:**
                 - Line Coverage: ${linePercentage >= 90 ? '✅' : '❌'} ${linePercentage}% (>= 90%)
                 - Branch Coverage: ${branchPercentage >= 80 ? '✅' : '❌'} ${branchPercentage}% (>= 80%)
-                
+
                 ${linePercentage >= 90 && branchPercentage >= 80 ? '🎉 All coverage thresholds met!' : '⚠️ Some coverage thresholds not met.'}
-                
+
                 Coverage reports are available as workflow artifacts.`;
-                
+
                 github.rest.issues.createComment({
                   issue_number: context.issue.number,
                   owner: context.repo.owner,

@@ -16,9 +16,9 @@ namespace :coverage do
       puts "📊 Coverage report generated in coverage/index.html"
 
       # Check if we can open the browser
-      if RUBY_PLATFORM.match?(/darwin/)
+      if RUBY_PLATFORM.include?("darwin")
         system("open coverage/index.html")
-      elsif RUBY_PLATFORM.match?(/linux/)
+      elsif RUBY_PLATFORM.include?("linux")
         system("xdg-open coverage/index.html 2>/dev/null || echo 'Please open coverage/index.html manually'")
       else
         puts "Please open coverage/index.html in your browser to view the report"
@@ -121,13 +121,13 @@ namespace :coverage do
           line_coverage = file_data["lines"]
           file_data["branches"]
 
-          if line_coverage
-            covered_lines = line_coverage.values.count { |v| v && v > 0 }
-            total_lines = line_coverage.values.count { |v| v }
-            line_percentage = (total_lines > 0) ? (covered_lines.to_f / total_lines * 100).round(1) : 0
+          next unless line_coverage
 
-            puts "  #{File.basename(file)}: #{line_percentage}% (#{covered_lines}/#{total_lines})"
-          end
+          covered_lines = line_coverage.values.count { |v| v && v > 0 }
+          total_lines = line_coverage.values.count { |v| v }
+          line_percentage = (total_lines > 0) ? (covered_lines.to_f / total_lines * 100).round(1) : 0
+
+          puts "  #{File.basename(file)}: #{line_percentage}% (#{covered_lines}/#{total_lines})"
         end
       end
     else

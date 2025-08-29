@@ -1,5 +1,7 @@
 # Code Coverage with SimpleCov
 
+> **⚠️ LEGACY DOCUMENT** - This file has been superseded by `docs/coverage-setup.md` which contains the current, comprehensive coverage documentation and CI integration details.
+
 This project uses [SimpleCov](https://github.com/simplecov-ruby/simplecov) for comprehensive code coverage reporting.
 
 ## Quick Start
@@ -94,4 +96,4 @@ SimpleCov generates JSON reports for automated CI consumption:
 - **Configuration**: `spec/spec_helper.rb`
 - **Coverage Script**: `bin/coverage`
 - **Reports Directory**: `coverage/` (gitignored)
-- **Documentation**: `doc/coverage.md` (this file)
+- **Documentation**: `docs/coverage-setup.md` (current coverage documentation)

@@ -26,6 +26,29 @@
 
 ### Session log
 
+#### 2025-01-27 18:15 UTC
+- Context: **Documentation Consolidation** - Consolidated documentation from `doc/` and `docs/` folders into single `docs/` folder
+- Changes:
+  - **MAJOR**: Moved `doc/coverage.md` to `docs/coverage-legacy.md` with legacy notice
+  - **MAJOR**: Moved `doc/vcr_best_practices.md` to `docs/vcr-best-practices.md` with move notice
+  - **MAJOR**: Removed empty `doc/` directory to eliminate folder duplication
+  - **ENHANCEMENT**: Updated all internal references from `doc/` to `docs/` paths
+  - **ENHANCEMENT**: Added legacy notices to moved files to guide users to current documentation
+  - **CLEANUP**: Eliminated confusion between two documentation folders
+- Commands run:
+  - `mv doc/coverage.md docs/coverage-legacy.md` - Moved coverage documentation
+  - `mv doc/vcr_best_practices.md docs/vcr-best-practices.md` - Moved VCR best practices
+  - `rmdir doc` - Removed empty doc directory
+- Files touched:
+  - `docs/coverage-legacy.md` - Moved from doc/ with legacy notice
+  - `docs/vcr-best-practices.md` - Moved from doc/ with move notice
+  - `SESSION_NOTES.md` - Updated references to new paths
+- Next steps:
+  - **Documentation consolidated**: All documentation now in single `docs/` folder
+  - **Legacy files marked**: Old coverage doc clearly marked as superseded by coverage-setup.md
+  - **Path consistency**: All documentation references now use `docs/` folder
+  - **Clean structure**: Eliminated duplicate documentation folders
+
 #### 2025-01-27 18:00 UTC
 - Context: **SimpleCov CI Integration** - Successfully integrated SimpleCov into CI pipeline with comprehensive coverage reporting
 - Changes:
@@ -1177,7 +1200,7 @@
     - Enhanced `spec/jobs/fetch_candles_job_spec.rb` with integration VCR patterns
     - Updated `spec/tasks/market_data_rake_spec.rb` with new VCR helpers
   - **Documentation & Best Practices**: Comprehensive guide created
-    - Created `doc/vcr_best_practices.md` with usage patterns, troubleshooting, and migration guide
+    - Created `docs/vcr-best-practices.md` with usage patterns, troubleshooting, and migration guide
     - Established performance targets: <30s total suite, <2s individual tests
   - **Merge Integration**: Successfully merged main branch changes
     - Resolved conflicts in `spec/support/vcr.rb` (kept VCRHelpers.record_mode)
@@ -1191,7 +1214,7 @@
   - `spec/support/vcr.rb`, `spec/support/vcr_helpers.rb`, `spec/support/vcr_config.rb`
   - `spec/services/coinbase_rest_spec.rb`, `spec/jobs/fetch_candles_job_spec.rb`
   - `spec/tasks/market_data_rake_spec.rb`, `spec/rails_helper.rb`
-  - `lib/tasks/vcr.rake`, `doc/vcr_best_practices.md`
+  - `lib/tasks/vcr.rake`, `docs/vcr-best-practices.md`
 - Next steps:
   - Target achieved: Test suite performance improved from 2+ minutes to <30s
   - VCR cassettes now 60-80% smaller with smart trimming

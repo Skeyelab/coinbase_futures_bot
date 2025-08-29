@@ -11,7 +11,7 @@ jobs:
     name: Update Coverage Badge
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -39,9 +39,9 @@ jobs:
                 puts '0'
               end
             ")
-            
+
             echo "Line coverage: ${LINE_COVERAGE}%"
-            
+
             # Determine badge color based on coverage
             if [ "$LINE_COVERAGE" -ge 90 ]; then
               COLOR="brightgreen"
@@ -54,12 +54,12 @@ jobs:
             else
               COLOR="red"
             fi
-            
+
             # Generate badge URL
             BADGE_URL="https://img.shields.io/badge/coverage-${LINE_COVERAGE}%25-${COLOR}?style=flat-square"
-            
+
             echo "Badge URL: $BADGE_URL"
-            
+
             # Update README.md with badge
             if [ -f "README.md" ]; then
               # Check if badge already exists
