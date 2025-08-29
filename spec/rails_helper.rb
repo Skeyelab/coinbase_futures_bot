@@ -51,9 +51,7 @@ if ENV["CI"]
   # Debug FactoryBot status
   puts "=== FACTORYBOT DEBUG ==="
   puts "FactoryBot defined: #{defined?(FactoryBot)}"
-  if defined?(FactoryBot)
-    puts "FactoryBot factories count: #{FactoryBot.factories.count}"
-  end
+  puts "FactoryBot factories count: #{FactoryBot.factories.count}" if defined?(FactoryBot)
 
   # Debug if any parallel processing is happening
   puts "=== PROCESS DEBUG ==="
