@@ -1,33 +1,41 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # SimpleCov coverage runner script
-#
-# Usage:
-#   bin/coverage           # Run all specs with coverage
-#   bin/coverage spec/models # Run specific specs with coverage
+# This script runs the coverage Rake task for consistent coverage reporting
 
-set -e
+require "bundler/setup"
 
-echo "Running RSpec with SimpleCov coverage..."
-echo "Coverage reports will be generated in ./coverage/"
+puts "🚀 SimpleCov Coverage Runner"
+puts "============================="
+puts
 
-if [ $# -eq 0 ]; then
-  # No arguments - run all specs
-  COVERAGE=true bundle exec rspec
+# Check if we're in a Rails environment
+unless File.exist?("Rakefile")
+  puts "❌ Error: Not in a Rails project directory"
+  puts "Please run this script from your Rails project root"
+  exit 1
+end
+
+puts "Running RSpec with SimpleCov coverage..."
+puts
+
+# Run the coverage Rake task
+system("bundle exec rake coverage:run")
+
+if $?.success?
+  puts
+  puts "🎉 Coverage generation completed successfully!"
+  puts
+  puts "Available coverage commands:"
+  puts "  rake coverage:check    - Check if thresholds are met"
+  puts "  rake coverage:summary  - Show detailed coverage summary"
+  puts "  rake coverage:clean    - Remove coverage files"
+  puts
+  puts "📊 Coverage report available at: coverage/index.html"
 else
-  # Run specific specs
-  COVERAGE=true bundle exec rspec "$@"
-fi
-
-echo ""
-echo "Coverage completed!"
-echo "HTML Report: coverage/index.html"
-echo "JSON Report: coverage/coverage.json"
-echo ""
-echo "Coverage Summary:"
-if [ -f coverage/coverage.json ]; then
-  ruby -rjson -e "
-    data = JSON.parse(File.read('coverage/coverage.json'))
-    puts \"Line Coverage:   #{data['metrics']['covered_percent'].round(2)}%\"
-    puts \"Branch Coverage: #{data['metrics']['branches']['covered_percent'].round(2)}%\"
-  "
-fi
+  puts
+  puts "❌ Coverage generation failed!"
+  puts "Please check the test output above for errors."
+  exit 1
+end
