@@ -127,18 +127,70 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "Ruby version: $(ruby --version)"
           echo "Bundle version: $(bundle --version)"
+
+          # Force fresh database setup - no caching shortcuts
+          echo "=== FORCING FRESH TEST ENVIRONMENT ==="
+          bin/rails db:drop db:create db:migrate RAILS_ENV=test
+
+          # Verify test environment is real
+          echo "=== TEST ENVIRONMENT VERIFICATION ==="
+          echo "Rails environment: $RAILS_ENV"
+          echo "Database URL: $DATABASE_URL"
+          echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
+
+          # Verify test effectiveness validation is loaded
+          echo "=== TEST EFFECTIVENESS VERIFICATION ==="
+          bundle exec rails runner "
+            puts 'RSpec configuration loaded: ' + defined?(RSpec).to_s
+            puts 'Test effectiveness loaded: ' + defined?(TestEffectiveness).to_s
+            puts 'Rails helper loaded: ' + File.exist?('spec/rails_helper.rb').to_s
+          "
+
+          # Verify database connectivity
+          echo "=== DATABASE VERIFICATION ==="
+          bundle exec rails runner "
+            puts 'Database connected: ' + ActiveRecord::Base.connected?.to_s
+            puts 'Database name: ' + ActiveRecord::Base.connection.current_database
+            puts 'Tables exist: ' + ActiveRecord::Base.connection.tables.include?('positions').to_s
+          "
+
+          # Verify we can perform real database operations
+          echo "=== REAL DATABASE OPERATION VERIFICATION ==="
+          bundle exec rails runner "
+            puts 'Creating test position to verify real database operations...'
+            pos = Position.create!(
+              product_id: 'TEST-USD',
+              side: 'LONG',
+              size: 1.0,
+              entry_price: 100.0,
+              entry_time: Time.current,
+              status: 'OPEN',
+              day_trading: true
+            )
+            puts 'Position created with ID: ' + pos.id.to_s
+            puts 'Position persisted: ' + pos.persisted?.to_s
+            puts 'Position count: ' + Position.count.to_s
+            pos.destroy
+            puts 'Test position cleaned up'
+          "
+
           echo "=== ENVIRONMENT VARIABLES ==="
           env | grep -E "(DATABASE|RAILS|BUNDLE|PATH)" | sort
           echo "=== CHECKING DATABASE CONNECTION ==="
           bin/rails db:version
-          echo "=== RUNNING TESTS IN PARALLEL ==="
-          echo "Using parallel_rspec with 4 processes (optimized for CI)"
-          echo "Slow tests (CoinbaseRest, TradingPair, MarketDataRake) run in isolation"
+
+          # Run tests with explicit configuration - no shortcuts
+          echo "=== RUNNING ACTUAL TESTS ==="
+          echo "Using single-process rspec to ensure real execution"
           set -x  # Enable command tracing
-          bundle exec parallel_rspec spec/
+          RAILS_ENV=test bundle exec rspec \
+            --format progress \
+            --backtrace \
+            --require rails_helper
           TEST_EXIT_CODE=$?
           set +x  # Disable command tracing
-                    echo "=== TEST RESULTS ==="
+
+          echo "=== TEST RESULTS ==="
           echo "Test exit code: $TEST_EXIT_CODE"
           echo "Tests completed"
 
