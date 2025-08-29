@@ -201,9 +201,7 @@ jobs:
             --backtrace \
             --order random \
             --seed $(date +%s) \
-            --require spec_helper \
-            --no-parallel \
-            --single-process
+            --require spec_helper
 
           TEST_EXIT_CODE=$?
           echo "🧪 FINISHED: $(date)"
