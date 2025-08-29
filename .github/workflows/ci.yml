@@ -144,23 +144,23 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "Ruby version: $(ruby --version)"
           echo "Bundle version: $(bundle --version)"
-          
+
           # Force fresh database setup - no caching shortcuts
           echo "=== FORCING FRESH TEST ENVIRONMENT ==="
           bin/rails db:drop db:create db:migrate RAILS_ENV=test
-          
+
           # Verify test environment
           echo "=== TEST ENVIRONMENT VERIFICATION ==="
           echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
           echo "Parallel tests disabled: $PARALLEL_TESTS"
           echo "Test processes: $PARALLEL_TEST_PROCESSES"
           echo "Test profiling disabled: $SAMPLE$RPROF$STACKPROF$TAG_PROF"
-          
+
           # Verify database connectivity with real operations
           echo "=== VERIFYING REAL DATABASE OPERATIONS ==="
           bin/rails runner "puts 'Database: ' + ActiveRecord::Base.connection.current_database"
           bin/rails runner "puts 'Tables: ' + ActiveRecord::Base.connection.tables.join(', ')"
-          
+
           # Test real database operations
           echo "=== TESTING REAL DATABASE OPERATIONS ==="
           bin/rails runner "
@@ -176,11 +176,11 @@ jobs:
                 day_trading: true
               )
               puts '✅ Real Position creation verified (ID: ' + test_pos.id.to_s + ')'
-              
+
               # Verify it exists
               found = Position.find_by(product_id: 'CI-VERIFY-TEST')
               puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')'
-              
+
               # Clean up
               test_pos.destroy
               puts '✅ Real Position deletion verified'
@@ -189,11 +189,11 @@ jobs:
               exit 1
             end
           "
-          
+
           # Run tests with explicit single-process configuration
           echo "=== RUNNING ACTUAL TESTS ==="
           echo "🧪 STARTING: $(date)"
-          
+
           # Force single-process RSpec with explicit configuration
           bundle exec rspec \
             --format documentation \
@@ -204,27 +204,27 @@ jobs:
             --require spec_helper \
             --no-parallel \
             --single-process
-          
+
           TEST_EXIT_CODE=$?
           echo "🧪 FINISHED: $(date)"
-          
+
           echo "=== TEST RESULTS ==="
           echo "Test exit code: $TEST_EXIT_CODE"
           echo "Tests completed"
-          
+
           # Check for background processes
           echo "=== CHECKING FOR BACKGROUND PROCESSES ==="
           set +x
           ps aux | grep ruby || echo "No Ruby processes found"
-          
+
           # Check for database connections
           echo "=== CHECKING FOR DATABASE CONNECTIONS ==="
           bin/rails runner "puts ActiveRecord::Base.connection_pool.stat"
-          
+
           # Check for file descriptors
           echo "=== CHECKING FOR FILE DESCRIPTORS ==="
           lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
-          
+
           # Check for errors in test output
           echo "=== CHECKING FOR ERRORS IN TEST OUTPUT ==="
           if [ $TEST_EXIT_CODE -eq 0 ]; then
@@ -232,7 +232,7 @@ jobs:
           else
             echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
           fi
-          
+
           # Exit with test result code
           exit $TEST_EXIT_CODE
 
