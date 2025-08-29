@@ -138,6 +138,8 @@ module MarketData
 
     # Generate contract ID for a specific month
     def generate_contract_id_for_month(asset, month_date)
+      return nil unless asset
+
       prefix = ASSET_MAPPING[asset.upcase]
       return nil unless prefix
 
