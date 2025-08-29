@@ -198,9 +198,9 @@ module MarketData
 
       expired_contracts.update_all(enabled: false)
 
-      if expired_contracts.any?
-        @logger.info("Disabled #{expired_contracts.count} expired #{asset} contracts")
-      end
+      return unless expired_contracts.any?
+
+      @logger.info("Disabled #{expired_contracts.count} expired #{asset} contracts")
     end
   end
 end

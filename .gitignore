@@ -53,3 +53,4 @@ cdp_api_key.json
 .brakeman/
 .rspec_status
 coverage/
+.github/.DS_Store

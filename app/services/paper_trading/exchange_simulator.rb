@@ -2,7 +2,8 @@
 
 module PaperTrading
   class ExchangeSimulator
-    Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl, keyword_init: true)
+    Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
+      keyword_init: true)
 
     attr_reader :orders, :fills, :equity_usd
 
@@ -17,13 +18,16 @@ module PaperTrading
 
     def place_limit(symbol:, side:, price:, quantity:, tp: nil, sl: nil)
       id = next_id
-      orders[id] = Order.new(id: id, symbol: symbol, side: side, price: price.to_f, quantity: quantity.to_f, status: :open, filled_qty: 0.0, created_at: Time.now.utc, tp: tp, sl: sl)
+      orders[id] =
+        Order.new(id: id, symbol: symbol, side: side, price: price.to_f, quantity: quantity.to_f, status: :open,
+          filled_qty: 0.0, created_at: Time.now.utc, tp: tp, sl: sl)
       id
     end
 
     def cancel(id)
       o = orders[id]
       return unless o && o.status == :open
+
       o.status = :canceled
     end
 
@@ -61,6 +65,7 @@ module PaperTrading
           exit_price = o.sl.to_f
         end
         next unless exit_price
+
         realize_pnl(o, exit_price)
         o.status = :closed
       end
@@ -78,7 +83,8 @@ module PaperTrading
       order.filled_qty = order.quantity
       fee = fill_price * order.filled_qty * @maker_fee
       @equity_usd -= fee
-      @fills << {order_id: order.id, side: order.side, price: fill_price, qty: order.filled_qty, fee: fee, time: Time.now.utc}
+      @fills << {order_id: order.id, side: order.side, price: fill_price, qty: order.filled_qty, fee: fee,
+                  time: Time.now.utc}
     end
 
     def realize_pnl(order, exit_price)
@@ -90,7 +96,8 @@ module PaperTrading
       when :sell then entry_value - exit_value - fee
       end
       @equity_usd += pnl
-      @fills << {order_id: order.id, side: ((order.side == :buy) ? :sell : :buy), price: exit_price, qty: order.filled_qty, fee: fee, time: Time.now.utc}
+      @fills << {order_id: order.id, side: ((order.side == :buy) ? :sell : :buy), price: exit_price,
+                  qty: order.filled_qty, fee: fee, time: Time.now.utc}
     end
   end
 end
