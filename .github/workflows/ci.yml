@@ -91,6 +91,14 @@ jobs:
 
       - name: Prepare database (create + migrate)
         run: |
+          echo "Waiting for PostgreSQL service to be ready..."
+          # Wait for PostgreSQL to be fully ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "PostgreSQL not ready yet, waiting..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+          
           # Ensure proper database setup for real testing
           bin/rails db:create
           bin/rails db:migrate

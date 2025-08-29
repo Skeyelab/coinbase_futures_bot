@@ -46,9 +46,19 @@ jobs:
 
       - name: Setup database
         run: |
+          echo "Waiting for PostgreSQL service to be ready..."
+          # Wait for PostgreSQL to be fully ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "PostgreSQL not ready yet, waiting..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+          
+          echo "Setting up database..."
           bin/rails db:create
           bin/rails db:migrate
           bin/rails db:test:prepare
+          echo "Database setup complete"
 
       - name: Run tests with coverage
         run: |
