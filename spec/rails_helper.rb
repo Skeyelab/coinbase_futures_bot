@@ -2,27 +2,29 @@
 
 # SimpleCov removed entirely
 
-ENV["RAILS_ENV"] ||= "test"
-require File.expand_path("../config/environment", __dir__)
-abort("The Rails environment is running in production mode!") if Rails.env.production?
-require "rspec/rails"
-require "factory_bot_rails"
+ENV['RAILS_ENV'] ||= 'test'
+require File.expand_path('../config/environment', __dir__)
+abort('The Rails environment is running in production mode!') if Rails.env.production?
+require 'rspec/rails'
+require 'factory_bot_rails'
 
 # Require rails-controller-testing for Rails 8 compatibility
-require "rails-controller-testing"
+require 'rails-controller-testing'
 
 # Test profiling (only load when needed to avoid overhead)
-require "test_prof" if (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
+if (ENV['SAMPLE'] && ENV['SAMPLE'] != '') || (ENV['RPROF'] && ENV['RPROF'] != '') || (ENV['STACKPROF'] && ENV['STACKPROF'] != '') || (ENV['TAG_PROF'] && ENV['TAG_PROF'] != '')
+  require 'test_prof'
+end
 
 # CI-specific configuration and verification
-if ENV["CI"]
-  puts "=== CI ENVIRONMENT DETECTED ==="
-  puts "Forcing real test execution..."
+if ENV['CI']
+  puts '=== CI ENVIRONMENT DETECTED ==='
+  puts 'Forcing real test execution...'
   puts "Rails environment: #{Rails.env}"
-  puts "Database URL: #{ENV["DATABASE_URL"]}"
+  puts "Database URL: #{ENV['DATABASE_URL']}"
 
   # Ensure test effectiveness is loaded
-  require_relative "support/test_effectiveness"
+  require_relative 'support/test_effectiveness'
   puts "Test effectiveness module loaded: #{defined?(TestEffectiveness)}"
 end
 
@@ -31,23 +33,23 @@ begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   puts "ERROR: Pending migrations detected: #{e.message}"
-  puts "Run `rails db:migrate` before running tests"
+  puts 'Run `rails db:migrate` before running tests'
   exit 1
 rescue ActiveRecord::ConnectionNotEstablished => e
   puts "ERROR: Database connection failed: #{e.message}"
-  puts "Ensure database is running and properly configured"
+  puts 'Ensure database is running and properly configured'
   exit 1
-rescue => e
+rescue StandardError => e
   puts "ERROR: Schema maintenance failed: #{e.message}"
-  puts "Check database configuration and migrations"
+  puts 'Check database configuration and migrations'
   exit 1
 end
 
 # Require support files
-Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
+Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
 
 # Load test effectiveness validation
-require Rails.root.join("spec/support/test_effectiveness.rb")
+require Rails.root.join('spec/support/test_effectiveness.rb')
 
 RSpec.configure do |config|
   # Use database transactions for fast test isolation instead of expensive delete_all
@@ -67,26 +69,26 @@ RSpec.configure do |config|
   config.add_formatter TestNameFormatter
 
   # CI-specific configuration
-  if ENV["CI"]
+  if ENV['CI']
     config.before(:suite) do
-      puts "=== CI TEST SUITE STARTING ==="
-      puts "Verifying real test environment..."
+      puts '=== CI TEST SUITE STARTING ==='
+      puts 'Verifying real test environment...'
 
       # Verify database connectivity
       expect(ActiveRecord::Base.connection).to be_active
-      puts "✅ Database connection verified"
+      puts '✅ Database connection verified'
 
       # Verify test effectiveness module
       expect(defined?(TestEffectiveness)).to be_truthy
-      puts "✅ Test effectiveness module verified"
+      puts '✅ Test effectiveness module verified'
 
       # Verify we can perform real operations
-      puts "Verifying real database operations..."
+      puts 'Verifying real database operations...'
       TestEffectiveness.verify_real_execution
     end
 
     config.after(:suite) do
-      puts "=== CI TEST SUITE COMPLETED ==="
+      puts '=== CI TEST SUITE COMPLETED ==='
       puts "Total tests run: #{RSpec.world.example_count}"
       puts "Total failures: #{RSpec.world.all_examples.count(&:exception)}"
       TestEffectiveness.ci_verification_summary
@@ -95,7 +97,7 @@ RSpec.configure do |config|
 
   # Test effectiveness validation
   config.before(:each) do |example|
-    puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
+    puts "\n🧪 Running: #{example.full_description}" unless ENV['TEST_ENV_NUMBER']
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
@@ -119,10 +121,10 @@ RSpec.configure do |config|
   # Add safety for database operations
   config.before(:suite) do
     # Ensure database is available before starting tests
-    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-  rescue => e
+    ActiveRecord::Base.connection.execute('SELECT 1') if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue StandardError => e
     puts "ERROR: Database health check failed: #{e.message}"
-    puts "Tests cannot continue with database issues"
+    puts 'Tests cannot continue with database issues'
     exit 1
   end
 
