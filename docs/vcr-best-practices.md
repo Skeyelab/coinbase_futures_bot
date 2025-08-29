@@ -85,7 +85,7 @@ RSpec.describe "Format validation", :vcr_fast do
   # Tests that verify response structure without API calls
 end
 
-# Slow tests - allow new recordings for comprehensive testing  
+# Slow tests - allow new recordings for comprehensive testing
 RSpec.describe "API integration", :vcr_slow do
   # Tests that may require fresh API data
 end
@@ -119,7 +119,7 @@ with_api_vcr("coinbase_rest/fetch_candles/btc_usd_1h")
 with_integration_vcr("fetch_candles_job/full_workflow")
 
 # Avoid
-with_api_vcr("test1") 
+with_api_vcr("test1")
 with_api_vcr("candles")
 ```
 
@@ -279,7 +279,7 @@ VCR_DEBUG=1 bundle exec rspec
 With these optimizations, aim for:
 
 - **Fast tests** (`:vcr_fast`): < 0.1 seconds per test
-- **Slow tests** (`:vcr_slow`): < 2 seconds per test  
+- **Slow tests** (`:vcr_slow`): < 2 seconds per test
 - **Total VCR test suite**: < 30 seconds
 - **Individual cassettes**: < 50KB each
 
@@ -300,7 +300,7 @@ end
 ```ruby
 it "fetches data" do
   with_api_vcr do
-    # test implementation  
+    # test implementation
   end
 end
 ```

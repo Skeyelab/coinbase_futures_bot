@@ -26,6 +26,21 @@
 
 ### Session log
 
+#### 2025-01-27 18:20 UTC
+- Context: **Documentation Cleanup** - Removed legacy coverage documentation that was superseded by current coverage setup
+- Changes:
+  - **CLEANUP**: Removed `docs/coverage-legacy.md` as it was superseded by `docs/coverage-setup.md`
+  - **ENHANCEMENT**: Current coverage documentation in `docs/coverage-setup.md` is comprehensive and up-to-date
+  - **SIMPLIFICATION**: Eliminated duplicate/outdated coverage information
+- Commands run:
+  - `rm docs/coverage-legacy.md` - Removed legacy coverage documentation
+- Files touched:
+  - `docs/coverage-legacy.md` - Deleted (superseded by coverage-setup.md)
+- Next steps:
+  - **Single source of truth**: All coverage documentation now in `docs/coverage-setup.md`
+  - **Clean documentation**: No duplicate or outdated coverage information
+  - **Current coverage docs**: Comprehensive coverage setup and CI integration documented
+
 #### 2025-01-27 18:15 UTC
 - Context: **Documentation Consolidation** - Consolidated documentation from `doc/` and `docs/` folders into single `docs/` folder
 - Changes:
