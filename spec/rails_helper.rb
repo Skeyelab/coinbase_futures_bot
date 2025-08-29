@@ -120,7 +120,7 @@ RSpec.configure do |config|
       if defined?(ActiveRecord::Base)
         puts "=== DATABASE QUERY COUNT DEBUG ==="
         puts "ActiveRecord query cache enabled: #{ActiveRecord::Base.connection.query_cache_enabled}"
-        puts "ActiveRecord prepared statements: #{ActiveRecord::Base.connection.supports_prepared_statements?}"
+        puts "Database adapter: #{ActiveRecord::Base.connection.adapter_name}"
       end
 
       # Verify we can perform real operations
