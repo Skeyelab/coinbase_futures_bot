@@ -12,7 +12,7 @@ require "factory_bot_rails"
 require "rails-controller-testing"
 
 # Test profiling (only load when needed to avoid overhead)
-require "test_prof" if ENV["SAMPLE"] || ENV["RPROF"] || ENV["STACKPROF"] || ENV["TAG_PROF"]
+require "test_prof" if (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
 
 # CI-specific configuration and verification
 if ENV["CI"]
