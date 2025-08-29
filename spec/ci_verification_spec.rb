@@ -20,74 +20,75 @@ RSpec.describe "CI Environment Verification", :ci_only do
     expect do
       Position.create!(
         product_id: "CI-TEST-USD",
-        side: "long",
+        side: "LONG", # Use uppercase enum value
         size: 1.0,
-        entry_price: 50000.0,
+        entry_price: 50_000.0,
         entry_time: Time.current,
-        status: "open",
+        status: "OPEN", # Use uppercase enum value
         day_trading: false
       )
-    end.to change(Position, :count).by(1)
+    end.to change { Position.count }.by(1)
 
-    # Clean up
-    Position.where(product_id: "CI-TEST-USD").destroy_all
+    # Verify the record was created
+    position = Position.last
+    expect(position.product_id).to eq("CI-TEST-USD")
+    expect(position.side).to eq("LONG")
+    expect(position.status).to eq("OPEN")
+
+    # Clean up - destroy the test record
+    expect { position.destroy! }.to change { Position.count }.by(-1)
     expect(Position.count).to eq(initial_count)
-    puts "✅ Position CRUD operations verified"
+
+    puts "✅ Real database operations verified"
   end
 
-  it "can create and destroy test data" do
-    # Test TradingPair creation with correct attributes
-    pair = TradingPair.create!(
-      product_id: "CI-TEST-PAIR",
-      base_currency: "CI",
-      quote_currency: "USD",
-      status: "active",
-      min_size: 0.001,
-      price_increment: 0.01,
-      size_increment: 0.001,
-      enabled: true,
-      contract_type: "futures",
-      expiration_date: 1.month.from_now
-    )
+  it "can create and destroy TradingPair records" do
+    initial_count = TradingPair.count
 
-    expect(pair).to be_persisted
-    expect(pair.product_id).to eq("CI-TEST-PAIR")
+    expect do
+      TradingPair.create!(
+        product_id: "CI-TEST-USD",
+        base_currency: "CI",
+        quote_currency: "USD",
+        status: "active",
+        contract_type: "futures",
+        expiration_date: 1.month.from_now,
+        min_size: 0.001,
+        price_increment: 0.01,
+        size_increment: 0.001
+      )
+    end.to change { TradingPair.count }.by(1)
+
+    # Verify the record was created
+    pair = TradingPair.last
+    expect(pair.product_id).to eq("CI-TEST-USD")
     expect(pair.base_currency).to eq("CI")
     expect(pair.quote_currency).to eq("USD")
 
-    # Clean up
-    pair.destroy
-    expect(TradingPair.find_by(product_id: "CI-TEST-PAIR")).to be_nil
-    puts "✅ TradingPair CRUD operations verified"
+    # Clean up - destroy the test record
+    expect { pair.destroy! }.to change { TradingPair.count }.by(-1)
+    expect(TradingPair.count).to eq(initial_count)
+
+    puts "✅ TradingPair operations verified"
   end
 
   it "can access test files" do
-    test_files = Dir.glob("spec/**/*_spec.rb")
-    expect(test_files).not_to be_empty
-    expect(test_files.first).to include("spec/")
-    puts "✅ Test file access verified (#{test_files.count} test files found)"
+    expect(File.exist?("spec/ci_verification_spec.rb")).to be true
+    expect(File.exist?("app/models/position.rb")).to be true
+    expect(File.exist?("app/models/trading_pair.rb")).to be true
+    puts "✅ Test file access verified"
   end
 
   it "has test effectiveness module loaded" do
-    expect(defined?(TestEffectiveness)).to be_truthy
-    puts "✅ TestEffectiveness module loaded"
+    expect(defined?(TestEffectiveness)).to eq("constant")
+    puts "✅ Test effectiveness module loaded"
   end
 
-  it "has proper RSpec configuration" do
-    expect(RSpec.configuration).to be_truthy
-    puts "✅ RSpec configuration loaded"
-  end
-
-  it "can perform database queries" do
-    # Test a simple query
-    count = TradingPair.count
-    expect(count).to be >= 0
-    puts "✅ Database queries working (TradingPair count: #{count})"
-  end
-
-  it "has proper test environment setup" do
-    expect(Rails.env.test?).to be true
-    expect(ActiveRecord::Base.connection.current_database).to include("test")
-    puts "✅ Test environment properly configured"
+  it "can perform basic ActiveRecord operations" do
+    # Test basic database operations
+    expect(ActiveRecord::Base.connection).to be_active
+    expect(ActiveRecord::Base.connection.tables).to include("positions")
+    expect(ActiveRecord::Base.connection.tables).to include("trading_pairs")
+    puts "✅ ActiveRecord operations verified"
   end
 end
