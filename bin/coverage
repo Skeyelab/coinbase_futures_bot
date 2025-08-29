@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# SimpleCov coverage runner script
+#
+# Usage:
+#   bin/coverage           # Run all specs with coverage
+#   bin/coverage spec/models # Run specific specs with coverage
+
+set -e
+
+echo "Running RSpec with SimpleCov coverage..."
+echo "Coverage reports will be generated in ./coverage/"
+
+if [ $# -eq 0 ]; then
+  # No arguments - run all specs
+  COVERAGE=true bundle exec rspec
+else
+  # Run specific specs
+  COVERAGE=true bundle exec rspec "$@"
+fi
+
+echo ""
+echo "Coverage completed!"
+echo "HTML Report: coverage/index.html"
+echo "JSON Report: coverage/coverage.json"
+echo ""
+echo "Coverage Summary:"
+if [ -f coverage/coverage.json ]; then
+  ruby -rjson -e "
+    data = JSON.parse(File.read('coverage/coverage.json'))
+    puts \"Line Coverage:   #{data['metrics']['covered_percent'].round(2)}%\"
+    puts \"Branch Coverage: #{data['metrics']['branches']['covered_percent'].round(2)}%\"
+  "
+fi
