@@ -12,8 +12,20 @@ require "factory_bot_rails"
 require "rails-controller-testing"
 
 # Test profiling (only load when needed to avoid overhead)
-if (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
+puts "=== TestProf DEBUG ==="
+puts "TAG_PROF env var: '#{ENV["TAG_PROF"]}'"
+puts "SAMPLE env var: '#{ENV["SAMPLE"]}'"
+puts "RPROF env var: '#{ENV["RPROF"]}'"
+puts "STACKPROF env var: '#{ENV["STACKPROF"]}'"
+
+will_load_test_prof = (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
+puts "Will load TestProf: #{will_load_test_prof}"
+
+if will_load_test_prof
   require "test_prof"
+  puts "TestProf loaded successfully"
+else
+  puts "TestProf NOT loaded (environment variables empty)"
 end
 
 # CI-specific configuration and verification
