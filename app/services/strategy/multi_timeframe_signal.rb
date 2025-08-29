@@ -97,20 +97,24 @@ module Strategy
       if trend == :up
         if interacted_with_5m_ema && last_close_5m > ema5 && micro_timing_ok
           entry = last_close_1m # Use 1m close for precise entry
-          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
+          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee],
+            slippage_rate: @config[:slippage])
           tp = [entry * (1.0 + @config[:tp_target]), be * 1.001].max
           sl = entry * (1.0 - @config[:sl_target])
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
-          conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_close_1m)
+          conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5,
+            ema1: ema1, last_price: last_close_1m)
           return order_hash(:buy, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :buy)
         end
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
-        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
+        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee],
+          slippage_rate: @config[:slippage])
         tp = [entry * (1.0 - @config[:tp_target]), be * 0.999].min
         sl = entry * (1.0 + @config[:sl_target])
         qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
-        conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1, last_price: last_close_1m)
+        conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1,
+          last_price: last_close_1m)
         return order_hash(:sell, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :sell)
       end
 
@@ -136,9 +140,10 @@ module Strategy
     def ema(values, period)
       period = period.to_i
       return values.last.to_f if period <= 1 || values.empty?
+
       k = 2.0 / (period + 1)
       ema_value = values.first.to_f
-      values.each do |v|
+      values.drop(1).each do |v| # Skip first value to avoid double-counting
         ema_value = v.to_f * k + ema_value * (1 - k)
       end
       ema_value
@@ -147,6 +152,7 @@ module Strategy
     def position_size(equity_usd:, entry:, sl:, risk_fraction:)
       risk_per_unit = (entry.to_f - sl.to_f).abs
       return 0 if risk_per_unit <= 0
+
       risk_budget = equity_usd.to_f * risk_fraction.to_f
 
       # Calculate BTC quantity based on risk
@@ -162,6 +168,7 @@ module Strategy
 
     def order_hash(side, price, quantity, tp, sl, confidence)
       return nil if quantity.to_f <= 0
+
       {
         side: side,
         price: price,
@@ -275,11 +282,13 @@ module Strategy
     end
 
     def sentiment_gate_allows?(symbol:, side:)
-      enabled = ENV.fetch("SENTIMENT_ENABLE", "false").to_s.downcase == "true"
+      enabled = ENV.fetch("SENTIMENT_ENABLE", "false").to_s.casecmp("true").zero?
       return true unless enabled
+
       threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
       z = latest_sentiment_z(symbol)
       return false if z.abs < threshold
+
       (side == :buy && z > 0) || (side == :sell && z < 0)
     end
 
@@ -290,9 +299,7 @@ module Strategy
       return nil unless symbol
 
       # If it's already a specific contract (contains date pattern), use it
-      if symbol.match?(/\d{2}[A-Z]{3}\d{2}/)
-        return symbol
-      end
+      return symbol if symbol.match?(/\d{2}[A-Z]{3}\d{2}/)
 
       # If it's an asset symbol (BTC, ETH), find best available contract
       asset = extract_asset_from_symbol(symbol)
@@ -328,7 +335,7 @@ module Strategy
     def extract_asset_from_symbol(symbol)
       case symbol
       when /^(BTC|ETH)(-USD)?$/
-        $1
+        ::Regexp.last_match(1)
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         # Current month contract: BIT-29AUG25-CDE -> BTC
         symbol.start_with?("BIT") ? "BTC" : "ETH"

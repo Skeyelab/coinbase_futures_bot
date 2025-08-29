@@ -8,7 +8,7 @@ class PositionsController < ActionController::Base
 
   def index
     @notice_message = params[:notice]
-    @positions = []  # Initialize to empty array
+    @positions = [] # Initialize to empty array
 
     begin
       @positions = positions_service.list_open_positions
@@ -108,7 +108,8 @@ class PositionsController < ActionController::Base
     password = ENV["POSITIONS_UI_PASSWORD"].to_s
 
     unless username.present? && password.present?
-      render plain: "Positions UI credentials not configured. Set POSITIONS_UI_USERNAME and POSITIONS_UI_PASSWORD.", status: :forbidden and return
+      render plain: "Positions UI credentials not configured. Set POSITIONS_UI_USERNAME and POSITIONS_UI_PASSWORD.",
+        status: :forbidden and return
     end
 
     authenticate_or_request_with_http_basic("Positions UI") do |u, p|

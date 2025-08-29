@@ -9,7 +9,7 @@ class FetchCandlesJob < ApplicationJob
     rest.upsert_products
 
     # Process both BTC-USD and ETH-USD for real-time monitoring
-    ["BTC-USD", "ETH-USD"].each do |product_id|
+    %w[BTC-USD ETH-USD].each do |product_id|
       pair = TradingPair.find_by(product_id: product_id)
       next unless pair&.enabled?
 

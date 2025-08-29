@@ -14,7 +14,7 @@ class SentimentController < ActionController::API
       symbol: symbol,
       window: window,
       count: records.size,
-      data: records.map { |r|
+      data: records.map do |r|
         {
           window_end_at: r.window_end_at,
           count: r.count,
@@ -22,7 +22,7 @@ class SentimentController < ActionController::API
           weighted_score: r.weighted_score.to_f,
           z_score: r.z_score.to_f
         }
-      }
+      end
     }
   end
 end
