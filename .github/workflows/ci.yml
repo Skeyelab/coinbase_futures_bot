@@ -75,7 +75,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev pkg-config
+          sudo apt-get install -y libpq-dev pkg-config postgresql-client
 
       - name: Cache test database and artifacts
         uses: actions/cache@v4
@@ -98,7 +98,7 @@ jobs:
             sleep 2
           done
           echo "PostgreSQL is ready!"
-          
+
           # Ensure proper database setup for real testing
           bin/rails db:create
           bin/rails db:migrate

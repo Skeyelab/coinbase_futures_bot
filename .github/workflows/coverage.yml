@@ -42,7 +42,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpq-dev pkg-config
+          sudo apt-get install -y libpq-dev pkg-config postgresql-client
 
       - name: Setup database
         run: |
@@ -53,7 +53,7 @@ jobs:
             sleep 2
           done
           echo "PostgreSQL is ready!"
-          
+
           echo "Setting up database..."
           bin/rails db:create
           bin/rails db:migrate
