@@ -118,6 +118,23 @@ jobs:
 
       - name: Run tests with enhanced debugging
         timeout-minutes: 15
+        env:
+          # Force single-process execution - disable parallel testing
+          PARALLEL_TESTS: "0"
+          PARALLEL_TEST_PROCESSES: "1"
+          # Disable test profiling and acceleration
+          SAMPLE: ""
+          RPROF: ""
+          STACKPROF: ""
+          TAG_PROF: ""
+          # Force real test execution
+          FORCE_REAL_TESTS: "true"
+          # Disable any caching
+          RAILS_CACHE_ID: "ci-$(date +%s)"
+          # Use VCR cassettes in CI but ensure real database testing
+          VCR_RECORD_MODE: none
+          CI: true
+          # COVERAGE: true  # Disabled to avoid SimpleCov processing errors
         run: |
           # Disable 'exit on error' for this block; we'll control exit codes manually
           set +e
@@ -127,95 +144,97 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "Ruby version: $(ruby --version)"
           echo "Bundle version: $(bundle --version)"
-
+          
           # Force fresh database setup - no caching shortcuts
           echo "=== FORCING FRESH TEST ENVIRONMENT ==="
           bin/rails db:drop db:create db:migrate RAILS_ENV=test
-
-          # Verify test environment is real
+          
+          # Verify test environment
           echo "=== TEST ENVIRONMENT VERIFICATION ==="
-          echo "Rails environment: $RAILS_ENV"
-          echo "Database URL: $DATABASE_URL"
           echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
-
-          # Verify test effectiveness validation is loaded
-          echo "=== TEST EFFECTIVENESS VERIFICATION ==="
-          bundle exec rails runner "
-            puts 'RSpec configuration loaded: ' + defined?(RSpec).to_s
-            puts 'Test effectiveness loaded: ' + defined?(TestEffectiveness).to_s
-            puts 'Rails helper loaded: ' + File.exist?('spec/rails_helper.rb').to_s
+          echo "Parallel tests disabled: $PARALLEL_TESTS"
+          echo "Test processes: $PARALLEL_TEST_PROCESSES"
+          echo "Test profiling disabled: $SAMPLE$RPROF$STACKPROF$TAG_PROF"
+          
+          # Verify database connectivity with real operations
+          echo "=== VERIFYING REAL DATABASE OPERATIONS ==="
+          bin/rails runner "puts 'Database: ' + ActiveRecord::Base.connection.current_database"
+          bin/rails runner "puts 'Tables: ' + ActiveRecord::Base.connection.tables.join(', ')"
+          
+          # Test real database operations
+          echo "=== TESTING REAL DATABASE OPERATIONS ==="
+          bin/rails runner "
+            begin
+              # Create a test record
+              test_pos = Position.create!(
+                product_id: 'CI-VERIFY-TEST',
+                side: 'LONG',
+                size: 1.0,
+                entry_price: 100.0,
+                entry_time: Time.current,
+                status: 'OPEN',
+                day_trading: true
+              )
+              puts '✅ Real Position creation verified (ID: ' + test_pos.id.to_s + ')'
+              
+              # Verify it exists
+              found = Position.find_by(product_id: 'CI-VERIFY-TEST')
+              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')'
+              
+              # Clean up
+              test_pos.destroy
+              puts '✅ Real Position deletion verified'
+            rescue => e
+              puts '❌ Real database operations failed: ' + e.message
+              exit 1
+            end
           "
-
-          # Verify database connectivity
-          echo "=== DATABASE VERIFICATION ==="
-          bundle exec rails runner "
-            puts 'Database connected: ' + ActiveRecord::Base.connected?.to_s
-            puts 'Database name: ' + ActiveRecord::Base.connection.current_database
-            puts 'Tables exist: ' + ActiveRecord::Base.connection.tables.include?('positions').to_s
-          "
-
-          # Verify we can perform real database operations
-          echo "=== REAL DATABASE OPERATION VERIFICATION ==="
-          bundle exec rails runner "
-            puts 'Creating test position to verify real database operations...'
-            pos = Position.create!(
-              product_id: 'TEST-USD',
-              side: 'LONG',
-              size: 1.0,
-              entry_price: 100.0,
-              entry_time: Time.current,
-              status: 'OPEN',
-              day_trading: true
-            )
-            puts 'Position created with ID: ' + pos.id.to_s
-            puts 'Position persisted: ' + pos.persisted?.to_s
-            puts 'Position count: ' + Position.count.to_s
-            pos.destroy
-            puts 'Test position cleaned up'
-          "
-
-          echo "=== ENVIRONMENT VARIABLES ==="
-          env | grep -E "(DATABASE|RAILS|BUNDLE|PATH)" | sort
-          echo "=== CHECKING DATABASE CONNECTION ==="
-          bin/rails db:version
-
-          # Run tests with explicit configuration - no shortcuts
+          
+          # Run tests with explicit single-process configuration
           echo "=== RUNNING ACTUAL TESTS ==="
-          echo "Using single-process rspec to ensure real execution"
-          set -x  # Enable command tracing
-          RAILS_ENV=test bundle exec rspec \
+          echo "🧪 STARTING: $(date)"
+          
+          # Force single-process RSpec with explicit configuration
+          bundle exec rspec \
+            --format documentation \
             --format progress \
             --backtrace \
-            --require rails_helper
+            --order random \
+            --seed $(date +%s) \
+            --require spec_helper \
+            --no-parallel \
+            --single-process
+          
           TEST_EXIT_CODE=$?
-          set +x  # Disable command tracing
-
+          echo "🧪 FINISHED: $(date)"
+          
           echo "=== TEST RESULTS ==="
           echo "Test exit code: $TEST_EXIT_CODE"
           echo "Tests completed"
-
-          # Check for any background processes or cleanup issues
+          
+          # Check for background processes
           echo "=== CHECKING FOR BACKGROUND PROCESSES ==="
-          ps aux | grep -E "(ruby|rspec|rails)" | grep -v grep || echo "No Ruby processes found"
+          set +x
+          ps aux | grep ruby || echo "No Ruby processes found"
+          
+          # Check for database connections
           echo "=== CHECKING FOR DATABASE CONNECTIONS ==="
-          bin/rails db:version 2>/dev/null && echo "Database still accessible" || echo "Database connection closed"
+          bin/rails runner "puts ActiveRecord::Base.connection_pool.stat"
+          
+          # Check for file descriptors
           echo "=== CHECKING FOR FILE DESCRIPTORS ==="
           lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
-
-          # Check if there were any errors in the test output
+          
+          # Check for errors in test output
           echo "=== CHECKING FOR ERRORS IN TEST OUTPUT ==="
-          if [ $TEST_EXIT_CODE -ne 0 ]; then
-            echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
-            exit $TEST_EXIT_CODE
-          else
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
             echo "✅ Tests passed successfully"
-            exit 0
+          else
+            echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
           fi
-        env:
-          # Use VCR cassettes in CI but ensure real database testing
-          VCR_RECORD_MODE: none
-          CI: true
-          # COVERAGE: true  # Disabled to avoid SimpleCov processing errors
+          
+          # Exit with test result code
+          exit $TEST_EXIT_CODE
 
       # Coverage reports generated locally in coverage/ directory
       # No external uploads configured
