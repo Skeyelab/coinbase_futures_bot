@@ -1,6 +1,7 @@
 # Coinbase Futures Bot
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
+[![codecov](https://codecov.io/gh/Skeyelab/coinbase_futures_bot/branch/main/graph/badge.svg)](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
 
 An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
@@ -33,6 +34,7 @@ This project maintains a comprehensive test suite with **141 test examples** cov
 
 ### Coverage Reports
 
+- **Online**: [Codecov Dashboard](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
 - **Local**: Generated automatically when running tests with coverage
 - **HTML Report**: View detailed coverage at `coverage/index.html`
 
