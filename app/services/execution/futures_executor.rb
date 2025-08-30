@@ -2,6 +2,8 @@
 
 module Execution
   class FuturesExecutor
+    include SentryServiceTracking
+
     def initialize(basis_threshold_bps: ENV.fetch("BASIS_THRESHOLD_BPS", 50).to_i, logger: Rails.logger)
       @basis_threshold_bps = basis_threshold_bps
       @logger = logger

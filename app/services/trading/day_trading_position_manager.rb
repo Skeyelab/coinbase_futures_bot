@@ -4,6 +4,8 @@ module Trading
   # Manages day trading positions with automatic same-day closure
   # This service ensures that all day trading positions are closed before the end of the trading day
   class DayTradingPositionManager
+    include SentryServiceTracking
+
     def initialize(logger: Rails.logger)
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)

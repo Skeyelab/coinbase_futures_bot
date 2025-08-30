@@ -561,17 +561,47 @@ end
 
 ### Error Notification
 
+The application now includes comprehensive Sentry error tracking for all background jobs:
+
 ```ruby
 class ApplicationJob < ActiveJob::Base
   rescue_from StandardError do |error|
-    Rails.logger.error("Job failed: #{error.class} - #{error.message}")
-    Rails.logger.error(error.backtrace.join("\n"))
+    # Enhanced Sentry tracking with job context
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_class", self.class.name)
+      scope.set_tag("job_id", job_id)
+      scope.set_tag("queue_name", queue_name)
+      
+      scope.set_context("job_arguments", arguments)
+      scope.set_context("job_execution", {
+        executions: executions,
+        enqueued_at: enqueued_at,
+        scheduled_at: scheduled_at
+      })
+      
+      Sentry.capture_exception(error)
+    end
 
-    # Send to error tracking service
-    Sentry.capture_exception(error) if defined?(Sentry)
+    Rails.logger.error("Job failed: #{error.class} - #{error.message}")
+    raise error # Allow normal retry/discard logic
   end
 end
 ```
+
+**Features:**
+- Automatic error capture with job context
+- Job argument and execution metadata
+- Queue name and priority tracking
+- Breadcrumb trail for debugging
+- Integration with retry/discard logic
+
+**Monitoring:**
+- All job errors are tracked in Sentry
+- Performance monitoring for long-running jobs
+- Queue health monitoring
+- Failed job rate tracking
+
+See `docs/sentry-monitoring.md` for complete Sentry implementation details.
 
 ## Performance Optimization
 

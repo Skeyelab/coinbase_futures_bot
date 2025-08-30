@@ -38,6 +38,24 @@ class HealthCheckJob < ApplicationJob
     logger.error("Health check job failed: #{e.message}")
     logger.error(e.backtrace.join("\n"))
 
+    # Enhanced Sentry tracking for health check failures
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "health_check")
+      scope.set_tag("error_type", "health_check_failure")
+      scope.set_tag("critical", "true")
+
+      # Try to gather partial health data for context
+      partial_health = begin
+        gather_health_data
+      rescue
+        {error: "Could not gather health data"}
+      end
+
+      scope.set_context("health_status", partial_health)
+
+      Sentry.capture_exception(e)
+    end
+
     # Send error notification
     SlackNotificationService.alert(
       "error",
@@ -92,9 +110,32 @@ class HealthCheckJob < ApplicationJob
   def check_coinbase_api_health
     client = Coinbase::Client.new
     result = client.test_auth
-    result[:advanced_trade][:ok] == true && result[:exchange][:ok] == true
+    api_healthy = result[:advanced_trade][:ok] == true && result[:exchange][:ok] == true
+
+    # Track API health status
+    SentryHelper.add_breadcrumb(
+      message: "Coinbase API health check completed",
+      category: "health_check",
+      level: api_healthy ? "info" : "warning",
+      data: {
+        advanced_trade_ok: result[:advanced_trade][:ok],
+        exchange_ok: result[:exchange][:ok],
+        overall_healthy: api_healthy
+      }
+    )
+
+    api_healthy
   rescue => e
     logger.warn("Coinbase API health check failed: #{e.message}")
+
+    # Track API health failures
+    Sentry.with_scope do |scope|
+      scope.set_tag("health_check_type", "coinbase_api")
+      scope.set_tag("error_type", "api_health_failure")
+
+      Sentry.capture_exception(e)
+    end
+
     false
   end
 

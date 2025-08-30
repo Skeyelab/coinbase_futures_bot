@@ -4,6 +4,8 @@ require "websocket-client-simple"
 
 module MarketData
   class CoinbaseSpotSubscriber
+    include SentryServiceTracking
+
     def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true)
       @product_ids = Array(product_ids)
       @logger = logger

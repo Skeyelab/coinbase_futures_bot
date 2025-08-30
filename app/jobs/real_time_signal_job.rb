@@ -27,8 +27,30 @@ class RealTimeSignalJob < ApplicationJob
       .update_all(alert_status: "expired", updated_at: Time.current.utc)
 
     Rails.logger.info("[RTSJ] Cleaned up #{expired_count} expired signal alerts") if expired_count > 0
+
+    # Track signal cleanup in Sentry
+    if expired_count > 0
+      SentryHelper.add_breadcrumb(
+        message: "Expired signals cleaned up",
+        category: "signal_management",
+        level: "info",
+        data: {
+          expired_count: expired_count,
+          operation: "cleanup_expired_signals"
+        }
+      )
+    end
   rescue => e
     Rails.logger.error("[RTSJ] Error cleaning up expired signals: #{e.message}")
+
+    # Track signal cleanup errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "real_time_signal")
+      scope.set_tag("operation", "cleanup_expired_signals")
+      scope.set_tag("error_type", "signal_cleanup_error")
+
+      Sentry.capture_exception(e)
+    end
   end
 
   def log_signal_stats
@@ -40,8 +62,25 @@ class RealTimeSignalJob < ApplicationJob
     }
 
     Rails.logger.info("[RTSJ] Signal stats: #{stats.inspect}")
+
+    # Track signal statistics in Sentry for monitoring
+    SentryHelper.add_breadcrumb(
+      message: "Signal statistics collected",
+      category: "signal_monitoring",
+      level: "info",
+      data: stats.merge(operation: "log_signal_stats")
+    )
   rescue => e
     Rails.logger.error("[RTSJ] Error logging signal stats: #{e.message}")
+
+    # Track stats collection errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "real_time_signal")
+      scope.set_tag("operation", "log_signal_stats")
+      scope.set_tag("error_type", "stats_collection_error")
+
+      Sentry.capture_exception(e)
+    end
   end
 
   # Class methods for job management

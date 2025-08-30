@@ -8,6 +8,8 @@ require "time"
 
 module Sentiment
   class CryptoPanicClient
+    include SentryServiceTracking
+
     API_BASE = "https://cryptopanic.com/api/developer/v2"
 
     def initialize(token: ENV["CRYPTOPANIC_TOKEN"], base_url: ENV["CRYPTOPANIC_BASE_URL"], logger: Rails.logger)
@@ -80,10 +82,72 @@ module Sentiment
       end
 
       @logger.info("CryptoPanic: Successfully fetched #{results.size} events from #{page - 1} pages")
+
+      # Track successful sentiment data fetching
+      SentryHelper.add_breadcrumb(
+        message: "CryptoPanic data fetched successfully",
+        category: "sentiment",
+        level: "info",
+        data: {
+          service: "cryptopanic",
+          events_count: results.size,
+          pages_fetched: page - 1
+        }
+      )
+
       results
+    rescue Net::HTTPError => e
+      @logger.error("CryptoPanic HTTP error: #{e.class} #{e.message}")
+
+      # Track HTTP errors separately
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "cryptopanic")
+        scope.set_tag("operation", "fetch_recent")
+        scope.set_tag("error_type", "http_error")
+
+        scope.set_context("api_call", {
+          base_url: @base_url,
+          max_pages: max_pages,
+          current_page: page,
+          has_token: @token.present?
+        })
+
+        Sentry.capture_exception(e)
+      end
+
+      []
+    rescue JSON::ParserError => e
+      @logger.error("CryptoPanic JSON parse error: #{e.message}")
+
+      # Track JSON parsing errors
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "cryptopanic")
+        scope.set_tag("operation", "parse_response")
+        scope.set_tag("error_type", "json_parse_error")
+
+        Sentry.capture_exception(e)
+      end
+
+      []
     rescue => e
       @logger.error("CryptoPanic fetch failed: #{e.class} #{e.message}")
       @logger.debug("Full error: #{e.backtrace.first(5).join('\n')}")
+
+      # Track unexpected errors
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "cryptopanic")
+        scope.set_tag("operation", "fetch_recent")
+        scope.set_tag("error_type", "unexpected_error")
+
+        scope.set_context("api_call", {
+          base_url: @base_url,
+          max_pages: max_pages,
+          has_token: @token.present?
+        })
+
+        Sentry.capture_exception(e)
+      end
+
       []
     end
 

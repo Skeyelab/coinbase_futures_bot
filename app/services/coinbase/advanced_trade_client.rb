@@ -8,6 +8,8 @@ require "cgi"
 
 module Coinbase
   class AdvancedTradeClient
+    include SentryServiceTracking
+
     DEFAULT_BASE = "https://api.coinbase.com"
 
     def initialize(base_url: ENV.fetch("COINBASE_AT_REST_URL", DEFAULT_BASE), logger: Rails.logger)
@@ -37,14 +39,15 @@ module Coinbase
       raise "Authentication required" unless @authenticated
 
       path = "/api/v3/brokerage/accounts"
-      begin
+
+      track_api_call(path, "test_auth") do
         resp = authenticated_get(path)
         data = JSON.parse(resp.body)
         {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
-      rescue Faraday::ClientError => e
-        body = (e.response && e.response[:body]).to_s
-        {ok: false, error: e.class.to_s, message: e.message, body: body}
       end
+    rescue Faraday::ClientError => e
+      body = (e.response && e.response[:body]).to_s
+      {ok: false, error: e.class.to_s, message: e.message, body: body}
     end
 
     # Get account balances
@@ -52,8 +55,10 @@ module Coinbase
       raise "Authentication required" unless @authenticated
 
       path = "/api/v3/brokerage/accounts"
-      resp = authenticated_get(path)
-      JSON.parse(resp.body)
+      track_api_call(path, "get_accounts") do
+        resp = authenticated_get(path)
+        JSON.parse(resp.body)
+      end
     end
 
     # Get specific account details
@@ -61,8 +66,10 @@ module Coinbase
       raise "Authentication required" unless @authenticated
 
       path = "/api/v3/brokerage/accounts/#{account_id}"
-      resp = authenticated_get(path)
-      JSON.parse(resp.body)
+      track_api_call(path, "get_account") do
+        resp = authenticated_get(path)
+        JSON.parse(resp.body)
+      end
     end
 
     # List futures positions
@@ -73,7 +80,7 @@ module Coinbase
       params = {}
       params[:product_id] = product_id if product_id
 
-      begin
+      track_api_call(path, "list_futures_positions") do
         resp = authenticated_get(path, params)
         data = JSON.parse(resp.body)
 
@@ -86,16 +93,19 @@ module Coinbase
         end
 
         positions = [positions] unless positions.is_a?(Array)
+
+        # Add breadcrumb for successful position retrieval
+        SentryHelper.add_breadcrumb(
+          message: "Retrieved futures positions",
+          category: "trading",
+          level: "info",
+          data: {
+            product_id: product_id,
+            position_count: positions.size
+          }
+        )
+
         positions
-      rescue Faraday::ClientError => e
-        body = (e.response && e.response[:body]).to_s
-        message = begin
-          parsed = JSON.parse(body)
-          parsed["message"] || parsed["error"] || body
-        rescue
-          body.presence || e.message
-        end
-        raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
       end
     end
 
@@ -312,6 +322,83 @@ module Coinbase
       # Include kid header for clarity; some infrastructures rely on it
       # Use the full API key path like the Python implementation
       JWT.encode(payload, private_key, "ES256", {kid: @api_key})
+    end
+
+    # Helper method to track API calls and errors in Sentry
+    def track_api_call(endpoint, operation, &block)
+      SentryHelper.add_breadcrumb(
+        message: "Coinbase Advanced Trade API call",
+        category: "api",
+        level: "info",
+        data: {
+          service: "advanced_trade",
+          endpoint: endpoint,
+          operation: operation
+        }
+      )
+
+      start_time = Time.current
+      result = yield
+      duration = (Time.current - start_time) * 1000 # Convert to milliseconds
+
+      # Track successful API calls for performance monitoring
+      SentryHelper.add_breadcrumb(
+        message: "API call completed successfully",
+        category: "api",
+        level: "info",
+        data: {
+          service: "advanced_trade",
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2)
+        }
+      )
+
+      result
+    rescue Faraday::ClientError => e
+      duration = (Time.current - start_time) * 1000
+
+      # Enhanced error tracking for API failures
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "coinbase_advanced_trade")
+        scope.set_tag("endpoint", endpoint)
+        scope.set_tag("operation", operation)
+        scope.set_tag("error_type", "api_client_error")
+
+        scope.set_context("api_call", {
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2),
+          response_status: e.response&.dig(:status),
+          response_body: e.response&.dig(:body),
+          authenticated: @authenticated
+        })
+
+        Sentry.capture_exception(e)
+      end
+
+      raise
+    rescue => e
+      duration = (Time.current - start_time) * 1000
+
+      # Track unexpected errors
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "coinbase_advanced_trade")
+        scope.set_tag("endpoint", endpoint)
+        scope.set_tag("operation", operation)
+        scope.set_tag("error_type", "unexpected_error")
+
+        scope.set_context("api_call", {
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2),
+          authenticated: @authenticated
+        })
+
+        Sentry.capture_exception(e)
+      end
+
+      raise
     end
 
     # Format URI for JWT claim per Coinbase requirements

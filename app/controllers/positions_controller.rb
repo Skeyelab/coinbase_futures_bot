@@ -12,8 +12,29 @@ class PositionsController < ActionController::Base
 
     begin
       @positions = positions_service.list_open_positions
+
+      # Track successful position retrieval
+      SentryHelper.add_breadcrumb(
+        message: "Positions retrieved successfully",
+        category: "trading",
+        level: "info",
+        data: {
+          controller: "positions",
+          action: "index",
+          position_count: @positions.size
+        }
+      )
     rescue Faraday::ClientError => e
       @error_message = e.message
+
+      # Track API errors specifically
+      Sentry.with_scope do |scope|
+        scope.set_tag("controller", "positions")
+        scope.set_tag("error_type", "api_error")
+        scope.set_context("positions_request", {operation: "list_open_positions"})
+
+        Sentry.capture_exception(e)
+      end
     rescue => e
       @error_message = e.message
       # @positions is already set to [] above

@@ -117,9 +117,22 @@ CRYPTOPANIC_BASE_URL=https://cryptopanic.com/api/v1
 
 #### Sentry Error Tracking
 ```bash
-# Error monitoring (optional)
+# Error monitoring (required for production)
 SENTRY_DSN=your_sentry_dsn_url
 SENTRY_ENVIRONMENT=development|staging|production
+
+# Performance monitoring (optional)
+SENTRY_TRACES_SAMPLE_RATE=0.1         # 10% of transactions (production)
+SENTRY_PROFILES_SAMPLE_RATE=0.1       # 10% of transactions (production)
+
+# Performance thresholds (optional)
+SENTRY_SLOW_QUERY_THRESHOLD=1000      # Database queries >1000ms
+SENTRY_SLOW_API_THRESHOLD=5000        # API calls >5000ms
+SENTRY_SLOW_TRADING_THRESHOLD=10000   # Trading operations >10000ms
+SENTRY_HIGH_MEMORY_THRESHOLD=1000     # Memory usage >1000MB
+
+# Application versioning (optional)
+APP_VERSION=1.0.0                     # Release tracking
 ```
 
 ### 4. Feature Flags

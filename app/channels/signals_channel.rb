@@ -33,6 +33,16 @@ class SignalsChannel < ApplicationCable::Channel
 
   # Allow clients to request current active signals
   def get_active_signals(data)
+    SentryHelper.add_breadcrumb(
+      message: "Active signals requested via WebSocket",
+      category: "websocket",
+      level: "info",
+      data: {
+        channel: "signals",
+        limit: data["limit"] || 10
+      }
+    )
+
     signals = SignalAlert.active
       .order(confidence: :desc, alert_timestamp: :desc)
       .limit(data["limit"] || 10)
@@ -42,12 +52,43 @@ class SignalsChannel < ApplicationCable::Channel
       timestamp: Time.current.utc.iso8601,
       signals: signals.map(&:to_api_response)
     })
+  rescue => e
+    # Track signal retrieval errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("channel", "signals")
+      scope.set_tag("operation", "get_active_signals")
+      scope.set_tag("error_type", "signal_retrieval_error")
+
+      scope.set_context("websocket_request", {
+        data: data,
+        connection_id: connection.connection_identifier
+      })
+
+      Sentry.capture_exception(e)
+    end
+
+    # Send error response to client
+    transmit({
+      type: "error",
+      message: "Failed to retrieve active signals",
+      timestamp: Time.current.utc.iso8601
+    })
   end
 
   # Allow clients to request signal statistics
   def get_stats(data)
     hours = data["hours"] || 24
     start_time = hours.to_i.hours.ago
+
+    SentryHelper.add_breadcrumb(
+      message: "Signal statistics requested via WebSocket",
+      category: "websocket",
+      level: "info",
+      data: {
+        channel: "signals",
+        time_range_hours: hours
+      }
+    )
 
     stats = {
       active_signals: SignalAlert.active.count,
@@ -66,6 +107,28 @@ class SignalsChannel < ApplicationCable::Channel
       timestamp: Time.current.utc.iso8601,
       stats: stats,
       time_range_hours: hours
+    })
+  rescue => e
+    # Track stats retrieval errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("channel", "signals")
+      scope.set_tag("operation", "get_stats")
+      scope.set_tag("error_type", "stats_retrieval_error")
+
+      scope.set_context("websocket_request", {
+        data: data,
+        connection_id: connection.connection_identifier,
+        time_range_hours: hours
+      })
+
+      Sentry.capture_exception(e)
+    end
+
+    # Send error response to client
+    transmit({
+      type: "error",
+      message: "Failed to retrieve signal statistics",
+      timestamp: Time.current.utc.iso8601
     })
   end
 
