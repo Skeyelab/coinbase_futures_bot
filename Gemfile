@@ -76,3 +76,6 @@ gem "jwt", "~> 3.1"
 
 # Slack integration for notifications and bot control
 gem "slack-ruby-client", "~> 2.4"
+
+# Pagination for API endpoints
+gem "kaminari", "~> 1.2"
