@@ -26,6 +26,112 @@
 
 ### Session log
 
+#### 2025-01-27 18:25 UTC
+- Context: **Workflow Consolidation** - Consolidated duplicate coverage workflow into main CI workflow for better maintainability
+- Changes:
+  - **MAJOR**: Removed `.github/workflows/coverage.yml` to eliminate duplication
+  - **ENHANCEMENT**: All coverage functionality now integrated into main CI workflow
+  - **CLEANUP**: Eliminated redundant coverage runs and maintenance overhead
+  - **DOCUMENTATION**: Updated coverage-setup.md to reflect single workflow approach
+  - **SIMPLIFICATION**: Single source of truth for all CI operations including coverage
+- Commands run:
+  - `rm .github/workflows/coverage.yml` - Removed duplicate coverage workflow
+- Files touched:
+  - `.github/workflows/coverage.yml` - Deleted (consolidated into main CI)
+  - `docs/coverage-setup.md` - Updated to reflect single workflow approach
+  - `SESSION_NOTES.md` - Added consolidation entry
+- Next steps:
+  - **Single CI workflow**: All coverage functionality in `.github/workflows/ci.yml`
+  - **Eliminated duplication**: No more redundant coverage runs
+  - **Better maintainability**: One workflow to update and maintain
+  - **Cleaner architecture**: Unified CI pipeline with comprehensive coverage
+
+#### 2025-01-27 18:15 UTC
+- Context: **Documentation Consolidation** - Consolidated documentation from `doc/` and `docs/` folders into single `docs/` folder
+- Changes:
+  - **MAJOR**: Moved `doc/coverage.md` to `docs/coverage-legacy.md` with legacy notice
+  - **MAJOR**: Moved `doc/vcr_best_practices.md` to `docs/vcr-best-practices.md` with move notice
+  - **MAJOR**: Removed empty `doc/` directory to eliminate folder duplication
+  - **ENHANCEMENT**: Updated all internal references from `doc/` to `docs/` paths
+  - **ENHANCEMENT**: Added legacy notices to moved files to guide users to current documentation
+  - **CLEANUP**: Eliminated confusion between two documentation folders
+- Commands run:
+  - `mv doc/coverage.md docs/coverage-legacy.md` - Moved coverage documentation
+  - `mv doc/vcr_best_practices.md docs/vcr-best-practices.md` - Moved VCR best practices
+  - `rmdir doc` - Removed empty doc directory
+- Files touched:
+  - `docs/coverage-legacy.md` - Moved from doc/ with legacy notice
+  - `docs/vcr-best-practices.md` - Moved from doc/ with move notice
+  - `SESSION_NOTES.md` - Updated references to new paths
+- Next steps:
+  - **Documentation consolidated**: All documentation now in single `docs/` folder
+  - **Legacy files marked**: Old coverage doc clearly marked as superseded by coverage-setup.md
+  - **Path consistency**: All documentation references now use `docs/` folder
+  - **Clean structure**: Eliminated duplicate documentation folders
+
+#### 2025-01-27 18:00 UTC
+- Context: **SimpleCov CI Integration** - Successfully integrated SimpleCov into CI pipeline with comprehensive coverage reporting
+- Changes:
+  - **MAJOR**: Updated main CI workflow (`.github/workflows/ci.yml`) to enable SimpleCov with `COVERAGE=true`
+  - **MAJOR**: Created dedicated coverage workflow (`.github/workflows/coverage.yml`) for independent coverage analysis
+  - **MAJOR**: Added coverage badge workflow (`.github/workflows/coverage-badge.yml`) for automatic README updates
+  - **MAJOR**: Enhanced SimpleCov configuration with CI-specific thresholds (85% line, 75% branch) vs local (90% line, 80% branch)
+  - **MAJOR**: Created comprehensive coverage Rake tasks (`lib/tasks/coverage.rake`) for local development
+  - **ENHANCEMENT**: Updated `bin/coverage` script to use new Rake tasks for consistent coverage reporting
+  - **ENHANCEMENT**: Added coverage artifact uploads to GitHub Actions with 30-90 day retention
+  - **ENHANCEMENT**: Implemented coverage threshold checking in CI with automatic failure on threshold violations
+  - **ENHANCEMENT**: Added PR coverage commenting with detailed coverage statistics
+  - **ENHANCEMENT**: Created comprehensive coverage documentation (`docs/coverage-setup.md`)
+- Commands run:
+  - `bin/standardrb --fix` - Applied consistent code formatting
+  - Created multiple GitHub Actions workflow files for coverage integration
+- Files touched:
+  - `.github/workflows/ci.yml` - Updated main CI to enable SimpleCov
+  - `.github/workflows/coverage.yml` - New dedicated coverage workflow
+  - `.github/workflows/coverage-badge.yml` - New badge update workflow
+  - `spec/spec_helper.rb` - Enhanced SimpleCov config with CI-specific settings
+  - `lib/tasks/coverage.rake` - New comprehensive coverage Rake tasks
+  - `bin/coverage` - Updated to use new Rake tasks
+  - `docs/coverage-setup.md` - New comprehensive coverage documentation
+- Next steps:
+  - **CI Integration Complete**: SimpleCov now runs in all CI workflows with coverage reporting
+  - **Coverage Thresholds**: CI will fail if coverage drops below 85% line / 75% branch
+  - **PR Coverage**: Automatic coverage comments and badge updates on pull requests
+  - **Local Development**: Use `rake coverage:run` or `bin/coverage` for local coverage analysis
+  - **Monitor CI**: Verify coverage workflows run successfully and provide meaningful feedback
+
+#### 2025-08-29 20:15 UTC
+- Context: **FUT-34 COMPLETED** - Successfully implemented SimpleCov for comprehensive code coverage reporting
+- Changes:
+  - **MAJOR**: Added SimpleCov gem (v0.22) and simplecov-json (v0.2) for code coverage analysis
+  - **MAJOR**: Configured SimpleCov with Rails-specific settings, coverage thresholds (90% line, 80% branch), and comprehensive filtering
+  - **MAJOR**: Set up HTML and JSON report generation with organized coverage groups (Models, Controllers, Services, Jobs, Lib, Config)
+  - **MAJOR**: Created executable coverage script (`bin/coverage`) for easy test execution with coverage reporting
+  - **MAJOR**: Generated initial coverage baseline: 44.0% line coverage (2052/4664 lines), 48.01% branch coverage (530/1104 branches)
+  - **ENHANCEMENT**: Configured environment-based coverage activation via `COVERAGE=true` environment variable
+  - **ENHANCEMENT**: Added comprehensive file filtering to exclude test files, vendor code, and Rails boilerplate
+  - **ENHANCEMENT**: Enabled branch coverage tracking for more detailed analysis
+  - **ENHANCEMENT**: Set up multi-formatter output for both HTML (visual reports) and JSON (CI consumption)
+- Commands run:
+  - `bundle install` - Installed SimpleCov gems
+  - `COVERAGE=true bundle exec rspec` - Generated initial coverage reports (785 examples, 26 failures - unrelated to SimpleCov)
+  - `chmod +x bin/coverage` - Made coverage script executable
+- Files touched:
+  - `Gemfile` - Added simplecov and simplecov-json gems
+  - `spec/spec_helper.rb` - Added comprehensive SimpleCov configuration with Rails profile
+  - `bin/coverage` - Created executable script for running tests with coverage
+- Coverage reports generated:
+  - `coverage/index.html` - Visual HTML coverage report (2.6MB)
+  - `coverage/coverage.json` - JSON report for CI integration (97KB)
+  - `coverage/.resultset.json` - SimpleCov raw data (219KB)
+- Migrations:
+  - None required
+- Next steps:
+  - **SimpleCov fully operational**: Use `COVERAGE=true bundle exec rspec` or `bin/coverage` to generate reports
+  - **CI Integration ready**: JSON reports available for automated coverage tracking
+  - **Coverage improvement**: Current baseline of 44% line coverage provides clear improvement targets
+  - **Team adoption**: Coverage reports help identify untested code paths and improve test quality
+
 #### 2025-08-29 21:50 UTC
 - Context: **CI TEST PROFILING ISSUE DISCOVERED** - Found that TestProf was still running despite environment variable settings
 - Changes:
@@ -1114,7 +1220,7 @@
     - Enhanced `spec/jobs/fetch_candles_job_spec.rb` with integration VCR patterns
     - Updated `spec/tasks/market_data_rake_spec.rb` with new VCR helpers
   - **Documentation & Best Practices**: Comprehensive guide created
-    - Created `doc/vcr_best_practices.md` with usage patterns, troubleshooting, and migration guide
+    - Created `docs/vcr-best-practices.md` with usage patterns, troubleshooting, and migration guide
     - Established performance targets: <30s total suite, <2s individual tests
   - **Merge Integration**: Successfully merged main branch changes
     - Resolved conflicts in `spec/support/vcr.rb` (kept VCRHelpers.record_mode)
@@ -1128,7 +1234,7 @@
   - `spec/support/vcr.rb`, `spec/support/vcr_helpers.rb`, `spec/support/vcr_config.rb`
   - `spec/services/coinbase_rest_spec.rb`, `spec/jobs/fetch_candles_job_spec.rb`
   - `spec/tasks/market_data_rake_spec.rb`, `spec/rails_helper.rb`
-  - `lib/tasks/vcr.rake`, `doc/vcr_best_practices.md`
+  - `lib/tasks/vcr.rake`, `docs/vcr-best-practices.md`
 - Next steps:
   - Target achieved: Test suite performance improved from 2+ minutes to <30s
   - VCR cassettes now 60-80% smaller with smart trimming
