@@ -6,6 +6,8 @@ require "openssl"
 
 module Coinbase
   class ExchangeClient
+    include SentryServiceTracking
+
     DEFAULT_BASE = "https://api.exchange.coinbase.com"
 
     def initialize(base_url: ENV.fetch("COINBASE_REST_URL", DEFAULT_BASE), logger: Rails.logger)
@@ -35,14 +37,14 @@ module Coinbase
       raise "Authentication required" unless @authenticated
 
       path = "/accounts"
-      begin
+      track_api_call(path, "test_auth") do
         resp = authenticated_get(path)
         data = JSON.parse(resp.body)
         {ok: true, count: data.is_a?(Array) ? data.size : 1, data: data}
-      rescue Faraday::ClientError => e
-        body = (e.response && e.response[:body]).to_s
-        {ok: false, error: e.class.to_s, message: e.message, body: body}
       end
+    rescue Faraday::ClientError => e
+      body = (e.response && e.response[:body]).to_s
+      {ok: false, error: e.class.to_s, message: e.message, body: body}
     end
 
     # Get account balances
@@ -175,6 +177,83 @@ module Coinbase
 
       # Make the request
       @conn.get(path, params)
+    end
+
+    # Helper method to track API calls and errors in Sentry
+    def track_api_call(endpoint, operation, &block)
+      SentryHelper.add_breadcrumb(
+        message: "Coinbase Exchange API call",
+        category: "api",
+        level: "info",
+        data: {
+          service: "exchange",
+          endpoint: endpoint,
+          operation: operation
+        }
+      )
+
+      start_time = Time.current
+      result = yield
+      duration = (Time.current - start_time) * 1000 # Convert to milliseconds
+
+      # Track successful API calls for performance monitoring
+      SentryHelper.add_breadcrumb(
+        message: "API call completed successfully",
+        category: "api",
+        level: "info",
+        data: {
+          service: "exchange",
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2)
+        }
+      )
+
+      result
+    rescue Faraday::ClientError => e
+      duration = (Time.current - start_time) * 1000
+
+      # Enhanced error tracking for API failures
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "coinbase_exchange")
+        scope.set_tag("endpoint", endpoint)
+        scope.set_tag("operation", operation)
+        scope.set_tag("error_type", "api_client_error")
+
+        scope.set_context("api_call", {
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2),
+          response_status: e.response&.dig(:status),
+          response_body: e.response&.dig(:body),
+          authenticated: @authenticated
+        })
+
+        Sentry.capture_exception(e)
+      end
+
+      raise
+    rescue => e
+      duration = (Time.current - start_time) * 1000
+
+      # Track unexpected errors
+      Sentry.with_scope do |scope|
+        scope.set_tag("service", "coinbase_exchange")
+        scope.set_tag("endpoint", endpoint)
+        scope.set_tag("operation", operation)
+        scope.set_tag("error_type", "unexpected_error")
+
+        scope.set_context("api_call", {
+          endpoint: endpoint,
+          operation: operation,
+          duration_ms: duration.round(2),
+          authenticated: @authenticated
+        })
+
+        Sentry.capture_exception(e)
+      end
+
+      raise
     end
   end
 end

@@ -9,13 +9,44 @@ class DayTradingPositionManagementJob < ApplicationJob
 
     @logger.info("Starting day trading position management job")
 
+    # Add Sentry breadcrumb for critical trading job
+    SentryHelper.add_breadcrumb(
+      message: "Day trading position management started",
+      category: "trading",
+      level: "info",
+      data: {
+        job_type: "position_management",
+        critical: true
+      }
+    )
+
     # Check for positions that need immediate closure (opened yesterday)
     if @manager.positions_need_closure?
       @logger.info("Found positions needing immediate closure")
+
+      SentryHelper.add_breadcrumb(
+        message: "Closing expired day trading positions",
+        category: "trading",
+        level: "warning",
+        data: {operation: "close_expired_positions"}
+      )
+
       closed_count = @manager.close_expired_positions
       @logger.info("Closed #{closed_count} expired positions")
 
       if closed_count > 0
+        # Track position closures in Sentry
+        Sentry.with_scope do |scope|
+          scope.set_tag("trading_operation", "expired_position_closure")
+          scope.set_tag("position_count", closed_count)
+          scope.set_context("position_closure", {
+            closed_count: closed_count,
+            reason: "24_hour_limit_exceeded"
+          })
+
+          Sentry.capture_message("Expired day trading positions closed", level: "warning")
+        end
+
         SlackNotificationService.alert(
           "warning",
           "Expired Positions Closed",

@@ -1,5 +1,13 @@
 class HealthController < ApplicationController
   def show
+    # Add Sentry breadcrumb for health check
+    SentryHelper.add_breadcrumb(
+      message: "Health check requested",
+      category: "health_check",
+      level: "info",
+      data: {controller: "health", action: "show"}
+    )
+
     # Get database connection pool information
     pool = ActiveRecord::Base.connection_pool
     pool_stats = {
@@ -16,18 +24,50 @@ class HealthController < ApplicationController
       true
     rescue => e
       Rails.logger.error("Database health check failed: #{e.message}")
+
+      # Track database connectivity issues
+      Sentry.with_scope do |scope|
+        scope.set_tag("health_check_type", "database")
+        scope.set_tag("error_type", "database_connectivity_error")
+        scope.set_context("database_health", pool_stats)
+
+        Sentry.capture_exception(e)
+      end
+
       false
     end
 
     # Get GoodJob stats if available
     good_job_stats = begin
-      {
+      stats = {
         queued: GoodJob::Job.where(finished_at: nil).count,
         running: GoodJob::Job.where.not(performed_at: nil).where(finished_at: nil).count,
         failed: GoodJob::Job.where.not(error: nil).count
       }
+
+      # Track job queue health
+      if stats[:failed] > 10
+        Sentry.with_scope do |scope|
+          scope.set_tag("health_check_type", "job_queue")
+          scope.set_tag("error_type", "high_failed_job_count")
+          scope.set_context("job_stats", stats)
+
+          Sentry.capture_message("High number of failed jobs detected", level: "warning")
+        end
+      end
+
+      stats
     rescue => e
       Rails.logger.warn("GoodJob stats unavailable: #{e.message}")
+
+      # Track GoodJob stats failures
+      Sentry.with_scope do |scope|
+        scope.set_tag("health_check_type", "job_queue")
+        scope.set_tag("error_type", "job_stats_error")
+
+        Sentry.capture_exception(e)
+      end
+
       nil
     end
 

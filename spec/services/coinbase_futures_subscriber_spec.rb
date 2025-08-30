@@ -56,6 +56,6 @@ RSpec.describe MarketData::CoinbaseFuturesSubscriber, type: :service do
     service.send(:handle_message, message)
 
     io.rewind
-    expect(io.read).to eq("")
+    expect(io.read).to include("[MD] JSON parse error: unexpected token 'not' at line 1 column 1")
   end
 end

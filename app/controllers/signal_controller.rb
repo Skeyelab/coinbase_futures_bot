@@ -39,6 +39,18 @@ class SignalController < ApplicationController
 
   # POST /signals/evaluate - Trigger real-time signal evaluation
   def evaluate
+    # Add Sentry breadcrumb for signal evaluation
+    SentryHelper.add_breadcrumb(
+      message: "Signal evaluation requested",
+      category: "trading",
+      level: "info",
+      data: {
+        controller: "signal",
+        action: "evaluate",
+        symbol: params[:symbol]
+      }
+    )
+
     evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
 
     if params[:symbol]
@@ -46,15 +58,64 @@ class SignalController < ApplicationController
       trading_pair = TradingPair.find_by(product_id: params[:symbol])
       if trading_pair
         evaluator.evaluate_pair(trading_pair)
+
+        # Track successful signal evaluation
+        SentryHelper.add_breadcrumb(
+          message: "Signal evaluation completed",
+          category: "trading",
+          level: "info",
+          data: {
+            symbol: params[:symbol],
+            evaluation_type: "single_pair"
+          }
+        )
+
         render json: {message: "Evaluated signals for #{params[:symbol]}"}
       else
+        # Track trading pair not found errors
+        Sentry.with_scope do |scope|
+          scope.set_tag("controller", "signal")
+          scope.set_tag("error_type", "trading_pair_not_found")
+          scope.set_context("request", {symbol: params[:symbol]})
+
+          Sentry.capture_message("Trading pair not found for signal evaluation", level: "warning")
+        end
+
         render json: {error: "Trading pair not found: #{params[:symbol]}"}, status: :not_found
       end
     else
       # Evaluate all pairs
       evaluator.evaluate_all_pairs
+
+      # Track successful bulk evaluation
+      SentryHelper.add_breadcrumb(
+        message: "Bulk signal evaluation completed",
+        category: "trading",
+        level: "info",
+        data: {
+          evaluation_type: "all_pairs"
+        }
+      )
+
       render json: {message: "Evaluated signals for all enabled trading pairs"}
     end
+  rescue => e
+    # Enhanced error tracking for signal evaluation failures
+    Sentry.with_scope do |scope|
+      scope.set_tag("controller", "signal")
+      scope.set_tag("action", "evaluate")
+      scope.set_tag("error_type", "signal_evaluation_error")
+      scope.set_tag("critical", "true")
+
+      scope.set_context("signal_evaluation", {
+        symbol: params[:symbol],
+        evaluation_type: params[:symbol] ? "single_pair" : "all_pairs"
+      })
+
+      Sentry.capture_exception(e)
+    end
+
+    raise # Let ApplicationController handle the response
   end
 
   # GET /signals/active - Get active signals only

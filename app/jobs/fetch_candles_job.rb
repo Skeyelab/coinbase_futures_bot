@@ -48,6 +48,23 @@ class FetchCandlesJob < ApplicationJob
     end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 1m candles for #{pair.product_id}: #{e.message}")
+
+    # Track candle fetching errors with specific context
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "1m")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_tag("error_type", "candle_fetch_error")
+
+      scope.set_context("candle_fetch", {
+        product_id: pair.product_id,
+        timeframe: "1m",
+        backfill_days: backfill_days,
+        start_time: start_time&.iso8601
+      })
+
+      Sentry.capture_exception(e)
+    end
   end
 
   def fetch_5m_candles(rest, pair, backfill_days)
@@ -73,6 +90,23 @@ class FetchCandlesJob < ApplicationJob
     end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 5m candles for #{pair.product_id}: #{e.message}")
+
+    # Track candle fetching errors with specific context
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "5m")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_tag("error_type", "candle_fetch_error")
+
+      scope.set_context("candle_fetch", {
+        product_id: pair.product_id,
+        timeframe: "5m",
+        backfill_days: backfill_days_5m,
+        start_time: start_time&.iso8601
+      })
+
+      Sentry.capture_exception(e)
+    end
   end
 
   def fetch_15m_candles(rest, pair, backfill_days)
@@ -98,6 +132,23 @@ class FetchCandlesJob < ApplicationJob
     end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 15m candles for #{pair.product_id}: #{e.message}")
+
+    # Track candle fetching errors with specific context
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "15m")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_tag("error_type", "candle_fetch_error")
+
+      scope.set_context("candle_fetch", {
+        product_id: pair.product_id,
+        timeframe: "15m",
+        backfill_days: backfill_days,
+        start_time: start_time&.iso8601
+      })
+
+      Sentry.capture_exception(e)
+    end
   end
 
   def fetch_1h_candles(rest, pair, backfill_days)
@@ -121,6 +172,23 @@ class FetchCandlesJob < ApplicationJob
     end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 1h candles for #{pair.product_id}: #{e.message}")
+
+    # Track candle fetching errors with specific context
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "1h")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_tag("error_type", "candle_fetch_error")
+
+      scope.set_context("candle_fetch", {
+        product_id: pair.product_id,
+        timeframe: "1h",
+        backfill_days: backfill_days,
+        start_time: start_time&.iso8601
+      })
+
+      Sentry.capture_exception(e)
+    end
   end
 
   def last_candle_time(product_id, timeframe)

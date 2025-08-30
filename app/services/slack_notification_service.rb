@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class SlackNotificationService
+  include SentryServiceTracking
   class << self
     # Send a trading signal notification
     def signal_generated(signal_data)
@@ -125,12 +126,45 @@ class SlackNotificationService
       rescue Slack::Web::Api::Errors::SlackError => e
         Rails.logger.error("[Slack] API Error: #{e.message}")
 
+        # Track Slack API errors in Sentry
+        Sentry.with_scope do |scope|
+          scope.set_tag("service", "slack")
+          scope.set_tag("operation", "send_message")
+          scope.set_tag("channel", channel)
+          scope.set_tag("retry_attempt", retries)
+          scope.set_tag("error_type", "slack_api_error")
+
+          scope.set_context("slack_call", {
+            channel: channel,
+            retries: retries,
+            max_retries: max_retries,
+            message_type: message.keys.join(",")
+          })
+
+          Sentry.capture_exception(e)
+        end
+
         if retries < max_retries
           Rails.logger.debug("[Slack] Retrying in #{2**(retries + 1)} seconds (attempt #{retries + 1}/#{max_retries})")
           sleep(2**(retries + 1)) # Exponential backoff
           send_message(message, channel: channel, retries: retries + 1)
         else
           Rails.logger.error("[Slack] Failed to send message after #{max_retries} retries")
+
+          # Track final failure in Sentry
+          Sentry.with_scope do |scope|
+            scope.set_tag("service", "slack")
+            scope.set_tag("operation", "send_message")
+            scope.set_tag("error_type", "slack_max_retries_exceeded")
+            scope.set_context("slack_failure", {
+              channel: channel,
+              max_retries: max_retries,
+              final_error: e.message
+            })
+
+            Sentry.capture_message("Slack message failed after max retries", level: "error")
+          end
+
           false
         end
       end

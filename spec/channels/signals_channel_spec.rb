@@ -318,7 +318,11 @@ RSpec.describe SignalsChannel, type: :channel do
       end
 
       it "raises the error" do
-        expect { perform :get_active_signals, {} }.to raise_error(StandardError, "Database error")
+        expect { perform :get_active_signals, {} }.to_not raise_error
+
+        # The service now catches errors and sends error responses instead of raising
+        expect(transmissions.last["type"]).to eq("error")
+        expect(transmissions.last["message"]).to eq("Failed to retrieve active signals")
       end
     end
   end

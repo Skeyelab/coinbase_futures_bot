@@ -26,6 +26,74 @@
 
 ### Session log
 
+#### 2025-08-30 00:45 UTC
+- Context: **FUT-31 COMPLETED** - Implemented comprehensive Sentry error tracking and monitoring across all application components
+- Changes:
+  - **MAJOR**: Enhanced `ApplicationJob` with comprehensive Sentry error tracking including job context, arguments, and execution metadata
+  - **MAJOR**: Updated `ApplicationController` with global error handling and sanitized request context for Sentry
+  - **MAJOR**: Enhanced Sentry configuration with performance monitoring, custom tags, and environment-specific sample rates
+  - **MAJOR**: Created `SentryTrackable` concern for ActiveRecord models with validation and operation error tracking
+  - **MAJOR**: Created `SentryServiceTracking` concern for service classes with API call and operation tracking
+  - **MAJOR**: Added comprehensive error tracking to all Coinbase API clients (`AdvancedTradeClient`, `ExchangeClient`, `CoinbasePositions`)
+  - **MAJOR**: Enhanced market data subscribers with WebSocket error tracking and message processing error handling
+  - **MAJOR**: Added ActionCable channel error tracking with connection and subscription monitoring
+  - **MAJOR**: Created `SentryDatabaseMonitoring` middleware for slow query detection and database performance monitoring
+  - **MAJOR**: Implemented `SentryMonitoringService` for business metrics and custom trading event tracking
+  - **MAJOR**: Created `SentryPerformanceService` for comprehensive performance monitoring across all components
+  - **CRITICAL**: Added Sentry tracking to critical trading jobs (`DayTradingPositionManagementJob`, `HealthCheckJob`, `FetchCandlesJob`)
+  - **CRITICAL**: Enhanced error handling in `SlackNotificationService` with retry tracking and failure monitoring
+  - **CRITICAL**: Added specific error context to `SignalController` for trading signal evaluation failures
+  - Added comprehensive Sentry testing utilities via `lib/tasks/sentry.rake`
+  - Created detailed documentation in `docs/sentry-monitoring.md`
+  - Updated existing documentation (`docs/jobs.md`, `docs/configuration.md`) with Sentry integration details
+- Commands run:
+  - `bundle install` - Installed dependencies
+  - `bin/standardrb --fix` - Applied code formatting standards
+  - `bin/rails runner "puts 'Rails loaded successfully with Sentry integration'"` - Verified Rails loads with Sentry
+  - `bin/rake sentry:config` - Verified Sentry configuration
+- Files touched:
+  - `config/initializers/sentry.rb` - Enhanced with performance monitoring and custom context
+  - `config/initializers/sentry_trading_monitoring.rb` (NEW) - Trading-specific event monitoring
+  - `config/application.rb` - Added database monitoring middleware subscription
+  - `app/jobs/application_job.rb` - Comprehensive error tracking with job context
+  - `app/controllers/application_controller.rb` - Global error handling with sanitized context
+  - `app/models/concerns/sentry_trackable.rb` (NEW) - Model validation and operation tracking
+  - `app/services/concerns/sentry_service_tracking.rb` (NEW) - Service layer error tracking
+  - `app/services/sentry_monitoring_service.rb` (NEW) - Business metrics and custom events
+  - `app/services/sentry_performance_service.rb` (NEW) - Performance monitoring utilities
+  - `app/middleware/sentry_database_monitoring.rb` (NEW) - Database query performance monitoring
+  - `app/services/coinbase/advanced_trade_client.rb` - Enhanced API error tracking
+  - `app/services/coinbase/exchange_client.rb` - Enhanced API error tracking
+  - `app/services/trading/coinbase_positions.rb` - Added SentryServiceTracking concern
+  - `app/services/trading/day_trading_position_manager.rb` - Added SentryServiceTracking concern
+  - `app/services/market_data/coinbase_futures_subscriber.rb` - WebSocket error tracking
+  - `app/services/market_data/coinbase_spot_subscriber.rb` - Added SentryServiceTracking concern
+  - `app/services/sentiment/crypto_panic_client.rb` - Enhanced API error tracking
+  - `app/services/slack_notification_service.rb` - Enhanced error tracking with retry context
+  - `app/controllers/slack_controller.rb` - Enhanced Slack webhook error tracking
+  - `app/controllers/signal_controller.rb` - Trading signal evaluation error tracking
+  - `app/controllers/health_controller.rb` - Health check error tracking
+  - `app/controllers/positions_controller.rb` - Position API error tracking
+  - `app/channels/application_cable/channel.rb` - ActionCable channel error tracking
+  - `app/channels/application_cable/connection.rb` - ActionCable connection error tracking
+  - `app/channels/signals_channel.rb` - Signal channel error tracking
+  - `app/models/position.rb` - Added SentryTrackable concern
+  - `app/models/signal_alert.rb` - Added SentryTrackable concern
+  - `app/models/trading_pair.rb` - Added SentryTrackable concern
+  - `app/jobs/health_check_job.rb` - Enhanced health check error tracking
+  - `app/jobs/day_trading_position_management_job.rb` - Critical position management error tracking
+  - `app/jobs/fetch_candles_job.rb` - Market data collection error tracking
+  - `app/jobs/real_time_signal_job.rb` - Signal management error tracking
+  - `lib/tasks/sentry.rake` (NEW) - Comprehensive Sentry testing utilities
+  - `docs/sentry-monitoring.md` (NEW) - Complete Sentry implementation documentation
+  - `docs/jobs.md` - Updated with Sentry integration details
+  - `docs/configuration.md` - Updated with Sentry environment variables
+- Next steps:
+  - Set `SENTRY_DSN` environment variable for error tracking
+  - Configure Sentry alerts for critical trading operations
+  - Test comprehensive error tracking in staging environment
+  - Monitor error patterns and adjust grouping rules as needed
+
 #### 2025-08-28 18:45 UTC
 - Context: **FUT-32 COMPLETED** - Comprehensively improved test coverage for contract ID generation logic to eliminate false positives
 - Changes:

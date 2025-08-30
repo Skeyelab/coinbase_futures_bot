@@ -19,6 +19,23 @@ class SlackController < ApplicationController
     Rails.logger.error("[SlackController] Error handling command: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
 
+    # Enhanced Sentry tracking for Slack command errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("controller", "slack")
+      scope.set_tag("operation", "handle_command")
+      scope.set_tag("error_type", "slack_command_error")
+
+      scope.set_context("slack_command", {
+        command: slack_command_params[:command],
+        text: slack_command_params[:text],
+        user_id: slack_command_params[:user_id],
+        team_id: slack_command_params[:team_id],
+        channel_id: slack_command_params[:channel_id]
+      })
+
+      Sentry.capture_exception(e)
+    end
+
     render json: {
       text: "❌ Error processing command. Please try again.",
       response_type: "ephemeral"
@@ -45,6 +62,23 @@ class SlackController < ApplicationController
   rescue => e
     Rails.logger.error("[SlackController] Error handling event: #{e.message}")
     Rails.logger.error(e.backtrace.join("\n"))
+
+    # Enhanced Sentry tracking for Slack event errors
+    Sentry.with_scope do |scope|
+      scope.set_tag("controller", "slack")
+      scope.set_tag("operation", "handle_event")
+      scope.set_tag("error_type", "slack_event_error")
+      scope.set_tag("event_type", params[:type])
+
+      scope.set_context("slack_event", {
+        event_type: params[:type],
+        team_id: params[:team_id],
+        api_app_id: params[:api_app_id],
+        event: params[:event]
+      })
+
+      Sentry.capture_exception(e)
+    end
 
     render json: {ok: false}
   end

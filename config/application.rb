@@ -58,6 +58,13 @@ module CoinbaseFuturesBot
     config.middleware.use ActionDispatch::Cookies
     config.middleware.use ActionDispatch::Session::CookieStore
     config.middleware.use ActionDispatch::Flash
+
+    # Subscribe to database query events for Sentry monitoring
+    config.after_initialize do
+      if defined?(Sentry) && ENV["SENTRY_DSN"].present?
+        ActiveSupport::Notifications.subscribe("sql.active_record", SentryDatabaseMonitoring.new)
+      end
+    end
   end
 
   # Sentry is initialized via config/initializers/sentry.rb

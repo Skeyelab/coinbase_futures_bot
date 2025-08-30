@@ -9,6 +9,8 @@ require "securerandom"
 
 module Trading
   class CoinbasePositions
+    include SentryServiceTracking
+
     DEFAULT_BASE = "https://api.coinbase.com"
 
     def initialize(base_url: ENV.fetch("COINBASE_AT_REST_URL", DEFAULT_BASE), logger: Rails.logger)
