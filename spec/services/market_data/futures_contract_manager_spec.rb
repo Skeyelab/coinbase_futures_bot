@@ -6,6 +6,11 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   let(:manager) { described_class.new }
   let(:current_date) { Date.new(2025, 8, 15) } # Mid-August 2025
 
+  # Mock Date.current to return a fixed date for all tests
+  before do
+    allow(Date).to receive(:current).and_return(current_date)
+  end
+
   # Helper method to dynamically generate expected contract IDs
   def expected_contract_id_for_month(asset, month_date)
     prefix = MarketData::FuturesContractManager::ASSET_MAPPING[asset.upcase]
@@ -24,11 +29,6 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   end
 
   context "Tests with mocked dates (existing behavior)" do
-    before do
-      # Mock Date.current to return a fixed date for testing
-      allow(Date).to receive(:current).and_return(current_date)
-    end
-
     describe "#generate_current_month_contract_id" do
       it "generates BTC contract ID for current month" do
         contract_id = manager.generate_current_month_contract_id("BTC")
@@ -197,11 +197,6 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   end
 
   context "Tests with mocked dates (existing behavior)" do
-    before do
-      # Mock Date.current to return a fixed date for testing
-      allow(Date).to receive(:current).and_return(current_date)
-    end
-
     describe "#generate_upcoming_month_contract_id" do
       it "generates BTC contract ID for upcoming month" do
         contract_id = manager.generate_upcoming_month_contract_id("BTC")
