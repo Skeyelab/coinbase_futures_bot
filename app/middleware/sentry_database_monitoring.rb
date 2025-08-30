@@ -29,14 +29,12 @@ class SentryDatabaseMonitoring
     )
 
     # Track slow queries as separate events
-    if duration > @slow_query_threshold
-      track_slow_query(sql, duration, payload)
-    end
+    track_slow_query(sql, duration, payload) if duration > @slow_query_threshold
 
     # Track queries with errors
-    if payload[:exception]
-      track_query_error(sql, duration, payload)
-    end
+    return unless payload[:exception]
+
+    track_query_error(sql, duration, payload)
   end
 
   private

@@ -4,12 +4,17 @@ require "rails_helper"
 
 RSpec.describe SlackNotificationService, type: :service do
   let(:service) { described_class.new }
-  let(:mock_client) { instance_double(Slack::Web::Client) }
 
   # Mock Slack client to prevent real API calls during tests
-  before do
+  def mock_slack_client
+    mock_client = instance_double(Slack::Web::Client)
     allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
     allow(mock_client).to receive(:chat_postMessage).and_return(true)
+
+    # Reset the cached client instance in the service
+    described_class.instance_variable_set(:@client, nil)
+
+    mock_client
   end
 
   # Test data setup without heavy mocking - avoid nil values for ClimateControl
@@ -88,26 +93,31 @@ RSpec.describe SlackNotificationService, type: :service do
 
   describe ".signal_generated" do
     it "handles valid signal data gracefully" do
-      # Test the core method logic without external dependencies
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.signal_generated(signal_data)
-      end.not_to raise_error
+      end
     end
 
     it "handles different signal types" do
       short_signal = signal_data.merge(side: "short", symbol: "ETH-USD")
 
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.signal_generated(short_signal)
-      end.not_to raise_error
+      end
     end
   end
 
   describe ".position_update" do
     it "handles position opened events" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.position_update(position, "opened")
-      end.not_to raise_error
+      end
     end
 
     it "handles position closed events with profit" do
@@ -118,9 +128,11 @@ RSpec.describe SlackNotificationService, type: :service do
         entry_price: 50_000.0,
         pnl: 1000.0)
 
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.position_update(profitable_position, "closed")
-      end.not_to raise_error
+      end
     end
 
     it "handles position closed events with loss" do
@@ -131,9 +143,11 @@ RSpec.describe SlackNotificationService, type: :service do
         entry_price: 1.0,
         pnl: -50.0)
 
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.position_update(loss_position, "closed")
-      end.not_to raise_error
+      end
     end
 
     it "handles positions with zero PnL" do
@@ -144,9 +158,11 @@ RSpec.describe SlackNotificationService, type: :service do
         entry_price: 3000.0,
         pnl: 0.0)
 
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.position_update(zero_pnl_position, "closed")
-      end.not_to raise_error
+      end
     end
 
     it "handles very small positions" do
@@ -157,9 +173,11 @@ RSpec.describe SlackNotificationService, type: :service do
         entry_price: 50_000.0,
         pnl: 0.5)
 
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.position_update(small_position, "opened")
-      end.not_to raise_error
+      end
     end
   end
 
@@ -176,49 +194,63 @@ RSpec.describe SlackNotificationService, type: :service do
     end
 
     it "handles active status data" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.bot_status(status_data)
-      end.not_to raise_error
+      end
     end
 
     it "handles inactive status data" do
       inactive_data = status_data.merge(status: "inactive", trading_active: false, healthy: false)
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.bot_status(inactive_data)
-      end.not_to raise_error
+      end
     end
 
     it "handles status data with no positions" do
       no_positions_data = status_data.merge(open_positions: 0, daily_pnl: 0.0)
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.bot_status(no_positions_data)
-      end.not_to raise_error
+      end
     end
   end
 
   describe ".alert" do
     it "handles critical alerts" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.alert("critical", "System Error", "Database connection lost")
-      end.not_to raise_error
+      end
     end
 
     it "handles warning alerts" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.alert("warning", "High Memory Usage")
-      end.not_to raise_error
+      end
     end
 
     it "handles info alerts" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.alert("info", "System Check", "All systems operational")
-      end.not_to raise_error
+      end
     end
 
     it "handles alerts without additional details" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.alert("warning", "Maintenance Mode")
-      end.not_to raise_error
+      end
     end
   end
 
@@ -234,62 +266,87 @@ RSpec.describe SlackNotificationService, type: :service do
     end
 
     it "handles positive PnL data" do
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.pnl_update(pnl_data)
-      end.not_to raise_error
+      end
     end
 
     it "handles negative PnL data" do
       negative_pnl = pnl_data.merge(total_pnl: -200.0, daily_pnl: -50.0)
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.pnl_update(negative_pnl)
-      end.not_to raise_error
+      end
     end
 
     it "handles zero PnL data" do
       zero_pnl = pnl_data.merge(total_pnl: 0.0, daily_pnl: 0.0, win_rate: 0.0)
-      expect do
+      ClimateControl.modify(test_env) do
+        mock_client = mock_slack_client
+        expect(mock_client).to receive(:chat_postMessage).once
         described_class.pnl_update(zero_pnl)
-      end.not_to raise_error
+      end
     end
   end
 
   describe "configuration and environment handling" do
     context "with missing Slack configuration" do
       it "handles missing bot token gracefully" do
-        # Test without environment variables set
-        expect do
-          described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
-        end.not_to raise_error
+        # Test with Slack disabled
+        ClimateControl.modify(disabled_env) do
+          expect do
+            described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
+          end.not_to raise_error
+        end
       end
     end
 
     context "with invalid channel configurations" do
       it "handles empty channels gracefully" do
-        expect do
-          described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
-        end.not_to raise_error
+        # Test with missing channel configuration
+        ClimateControl.modify(missing_config_env) do
+          expect do
+            described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
+          end.not_to raise_error
+        end
       end
     end
 
     context "with malformed data" do
       it "handles nil signal data gracefully" do
-        expect do
-          described_class.signal_generated(nil)
-        end.not_to raise_error
+        ClimateControl.modify(test_env) do
+          mock_client = mock_slack_client
+          # Should not call Slack client for nil data
+          expect(mock_client).not_to receive(:chat_postMessage)
+          expect do
+            described_class.signal_generated(nil)
+          end.not_to raise_error
+        end
       end
 
       it "handles empty signal data gracefully" do
-        expect do
-          described_class.signal_generated({})
-        end.not_to raise_error
+        ClimateControl.modify(test_env) do
+          mock_client = mock_slack_client
+          # Should not call Slack client for empty data
+          expect(mock_client).not_to receive(:chat_postMessage)
+          expect do
+            described_class.signal_generated({})
+          end.not_to raise_error
+        end
       end
 
       it "handles signal data with missing fields" do
         incomplete_signal = {symbol: "BTC-USD"}
-        expect do
-          described_class.signal_generated(incomplete_signal)
-        end.not_to raise_error
+        ClimateControl.modify(test_env) do
+          mock_client = mock_slack_client
+          expect(mock_client).to receive(:chat_postMessage).once
+          expect do
+            described_class.signal_generated(incomplete_signal)
+          end.not_to raise_error
+        end
       end
     end
   end
