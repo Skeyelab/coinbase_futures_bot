@@ -5,6 +5,7 @@ class SlackNotificationService
     # Send a trading signal notification
     def signal_generated(signal_data)
       return unless enabled?
+      return unless signal_data.present? && signal_data.is_a?(Hash)
 
       message = format_signal_message(signal_data)
       send_message(message, channel: signals_channel)
@@ -13,6 +14,8 @@ class SlackNotificationService
     # Send position update notification
     def position_update(position, action)
       return unless enabled?
+      return unless position.present?
+      return unless action.present?
 
       message = format_position_message(position, action)
       send_message(message, channel: positions_channel)
@@ -21,6 +24,7 @@ class SlackNotificationService
     # Send bot status notification
     def bot_status(status_data)
       return unless enabled?
+      return unless status_data.present? && status_data.is_a?(Hash)
 
       message = format_status_message(status_data)
       send_message(message, channel: status_channel)
@@ -29,6 +33,7 @@ class SlackNotificationService
     # Send error/alert notification
     def alert(level, title, details = nil)
       return unless enabled?
+      return unless level.present? && title.present?
 
       message = format_alert_message(level, title, details)
       channel = case level.to_s.downcase
@@ -43,6 +48,7 @@ class SlackNotificationService
     # Send PnL update notification
     def pnl_update(pnl_data)
       return unless enabled?
+      return unless pnl_data.present? && pnl_data.is_a?(Hash)
 
       message = format_pnl_message(pnl_data)
       send_message(message, channel: positions_channel)
@@ -51,6 +57,7 @@ class SlackNotificationService
     # Send health check notification
     def health_check(health_data)
       return unless enabled?
+      return unless health_data.present? && health_data.is_a?(Hash)
 
       message = format_health_message(health_data)
       send_message(message, channel: status_channel)
@@ -59,6 +66,7 @@ class SlackNotificationService
     # Send market condition alert
     def market_alert(market_data)
       return unless enabled?
+      return unless market_data.present? && market_data.is_a?(Hash)
 
       message = format_market_message(market_data)
       send_message(message, channel: alerts_channel)
@@ -129,10 +137,12 @@ class SlackNotificationService
     end
 
     def format_signal_message(signal_data)
-      symbol = signal_data[:symbol] || signal_data[:product_id]
-      side = signal_data[:side]
+      return {} unless signal_data.present? && signal_data.is_a?(Hash)
+
+      symbol = signal_data[:symbol] || signal_data[:product_id] || "N/A"
+      side = signal_data[:side] || "N/A"
       price = signal_data[:price]&.round(2)
-      quantity = signal_data[:quantity]
+      quantity = signal_data[:quantity] || 0
       confidence = signal_data[:confidence]
       tp = signal_data[:tp]&.round(2)
       sl = signal_data[:sl]&.round(2)
@@ -199,6 +209,8 @@ class SlackNotificationService
     end
 
     def format_position_message(position, action)
+      return {} unless position.present?
+
       action_emoji = case action.to_s.downcase
       when "opened"
         "🟢"
@@ -222,22 +234,22 @@ class SlackNotificationService
       fields = [
         {
           title: "Symbol",
-          value: position.product_id,
+          value: position.product_id || "N/A",
           short: true
         },
         {
           title: "Side",
-          value: position.side.upcase,
+          value: position.side&.upcase || "N/A",
           short: true
         },
         {
           title: "Size",
-          value: position.size.to_s,
+          value: position.size&.to_s || "N/A",
           short: true
         },
         {
           title: "Entry Price",
-          value: "$#{position.entry_price&.round(2)}",
+          value: position.entry_price ? "$#{position.entry_price.round(2)}" : "N/A",
           short: true
         }
       ]
@@ -250,7 +262,7 @@ class SlackNotificationService
         }
       end
 
-      if position.close_time
+      if position.close_time && position.entry_time
         fields << {
           title: "Duration",
           value: duration_in_words(position.entry_time, position.close_time),
@@ -259,7 +271,7 @@ class SlackNotificationService
       end
 
       {
-        text: "#{action_emoji} Position #{action.capitalize}: #{position.product_id}",
+        text: "#{action_emoji} Position #{action&.capitalize || "Unknown"}: #{position.product_id || "N/A"}",
         attachments: [
           {
             color: color,
@@ -270,6 +282,8 @@ class SlackNotificationService
     end
 
     def format_status_message(status_data)
+      return {} unless status_data.present? && status_data.is_a?(Hash)
+
       {
         text: "🤖 Bot Status Update",
         attachments: [
@@ -313,6 +327,8 @@ class SlackNotificationService
     end
 
     def format_alert_message(level, title, details)
+      return {} unless level.present? && title.present?
+
       emoji = case level.to_s.downcase
       when "critical"
         "🚨"
@@ -368,6 +384,8 @@ class SlackNotificationService
     end
 
     def format_pnl_message(pnl_data)
+      return {} unless pnl_data.present? && pnl_data.is_a?(Hash)
+
       total_pnl = pnl_data[:total_pnl]
       color = total_pnl&.positive? ? "good" : "danger"
       emoji = total_pnl&.positive? ? "📈" : "📉"
@@ -415,6 +433,8 @@ class SlackNotificationService
     end
 
     def format_health_message(health_data)
+      return {} unless health_data.present? && health_data.is_a?(Hash)
+
       overall_health = health_data[:overall_health]
       color = case overall_health
       when "healthy"
@@ -477,6 +497,8 @@ class SlackNotificationService
     end
 
     def format_market_message(market_data)
+      return {} unless market_data.present? && market_data.is_a?(Hash)
+
       {
         text: "📊 Market Alert",
         attachments: [
@@ -485,17 +507,17 @@ class SlackNotificationService
             fields: [
               {
                 title: "Alert Type",
-                value: market_data[:alert_type],
+                value: market_data[:alert_type] || "N/A",
                 short: true
               },
               {
                 title: "Symbol",
-                value: market_data[:symbol],
+                value: market_data[:symbol] || "N/A",
                 short: true
               },
               {
                 title: "Current Price",
-                value: "$#{market_data[:current_price]&.round(2)}",
+                value: market_data[:current_price] ? "$#{market_data[:current_price].round(2)}" : "N/A",
                 short: true
               },
               {

@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# SimpleCov coverage runner script
+# This script runs the coverage Rake task for consistent coverage reporting
+
+require "bundler/setup"
+
+puts "🚀 SimpleCov Coverage Runner"
+puts "============================="
+puts
+
+# Check if we're in a Rails environment
+unless File.exist?("Rakefile")
+  puts "❌ Error: Not in a Rails project directory"
+  puts "Please run this script from your Rails project root"
+  exit 1
+end
+
+puts "Running RSpec with SimpleCov coverage..."
+puts
+
+# Run the coverage Rake task
+system("bundle exec rake coverage:run")
+
+if $?.success?
+  puts
+  puts "🎉 Coverage generation completed successfully!"
+  puts
+  puts "Available coverage commands:"
+  puts "  rake coverage:check    - Check if thresholds are met"
+  puts "  rake coverage:summary  - Show detailed coverage summary"
+  puts "  rake coverage:clean    - Remove coverage files"
+  puts
+  puts "📊 Coverage report available at: coverage/index.html"
+else
+  puts
+  puts "❌ Coverage generation failed!"
+  puts "Please check the test output above for errors."
+  exit 1
+end

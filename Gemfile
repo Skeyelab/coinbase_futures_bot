@@ -61,6 +61,10 @@ group :test do
 
   # JUnit XML output for CI systems
   gem "rspec_junit_formatter", "~> 0.6"
+
+  # Code coverage analysis and reporting
+  gem "simplecov", "~> 0.22", require: false
+  gem "simplecov-json", "~> 0.2", require: false
 end
 
 gem "good_job", "~> 4.11"

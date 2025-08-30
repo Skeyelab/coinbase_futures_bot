@@ -138,6 +138,8 @@ module MarketData
 
     # Generate contract ID for a specific month
     def generate_contract_id_for_month(asset, month_date)
+      return nil unless asset
+
       prefix = ASSET_MAPPING[asset.upcase]
       return nil unless prefix
 
@@ -196,9 +198,9 @@ module MarketData
 
       expired_contracts.update_all(enabled: false)
 
-      if expired_contracts.any?
-        @logger.info("Disabled #{expired_contracts.count} expired #{asset} contracts")
-      end
+      return unless expired_contracts.any?
+
+      @logger.info("Disabled #{expired_contracts.count} expired #{asset} contracts")
     end
   end
 end

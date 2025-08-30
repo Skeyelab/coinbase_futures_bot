@@ -117,11 +117,26 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   end
 
   describe "#active_futures_contracts" do
-    let!(:btc_current) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
-    let!(:eth_current) { TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
-    let!(:btc_next) { TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 30), enabled: true) }
-    let!(:expired_contract) { TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31), enabled: true) }
-    let!(:disabled_contract) { TradingPair.create!(product_id: "BIT-31DEC25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 12, 31), enabled: false) }
+    let!(:btc_current) do
+      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 8, 29), enabled: true)
+    end
+    let!(:eth_current) do
+      TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD",
+        expiration_date: Date.new(2025, 8, 29), enabled: true)
+    end
+    let!(:btc_next) do
+      TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 9, 30), enabled: true)
+    end
+    let!(:expired_contract) do
+      TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 7, 31), enabled: true)
+    end
+    let!(:disabled_contract) do
+      TradingPair.create!(product_id: "BIT-31DEC25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 12, 31), enabled: false)
+    end
 
     it "returns only active, non-expired futures contracts" do
       active_contracts = manager.active_futures_contracts
@@ -131,9 +146,18 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   end
 
   describe "#expiring_contracts" do
-    let!(:expiring_soon) { TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 17), enabled: true) }
-    let!(:expiring_later) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
-    let!(:expiring_next_month) { TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 30), enabled: true) }
+    let!(:expiring_soon) do
+      TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 8, 17), enabled: true)
+    end
+    let!(:expiring_later) do
+      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 8, 29), enabled: true)
+    end
+    let!(:expiring_next_month) do
+      TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+        expiration_date: Date.new(2025, 9, 30), enabled: true)
+    end
 
     it "returns contracts expiring within specified days" do
       # Test with 7 days ahead (default)
@@ -150,7 +174,10 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
   describe "#rollover_needed?" do
     context "when contracts are expiring soon" do
-      let!(:expiring_soon) { TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 17), enabled: true) }
+      let!(:expiring_soon) do
+        TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+          expiration_date: Date.new(2025, 8, 17), enabled: true)
+      end
 
       it "returns true" do
         expect(manager.rollover_needed?).to be true
@@ -158,7 +185,10 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     end
 
     context "when no contracts are expiring soon" do
-      let!(:expiring_later) { TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 30), enabled: true) }
+      let!(:expiring_later) do
+        TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+          expiration_date: Date.new(2025, 9, 30), enabled: true)
+      end
 
       it "returns false" do
         expect(manager.rollover_needed?).to be false
@@ -508,6 +538,430 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
         expect(actual_eth).to eq(expected_eth),
           "Service method should match helper method logic for ETH"
+      end
+    end
+  end
+
+  # === CONTRACT DISCOVERY AND METADATA VALIDATION ===
+
+  describe "#generate_contract_id_for_month" do
+    context "with valid inputs" do
+      it "generates BTC contract ID for specific month" do
+        march_date = Date.new(2025, 3, 15)
+        contract_id = manager.generate_contract_id_for_month("BTC", march_date)
+        expect(contract_id).to eq("BIT-28MAR25-CDE") # Last Friday of March 2025
+      end
+
+      it "generates ETH contract ID for specific month" do
+        december_date = Date.new(2025, 12, 10)
+        contract_id = manager.generate_contract_id_for_month("ETH", december_date)
+        expect(contract_id).to eq("ET-26DEC25-CDE") # Last Friday of December 2025
+      end
+
+      it "handles edge case where last Friday is very early in month" do
+        # February 2025 - last Friday is Feb 28th
+        feb_date = Date.new(2025, 2, 10)
+        contract_id = manager.generate_contract_id_for_month("BTC", feb_date)
+        expect(contract_id).to eq("BIT-28FEB25-CDE")
+      end
+
+      it "handles months with different Friday patterns" do
+        # June 2025 - last Friday is June 27th
+        june_date = Date.new(2025, 6, 15)
+        contract_id = manager.generate_contract_id_for_month("ETH", june_date)
+        expect(contract_id).to eq("ET-27JUN25-CDE")
+      end
+    end
+
+    context "with invalid inputs" do
+      it "returns nil for unsupported asset" do
+        contract_id = manager.generate_contract_id_for_month("INVALID", Date.current)
+        expect(contract_id).to be_nil
+      end
+
+      it "returns nil for nil asset" do
+        contract_id = manager.generate_contract_id_for_month(nil, Date.current)
+        expect(contract_id).to be_nil
+      end
+
+      it "handles case-insensitive asset names" do
+        contract_id = manager.generate_contract_id_for_month("btc", current_date)
+        expect(contract_id).to eq("BIT-29AUG25-CDE")
+      end
+    end
+
+    context "edge case months" do
+      it "handles month where no Friday exists before beginning_of_month (safety check)" do
+        # This is a theoretical edge case - testing the safety break
+        # Mock a scenario where we might hit the safety check
+        jan_date = Date.new(2025, 1, 1)
+        contract_id = manager.generate_contract_id_for_month("BTC", jan_date)
+        expect(contract_id).to match(/BIT-\d{2}JAN25-CDE/)
+      end
+    end
+  end
+
+  # === ERROR HANDLING AND EDGE CASES ===
+
+  describe "error handling in discovery methods" do
+    let(:logger) { instance_double(Logger) }
+    let(:manager_with_logger) { described_class.new(logger: logger) }
+
+    before do
+      allow(logger).to receive(:info)
+      allow(logger).to receive(:warn)
+      allow(logger).to receive(:error)
+    end
+
+    describe "#discover_current_month_contract" do
+      it "returns nil when contract ID generation fails" do
+        allow(manager_with_logger).to receive(:generate_current_month_contract_id).and_return(nil)
+
+        result = manager_with_logger.discover_current_month_contract("BTC")
+        expect(result).to be_nil
+      end
+
+      it "returns nil when contract info parsing fails" do
+        allow(TradingPair).to receive(:parse_contract_info).and_return(nil)
+
+        result = manager_with_logger.discover_current_month_contract("BTC")
+        expect(result).to be_nil
+      end
+
+      it "returns nil and logs error when trading pair save fails" do
+        # Create an invalid trading pair that will fail validation
+        invalid_pair = TradingPair.new
+        allow(TradingPair).to receive(:find_or_initialize_by).and_return(invalid_pair)
+        allow(invalid_pair).to receive(:assign_attributes)
+        allow(invalid_pair).to receive(:save).and_return(false)
+        allow(invalid_pair).to receive(:errors).and_return(
+          double(full_messages: ["Product ID can't be blank"])
+        )
+
+        expect(logger).to receive(:error).with(
+          "Failed to create contract BIT-29AUG25-CDE: [\"Product ID can't be blank\"]"
+        )
+
+        result = manager_with_logger.discover_current_month_contract("BTC")
+        expect(result).to be_nil
+      end
+    end
+
+    describe "#discover_upcoming_month_contract" do
+      it "returns nil when contract ID generation fails" do
+        allow(manager_with_logger).to receive(:generate_upcoming_month_contract_id).and_return(nil)
+
+        result = manager_with_logger.discover_upcoming_month_contract("BTC")
+        expect(result).to be_nil
+      end
+
+      it "returns nil when contract info parsing fails" do
+        allow(TradingPair).to receive(:parse_contract_info).and_return(nil)
+
+        result = manager_with_logger.discover_upcoming_month_contract("BTC")
+        expect(result).to be_nil
+      end
+
+      it "returns nil and logs error when trading pair save fails" do
+        invalid_pair = TradingPair.new
+        allow(TradingPair).to receive(:find_or_initialize_by).and_return(invalid_pair)
+        allow(invalid_pair).to receive(:assign_attributes)
+        allow(invalid_pair).to receive(:save).and_return(false)
+        allow(invalid_pair).to receive(:errors).and_return(
+          double(full_messages: ["Product ID can't be blank"])
+        )
+
+        expect(logger).to receive(:error).with(
+          "Failed to create upcoming month contract BIT-26SEP25-CDE: [\"Product ID can't be blank\"]"
+        )
+
+        result = manager_with_logger.discover_upcoming_month_contract("BTC")
+        expect(result).to be_nil
+      end
+    end
+  end
+
+  # === CONTRACT VALIDATION AND BUSINESS RULES ===
+
+  describe "contract validation and business rules" do
+    describe "asset mapping validation" do
+      it "supports BTC to BIT mapping" do
+        expect(described_class::ASSET_MAPPING["BTC"]).to eq("BIT")
+      end
+
+      it "supports ETH to ET mapping" do
+        expect(described_class::ASSET_MAPPING["ETH"]).to eq("ET")
+      end
+
+      it "freezes the asset mapping constant" do
+        expect(described_class::ASSET_MAPPING).to be_frozen
+      end
+
+      it "handles case sensitivity correctly" do
+        contract_id = manager.generate_current_month_contract_id("btc")
+        expect(contract_id).to eq("BIT-29AUG25-CDE")
+      end
+    end
+
+    describe "contract expiration date validation" do
+      it "ensures expiration dates are always last Friday of month" do
+        # Test multiple months to ensure consistency
+        test_months = [
+          Date.new(2025, 1, 15),
+          Date.new(2025, 4, 10),
+          Date.new(2025, 7, 20),
+          Date.new(2025, 10, 5)
+        ]
+
+        test_months.each do |month_date|
+          contract_id = manager.generate_contract_id_for_month("BTC", month_date)
+
+          # Parse the date from the contract ID
+          match = contract_id.match(/-(\d{2}[A-Z]{3}\d{2})-/)
+          date_str = match[1]
+          parsed_date = Date.strptime(date_str, "%d%b%y")
+
+          # Verify it's a Friday
+          expect(parsed_date.friday?).to be true
+
+          # Verify it's in the correct month
+          expect(parsed_date.month).to eq(month_date.month)
+          expect(parsed_date.year).to eq(month_date.year)
+
+          # Verify it's the last Friday
+          next_friday = parsed_date + 7.days
+          expect(next_friday.month).not_to eq(month_date.month)
+        end
+      end
+    end
+
+    describe "contract status management" do
+      it "sets correct default attributes for new contracts" do
+        contract_id = manager.discover_current_month_contract("BTC")
+        trading_pair = TradingPair.find_by(product_id: contract_id)
+
+        expect(trading_pair.enabled).to be true
+        expect(trading_pair.status).to eq("online")
+        expect(trading_pair.base_currency).to eq("BTC")
+        expect(trading_pair.quote_currency).to eq("USD")
+        expect(trading_pair.contract_type).to eq("CDE")
+      end
+    end
+  end
+
+  # === INTEGRATION AND LIFECYCLE MANAGEMENT ===
+
+  describe "contract lifecycle management" do
+    describe "#expiring_contracts with various scenarios" do
+      let!(:expiring_today) {
+        TradingPair.create!(
+          product_id: "BIT-15AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: current_date,
+          enabled: true
+        )
+      }
+      let!(:expiring_tomorrow) {
+        TradingPair.create!(
+          product_id: "BIT-16AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: current_date + 1.day,
+          enabled: true
+        )
+      }
+      let!(:disabled_expiring) {
+        TradingPair.create!(
+          product_id: "BIT-17AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: current_date + 2.days,
+          enabled: false
+        )
+      }
+      let!(:expired_yesterday) {
+        TradingPair.create!(
+          product_id: "BIT-14AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: current_date - 1.day,
+          enabled: true
+        )
+      }
+
+      it "excludes contracts expiring today" do
+        expiring = manager.expiring_contracts(days_ahead: 5)
+        expect(expiring).not_to include(expiring_today)
+      end
+
+      it "excludes already expired contracts" do
+        expiring = manager.expiring_contracts(days_ahead: 5)
+        expect(expiring).not_to include(expired_yesterday)
+      end
+
+      it "excludes disabled contracts" do
+        expiring = manager.expiring_contracts(days_ahead: 5)
+        expect(expiring).not_to include(disabled_expiring)
+      end
+
+      it "includes only enabled contracts expiring in the future within range" do
+        expiring = manager.expiring_contracts(days_ahead: 2)
+        expect(expiring).to contain_exactly(expiring_tomorrow)
+      end
+    end
+
+    describe "#rollover_needed? edge cases" do
+      it "returns false when no contracts exist" do
+        expect(manager.rollover_needed?).to be false
+      end
+
+      it "returns false with custom days_before_expiry" do
+        expect(manager.rollover_needed?(days_before_expiry: 1)).to be false
+      end
+
+      it "returns true when contracts expire exactly on the threshold" do
+        TradingPair.create!(
+          product_id: "BIT-18AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: current_date + 3.days,
+          enabled: true
+        )
+
+        expect(manager.rollover_needed?(days_before_expiry: 3)).to be true
+      end
+    end
+  end
+
+  # === LOGGING AND INSTRUMENTATION ===
+
+  describe "logging behavior" do
+    let(:logger) { instance_double(Logger) }
+    let(:manager_with_logger) { described_class.new(logger: logger) }
+
+    before do
+      allow(logger).to receive(:info)
+      allow(logger).to receive(:warn)
+      allow(logger).to receive(:error)
+    end
+
+    describe "successful operations logging" do
+      it "logs successful contract creation" do
+        expect(logger).to receive(:info).with("Created current month contract: BIT-29AUG25-CDE")
+
+        manager_with_logger.discover_current_month_contract("BTC")
+      end
+
+      it "logs contract updates during asset processing" do
+        expect(logger).to receive(:info).with("Updating current month contracts for BTC")
+        expect(logger).to receive(:info).with("Current month contract for BTC: BIT-29AUG25-CDE")
+        expect(logger).to receive(:info).with("Updating current month contracts for ETH")
+        expect(logger).to receive(:info).with("Current month contract for ETH: ET-29AUG25-CDE")
+
+        manager_with_logger.update_current_month_contracts
+      end
+
+      it "logs warning when contract discovery fails" do
+        # Mock contract discovery to fail for testing warning path
+        allow(manager_with_logger).to receive(:discover_current_month_contract).and_return(nil)
+
+        expect(logger).to receive(:warn).with("Could not discover current month contract for BTC")
+
+        # Call the private method to trigger the warning
+        manager_with_logger.send(:update_contracts_for_asset, "BTC", current_date)
+      end
+    end
+
+    describe "warning and error logging" do
+      it "logs warning when contract discovery fails" do
+        allow(manager_with_logger).to receive(:discover_current_month_contract).and_return(nil)
+
+        expect(logger).to receive(:warn).with("Could not discover current month contract for BTC")
+        expect(logger).to receive(:warn).with("Could not discover current month contract for ETH")
+
+        manager_with_logger.update_current_month_contracts
+      end
+    end
+  end
+
+  # === INITIALIZATION AND CONFIGURATION ===
+
+  describe "initialization" do
+    it "accepts custom logger" do
+      custom_logger = Logger.new($stdout)
+      custom_manager = described_class.new(logger: custom_logger)
+
+      expect(custom_manager.instance_variable_get(:@logger)).to eq(custom_logger)
+    end
+
+    it "defaults to Rails.logger when no logger provided" do
+      default_manager = described_class.new
+
+      expect(default_manager.instance_variable_get(:@logger)).to eq(Rails.logger)
+    end
+  end
+
+  # === INTEGRATION WITH TRADING_PAIR MODEL ===
+
+  describe "TradingPair integration" do
+    describe "scope interactions" do
+      let!(:active_current) {
+        TradingPair.create!(
+          product_id: "BIT-29AUG25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: Date.new(2025, 8, 29),
+          enabled: true
+        )
+      }
+      let!(:active_upcoming) {
+        TradingPair.create!(
+          product_id: "BIT-26SEP25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: Date.new(2025, 9, 26),
+          enabled: true
+        )
+      }
+      let!(:disabled_contract) {
+        TradingPair.create!(
+          product_id: "BIT-31DEC25-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: Date.new(2025, 12, 31),
+          enabled: false
+        )
+      }
+
+      it "interacts correctly with TradingPair.current_month_for_asset" do
+        contracts = TradingPair.current_month_for_asset("BTC")
+        expect(contracts).to contain_exactly(active_current)
+      end
+
+      it "interacts correctly with TradingPair.upcoming_month_for_asset" do
+        contracts = TradingPair.upcoming_month_for_asset("BTC")
+        expect(contracts).to contain_exactly(active_upcoming)
+      end
+
+      it "interacts correctly with TradingPair.best_available_for_asset" do
+        best_contract = TradingPair.best_available_for_asset("BTC")
+        expect(best_contract).to eq(active_current)
+      end
+    end
+
+    describe "contract info parsing integration" do
+      it "correctly utilizes TradingPair.parse_contract_info" do
+        # This tests the integration between the manager and the model
+        contract_id = manager.discover_current_month_contract("BTC")
+        trading_pair = TradingPair.find_by(product_id: contract_id)
+
+        parsed_info = TradingPair.parse_contract_info(contract_id)
+
+        expect(trading_pair.base_currency).to eq(parsed_info[:base_currency])
+        expect(trading_pair.quote_currency).to eq(parsed_info[:quote_currency])
+        expect(trading_pair.expiration_date).to eq(parsed_info[:expiration_date])
+        expect(trading_pair.contract_type).to eq(parsed_info[:contract_type])
       end
     end
   end
