@@ -4,6 +4,13 @@ require "rails_helper"
 
 RSpec.describe SlackNotificationService, type: :service do
   let(:service) { described_class.new }
+  let(:mock_client) { instance_double(Slack::Web::Client) }
+
+  # Mock Slack client to prevent real API calls during tests
+  before do
+    allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
+    allow(mock_client).to receive(:chat_postMessage).and_return(true)
+  end
 
   # Test data setup without heavy mocking - avoid nil values for ClimateControl
   let(:test_env) do
