@@ -259,16 +259,6 @@ jobs:
           # Exit with test result code
           exit $TEST_EXIT_CODE
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        if: success()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: coverage/cobertura.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()

@@ -23,8 +23,7 @@ if ENV["COVERAGE"] == "true"
     # Output formats
     formatter SimpleCov::Formatter::MultiFormatter.new([
       SimpleCov::Formatter::HTMLFormatter,
-      SimpleCov::Formatter::JSONFormatter,
-      SimpleCov::Formatter::CoberturaFormatter
+      SimpleCov::Formatter::JSONFormatter
     ])
 
     # Coverage groups for organized reporting
