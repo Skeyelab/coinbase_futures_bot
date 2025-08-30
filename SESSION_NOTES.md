@@ -26,20 +26,25 @@
 
 ### Session log
 
-#### 2025-01-27 18:20 UTC
-- Context: **Documentation Cleanup** - Removed legacy coverage documentation that was superseded by current coverage setup
+#### 2025-01-27 18:25 UTC
+- Context: **Workflow Consolidation** - Consolidated duplicate coverage workflow into main CI workflow for better maintainability
 - Changes:
-  - **CLEANUP**: Removed `docs/coverage-legacy.md` as it was superseded by `docs/coverage-setup.md`
-  - **ENHANCEMENT**: Current coverage documentation in `docs/coverage-setup.md` is comprehensive and up-to-date
-  - **SIMPLIFICATION**: Eliminated duplicate/outdated coverage information
+  - **MAJOR**: Removed `.github/workflows/coverage.yml` to eliminate duplication
+  - **ENHANCEMENT**: All coverage functionality now integrated into main CI workflow
+  - **CLEANUP**: Eliminated redundant coverage runs and maintenance overhead
+  - **DOCUMENTATION**: Updated coverage-setup.md to reflect single workflow approach
+  - **SIMPLIFICATION**: Single source of truth for all CI operations including coverage
 - Commands run:
-  - `rm docs/coverage-legacy.md` - Removed legacy coverage documentation
+  - `rm .github/workflows/coverage.yml` - Removed duplicate coverage workflow
 - Files touched:
-  - `docs/coverage-legacy.md` - Deleted (superseded by coverage-setup.md)
+  - `.github/workflows/coverage.yml` - Deleted (consolidated into main CI)
+  - `docs/coverage-setup.md` - Updated to reflect single workflow approach
+  - `SESSION_NOTES.md` - Added consolidation entry
 - Next steps:
-  - **Single source of truth**: All coverage documentation now in `docs/coverage-setup.md`
-  - **Clean documentation**: No duplicate or outdated coverage information
-  - **Current coverage docs**: Comprehensive coverage setup and CI integration documented
+  - **Single CI workflow**: All coverage functionality in `.github/workflows/ci.yml`
+  - **Eliminated duplication**: No more redundant coverage runs
+  - **Better maintainability**: One workflow to update and maintain
+  - **Cleaner architecture**: Unified CI pipeline with comprehensive coverage
 
 #### 2025-01-27 18:15 UTC
 - Context: **Documentation Consolidation** - Consolidated documentation from `doc/` and `docs/` folders into single `docs/` folder

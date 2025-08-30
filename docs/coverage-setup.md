@@ -37,23 +37,19 @@ The following files are excluded from coverage analysis:
 
 ## CI Integration
 
-### Workflows
-
-We have three GitHub Actions workflows for coverage:
+Our SimpleCov coverage is fully integrated into the main CI pipeline:
 
 1. **Main CI Workflow** (`.github/workflows/ci.yml`)
-   - Runs tests with coverage enabled
-   - Uploads coverage artifacts
-   - Checks coverage thresholds
+   - Runs on pull requests and pushes to main
+   - Includes linting, security scanning, and tests with coverage
+   - Automatically generates coverage reports and artifacts
+   - Checks coverage thresholds and provides guidance
+   - Uploads coverage artifacts for review and badge generation
 
-2. **Coverage Workflow** (`.github/workflows/coverage.yml`)
-   - Dedicated coverage analysis
-   - Generates detailed coverage reports
-   - Comments on PRs with coverage status
-
-3. **Coverage Badge Workflow** (`.github/workflows/coverage-badge.yml`)
-   - Updates coverage badges in README
+2. **Coverage Badge Workflow** (`.github/workflows/coverage-badge.yml`)
+   - Automatically updates coverage badges in README
    - Runs after successful coverage generation
+   - Provides visual coverage status indicators
 
 ### Coverage Artifacts
 
