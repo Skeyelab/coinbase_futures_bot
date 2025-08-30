@@ -41,10 +41,14 @@
 !/.cursor/rules/
 !/.cursor/rules/*.mdc
 !/.cursor/Dockerfile
+# macOS system files
 .DS_Store
-
-.DS_Store
-
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 # Coinbase CDP API credentials
 cdp_api_key.json
 
