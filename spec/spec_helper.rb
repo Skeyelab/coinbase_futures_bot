@@ -4,6 +4,7 @@
 if ENV["COVERAGE"] == "true"
   require "simplecov"
   require "simplecov-json"
+  require "simplecov-cobertura"
 
   SimpleCov.start "rails" do
     # Enable branch coverage first

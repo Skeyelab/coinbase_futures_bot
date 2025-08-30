@@ -3,18 +3,13 @@ name: CI
 on:
   pull_request:
     branches: [ main, feat/** ]
-    types: [opened, synchronize, reopened]
   push:
     branches: [ main ]
-
-# Force workflow refresh - v20250127-1745
-# This is a completely new workflow file to force cache refresh
-# UNIQUE_CACHE_BREAKER_ID: WORKFLOW_REFRESH_ATTEMPT_4_1745
 
 env:
   RAILS_ENV: test
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/coinbase_futures_bot_test
-  COVERAGE: true  # Enable SimpleCov in CI
+  COVERAGE: true
 
 jobs:
   lint:
@@ -260,8 +255,8 @@ jobs:
           exit $TEST_EXIT_CODE
 
       - name: Upload coverage to Codecov
+        if: success() && hashFiles('coverage/cobertura.xml') != ''
         uses: codecov/codecov-action@v4
-        if: success()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: coverage/cobertura.xml
