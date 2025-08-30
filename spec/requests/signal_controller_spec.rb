@@ -15,7 +15,12 @@ RSpec.describe "Signals API", type: :request do
 
     # Mock Sentry components to avoid noise in tests
     allow(SentryHelper).to receive(:add_breadcrumb)
-    allow(Sentry).to receive(:with_scope).and_yield(double("scope", set_tag: nil, set_context: nil))
+    allow(Sentry).to receive(:with_scope).and_yield(double("scope",
+      set_tag: nil,
+      set_context: nil,
+      clear_breadcrumbs: nil,
+      set_user: nil,
+      set_level: nil))
     allow(Sentry).to receive(:capture_message)
     allow(Sentry).to receive(:capture_exception)
 

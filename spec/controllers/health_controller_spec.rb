@@ -10,7 +10,10 @@ RSpec.describe HealthController, type: :controller do
     # Mock Sentry to avoid external calls - simplified approach
     allow(Sentry).to receive(:with_scope).and_yield(double(
       set_tag: true,
-      set_context: true
+      set_context: true,
+      clear_breadcrumbs: true,
+      set_user: true,
+      set_level: true
     ))
     allow(Sentry).to receive(:capture_exception)
     allow(Sentry).to receive(:capture_message)
