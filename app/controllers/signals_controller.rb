@@ -120,55 +120,83 @@ class SignalsController < ApplicationController
 
   # GET /signals/active - Get active signals only
   def active
+    limit = (params[:limit] || 100).to_i
+
+    # Validate limit parameter (1-1000)
+    limit = 100 if limit < 1 || limit > 1000
+
     signals = SignalAlert.active
       .order(confidence: :desc, alert_timestamp: :desc)
-      .limit(params[:limit] || 100)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
-      count: signals.count
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/high_confidence - Get high confidence signals only
   def high_confidence
-    threshold = params[:threshold] || 70
+    threshold = (params[:threshold] || 70).to_i
+    limit = (params[:limit] || 50).to_i
+
+    # Validate threshold parameter (0-100)
+    threshold = 70 if threshold < 0 || threshold > 100
+
+    # Validate limit parameter (1-1000)
+    limit = 50 if limit < 1 || limit > 1000
+
     signals = SignalAlert.active
       .high_confidence(threshold)
       .order(confidence: :desc, alert_timestamp: :desc)
-      .limit(params[:limit] || 50)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
       threshold: threshold,
-      count: signals.count
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/recent - Get recently generated signals
   def recent
-    hours = params[:hours] || 1
+    hours = (params[:hours] || 1).to_i
+    limit = (params[:limit] || 100).to_i
+
+    # Validate hours parameter (1-168 hours = 1 week)
+    hours = 1 if hours < 1 || hours > 168
+
+    # Validate limit parameter (1-1000)
+    limit = 100 if limit < 1 || limit > 1000
+
     signals = SignalAlert.recent(hours)
       .order(alert_timestamp: :desc)
-      .limit(params[:limit] || 100)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
       hours: hours,
-      count: signals.count
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/stats - Get signal statistics
   def stats
-    time_range = params[:hours] || 24
-    start_time = time_range.to_i.hours.ago
+    time_range = (params[:hours] || 24).to_i
+
+    # Validate time_range parameter (1-168 hours = 1 week)
+    time_range = 24 if time_range < 1 || time_range > 168
+
+    start_time = time_range.hours.ago
 
     stats = {
       active_signals: SignalAlert.active.count,
@@ -234,22 +262,28 @@ class SignalsController < ApplicationController
 
   def filter_signals(signals)
     # Filter by symbol
-    signals = signals.for_symbol(params[:symbol]) if params[:symbol]
+    signals = signals.for_symbol(params[:symbol]) if params[:symbol].present?
 
     # Filter by strategy
-    signals = signals.by_strategy(params[:strategy]) if params[:strategy]
+    signals = signals.by_strategy(params[:strategy]) if params[:strategy].present?
 
     # Filter by side
-    signals = signals.by_side(params[:side]) if params[:side]
+    signals = signals.by_side(params[:side]) if params[:side].present?
 
     # Filter by signal type
-    signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type]
+    signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type].present?
 
-    # Filter by minimum confidence
-    signals = signals.where("confidence >= ?", params[:min_confidence]) if params[:min_confidence]
+    # Filter by minimum confidence (validate numeric)
+    if params[:min_confidence].present? && params[:min_confidence].to_s.match?(/\A\d+(\.\d+)?\z/)
+      min_conf = params[:min_confidence].to_f
+      signals = signals.where("confidence >= ?", min_conf) if min_conf.between?(0, 100)
+    end
 
-    # Filter by maximum confidence
-    signals = signals.where("confidence <= ?", params[:max_confidence]) if params[:max_confidence]
+    # Filter by maximum confidence (validate numeric)
+    if params[:max_confidence].present? && params[:max_confidence].to_s.match?(/\A\d+(\.\d+)?\z/)
+      max_conf = params[:max_confidence].to_f
+      signals = signals.where("confidence <= ?", max_conf) if max_conf.between?(0, 100)
+    end
 
     signals
   end

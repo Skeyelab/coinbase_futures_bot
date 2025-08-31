@@ -456,7 +456,7 @@ RSpec.describe "Signals API", type: :request do
 
         json_response = JSON.parse(response.body)
         expect(json_response["signals"].length).to eq(1)
-        expect(json_response["threshold"]).to eq("80")
+        expect(json_response["threshold"]).to eq(80)
         expect(json_response["signals"][0]["confidence"]).to eq(85.0)
       end
 
@@ -572,9 +572,9 @@ RSpec.describe "Signals API", type: :request do
       let!(:triggered_signal) do
         create(:signal_alert, :triggered, confidence: 75, symbol: "ETH-USD", strategy_name: "Strategy2")
       end
-      let!(:expired_signal) { create(:signal_alert, :expired, confidence: 65) }
-      let!(:high_conf_signal) { create(:signal_alert, :high_confidence, confidence: 90) }
-      let!(:old_signal) { create(:signal_alert, alert_timestamp: 25.hours.ago) }
+      let!(:expired_signal) { create(:signal_alert, :expired, confidence: 65, symbol: "BTC-USD") }
+      let!(:high_conf_signal) { create(:signal_alert, :high_confidence, confidence: 90, symbol: "BTC-USD") }
+      let!(:old_signal) { create(:signal_alert, alert_timestamp: 25.hours.ago, symbol: "BTC-USD") }
 
       it "returns comprehensive statistics for default 24 hour period" do
         get "/signals/stats", headers: @headers
@@ -589,8 +589,8 @@ RSpec.describe "Signals API", type: :request do
         expect(json_response["high_confidence_signals"]).to be >= 2 # at least active_signal (85) and high_conf_signal (90)
         expect(json_response["time_range_hours"]).to eq(24)
 
-        # Test grouped data
-        expect(json_response["signals_by_symbol"]).to include("BTC-USD" => 1, "ETH-USD" => 1)
+        # Test grouped data (only includes signals within 24h window)
+        expect(json_response["signals_by_symbol"]).to include("BTC-USD" => 3, "ETH-USD" => 1)
         expect(json_response["signals_by_strategy"]).to include("Strategy1" => 1, "Strategy2" => 1)
 
         # Test average confidence (should include recent signals)
@@ -602,7 +602,7 @@ RSpec.describe "Signals API", type: :request do
         get "/signals/stats", headers: @headers, params: {hours: 1}
 
         json_response = JSON.parse(response.body)
-        expect(json_response["time_range_hours"]).to eq("1")
+        expect(json_response["time_range_hours"]).to eq(1)
         expect(json_response["recent_signals"]).to eq(4) # all signals within 1 hour
       end
 
@@ -692,10 +692,10 @@ RSpec.describe "Signals API", type: :request do
     end
 
     context "with signals in database" do
-      let!(:latest_signal) { create(:signal_alert, alert_timestamp: 30.minutes.ago) }
       let!(:older_signal) { create(:signal_alert, alert_timestamp: 2.hours.ago) }
-      let!(:active_signal) { create(:signal_alert, alert_status: "active") }
       let!(:recent_signal) { create(:signal_alert, alert_timestamp: 45.minutes.ago) }
+      let!(:active_signal) { create(:signal_alert, alert_status: "active", alert_timestamp: 15.minutes.ago) }
+      let!(:latest_signal) { create(:signal_alert, alert_timestamp: 5.minutes.ago) }
 
       it "returns health status with signal metrics" do
         get "/signals/health"
