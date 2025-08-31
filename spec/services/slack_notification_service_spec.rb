@@ -197,7 +197,9 @@ RSpec.describe SlackNotificationService, type: :service do
   end
 
   describe "#position_update" do
-    let(:mock_position) { double("Position", product_id: "BTC-USD", side: "long", size: 1, entry_price: 50_000.0, pnl: 100.0) }
+    let(:mock_position) do
+      double("Position", product_id: "BTC-USD", side: "long", size: 1, entry_price: 50_000.0, pnl: 100.0)
+    end
     let(:action) { "closed" }
 
     context "when service is enabled" do
@@ -594,6 +596,7 @@ RSpec.describe SlackNotificationService, type: :service do
           allow(mock_client).to receive(:chat_postMessage) do
             call_count += 1
             raise slack_error if call_count <= 3
+
             true
           end
 

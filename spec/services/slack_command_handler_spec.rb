@@ -21,7 +21,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       end
 
       it "returns array of authorized users" do
-        expect(described_class.authorized_users).to eq(["U123", "U456", "U789"])
+        expect(described_class.authorized_users).to eq(%w[U123 U456 U789])
       end
     end
 
@@ -468,7 +468,10 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
 
     context "with negative PnL" do
-      let(:pnl_data) { {total_pnl: -50.0, realized_pnl: -30.0, unrealized_pnl: -20.0, completed_trades: 5, win_rate: 40.0, best_trade: 25.0} }
+      let(:pnl_data) do
+        {total_pnl: -50.0, realized_pnl: -30.0, unrealized_pnl: -20.0, completed_trades: 5, win_rate: 40.0,
+         best_trade: 25.0}
+      end
 
       it "formats negative PnL with loss emoji" do
         result = described_class.send(:handle_pnl_command, "today")
@@ -606,9 +609,15 @@ RSpec.describe SlackCommandHandler, type: :service do
   describe "data retrieval methods" do
     describe ".get_bot_status" do
       before do
-        allow(Position).to receive(:open).and_return(double("OpenPositions", day_trading: double("DayTradingPositions", count: 3)))
+        allow(Position).to receive(:open).and_return(double("OpenPositions",
+          day_trading: double("DayTradingPositions", count: 3)))
         allow(Position).to receive(:where).and_return(double("DailyPositions", sum: 250.0))
-        allow(GenerateSignalsJob).to receive(:where).and_return(double("RecentJobs", order: double("OrderedJobs", first: double("LastJob", finished_at: Time.new(2024, 1, 15, 14, 30, 0)))))
+        allow(GenerateSignalsJob).to receive(:where).and_return(double("RecentJobs",
+          order: double("OrderedJobs",
+            first: double("LastJob",
+              finished_at: Time.new(
+                2024, 1, 15, 14, 30, 0
+              )))))
         allow(described_class).to receive(:overall_health_status).and_return("healthy")
         allow(described_class).to receive(:application_uptime).and_return("3h 45m")
       end
@@ -651,7 +660,8 @@ RSpec.describe SlackCommandHandler, type: :service do
       let(:mock_positions) { [double("Position", product_id: "BTC-USD")] }
 
       before do
-        allow(Position).to receive(:includes).and_return(double("PositionQuery", order: double("OrderedQuery", limit: mock_positions)))
+        allow(Position).to receive(:includes).and_return(double("PositionQuery",
+          order: double("OrderedQuery", limit: mock_positions)))
       end
 
       it "returns positions with default filter" do
@@ -695,7 +705,8 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     describe ".get_pnl_data" do
       before do
-        allow(Position).to receive(:where).and_return(double("TimeRangePositions", closed: double("ClosedPositions", sum: 150.0, count: 8)))
+        allow(Position).to receive(:where).and_return(double("TimeRangePositions",
+          closed: double("ClosedPositions", sum: 150.0, count: 8)))
         allow(Position).to receive(:sum).and_return(200.0)
       end
 
