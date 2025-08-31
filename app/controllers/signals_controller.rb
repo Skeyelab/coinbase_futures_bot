@@ -2,7 +2,7 @@
 
 # API controller for real-time trading signals
 # Provides REST endpoints to access signal alerts and trigger evaluations
-class SignalController < ApplicationController
+class SignalsController < ApplicationController
   before_action :authenticate_request, except: [:health]
   before_action :set_cors_headers
 
