@@ -13,7 +13,11 @@ RSpec.describe HealthController, type: :controller do
       set_context: true,
       clear_breadcrumbs: true,
       set_user: true,
-      set_level: true
+      set_level: true,
+      set_transaction_name: true,
+      set_rack_env: true,
+      transaction_name: true,
+      transaction_source: true
     ))
     allow(Sentry).to receive(:capture_exception)
     allow(Sentry).to receive(:capture_message)

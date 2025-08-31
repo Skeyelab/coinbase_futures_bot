@@ -20,7 +20,11 @@ RSpec.describe SignalController, type: :controller do
       set_context: nil,
       clear_breadcrumbs: nil,
       set_user: nil,
-      set_level: nil))
+      set_level: nil,
+      set_transaction_name: nil,
+      set_rack_env: nil,
+      transaction_name: nil,
+      transaction_source: nil))
     allow(Sentry).to receive(:capture_message)
     allow(Sentry).to receive(:capture_exception)
 
@@ -59,7 +63,11 @@ RSpec.describe SignalController, type: :controller do
         set_context: nil,
         clear_breadcrumbs: nil,
         set_user: nil,
-        set_level: nil))
+        set_level: nil,
+        set_transaction_name: nil,
+        set_rack_env: nil,
+        transaction_name: nil,
+        transaction_source: nil))
       allow(Sentry).to receive(:capture_message)
       allow(Sentry).to receive(:capture_exception)
 
@@ -571,7 +579,11 @@ RSpec.describe SignalController, type: :controller do
         set_context: nil,
         clear_breadcrumbs: nil,
         set_user: nil,
-        set_level: nil))
+        set_level: nil,
+        set_transaction_name: nil,
+        set_rack_env: nil,
+        transaction_name: nil,
+        transaction_source: nil))
       allow(Sentry).to receive(:capture_message)
       allow(Sentry).to receive(:capture_exception)
     end
@@ -651,14 +663,14 @@ RSpec.describe SignalController, type: :controller do
         signal_type: "entry",
         strategy_name: "TestStrategy",
         confidence: 85.5,
-        entry_price: 50000.0,
-        stop_loss: 49000.0,
-        take_profit: 52000.0,
+        entry_price: 50_000.0,
+        stop_loss: 49_000.0,
+        take_profit: 52_000.0,
         quantity: 10,
         timeframe: "15m",
         alert_status: "active",
         metadata: {"test" => "data"},
-        strategy_data: {"ema" => 49900})
+        strategy_data: {"ema" => 49_900})
 
       allow(controller_instance).to receive(:params).and_return(
         ActionController::Parameters.new(id: signal.id.to_s)

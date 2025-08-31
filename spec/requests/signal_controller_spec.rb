@@ -15,12 +15,10 @@ RSpec.describe "Signals API", type: :request do
 
     # Mock Sentry components to avoid noise in tests
     allow(SentryHelper).to receive(:add_breadcrumb)
-    allow(Sentry).to receive(:with_scope).and_yield(double("scope",
-      set_tag: nil,
-      set_context: nil,
-      clear_breadcrumbs: nil,
-      set_user: nil,
-      set_level: nil))
+
+    # Use spy for permissive mocking of Sentry scope
+    sentry_scope = spy("Sentry::Scope")
+    allow(Sentry).to receive(:with_scope).and_yield(sentry_scope)
     allow(Sentry).to receive(:capture_message)
     allow(Sentry).to receive(:capture_exception)
 
@@ -128,8 +126,14 @@ RSpec.describe "Signals API", type: :request do
     end
 
     context "with filtering" do
-      let!(:btc_signal) { create(:signal_alert, symbol: "BTC-USD", strategy_name: "Strategy1", side: "long", signal_type: "entry", confidence: 80) }
-      let!(:eth_signal) { create(:signal_alert, symbol: "ETH-USD", strategy_name: "Strategy2", side: "short", signal_type: "exit", confidence: 60) }
+      let!(:btc_signal) do
+        create(:signal_alert, symbol: "BTC-USD", strategy_name: "Strategy1", side: "long", signal_type: "entry",
+          confidence: 80)
+      end
+      let!(:eth_signal) do
+        create(:signal_alert, symbol: "ETH-USD", strategy_name: "Strategy2", side: "short", signal_type: "exit",
+          confidence: 60)
+      end
 
       it "filters by symbol" do
         get "/signals", headers: @headers, params: {symbol: "BTC-USD"}
@@ -340,7 +344,8 @@ RSpec.describe "Signals API", type: :request do
         post "/signals/evaluate", headers: @headers, params: {symbol: "INVALID-USD"}
 
         expect(Sentry).to have_received(:with_scope)
-        expect(Sentry).to have_received(:capture_message).with("Trading pair not found for signal evaluation", level: "warning")
+        expect(Sentry).to have_received(:capture_message).with("Trading pair not found for signal evaluation",
+          level: "warning")
       end
     end
 
@@ -351,9 +356,9 @@ RSpec.describe "Signals API", type: :request do
       end
 
       it "captures the error in Sentry and re-raises" do
-        expect {
+        expect do
           post "/signals/evaluate", headers: @headers, params: {symbol: "BTC-USD"}
-        }.to raise_error(StandardError, "Evaluation failed")
+        end.to raise_error(StandardError, "Evaluation failed")
 
         expect(Sentry).to have_received(:with_scope)
         expect(Sentry).to have_received(:capture_exception)
@@ -554,8 +559,12 @@ RSpec.describe "Signals API", type: :request do
     end
 
     context "with various signals" do
-      let!(:active_signal) { create(:signal_alert, alert_status: "active", confidence: 85, symbol: "BTC-USD", strategy_name: "Strategy1") }
-      let!(:triggered_signal) { create(:signal_alert, :triggered, confidence: 75, symbol: "ETH-USD", strategy_name: "Strategy2") }
+      let!(:active_signal) do
+        create(:signal_alert, alert_status: "active", confidence: 85, symbol: "BTC-USD", strategy_name: "Strategy1")
+      end
+      let!(:triggered_signal) do
+        create(:signal_alert, :triggered, confidence: 75, symbol: "ETH-USD", strategy_name: "Strategy2")
+      end
       let!(:expired_signal) { create(:signal_alert, :expired, confidence: 65) }
       let!(:high_conf_signal) { create(:signal_alert, :high_confidence, confidence: 90) }
       let!(:old_signal) { create(:signal_alert, alert_timestamp: 25.hours.ago) }
@@ -740,9 +749,7 @@ RSpec.describe "Signals API", type: :request do
         expect(json_response["error"]).to eq("Internal server error")
 
         # In development, error message should be included
-        if Rails.env.development?
-          expect(json_response["message"]).to eq("Database connection failed")
-        end
+        expect(json_response["message"]).to eq("Database connection failed") if Rails.env.development?
       end
     end
   end
@@ -759,14 +766,14 @@ RSpec.describe "Signals API", type: :request do
         signal_type: "entry",
         strategy_name: "TestStrategy",
         confidence: 85.5,
-        entry_price: 50000.0,
-        stop_loss: 49000.0,
-        take_profit: 52000.0,
+        entry_price: 50_000.0,
+        stop_loss: 49_000.0,
+        take_profit: 52_000.0,
         quantity: 10,
         timeframe: "15m",
         alert_status: "active",
         metadata: {"test" => "data"},
-        strategy_data: {"ema" => 49900})
+        strategy_data: {"ema" => 49_900})
 
       get "/signals/#{signal.id}", headers: @headers
 
@@ -780,9 +787,9 @@ RSpec.describe "Signals API", type: :request do
         "signal_type" => "entry",
         "strategy_name" => "TestStrategy",
         "confidence" => 85.5,
-        "entry_price" => 50000.0,
-        "stop_loss" => 49000.0,
-        "take_profit" => 52000.0,
+        "entry_price" => 50_000.0,
+        "stop_loss" => 49_000.0,
+        "take_profit" => 52_000.0,
         "quantity" => 10,
         "timeframe" => "15m",
         "alert_status" => "active",

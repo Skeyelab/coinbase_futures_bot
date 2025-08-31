@@ -10,7 +10,7 @@ require "action_controller/railtie"
 require "action_mailer/railtie"
 # require "action_mailbox/engine"
 # require "action_text/engine"
-require "action_view/railtie"
+# require "action_view/railtie"  # Not needed for API-only apps
 require "action_cable/engine"
 
 # Require the gems listed in Gemfile, including any gems
