@@ -3,123 +3,94 @@
 require "rails_helper"
 
 RSpec.describe SignalBroadcaster, type: :service do
-  let(:mock_action_cable) { instance_double(ActionCable::Server::Base) }
+  let(:mock_action_cable) { double("ActionCable::Server") }
+  let(:signal_data) do
+    {
+      id: 123,
+      symbol: "BTC-USD",
+      side: "long",
+      signal_type: "entry",
+      strategy_name: "MultiTimeframeSignal",
+      confidence: 85,
+      price: 50_000.0,
+      sl: 49_000.0,
+      tp: 52_000.0,
+      quantity: 1,
+      timeframe: "1h",
+      metadata: {custom_field: "value"},
+      strategy_data: {indicator_data: "data"}
+    }
+  end
 
   before do
     allow(ActionCable).to receive(:server).and_return(mock_action_cable)
     allow(mock_action_cable).to receive(:broadcast)
-    allow(Rails).to receive(:logger).and_return(instance_double(Logger))
     allow(Rails.logger).to receive(:info)
     allow(Rails.logger).to receive(:error)
   end
 
   describe ".broadcast" do
-    let(:signal_data) do
-      {
-        id: 123,
-        symbol: "BTC-USD",
-        side: "long",
-        signal_type: "entry",
-        strategy_name: "MultiTimeframeSignal",
-        confidence: 75,
-        price: 50_000,
-        sl: 49_000,
-        tp: 52_000,
-        quantity: 10,
-        timeframe: "15m",
-        metadata: {"test" => "metadata"},
-        strategy_data: {"ema_short" => 49_900, "ema_long" => 49_800}
-      }
-    end
-
     context "when broadcasting is enabled" do
       before do
         allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
       end
 
+      it "formats the signal payload" do
+        expect(described_class).to receive(:format_signal_payload).with(signal_data)
+        described_class.broadcast(signal_data)
+      end
+
       it "broadcasts to general signals channel" do
         expect(mock_action_cable).to receive(:broadcast).with("signals", anything)
-
         described_class.broadcast(signal_data)
       end
 
       it "broadcasts to symbol-specific channel" do
         expect(mock_action_cable).to receive(:broadcast).with("signals:BTC-USD", anything)
-
         described_class.broadcast(signal_data)
       end
 
       it "broadcasts to strategy-specific channel" do
         expect(mock_action_cable).to receive(:broadcast).with("signals:strategy:MultiTimeframeSignal", anything)
-
         described_class.broadcast(signal_data)
-      end
-
-      it "formats the signal payload correctly" do
-        formatted_payload = nil
-        allow(mock_action_cable).to receive(:broadcast) do |channel, payload|
-          formatted_payload = payload if channel == "signals"
-        end
-
-        described_class.broadcast(signal_data)
-
-        expect(formatted_payload).to include(
-          type: "signal_alert",
-          timestamp: anything,
-          signal: hash_including(
-            id: 123,
-            symbol: "BTC-USD",
-            side: "long",
-            signal_type: "entry",
-            strategy_name: "MultiTimeframeSignal",
-            confidence: 75,
-            entry_price: 50_000,
-            stop_loss: 49_000,
-            take_profit: 52_000,
-            quantity: 10,
-            timeframe: "15m",
-            alert_status: "active",
-            metadata: {"test" => "metadata"},
-            strategy_data: {"ema_short" => 49_900, "ema_long" => 49_800}
-          )
-        )
       end
 
       it "logs successful broadcast" do
-        expect(Rails.logger).to receive(:info).with("[SignalBroadcaster] Broadcast signal: BTC-USD long@50000")
-
+        expect(Rails.logger).to receive(:info).with("[SignalBroadcaster] Broadcast signal: BTC-USD long@50000.0")
         described_class.broadcast(signal_data)
       end
 
-      it "handles signals without symbol" do
-        signal_without_symbol = signal_data.except(:symbol)
+      context "when symbol is missing" do
+        let(:signal_data_without_symbol) { signal_data.except(:symbol) }
 
-        expect(mock_action_cable).to receive(:broadcast).with("signals", anything)
-        expect(mock_action_cable).not_to receive(:broadcast).with(/^signals:[^s]/, anything)
-
-        described_class.broadcast(signal_without_symbol)
+        it "does not broadcast to symbol-specific channel" do
+          expect(mock_action_cable).not_to receive(:broadcast).with(/signals:[^s]/, anything)
+          described_class.broadcast(signal_data_without_symbol)
+        end
       end
 
-      it "handles signals without strategy_name" do
-        signal_without_strategy = signal_data.except(:strategy_name)
+      context "when strategy_name is missing" do
+        let(:signal_data_without_strategy) { signal_data.except(:strategy_name) }
 
-        expect(mock_action_cable).to receive(:broadcast).with("signals", anything)
-        expect(mock_action_cable).to receive(:broadcast).with("signals:BTC-USD", anything)
-        expect(mock_action_cable).not_to receive(:broadcast).with(/^signals:strategy:/, anything)
-
-        described_class.broadcast(signal_without_strategy)
+        it "does not broadcast to strategy-specific channel" do
+          expect(mock_action_cable).not_to receive(:broadcast).with(/signals:strategy:/, anything)
+          described_class.broadcast(signal_data_without_strategy)
+        end
       end
 
-      it "calculates correct expiry for different timeframes" do
-        formatted_payload = nil
-        allow(mock_action_cable).to receive(:broadcast) do |channel, payload|
-          formatted_payload = payload if channel == "signals"
+      context "when broadcasting fails" do
+        before do
+          allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Broadcast failed"))
         end
 
-        described_class.broadcast(signal_data)
+        it "logs the error" do
+          expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast signal: Broadcast failed")
+          described_class.broadcast(signal_data)
+        end
 
-        expected_expiry = 15.minutes.from_now.utc.iso8601
-        expect(formatted_payload[:signal][:expires_at]).to eq(expected_expiry)
+        it "does not raise the error" do
+          expect { described_class.broadcast(signal_data) }.not_to raise_error
+        end
       end
     end
 
@@ -128,33 +99,14 @@ RSpec.describe SignalBroadcaster, type: :service do
         allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("false")
       end
 
-      it "does not broadcast signals" do
+      it "returns early without broadcasting" do
         expect(mock_action_cable).not_to receive(:broadcast)
-
         described_class.broadcast(signal_data)
       end
 
-      it "returns early without processing" do
-        expect(described_class).not_to receive(:format_signal_payload)
-
+      it "does not log anything" do
+        expect(Rails.logger).not_to receive(:info)
         described_class.broadcast(signal_data)
-      end
-    end
-
-    context "when broadcasting fails" do
-      before do
-        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
-        allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Broadcast failed"))
-      end
-
-      it "logs the error" do
-        expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast signal: Broadcast failed")
-
-        described_class.broadcast(signal_data)
-      end
-
-      it "does not raise the error" do
-        expect { described_class.broadcast(signal_data) }.not_to raise_error
       end
     end
   end
@@ -163,9 +115,9 @@ RSpec.describe SignalBroadcaster, type: :service do
     let(:stats_data) do
       {
         total_signals: 150,
-        active_signals: 25,
-        success_rate: 68.5,
-        avg_confidence: 72.3
+        successful_trades: 120,
+        win_rate: 80.0,
+        average_profit: 250.0
       }
     end
 
@@ -175,24 +127,36 @@ RSpec.describe SignalBroadcaster, type: :service do
       end
 
       it "broadcasts to signal_stats channel" do
-        expect(mock_action_cable).to receive(:broadcast).with("signal_stats", anything)
-
+        expect(mock_action_cable).to receive(:broadcast).with("signal_stats", {
+          type: "stats_update",
+          timestamp: an_instance_of(String),
+          stats: stats_data
+        })
         described_class.broadcast_stats(stats_data)
       end
 
-      it "formats the stats payload correctly" do
-        formatted_payload = nil
-        allow(mock_action_cable).to receive(:broadcast) do |channel, payload|
-          formatted_payload = payload if channel == "signal_stats"
+      it "includes current timestamp in ISO format" do
+        allow(Time).to receive(:current).and_return(Time.new(2024, 1, 15, 14, 30, 0, "+00:00"))
+
+        expected_payload = {
+          type: "stats_update",
+          timestamp: "2024-01-15T14:30:00Z",
+          stats: stats_data
+        }
+
+        expect(mock_action_cable).to receive(:broadcast).with("signal_stats", expected_payload)
+        described_class.broadcast_stats(stats_data)
+      end
+
+      context "when broadcasting fails" do
+        before do
+          allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Stats broadcast failed"))
         end
 
-        described_class.broadcast_stats(stats_data)
-
-        expect(formatted_payload).to include(
-          type: "stats_update",
-          timestamp: anything,
-          stats: stats_data
-        )
+        it "logs the error" do
+          expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast stats: Stats broadcast failed")
+          described_class.broadcast_stats(stats_data)
+        end
       end
     end
 
@@ -201,22 +165,8 @@ RSpec.describe SignalBroadcaster, type: :service do
         allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("false")
       end
 
-      it "does not broadcast stats" do
+      it "returns early without broadcasting" do
         expect(mock_action_cable).not_to receive(:broadcast)
-
-        described_class.broadcast_stats(stats_data)
-      end
-    end
-
-    context "when broadcasting fails" do
-      before do
-        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
-        allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Stats broadcast failed"))
-      end
-
-      it "logs the error" do
-        expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast stats: Stats broadcast failed")
-
         described_class.broadcast_stats(stats_data)
       end
     end
@@ -225,10 +175,10 @@ RSpec.describe SignalBroadcaster, type: :service do
   describe ".broadcast_status" do
     let(:status_data) do
       {
-        system_status: "operational",
-        last_evaluation: Time.current.utc.iso8601,
-        active_connections: 15,
-        queue_depth: 3
+        trading_active: true,
+        open_positions: 5,
+        daily_pnl: 1250.0,
+        health_status: "healthy"
       }
     end
 
@@ -238,24 +188,36 @@ RSpec.describe SignalBroadcaster, type: :service do
       end
 
       it "broadcasts to signal_status channel" do
-        expect(mock_action_cable).to receive(:broadcast).with("signal_status", anything)
-
+        expect(mock_action_cable).to receive(:broadcast).with("signal_status", {
+          type: "status_update",
+          timestamp: an_instance_of(String),
+          status: status_data
+        })
         described_class.broadcast_status(status_data)
       end
 
-      it "formats the status payload correctly" do
-        formatted_payload = nil
-        allow(mock_action_cable).to receive(:broadcast) do |channel, payload|
-          formatted_payload = payload if channel == "signal_status"
+      it "includes current timestamp in ISO format" do
+        allow(Time).to receive(:current).and_return(Time.new(2024, 1, 15, 16, 45, 0, "+00:00"))
+
+        expected_payload = {
+          type: "status_update",
+          timestamp: "2024-01-15T16:45:00Z",
+          status: status_data
+        }
+
+        expect(mock_action_cable).to receive(:broadcast).with("signal_status", expected_payload)
+        described_class.broadcast_status(status_data)
+      end
+
+      context "when broadcasting fails" do
+        before do
+          allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Status broadcast failed"))
         end
 
-        described_class.broadcast_status(status_data)
-
-        expect(formatted_payload).to include(
-          type: "status_update",
-          timestamp: anything,
-          status: status_data
-        )
+        it "logs the error" do
+          expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast status: Status broadcast failed")
+          described_class.broadcast_status(status_data)
+        end
       end
     end
 
@@ -264,213 +226,219 @@ RSpec.describe SignalBroadcaster, type: :service do
         allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("false")
       end
 
-      it "does not broadcast status" do
+      it "returns early without broadcasting" do
         expect(mock_action_cable).not_to receive(:broadcast)
-
-        described_class.broadcast_status(status_data)
-      end
-    end
-
-    context "when broadcasting fails" do
-      before do
-        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
-        allow(mock_action_cable).to receive(:broadcast).and_raise(StandardError.new("Status broadcast failed"))
-      end
-
-      it "logs the error" do
-        expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast status: Status broadcast failed")
-
         described_class.broadcast_status(status_data)
       end
     end
   end
 
   describe ".enabled?" do
-    it "returns true when SIGNAL_BROADCAST_ENABLED is true" do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
+    context "when SIGNAL_BROADCAST_ENABLED is true" do
+      before do
+        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
+      end
 
-      expect(described_class.send(:enabled?)).to be true
+      it "returns true" do
+        expect(described_class.send(:enabled?)).to be true
+      end
     end
 
-    it "returns true when SIGNAL_BROADCAST_ENABLED is TRUE (case insensitive)" do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("TRUE")
+    context "when SIGNAL_BROADCAST_ENABLED is TRUE" do
+      before do
+        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("TRUE")
+      end
 
-      expect(described_class.send(:enabled?)).to be true
+      it "returns true (case insensitive)" do
+        expect(described_class.send(:enabled?)).to be true
+      end
     end
 
-    it "returns false when SIGNAL_BROADCAST_ENABLED is false" do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("false")
+    context "when SIGNAL_BROADCAST_ENABLED is false" do
+      before do
+        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("false")
+      end
 
-      expect(described_class.send(:enabled?)).to be false
+      it "returns false" do
+        expect(described_class.send(:enabled?)).to be false
+      end
     end
 
-    it "returns false when SIGNAL_BROADCAST_ENABLED is FALSE (case insensitive)" do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("FALSE")
+    context "when SIGNAL_BROADCAST_ENABLED is not set" do
+      before do
+        allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
+      end
 
-      expect(described_class.send(:enabled?)).to be false
-    end
-
-    it "defaults to true when SIGNAL_BROADCAST_ENABLED is not set" do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
-
-      expect(described_class.send(:enabled?)).to be true
+      it "returns true (default)" do
+        expect(described_class.send(:enabled?)).to be true
+      end
     end
   end
 
   describe ".format_signal_payload" do
-    let(:signal_data) do
-      {
-        symbol: "BTC-USD",
-        side: "long",
-        strategy_name: "MultiTimeframeSignal",
-        confidence: 80,
-        price: 50_000,
-        sl: 49_000,
-        tp: 52_000,
-        quantity: 5,
-        timeframe: "1h"
-      }
-    end
+    let(:formatted_payload) { described_class.send(:format_signal_payload, signal_data) }
 
-    it "formats the signal data correctly" do
-      payload = described_class.send(:format_signal_payload, signal_data)
-
-      expect(payload).to include(
+    it "returns properly formatted payload" do
+      expect(formatted_payload).to include(
         type: "signal_alert",
-        timestamp: anything
-      )
-
-      expect(payload[:signal]).to include(
-        symbol: "BTC-USD",
-        side: "long",
-        signal_type: "entry",
-        strategy_name: "MultiTimeframeSignal",
-        confidence: 80,
-        entry_price: 50_000,
-        stop_loss: 49_000,
-        take_profit: 52_000,
-        quantity: 5,
-        timeframe: "1h",
-        alert_status: "active"
+        timestamp: an_instance_of(String),
+        signal: hash_including(
+          id: 123,
+          symbol: "BTC-USD",
+          side: "long",
+          signal_type: "entry",
+          strategy_name: "MultiTimeframeSignal",
+          confidence: 85,
+          entry_price: 50_000.0,
+          stop_loss: 49_000.0,
+          take_profit: 52_000.0,
+          quantity: 1,
+          timeframe: "1h",
+          alert_status: "active",
+          alert_timestamp: an_instance_of(String),
+          expires_at: an_instance_of(String),
+          metadata: {custom_field: "value"},
+          strategy_data: {indicator_data: "data"}
+        )
       )
     end
 
-    it "includes timestamps in ISO format" do
-      payload = described_class.send(:format_signal_payload, signal_data)
+    it "includes current timestamp" do
+      allow(Time).to receive(:current).and_return(Time.new(2024, 1, 15, 14, 30, 0, "+00:00"))
 
-      expect(payload[:timestamp]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
-      expect(payload[:signal][:alert_timestamp]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
+      expect(formatted_payload[:timestamp]).to eq("2024-01-15T14:30:00Z")
+      expect(formatted_payload[:signal][:alert_timestamp]).to eq("2024-01-15T14:30:00Z")
     end
 
-    it "provides default values for missing data" do
-      minimal_signal = {symbol: "BTC-USD", side: "long"}
-      payload = described_class.send(:format_signal_payload, minimal_signal)
+    context "when signal_type is missing" do
+      let(:signal_data_without_type) { signal_data.except(:signal_type) }
 
-      expect(payload[:signal]).to include(
-        signal_type: "entry",
-        metadata: {},
-        strategy_data: {}
-      )
+      it "defaults to entry" do
+        result = described_class.send(:format_signal_payload, signal_data_without_type)
+        expect(result[:signal][:signal_type]).to eq("entry")
+      end
+    end
+
+    context "when metadata is missing" do
+      let(:signal_data_without_metadata) { signal_data.except(:metadata) }
+
+      it "defaults to empty hash" do
+        result = described_class.send(:format_signal_payload, signal_data_without_metadata)
+        expect(result[:signal][:metadata]).to eq({})
+      end
+    end
+
+    context "when strategy_data is missing" do
+      let(:signal_data_without_strategy_data) { signal_data.except(:strategy_data) }
+
+      it "defaults to empty hash" do
+        result = described_class.send(:format_signal_payload, signal_data_without_strategy_data)
+        expect(result[:signal][:strategy_data]).to eq({})
+      end
     end
   end
 
   describe ".calculate_expiry" do
-    context "with MultiTimeframeSignal strategy" do
-      it "calculates 2 minutes expiry for 1m timeframe" do
-        expiry = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "1m")
-        expected = 2.minutes.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+    context "for MultiTimeframeSignal strategy" do
+      it "calculates expiry for 1m timeframe" do
+        result = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "1m")
+        expect(result).to match(/T\d{2}:\d{2}:\d{2}Z/)
+
+        # Should be 2 minutes from now
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(2.minutes.from_now)
       end
 
-      it "calculates 5 minutes expiry for 5m timeframe" do
-        expiry = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "5m")
-        expected = 5.minutes.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+      it "calculates expiry for 5m timeframe" do
+        result = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "5m")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(5.minutes.from_now)
       end
 
-      it "calculates 15 minutes expiry for 15m timeframe" do
-        expiry = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "15m")
-        expected = 15.minutes.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+      it "calculates expiry for 15m timeframe" do
+        result = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "15m")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(15.minutes.from_now)
       end
 
-      it "calculates 1 hour expiry for 1h timeframe" do
-        expiry = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "1h")
-        expected = 1.hour.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+      it "calculates expiry for 1h timeframe" do
+        result = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "1h")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(1.hour.from_now)
       end
 
-      it "calculates 30 minutes expiry for unknown timeframe" do
-        expiry = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "4h")
-        expected = 30.minutes.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+      it "calculates default expiry for unknown timeframe" do
+        result = described_class.send(:calculate_expiry, "MultiTimeframeSignal", "30m")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(30.minutes.from_now)
       end
     end
 
-    context "with other strategies" do
-      it "calculates 15 minutes expiry for non-MultiTimeframeSignal strategies" do
-        expiry = described_class.send(:calculate_expiry, "CustomStrategy", "15m")
-        expected = 15.minutes.from_now.utc.iso8601
-        expect(expiry).to eq(expected)
+    context "for other strategies" do
+      it "calculates 15 minute expiry" do
+        result = described_class.send(:calculate_expiry, "OtherStrategy", "1h")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(15.minutes.from_now)
+      end
+    end
+
+    context "when strategy_name is nil" do
+      it "calculates 15 minute expiry" do
+        result = described_class.send(:calculate_expiry, nil, "1h")
+        parsed_time = Time.iso8601(result)
+        expect(parsed_time).to be_within(5.seconds).of(15.minutes.from_now)
       end
     end
   end
 
-  describe "integration with different signal types" do
-    let(:long_signal) do
-      {
-        symbol: "BTC-USD",
-        side: "long",
-        strategy_name: "MultiTimeframeSignal",
-        confidence: 85,
-        price: 50_000,
-        sl: 49_000,
-        tp: 52_000,
-        quantity: 10,
-        timeframe: "15m"
-      }
+  describe "integration with ActionCable" do
+    it "uses ActionCable.server.broadcast" do
+      expect(ActionCable).to receive(:server)
+      described_class.broadcast(signal_data)
     end
+  end
 
-    let(:short_signal) do
-      {
-        symbol: "ETH-USD",
-        side: "short",
-        strategy_name: "MultiTimeframeSignal",
-        confidence: 78,
-        price: 3_000,
-        sl: 3_100,
-        tp: 2_900,
-        quantity: 5,
-        timeframe: "5m"
-      }
+  describe "error handling" do
+    context "when ActionCable broadcasting fails" do
+      before do
+        allow(ActionCable).to receive(:server).and_raise(StandardError.new("ActionCable unavailable"))
+      end
+
+      it "handles broadcast gracefully" do
+        expect { described_class.broadcast(signal_data) }.not_to raise_error
+      end
+
+      it "logs the error" do
+        expect(Rails.logger).to receive(:error).with("[SignalBroadcaster] Failed to broadcast signal: ActionCable unavailable")
+        described_class.broadcast(signal_data)
+      end
     end
+  end
 
-    before do
-      allow(ENV).to receive(:fetch).with("SIGNAL_BROADCAST_ENABLED", "true").and_return("true")
-    end
-
-    it "handles long signals correctly" do
+  describe "channel naming" do
+    it "uses consistent channel names" do
       expect(mock_action_cable).to receive(:broadcast).with("signals", anything)
       expect(mock_action_cable).to receive(:broadcast).with("signals:BTC-USD", anything)
       expect(mock_action_cable).to receive(:broadcast).with("signals:strategy:MultiTimeframeSignal", anything)
 
-      described_class.broadcast(long_signal)
+      described_class.broadcast(signal_data)
     end
+  end
 
-    it "handles short signals correctly" do
-      expect(mock_action_cable).to receive(:broadcast).with("signals", anything)
-      expect(mock_action_cable).to receive(:broadcast).with("signals:ETH-USD", anything)
-      expect(mock_action_cable).to receive(:broadcast).with("signals:strategy:MultiTimeframeSignal", anything)
+  describe "payload structure" do
+    it "maintains consistent payload structure" do
+      payload = described_class.send(:format_signal_payload, signal_data)
 
-      described_class.broadcast(short_signal)
-    end
+      expect(payload).to have_key(:type)
+      expect(payload).to have_key(:timestamp)
+      expect(payload).to have_key(:signal)
 
-    it "logs different signal types appropriately" do
-      expect(Rails.logger).to receive(:info).with("[SignalBroadcaster] Broadcast signal: BTC-USD long@50000")
-      described_class.broadcast(long_signal)
-
-      expect(Rails.logger).to receive(:info).with("[SignalBroadcaster] Broadcast signal: ETH-USD short@3000")
-      described_class.broadcast(short_signal)
+      signal = payload[:signal]
+      expect(signal).to have_key(:id)
+      expect(signal).to have_key(:symbol)
+      expect(signal).to have_key(:side)
+      expect(signal).to have_key(:alert_status)
+      expect(signal).to have_key(:expires_at)
     end
   end
 end

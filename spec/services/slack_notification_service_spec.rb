@@ -3,351 +3,789 @@
 require "rails_helper"
 
 RSpec.describe SlackNotificationService, type: :service do
-  let(:service) { described_class.new }
+  let(:mock_client) { instance_double(Slack::Web::Client) }
+  let(:mock_response) { instance_double(Faraday::Response) }
 
-  # Mock Slack client to prevent real API calls during tests
-  def mock_slack_client
-    mock_client = instance_double(Slack::Web::Client)
-    allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-    allow(mock_client).to receive(:chat_postMessage).and_return(true)
+  before do
+    # Create a new mock client for each test to avoid expiration issues
+    mock_client_instance = instance_double(Slack::Web::Client)
+    allow(Slack::Web::Client).to receive(:new).and_return(mock_client_instance)
+    allow(mock_client_instance).to receive(:chat_postMessage).and_return(true)
 
-    # Reset the cached client instance in the service
-    described_class.instance_variable_set(:@client, nil)
+    # Mock logging and error tracking
+    allow(Rails.logger).to receive(:info)
+    allow(Rails.logger).to receive(:error)
+    allow(Rails.logger).to receive(:debug)
+    allow(Sentry).to receive(:with_scope)
+    allow(Sentry).to receive(:capture_exception)
+    allow(Sentry).to receive(:capture_message)
+    allow(Sentry).to receive(:capture_message)
 
-    mock_client
+    # Mock all ENV variables that might be accessed
+    allow(ENV).to receive(:[]).and_call_original
   end
 
-  # Test data setup without heavy mocking - avoid nil values for ClimateControl
-  let(:test_env) do
-    {
-      "SLACK_ENABLED" => "true",
-      "SLACK_BOT_TOKEN" => "xoxb-test-token",
-      "SLACK_SIGNALS_CHANNEL" => "#test-signals",
-      "SLACK_POSITIONS_CHANNEL" => "#test-positions",
-      "SLACK_STATUS_CHANNEL" => "#test-status",
-      "SLACK_ALERTS_CHANNEL" => "#test-alerts",
-      "SLACK_WEBHOOK_URL" => "https://hooks.slack.com/test"
-    }
+  describe "#enabled?" do
+    context "when SLACK_ENABLED is true" do
+      before { allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true") }
+
+      context "when SLACK_BOT_TOKEN is present" do
+        before { allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token") }
+
+        it "returns true" do
+          expect(described_class.send(:enabled?)).to be true
+        end
+      end
+
+      context "when SLACK_BOT_TOKEN is not present" do
+        before { allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return(nil) }
+
+        it "returns false" do
+          expect(described_class.send(:enabled?)).to be false
+        end
+      end
+    end
+
+    context "when SLACK_ENABLED is not true" do
+      before { allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false") }
+
+      it "returns false" do
+        expect(described_class.send(:enabled?)).to be false
+      end
+    end
   end
 
-  let(:disabled_env) do
-    {
-      "SLACK_ENABLED" => "false",
-      "SLACK_BOT_TOKEN" => "xoxb-test-token",
-      "SLACK_SIGNALS_CHANNEL" => "#test-signals",
-      "SLACK_POSITIONS_CHANNEL" => "#test-positions",
-      "SLACK_STATUS_CHANNEL" => "#test-status",
-      "SLACK_ALERTS_CHANNEL" => "#test-alerts",
-      "SLACK_WEBHOOK_URL" => "https://hooks.slack.com/test"
-    }
+  describe "#bot_token" do
+    it "returns the SLACK_BOT_TOKEN environment variable" do
+      allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("test-token")
+      expect(described_class.send(:bot_token)).to eq("test-token")
+    end
   end
 
-  let(:missing_config_env) do
-    {
-      "SLACK_ENABLED" => "true",
-      "SLACK_BOT_TOKEN" => "",
-      "SLACK_SIGNALS_CHANNEL" => "",
-      "SLACK_POSITIONS_CHANNEL" => "#test-positions",
-      "SLACK_STATUS_CHANNEL" => "#test-status",
-      "SLACK_ALERTS_CHANNEL" => "#test-alerts",
-      "SLACK_WEBHOOK_URL" => "https://hooks.slack.com/test"
-    }
+  describe "channel methods" do
+    describe "#signals_channel" do
+      context "when SLACK_SIGNALS_CHANNEL is set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_SIGNALS_CHANNEL").and_return("#custom-signals") }
+
+        it "returns the custom channel" do
+          expect(described_class.send(:signals_channel)).to eq("#custom-signals")
+        end
+      end
+
+      context "when SLACK_SIGNALS_CHANNEL is not set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_SIGNALS_CHANNEL").and_return(nil) }
+
+        it "returns the default channel" do
+          expect(described_class.send(:signals_channel)).to eq("#trading-signals")
+        end
+      end
+    end
+
+    describe "#positions_channel" do
+      context "when SLACK_POSITIONS_CHANNEL is set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_POSITIONS_CHANNEL").and_return("#custom-positions") }
+
+        it "returns the custom channel" do
+          expect(described_class.send(:positions_channel)).to eq("#custom-positions")
+        end
+      end
+
+      context "when SLACK_POSITIONS_CHANNEL is not set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_POSITIONS_CHANNEL").and_return(nil) }
+
+        it "returns the default channel" do
+          expect(described_class.send(:positions_channel)).to eq("#trading-positions")
+        end
+      end
+    end
+
+    describe "#status_channel" do
+      context "when SLACK_STATUS_CHANNEL is set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_STATUS_CHANNEL").and_return("#custom-status") }
+
+        it "returns the custom channel" do
+          expect(described_class.send(:status_channel)).to eq("#custom-status")
+        end
+      end
+
+      context "when SLACK_STATUS_CHANNEL is not set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_STATUS_CHANNEL").and_return(nil) }
+
+        it "returns the default channel" do
+          expect(described_class.send(:status_channel)).to eq("#bot-status")
+        end
+      end
+    end
+
+    describe "#alerts_channel" do
+      context "when SLACK_ALERTS_CHANNEL is set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_ALERTS_CHANNEL").and_return("#custom-alerts") }
+
+        it "returns the custom channel" do
+          expect(described_class.send(:alerts_channel)).to eq("#custom-alerts")
+        end
+      end
+
+      context "when SLACK_ALERTS_CHANNEL is not set" do
+        before { allow(ENV).to receive(:[]).with("SLACK_ALERTS_CHANNEL").and_return(nil) }
+
+        it "returns the default channel" do
+          expect(described_class.send(:alerts_channel)).to eq("#trading-alerts")
+        end
+      end
+    end
   end
 
-  let(:invalid_channels_env) do
-    {
-      "SLACK_ENABLED" => "true",
-      "SLACK_BOT_TOKEN" => "xoxb-test-token",
-      "SLACK_SIGNALS_CHANNEL" => "",
-      "SLACK_POSITIONS_CHANNEL" => "",
-      "SLACK_STATUS_CHANNEL" => "#test-status",
-      "SLACK_ALERTS_CHANNEL" => "#test-alerts",
-      "SLACK_WEBHOOK_URL" => "https://hooks.slack.com/test"
-    }
-  end
+  describe "#signal_generated" do
+    let(:signal_data) do
+      {
+        symbol: "BTC-USD",
+        side: "long",
+        price: 50_000.0,
+        quantity: 1,
+        tp: 52_000.0,
+        sl: 49_000.0,
+        confidence: 80
+      }
+    end
 
-  # Use realistic test data instead of mocking external services
-  let(:signal_data) do
-    {
-      symbol: "BTC-USD",
-      side: "long",
-      price: 50_000.0,
-      quantity: 0.1,
-      tp: 52_000.0,
-      sl: 48_000.0,
-      confidence: 75
-    }
-  end
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
 
-  let(:position) do
-    create(:position,
-      product_id: "ETH-USD",
-      side: "LONG",
-      size: 1.0,
-      entry_price: 3000.0,
-      pnl: 150.0)
-  end
+      it "formats and sends the signal message" do
+        expect(described_class).to receive(:format_signal_message).with(signal_data)
+        expect(described_class).to receive(:send_message)
+        described_class.signal_generated(signal_data)
+      end
 
-  # Remove the global before block to avoid ClimateControl issues with nil values
-  # Each test will handle its own environment setup
-
-  describe ".signal_generated" do
-    it "handles valid signal data gracefully" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
+      it "uses the signals channel" do
+        expect(described_class).to receive(:signals_channel)
         described_class.signal_generated(signal_data)
       end
     end
 
-    it "handles different signal types" do
-      short_signal = signal_data.merge(side: "short", symbol: "ETH-USD")
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
 
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.signal_generated(short_signal)
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_signal_message)
+        described_class.signal_generated(signal_data)
+      end
+    end
+
+    context "when signal_data is invalid" do
+      it "returns early for nil data" do
+        expect(described_class).not_to receive(:format_signal_message)
+        described_class.signal_generated(nil)
+      end
+
+      it "returns early for empty data" do
+        expect(described_class).not_to receive(:format_signal_message)
+        described_class.signal_generated({})
+      end
+
+      it "returns early for non-hash data" do
+        expect(described_class).not_to receive(:format_signal_message)
+        described_class.signal_generated("invalid")
       end
     end
   end
 
-  describe ".position_update" do
-    it "handles position opened events" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.position_update(position, "opened")
+  describe "#position_update" do
+    let(:mock_position) { double("Position", product_id: "BTC-USD", side: "long", size: 1, entry_price: 50_000.0, pnl: 100.0) }
+    let(:action) { "closed" }
+
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the position message" do
+        expect(described_class).to receive(:format_position_message).with(mock_position, action)
+        expect(described_class).to receive(:send_message)
+        described_class.position_update(mock_position, action)
+      end
+
+      it "uses the positions channel" do
+        expect(described_class).to receive(:positions_channel)
+        described_class.position_update(mock_position, action)
       end
     end
 
-    it "handles position closed events with profit" do
-      profitable_position = create(:position,
-        product_id: "BTC-USD",
-        side: "LONG",
-        size: 1.0,
-        entry_price: 50_000.0,
-        pnl: 1000.0)
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
 
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.position_update(profitable_position, "closed")
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_position_message)
+        described_class.position_update(mock_position, action)
       end
     end
 
-    it "handles position closed events with loss" do
-      loss_position = create(:position,
-        product_id: "ADA-USD",
-        side: "SHORT",
-        size: 100.0,
-        entry_price: 1.0,
-        pnl: -50.0)
-
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.position_update(loss_position, "closed")
+    context "when position is invalid" do
+      it "returns early for nil position" do
+        expect(described_class).not_to receive(:format_position_message)
+        described_class.position_update(nil, action)
       end
     end
 
-    it "handles positions with zero PnL" do
-      zero_pnl_position = create(:position,
-        product_id: "ETH-USD",
-        side: "LONG",
-        size: 1.0,
-        entry_price: 3000.0,
-        pnl: 0.0)
-
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.position_update(zero_pnl_position, "closed")
+    context "when action is invalid" do
+      it "returns early for nil action" do
+        expect(described_class).not_to receive(:format_position_message)
+        described_class.position_update(mock_position, nil)
       end
-    end
 
-    it "handles very small positions" do
-      small_position = create(:position,
-        product_id: "BTC-USD",
-        side: "LONG",
-        size: 0.001,
-        entry_price: 50_000.0,
-        pnl: 0.5)
-
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.position_update(small_position, "opened")
+      it "returns early for empty action" do
+        expect(described_class).not_to receive(:format_position_message)
+        described_class.position_update(mock_position, "")
       end
     end
   end
 
-  describe ".bot_status" do
+  describe "#bot_status" do
     let(:status_data) do
       {
         status: "active",
         trading_active: true,
-        open_positions: 5,
-        daily_pnl: 250.0,
-        last_signal_time: "10:30 UTC",
-        healthy: true
+        healthy: true,
+        open_positions: 2,
+        daily_pnl: 150.0
       }
     end
 
-    it "handles active status data" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the status message" do
+        expect(described_class).to receive(:format_status_message).with(status_data)
+        expect(described_class).to receive(:send_message)
+        described_class.bot_status(status_data)
+      end
+
+      it "uses the status channel" do
+        expect(described_class).to receive(:status_channel)
         described_class.bot_status(status_data)
       end
     end
 
-    it "handles inactive status data" do
-      inactive_data = status_data.merge(status: "inactive", trading_active: false, healthy: false)
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.bot_status(inactive_data)
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
+
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_status_message)
+        described_class.bot_status(status_data)
       end
     end
 
-    it "handles status data with no positions" do
-      no_positions_data = status_data.merge(open_positions: 0, daily_pnl: 0.0)
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.bot_status(no_positions_data)
+    context "when status_data is invalid" do
+      it "returns early for nil data" do
+        expect(described_class).not_to receive(:format_status_message)
+        described_class.bot_status(nil)
       end
-    end
-  end
 
-  describe ".alert" do
-    it "handles critical alerts" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.alert("critical", "System Error", "Database connection lost")
+      it "returns early for empty data" do
+        expect(described_class).not_to receive(:format_status_message)
+        described_class.bot_status({})
       end
-    end
 
-    it "handles warning alerts" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.alert("warning", "High Memory Usage")
-      end
-    end
-
-    it "handles info alerts" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.alert("info", "System Check", "All systems operational")
-      end
-    end
-
-    it "handles alerts without additional details" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.alert("warning", "Maintenance Mode")
+      it "returns early for non-hash data" do
+        expect(described_class).not_to receive(:format_status_message)
+        described_class.bot_status("invalid")
       end
     end
   end
 
-  describe ".pnl_update" do
+  describe "#alert" do
+    let(:level) { "error" }
+    let(:title) { "Test Alert" }
+    let(:details) { "Something went wrong" }
+
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the alert message" do
+        expect(described_class).to receive(:format_alert_message).with(level, title, details)
+        expect(described_class).to receive(:send_message)
+        described_class.alert(level, title, details)
+      end
+
+      context "with critical level" do
+        it "uses alerts channel" do
+          expect(described_class).to receive(:alerts_channel)
+          described_class.alert("critical", title)
+        end
+      end
+
+      context "with error level" do
+        it "uses alerts channel" do
+          expect(described_class).to receive(:alerts_channel)
+          described_class.alert("error", title)
+        end
+      end
+
+      context "with other levels" do
+        it "uses status channel" do
+          expect(described_class).to receive(:status_channel)
+          described_class.alert("info", title)
+        end
+      end
+    end
+
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
+
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_alert_message)
+        described_class.alert(level, title)
+      end
+    end
+
+    context "when parameters are invalid" do
+      it "returns early for nil level" do
+        expect(described_class).not_to receive(:format_alert_message)
+        described_class.alert(nil, title)
+      end
+
+      it "returns early for empty level" do
+        expect(described_class).not_to receive(:format_alert_message)
+        described_class.alert("", title)
+      end
+
+      it "returns early for nil title" do
+        expect(described_class).not_to receive(:format_alert_message)
+        described_class.alert(level, nil)
+      end
+
+      it "returns early for empty title" do
+        expect(described_class).not_to receive(:format_alert_message)
+        described_class.alert(level, "")
+      end
+    end
+  end
+
+  describe "#pnl_update" do
     let(:pnl_data) do
       {
-        total_pnl: 500.0,
-        daily_pnl: 100.0,
-        open_positions: 3,
-        closed_today: 2,
-        win_rate: 66.7
+        total_pnl: 250.0,
+        daily_pnl: 150.0,
+        open_positions: 2
       }
     end
 
-    it "handles positive PnL data" do
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the PnL message" do
+        expect(described_class).to receive(:format_pnl_message).with(pnl_data)
+        expect(described_class).to receive(:send_message)
+        described_class.pnl_update(pnl_data)
+      end
+
+      it "uses the positions channel" do
+        expect(described_class).to receive(:positions_channel)
         described_class.pnl_update(pnl_data)
       end
     end
 
-    it "handles negative PnL data" do
-      negative_pnl = pnl_data.merge(total_pnl: -200.0, daily_pnl: -50.0)
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.pnl_update(negative_pnl)
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
+
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_pnl_message)
+        described_class.pnl_update(pnl_data)
       end
     end
 
-    it "handles zero PnL data" do
-      zero_pnl = pnl_data.merge(total_pnl: 0.0, daily_pnl: 0.0, win_rate: 0.0)
-      ClimateControl.modify(test_env) do
-        mock_client = mock_slack_client
-        expect(mock_client).to receive(:chat_postMessage).once
-        described_class.pnl_update(zero_pnl)
+    context "when pnl_data is invalid" do
+      it "returns early for nil data" do
+        expect(described_class).not_to receive(:format_pnl_message)
+        described_class.pnl_update(nil)
+      end
+
+      it "returns early for empty data" do
+        expect(described_class).not_to receive(:format_pnl_message)
+        described_class.pnl_update({})
+      end
+
+      it "returns early for non-hash data" do
+        expect(described_class).not_to receive(:format_pnl_message)
+        described_class.pnl_update("invalid")
       end
     end
   end
 
-  describe "configuration and environment handling" do
-    context "with missing Slack configuration" do
-      it "handles missing bot token gracefully" do
-        # Test with Slack disabled
-        ClimateControl.modify(disabled_env) do
-          expect do
-            described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
-          end.not_to raise_error
-        end
+  describe "#health_check" do
+    let(:health_data) do
+      {
+        overall_health: "healthy",
+        database: true,
+        coinbase_api: true,
+        background_jobs: true
+      }
+    end
+
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the health message" do
+        expect(described_class).to receive(:format_health_message).with(health_data)
+        expect(described_class).to receive(:send_message)
+        described_class.health_check(health_data)
+      end
+
+      it "uses the status channel" do
+        expect(described_class).to receive(:status_channel)
+        described_class.health_check(health_data)
       end
     end
 
-    context "with invalid channel configurations" do
-      it "handles empty channels gracefully" do
-        # Test with missing channel configuration
-        ClimateControl.modify(missing_config_env) do
-          expect do
-            described_class.signal_generated({symbol: "BTC-USD", side: "long", price: 50_000.0})
-          end.not_to raise_error
-        end
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
+
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_health_message)
+        described_class.health_check(health_data)
+      end
+    end
+  end
+
+  describe "#market_alert" do
+    let(:market_data) do
+      {
+        alert_type: "volatility_spike",
+        symbol: "BTC-USD",
+        current_price: 50_000.0,
+        volatility: 15.5
+      }
+    end
+
+    context "when service is enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+        allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+      end
+
+      it "formats and sends the market alert message" do
+        expect(described_class).to receive(:format_market_message).with(market_data)
+        expect(described_class).to receive(:send_message)
+        described_class.market_alert(market_data)
+      end
+
+      it "uses the alerts channel" do
+        expect(described_class).to receive(:alerts_channel)
+        described_class.market_alert(market_data)
       end
     end
 
-    context "with malformed data" do
-      it "handles nil signal data gracefully" do
-        ClimateControl.modify(test_env) do
-          mock_client = mock_slack_client
-          # Should not call Slack client for nil data
-          expect(mock_client).not_to receive(:chat_postMessage)
-          expect do
-            described_class.signal_generated(nil)
-          end.not_to raise_error
+    context "when service is not enabled" do
+      before do
+        allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
+      end
+
+      it "returns early without sending" do
+        expect(described_class).not_to receive(:format_market_message)
+        described_class.market_alert(market_data)
+      end
+    end
+  end
+
+  describe "#send_message" do
+    let(:message) { {text: "Test message", attachments: []} }
+    let(:channel) { "#test-channel" }
+
+    before do
+      allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
+      allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("xoxb-token")
+    end
+
+    context "when message is valid" do
+      it "creates a client instance" do
+        described_class.send(:send_message, message, channel: channel)
+        expect(Slack::Web::Client).to have_received(:new)
+      end
+
+      it "sends the message with correct parameters" do
+        expect(mock_client).to receive(:chat_postMessage).with(
+          channel: channel,
+          text: message[:text],
+          attachments: message[:attachments],
+          blocks: message[:blocks]
+        )
+        described_class.send(:send_message, message, channel: channel)
+      end
+
+      it "returns true on success" do
+        result = described_class.send(:send_message, message, channel: channel)
+        expect(result).to be true
+      end
+
+      it "logs successful message sending" do
+        expect(Rails.logger).to receive(:info).with("[Slack] Message sent to #{channel}")
+        described_class.send(:send_message, message, channel: channel)
+      end
+    end
+
+    context "when message is invalid" do
+      it "returns without sending for nil message" do
+        expect(mock_client).not_to receive(:chat_postMessage)
+        result = described_class.send(:send_message, nil, channel: channel)
+        expect(result).to be_nil
+      end
+
+      it "returns without sending for empty message" do
+        expect(mock_client).not_to receive(:chat_postMessage)
+        result = described_class.send(:send_message, {}, channel: channel)
+        expect(result).to be_nil
+      end
+    end
+
+    context "when Slack API error occurs" do
+      let(:slack_error) { Slack::Web::Api::Errors::SlackError.new("API Error") }
+
+      before do
+        allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+      end
+
+      it "logs the error" do
+        expect(Rails.logger).to receive(:error).with("[Slack] API Error: API Error")
+        described_class.send(:send_message, message, channel: channel)
+      end
+
+      it "sends error to Sentry" do
+        expect(Sentry).to receive(:with_scope)
+        described_class.send(:send_message, message, channel: channel)
+      end
+
+      context "when retries are available" do
+        it "retries with exponential backoff" do
+          expect(described_class).to receive(:sleep).with(2)
+          expect(described_class).to receive(:sleep).with(4)
+          expect(described_class).to receive(:sleep).with(8)
+
+          # Allow the recursive call to eventually succeed
+          call_count = 0
+          allow(mock_client).to receive(:chat_postMessage) do
+            call_count += 1
+            raise slack_error if call_count <= 3
+            true
+          end
+
+          described_class.send(:send_message, message, channel: channel)
+        end
+
+        it "retries up to max_retries times" do
+          expect(described_class).to receive(:send_message).exactly(3).times.and_call_original
+          described_class.send(:send_message, message, channel: channel)
         end
       end
 
-      it "handles empty signal data gracefully" do
-        ClimateControl.modify(test_env) do
-          mock_client = mock_slack_client
-          # Should not call Slack client for empty data
-          expect(mock_client).not_to receive(:chat_postMessage)
-          expect do
-            described_class.signal_generated({})
-          end.not_to raise_error
+      context "when max retries exceeded" do
+        before do
+          allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
         end
+
+        it "logs max retries exceeded" do
+          expect(Rails.logger).to receive(:error).with("[Slack] Failed to send message after 3 retries")
+          described_class.send(:send_message, message, channel: channel)
+        end
+
+        it "sends final failure to Sentry" do
+          expect(Sentry).to receive(:capture_message).with("Slack message failed after max retries", level: "error")
+          described_class.send(:send_message, message, channel: channel)
+        end
+
+        it "returns false" do
+          result = described_class.send(:send_message, message, channel: channel)
+          expect(result).to be false
+        end
+      end
+    end
+  end
+
+  describe "message formatting methods" do
+    describe "#format_signal_message" do
+      let(:signal_data) do
+        {
+          symbol: "BTC-USD",
+          side: "long",
+          price: 50_000.0,
+          quantity: 1,
+          tp: 52_000.0,
+          sl: 49_000.0,
+          confidence: 80
+        }
       end
 
-      it "handles signal data with missing fields" do
-        incomplete_signal = {symbol: "BTC-USD"}
-        ClimateControl.modify(test_env) do
-          mock_client = mock_slack_client
-          expect(mock_client).to receive(:chat_postMessage).once
-          expect do
-            described_class.signal_generated(incomplete_signal)
-          end.not_to raise_error
-        end
+      it "returns properly formatted message" do
+        result = described_class.send(:format_signal_message, signal_data)
+
+        expect(result[:text]).to eq("🎯 New Trading Signal: BTC-USD")
+        expect(result[:attachments]).to be_an(Array)
+        expect(result[:attachments].first[:fields]).to include(
+          {title: "Symbol", value: "BTC-USD", short: true},
+          {title: "Side", value: "LONG", short: true},
+          {title: "Price", value: "$50000.0", short: true}
+        )
       end
+
+      it "handles missing data gracefully" do
+        result = described_class.send(:format_signal_message, {})
+        expect(result[:text]).to eq("🎯 New Trading Signal: N/A")
+      end
+
+      it "formats colors correctly" do
+        long_signal = signal_data.merge(side: "long")
+        result = described_class.send(:format_signal_message, long_signal)
+        expect(result[:attachments].first[:color]).to eq("good")
+
+        short_signal = signal_data.merge(side: "short")
+        result = described_class.send(:format_signal_message, short_signal)
+        expect(result[:attachments].first[:color]).to eq("danger")
+      end
+    end
+
+    describe "#format_position_message" do
+      let(:mock_position) do
+        double("Position",
+          product_id: "BTC-USD",
+          side: "long",
+          size: 1,
+          entry_price: 50_000.0,
+          pnl: 100.0,
+          entry_time: 1.hour.ago,
+          close_time: Time.current)
+      end
+
+      it "returns properly formatted message" do
+        result = described_class.send(:format_position_message, mock_position, "closed")
+
+        expect(result[:text]).to eq("🔴 Position Closed: BTC-USD")
+        expect(result[:attachments]).to be_an(Array)
+        expect(result[:attachments].first[:fields]).to include(
+          {title: "Symbol", value: "BTC-USD", short: true},
+          {title: "Side", value: "LONG", short: true}
+        )
+      end
+
+      it "includes PnL information when available" do
+        result = described_class.send(:format_position_message, mock_position, "closed")
+        pnl_field = result[:attachments].first[:fields].find { |f| f[:title] == "PnL" }
+        expect(pnl_field[:value]).to eq("$100.0")
+      end
+
+      it "formats duration correctly" do
+        result = described_class.send(:format_position_message, mock_position, "closed")
+        duration_field = result[:attachments].first[:fields].find { |f| f[:title] == "Duration" }
+        expect(duration_field[:value]).to match(/\d+h \d+m/)
+      end
+    end
+
+    describe "#format_alert_message" do
+      it "formats critical alerts correctly" do
+        result = described_class.send(:format_alert_message, "critical", "System Down", "Database connection failed")
+
+        expect(result[:text]).to eq("🚨 Alert: System Down")
+        expect(result[:attachments].first[:color]).to eq("danger")
+        expect(result[:attachments].first[:fields]).to include(
+          {title: "Level", value: "CRITICAL", short: true},
+          {title: "Details", value: "Database connection failed", short: false}
+        )
+      end
+
+      it "handles alerts without details" do
+        result = described_class.send(:format_alert_message, "warning", "High CPU Usage")
+
+        expect(result[:text]).to eq("⚠️ Alert: High CPU Usage")
+        expect(result[:attachments].first[:color]).to eq("warning")
+      end
+    end
+
+    describe "#format_health_message" do
+      let(:health_data) do
+        {
+          overall_health: "healthy",
+          database: true,
+          coinbase_api: true,
+          background_jobs: true,
+          websocket_connections: 5
+        }
+      end
+
+      it "formats healthy status correctly" do
+        result = described_class.send(:format_health_message, health_data)
+
+        expect(result[:text]).to eq("✅ Health Check")
+        expect(result[:attachments].first[:color]).to eq("good")
+        expect(result[:attachments].first[:fields]).to include(
+          {title: "Overall Health", value: "Healthy", short: true},
+          {title: "Database", value: "✅", short: true}
+        )
+      end
+
+      it "formats unhealthy status correctly" do
+        unhealthy_data = health_data.merge(overall_health: "unhealthy", database: false)
+        result = described_class.send(:format_health_message, unhealthy_data)
+
+        expect(result[:text]).to eq("❌ Health Check")
+        expect(result[:attachments].first[:color]).to eq("danger")
+        expect(result[:attachments].first[:fields].find { |f| f[:title] == "Database" }[:value]).to eq("❌")
+      end
+    end
+
+    describe "#duration_in_words" do
+      it "formats hours and minutes correctly" do
+        start_time = Time.current - 2.hours - 30.minutes
+        end_time = Time.current
+
+        result = described_class.send(:duration_in_words, start_time, end_time)
+        expect(result).to eq("2h 30m")
+      end
+
+      it "formats only minutes when less than an hour" do
+        start_time = Time.current - 45.minutes
+        end_time = Time.current
+
+        result = described_class.send(:duration_in_words, start_time, end_time)
+        expect(result).to eq("45m")
+      end
+
+      it "returns N/A for invalid times" do
+        result = described_class.send(:duration_in_words, nil, nil)
+        expect(result).to eq("N/A")
+      end
+    end
+  end
+
+  describe "Sentry integration" do
+    it "includes SentryServiceTracking" do
+      expect(described_class.ancestors).to include(SentryServiceTracking)
     end
   end
 end
