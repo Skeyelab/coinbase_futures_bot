@@ -185,7 +185,7 @@ jobs:
 
               # Verify it exists
               found = Position.find_by(product_id: 'CI-VERIFY-TEST')
-              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')'
+              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')
 
               # Clean up
               test_pos.destroy
