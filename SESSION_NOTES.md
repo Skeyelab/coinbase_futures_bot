@@ -26,6 +26,25 @@
 
 ### Session log
 
+#### 2025-09-04 19:25 UTC
+- Context: **FUT-55 COMPLETED** - Resolved N+1 query issue from Sentry alert FUTURES_BOT-22
+- Changes:
+  - Fixed N+1 query issues in SignalController by adding missing `includes(:trading_pair)` to `active`, `high_confidence`, and `recent` methods
+  - Fixed N+1 query issue in SignalsChannel by adding `includes(:trading_pair)` to `get_active_signals` method
+  - Added proper eager loading to prevent database performance issues when accessing signal collections
+- Commands run:
+  - `bundle install` - installed missing gems
+  - `bin/standardrb --fix` - applied code formatting
+  - `bundle exec rspec spec/controllers/signal_controller_spec.rb` - verified all controller tests pass (46 examples)
+  - `bundle exec rspec spec/channels/signals_channel_spec.rb` - verified all channel tests pass (38 examples)
+- Files touched:
+  - `app/controllers/signal_controller.rb` - added `includes(:trading_pair)` to 3 methods
+  - `app/channels/signals_channel.rb` - added `includes(:trading_pair)` to `get_active_signals` method
+- Migrations: none
+- Next steps:
+  - Monitor Sentry for confirmation that N+1 queries are resolved
+  - Consider adding database query monitoring to prevent future N+1 issues
+
 #### 2025-08-30 06:30 UTC
 - Context: **FUT-43 COMPLETED** - Finalized comprehensive test coverage improvements including Slack integration services
 - Changes:

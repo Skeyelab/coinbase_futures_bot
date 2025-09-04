@@ -120,7 +120,8 @@ class SignalController < ApplicationController
 
   # GET /signals/active - Get active signals only
   def active
-    signals = SignalAlert.active
+    signals = SignalAlert.includes(:trading_pair)
+      .active
       .order(confidence: :desc, alert_timestamp: :desc)
       .limit(params[:limit] || 100)
 
@@ -135,7 +136,8 @@ class SignalController < ApplicationController
   # GET /signals/high_confidence - Get high confidence signals only
   def high_confidence
     threshold = params[:threshold] || 70
-    signals = SignalAlert.active
+    signals = SignalAlert.includes(:trading_pair)
+      .active
       .high_confidence(threshold)
       .order(confidence: :desc, alert_timestamp: :desc)
       .limit(params[:limit] || 50)
@@ -152,7 +154,8 @@ class SignalController < ApplicationController
   # GET /signals/recent - Get recently generated signals
   def recent
     hours = params[:hours] || 1
-    signals = SignalAlert.recent(hours)
+    signals = SignalAlert.includes(:trading_pair)
+      .recent(hours)
       .order(alert_timestamp: :desc)
       .limit(params[:limit] || 100)
 

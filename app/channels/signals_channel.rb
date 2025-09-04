@@ -43,7 +43,8 @@ class SignalsChannel < ApplicationCable::Channel
       }
     )
 
-    signals = SignalAlert.active
+    signals = SignalAlert.includes(:trading_pair)
+      .active
       .order(confidence: :desc, alert_timestamp: :desc)
       .limit(data["limit"] || 10)
 
