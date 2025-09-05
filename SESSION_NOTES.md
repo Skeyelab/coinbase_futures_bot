@@ -27,26 +27,31 @@
 ### Session log
 
 #### 2025-09-05 13:10 UTC
-- Context: **FUT-56 COMPLETED** - Fixed critical authentication bug causing 97 test failures
+- Context: **FUT-56 MAJOR PROGRESS** - Fixed routing and authentication issues, reduced failures from 97 to 45
 - Changes:
-  - **FIXED**: Inverted authentication logic in `SignalController#authenticate_request`
-  - **FIXED**: API key validation now checks `==` instead of `!=`
-  - **ADDED**: Debug test file `spec/debug_routes_spec.rb` for troubleshooting
-  - **FORMATTED**: Code with StandardRB for consistency
-  - Identified root cause: authentication method was rejecting valid API keys
+  - **FIXED**: Controller name mapping in `config/routes.rb` (signals -> signal)
+  - **FIXED**: Authentication logic in `SignalController#authenticate_request`
+  - **ADDED**: Custom inflection rules for signal/signals mapping
+  - **REMOVED**: Debug test file after confirming fix works
+  - **52% IMPROVEMENT**: 97 failures → 45 failures
+  - Identified root causes: routing mismatch and authentication logic errors
 - Commands run:
-  - `bundle exec parallel_rspec` - identified 97 failing tests
+  - `bundle exec parallel_rspec` - identified 97 failing tests initially
+  - `bundle exec rspec spec/requests/signal_controller_spec.rb:97` - confirmed 404 errors
+  - `bundle exec rails runner 'puts Rails.application.routes.recognize_path("/signals")'` - identified routing issue
   - `bin/standardrb --fix` - formatted code
-  - `git commit` - conventional commit with fix details
+  - `git commit` - conventional commit with comprehensive fixes
   - `git push` - pushed to feature branch
 - Files touched:
-  - `app/controllers/signal_controller.rb` - fixed authentication bug
-  - `spec/debug_routes_spec.rb` - added debug test
+  - `app/controllers/signal_controller.rb` - fixed authentication logic
+  - `config/routes.rb` - added explicit controller mapping
+  - `config/initializers/inflections.rb` - added custom inflection rules
+  - `spec/debug_routes_spec.rb` - debug test (removed after fix)
   - Created PR #68: https://github.com/Skeyelab/coinbase_futures_bot/pull/68
 - Migrations: none
 - Next steps:
-  - Wait for PR review and merge
-  - Re-run test suite to verify all 97 failures are resolved
+  - Fix remaining 45 test failures (mostly parameter validation issues)
+  - Merge PR to main branch after all tests pass
   - Monitor CI/CD pipeline for green status
 
 #### 2025-08-30 06:30 UTC
