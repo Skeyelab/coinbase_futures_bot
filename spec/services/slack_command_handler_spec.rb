@@ -464,6 +464,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
 
     it "formats positive PnL with profit emoji" do
+      result = described_class.send(:handle_pnl_command, "today")
       expect(result[:text]).to start_with("📈")
     end
 
@@ -590,7 +591,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
-      expect(fields.size).to eq(7) # 7 commands
+      expect(fields.size).to eq(8) # 8 commands
 
       # Check that key commands are included
       command_titles = fields.map { |f| f[:title] }

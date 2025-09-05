@@ -7,7 +7,7 @@ module FactoryHelpers
   def self.bulk_create_signal_alerts(count, attributes = {})
     # Use insert_all for maximum performance
     SignalAlert.insert_all(
-      count.times.map do |i|
+      Array.new(count) do |i|
         {
           symbol: attributes[:symbol] || "BTC-USD",
           side: attributes[:side] || "long",

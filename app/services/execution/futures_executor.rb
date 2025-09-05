@@ -89,7 +89,7 @@ module Execution
     # If it's an asset (BTC, ETH), return current month contract
     # If it's already a specific contract, validate it's still active
     def resolve_trading_contract(product_id)
-      return nil unless product_id
+      return nil unless product_id&.present?
 
       # If it's already a specific current month contract, check if it's still valid
       if product_id.match?(/\d{2}[A-Z]{3}\d{2}/)
