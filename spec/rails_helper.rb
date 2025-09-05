@@ -202,3 +202,6 @@ RSpec.configure do |config|
 
   # Host authorization is disabled in test environment via config.hosts = nil
 end
+
+# Load test support files
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }

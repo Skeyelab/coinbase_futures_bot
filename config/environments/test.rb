@@ -64,4 +64,9 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Disable Sentry in test environment for better performance
+  # We still test Sentry integration in specific tests, but don't want the overhead
+  # of Sentry tracking for every model operation during testing
+  config.sentry_dsn = nil
 end

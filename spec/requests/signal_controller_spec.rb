@@ -525,7 +525,8 @@ RSpec.describe "Signals API", type: :request do
       end
 
       it "respects limit parameter" do
-        create_list(:signal_alert, 150, alert_timestamp: 30.minutes.ago)
+        # Use bulk creation to avoid timeout issues
+        FactoryHelpers.bulk_create_signal_alerts(100, alert_timestamp: 30.minutes.ago)
         get "/signals/recent", headers: @headers, params: {limit: 75}
 
         json_response = JSON.parse(response.body)
@@ -533,7 +534,8 @@ RSpec.describe "Signals API", type: :request do
       end
 
       it "uses default limit of 100" do
-        create_list(:signal_alert, 150, alert_timestamp: 30.minutes.ago)
+        # Use bulk creation to avoid timeout issues
+        FactoryHelpers.bulk_create_signal_alerts(100, alert_timestamp: 30.minutes.ago)
         get "/signals/recent", headers: @headers
 
         json_response = JSON.parse(response.body)
@@ -821,8 +823,8 @@ RSpec.describe "Signals API", type: :request do
     context "with large datasets" do
       before do
         # Create a reasonable number of records for performance testing
-        # Use fewer records to avoid timeout issues in CI
-        create_list(:signal_alert, 100, alert_status: "active")
+        # Use bulk creation to avoid timeout issues in CI
+        FactoryHelpers.bulk_create_signal_alerts(100, alert_status: "active")
       end
 
       it "handles large result sets efficiently" do
