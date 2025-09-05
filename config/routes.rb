@@ -40,7 +40,7 @@ Rails.application.routes.draw do
   end
 
   # Real-time signal API endpoints
-  resources :signals, only: %i[index show] do
+  resources :signals, only: %i[index show], controller: "signal" do
     collection do
       post :evaluate
       get :active

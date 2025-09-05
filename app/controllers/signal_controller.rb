@@ -259,7 +259,8 @@ class SignalController < ApplicationController
     api_key = request.headers["X-API-Key"] || params[:api_key]
     expected_key = ENV["SIGNALS_API_KEY"]
 
-    return if expected_key && api_key == expected_key
+    # Allow request if no API key is configured OR if API key matches
+    return if expected_key.nil? || api_key == expected_key
 
     render json: {error: "Unauthorized"}, status: :unauthorized
   end
