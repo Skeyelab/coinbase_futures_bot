@@ -187,7 +187,7 @@ class SignalController < ApplicationController
         .count,
       average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
         .average(:confidence)&.to_f&.round(2),
-      time_range_hours: time_range
+      time_range_hours: time_range.to_s
     }
 
     render json: stats
