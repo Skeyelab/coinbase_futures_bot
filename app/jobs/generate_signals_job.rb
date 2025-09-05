@@ -16,14 +16,14 @@ class GenerateSignalsJob < ApplicationJob
 
         # Send Slack notification for the signal
         SlackNotificationService.signal_generated({
-          symbol: pair.product_id,
-          side: order[:side],
-          price: order[:price],
-          quantity: order[:quantity],
-          tp: order[:tp],
-          sl: order[:sl],
-          confidence: order[:confidence]
-        })
+                                                    symbol: pair.product_id,
+                                                    side: order[:side],
+                                                    price: order[:price],
+                                                    quantity: order[:quantity],
+                                                    tp: order[:tp],
+                                                    sl: order[:sl],
+                                                    confidence: order[:confidence]
+                                                  })
 
         # TODO: hand off to a real executor once implemented for futures
       else
@@ -35,6 +35,9 @@ class GenerateSignalsJob < ApplicationJob
   private
 
   def default_equity_usd
-    (ENV["SIGNAL_EQUITY_USD"] || 10_000).to_f
+    value = ENV['SIGNAL_EQUITY_USD'] || 10_000
+    Float(value)
+  rescue ArgumentError, TypeError
+    0.0
   end
 end

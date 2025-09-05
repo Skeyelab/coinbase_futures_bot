@@ -613,8 +613,12 @@ RSpec.describe SignalController, type: :controller do
       create_list(:signal_alert, 10, alert_status: "active")
 
       # Invalid confidence parameters should be handled gracefully by the filter method
-      # but the actual database query may still raise an error, which is expected behavior
-      expect { controller_instance.active }.to raise_error
+      # The safe_param_to_f method should return nil for invalid values, which means
+      # no filtering is applied, so all signals should be returned
+      expect { controller_instance.active }.not_to raise_error
+
+      # Verify that the method completes successfully and renders a response
+      expect(controller_instance).to have_received(:render)
     end
 
     it "handles database errors appropriately" do
