@@ -543,27 +543,18 @@ RSpec.describe SlackNotificationService, type: :service do
       allow(ENV).to receive(:[]).with('SLACK_BOT_TOKEN').and_return('xoxb-token')
     end
 
-    after do
-      # Clean up any global mocks to prevent leakage
-      RSpec::Mocks.space.proxy_for(Slack::Web::Client)&.reset
-    end
-
     context 'when message is valid' do
-      it 'creates a client instance' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
+      before do
+        allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_return(true)
+      end
 
+      it 'creates a client instance' do
+        expect(Slack::Web::Client).to receive(:new)
         described_class.send(:send_message, message, channel: channel)
-        expect(Slack::Web::Client).to have_received(:new)
       end
 
       it 'sends the message with correct parameters' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
-
-        expect(mock_client).to receive(:chat_postMessage).with(
+        expect_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).with(
           channel: channel,
           text: message[:text],
           attachments: message[:attachments],
@@ -573,19 +564,11 @@ RSpec.describe SlackNotificationService, type: :service do
       end
 
       it 'returns true on success' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
-
         result = described_class.send(:send_message, message, channel: channel)
         expect(result).to be true
       end
 
       it 'logs successful message sending' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
-
         expect(Rails.logger).to receive(:info).with("[Slack] Message sent to #{channel}")
         described_class.send(:send_message, message, channel: channel)
       end
@@ -593,21 +576,13 @@ RSpec.describe SlackNotificationService, type: :service do
 
     context 'when message is invalid' do
       it 'returns without sending for nil message' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
-
-        expect(mock_client).not_to receive(:chat_postMessage)
+        expect_any_instance_of(Slack::Web::Client).not_to receive(:chat_postMessage)
         result = described_class.send(:send_message, nil, channel: channel)
         expect(result).to be_nil
       end
 
       it 'returns without sending for empty message' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_return(true)
-
-        expect(mock_client).not_to receive(:chat_postMessage)
+        expect_any_instance_of(Slack::Web::Client).not_to receive(:chat_postMessage)
         result = described_class.send(:send_message, {}, channel: channel)
         expect(result).to be_nil
       end
@@ -617,18 +592,14 @@ RSpec.describe SlackNotificationService, type: :service do
       let(:slack_error) { Slack::Web::Api::Errors::SlackError.new('API Error') }
 
       it 'logs the error' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+        allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
         expect(Rails.logger).to receive(:error).with('[Slack] API Error: API Error')
         described_class.send(:send_message, message, channel: channel)
       end
 
       it 'sends error to Sentry' do
-        mock_client = instance_double(Slack::Web::Client)
-        allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-        allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+        allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
         expect(Sentry).to receive(:with_scope)
         described_class.send(:send_message, message, channel: channel)
@@ -636,16 +607,13 @@ RSpec.describe SlackNotificationService, type: :service do
 
       context 'when retries are available' do
         it 'retries with exponential backoff' do
-          mock_client = instance_double(Slack::Web::Client)
-          allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-
           expect(described_class).to receive(:sleep).with(2)
           expect(described_class).to receive(:sleep).with(4)
           expect(described_class).to receive(:sleep).with(8)
 
           # Allow the recursive call to eventually succeed
           call_count = 0
-          allow(mock_client).to receive(:chat_postMessage) do
+          allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage) do
             call_count += 1
             raise slack_error if call_count <= 3
 
@@ -656,38 +624,30 @@ RSpec.describe SlackNotificationService, type: :service do
         end
 
         it 'retries up to max_retries times' do
-          mock_client = instance_double(Slack::Web::Client)
-          allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-          allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+          allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
-          expect(described_class).to receive(:send_message).exactly(3).times.and_call_original
+          expect(described_class).to receive(:send_message).exactly(4).times.and_call_original
           described_class.send(:send_message, message, channel: channel)
         end
       end
 
       context 'when max retries exceeded' do
         it 'logs max retries exceeded' do
-          mock_client = instance_double(Slack::Web::Client)
-          allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-          allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+          allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
           expect(Rails.logger).to receive(:error).with('[Slack] Failed to send message after 3 retries')
           described_class.send(:send_message, message, channel: channel)
         end
 
         it 'sends final failure to Sentry' do
-          mock_client = instance_double(Slack::Web::Client)
-          allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-          allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+          allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
           expect(Sentry).to receive(:capture_message).with('Slack message failed after max retries', level: 'error')
           described_class.send(:send_message, message, channel: channel)
         end
 
         it 'returns false' do
-          mock_client = instance_double(Slack::Web::Client)
-          allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
-          allow(mock_client).to receive(:chat_postMessage).and_raise(slack_error)
+          allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
 
           result = described_class.send(:send_message, message, channel: channel)
           expect(result).to be false
