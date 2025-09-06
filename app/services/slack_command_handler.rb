@@ -22,7 +22,8 @@ class SlackCommandHandler
       when "/bot-positions"
         handle_positions_command(text)
       when "/bot-pnl"
-        handle_pnl_command(text)
+        period = text.blank? ? "today" : text
+        handle_pnl_command(period)
       when "/bot-health"
         handle_health_command
       when "/bot-stop"

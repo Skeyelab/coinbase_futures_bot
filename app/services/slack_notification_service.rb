@@ -167,6 +167,10 @@ class SlackNotificationService
 
           false
         end
+      rescue => e
+        Rails.logger.error("[Slack] Unexpected error: #{e.message}")
+        Sentry.capture_exception(e)
+        false
       end
     end
 

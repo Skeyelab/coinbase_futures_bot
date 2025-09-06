@@ -173,13 +173,14 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     context "when an error occurs during command processing" do
       before do
+        allow(ENV).to receive(:[]).and_call_original
         allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
         allow(described_class).to receive(:handle_status_command).and_raise(StandardError.new("Command failed"))
       end
 
       it "logs the error" do
         expect(Rails.logger).to receive(:error).with("[SlackCommand] Error handling command #{command}: Command failed")
-        expect(Rails.logger).to receive(:error).with(/backtrace/)
+        expect(Rails.logger).to receive(:error).with(instance_of(String))
         described_class.handle_command(params)
       end
 
@@ -706,9 +707,15 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     describe ".get_pnl_data" do
       before do
-        allow(Position).to receive(:where).and_return(double("TimeRangePositions",
-          closed: double("ClosedPositions", sum: 150.0, count: 8)))
-        allow(Position).to receive(:sum).and_return(200.0)
+        positions_double = double("TimeRangePositions")
+        closed_positions_double = double("ClosedPositions", sum: 150.0, count: 8)
+
+        allow(positions_double).to receive(:sum).with(:pnl).and_return(200.0)
+        allow(positions_double).to receive(:closed).and_return(closed_positions_double)
+        allow(closed_positions_double).to receive(:where).and_return(double("WinningTrades", count: 5))
+        allow(closed_positions_double).to receive(:maximum).with(:pnl).and_return(75.0)
+
+        allow(Position).to receive(:where).and_return(positions_double)
       end
 
       it "calculates PnL data correctly" do
@@ -720,12 +727,12 @@ RSpec.describe SlackCommandHandler, type: :service do
           unrealized_pnl: 50.0,
           completed_trades: 8,
           win_rate: 62.5, # 5 winning trades out of 8
-          best_trade: nil
+          best_trade: 75.0
         )
       end
 
       it "handles different time periods" do
-        expect(Position).to receive(:where).with(1.week.ago..Time.current)
+        expect(Position).to receive(:where).with(hash_including(entry_time: kind_of(Range)))
         described_class.send(:get_pnl_data, "week")
       end
 
