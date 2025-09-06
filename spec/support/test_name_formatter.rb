@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class TestNameFormatter
-  RSpec::Core::Formatters.register self, :example_started, :example_finished
+  # Only register when explicitly requested to avoid verbose output during normal development
+  RSpec::Core::Formatters.register self, :example_started, :example_finished if ENV['VERBOSE_TESTS'] == 'true' || ENV['CI']
 
   def initialize(output)
     @output = output
