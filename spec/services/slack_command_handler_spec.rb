@@ -614,7 +614,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         allow(Position).to receive(:open).and_return(double("OpenPositions",
           day_trading: double("DayTradingPositions", count: 3)))
         allow(Position).to receive(:where).and_return(double("DailyPositions", sum: 250.0))
-        allow(GenerateSignalsJob).to receive(:where).and_return(double("RecentJobs",
+        allow(GoodJob::Job).to receive(:where).and_return(double("RecentJobs",
           order: double("OrderedJobs",
             first: double("LastJob",
               finished_at: Time.new(
@@ -622,6 +622,7 @@ RSpec.describe SlackCommandHandler, type: :service do
               )))))
         allow(described_class).to receive(:overall_health_status).and_return("healthy")
         allow(described_class).to receive(:application_uptime).and_return("3h 45m")
+        allow(described_class).to receive(:trading_active?).and_return(true)
       end
 
       it "returns comprehensive bot status" do
