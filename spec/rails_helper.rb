@@ -2,41 +2,41 @@
 
 # SimpleCov removed entirely
 
-ENV['RAILS_ENV'] ||= 'test'
-require File.expand_path('../config/environment', __dir__)
-abort('The Rails environment is running in production mode!') if Rails.env.production?
-require 'rspec/rails'
-require 'factory_bot_rails'
+ENV["RAILS_ENV"] ||= "test"
+require File.expand_path("../config/environment", __dir__)
+abort("The Rails environment is running in production mode!") if Rails.env.production?
+require "rspec/rails"
+require "factory_bot_rails"
 
 # Require rails-controller-testing for Rails 8 compatibility
-require 'rails-controller-testing'
+require "rails-controller-testing"
 
 # Test profiling (only load when needed to avoid overhead)
-puts '=== TestProf DEBUG ==='
-puts "TAG_PROF env var: '#{ENV['TAG_PROF']}'"
-puts "SAMPLE env var: '#{ENV['SAMPLE']}'"
-puts "RPROF env var: '#{ENV['RPROF']}'"
-puts "STACKPROF env var: '#{ENV['STACKPROF']}'"
+puts "=== TestProf DEBUG ==="
+puts "TAG_PROF env var: '#{ENV["TAG_PROF"]}'"
+puts "SAMPLE env var: '#{ENV["SAMPLE"]}'"
+puts "RPROF env var: '#{ENV["RPROF"]}'"
+puts "STACKPROF env var: '#{ENV["STACKPROF"]}'"
 
-will_load_test_prof = (ENV['SAMPLE'] && ENV['SAMPLE'] != '') || (ENV['RPROF'] && ENV['RPROF'] != '') || (ENV['STACKPROF'] && ENV['STACKPROF'] != '') || (ENV['TAG_PROF'] && ENV['TAG_PROF'] != '')
+will_load_test_prof = (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
 puts "Will load TestProf: #{will_load_test_prof}"
 
 if will_load_test_prof
-  require 'test_prof'
-  puts 'TestProf loaded successfully'
+  require "test_prof"
+  puts "TestProf loaded successfully"
 else
-  puts 'TestProf NOT loaded (environment variables empty)'
+  puts "TestProf NOT loaded (environment variables empty)"
 end
 
 # CI-specific configuration and verification
-if ENV['CI']
-  puts '=== CI ENVIRONMENT DETECTED ==='
-  puts 'Forcing real test execution...'
+if ENV["CI"]
+  puts "=== CI ENVIRONMENT DETECTED ==="
+  puts "Forcing real test execution..."
   puts "Rails environment: #{Rails.env}"
-  puts "Database URL: #{ENV['DATABASE_URL']}"
+  puts "Database URL: #{ENV["DATABASE_URL"]}"
 
   # Debug database connection pooling
-  puts '=== DATABASE DEBUG ==='
+  puts "=== DATABASE DEBUG ==="
   if ActiveRecord::Base.connected?
     puts "Database connected: #{ActiveRecord::Base.connection.current_database}"
     puts "Connection pool size: #{ActiveRecord::Base.connection_pool.size}"
@@ -44,21 +44,21 @@ if ENV['CI']
   end
 
   # Debug Rails cache status
-  puts '=== RAILS CACHE DEBUG ==='
+  puts "=== RAILS CACHE DEBUG ==="
   puts "Rails cache store: #{Rails.cache.class.name}"
-  puts "Rails cache enabled: #{Rails.cache.respond_to?(:enabled?) ? Rails.cache.enabled? : 'unknown'}"
+  puts "Rails cache enabled: #{Rails.cache.respond_to?(:enabled?) ? Rails.cache.enabled? : "unknown"}"
 
   # Debug FactoryBot status
-  puts '=== FACTORYBOT DEBUG ==='
+  puts "=== FACTORYBOT DEBUG ==="
   puts "FactoryBot defined: #{defined?(FactoryBot)}"
   puts "FactoryBot factories count: #{FactoryBot.factories.count}" if defined?(FactoryBot)
 
   # Debug if any parallel processing is happening
-  puts '=== PROCESS DEBUG ==='
+  puts "=== PROCESS DEBUG ==="
   puts "Ruby process ID: #{Process.pid}"
 
   # Ensure test effectiveness is loaded
-  require_relative 'support/test_effectiveness'
+  require_relative "support/test_effectiveness"
   puts "Test effectiveness module loaded: #{defined?(TestEffectiveness)}"
 end
 
@@ -67,27 +67,27 @@ begin
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   puts "ERROR: Pending migrations detected: #{e.message}"
-  puts 'Run `rails db:migrate` before running tests'
+  puts "Run `rails db:migrate` before running tests"
   exit 1
 rescue ActiveRecord::ConnectionNotEstablished => e
   puts "ERROR: Database connection failed: #{e.message}"
-  puts 'Ensure database is running and properly configured'
+  puts "Ensure database is running and properly configured"
   exit 1
-rescue StandardError => e
+rescue => e
   puts "ERROR: Schema maintenance failed: #{e.message}"
-  puts 'Check database configuration and migrations'
+  puts "Check database configuration and migrations"
   exit 1
 end
 
 # Require support files
-Dir[Rails.root.join('spec/support/**/*.rb')].sort.each { |f| require f }
+Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 
 # Load test effectiveness validation
-require Rails.root.join('spec/support/test_effectiveness.rb')
+require Rails.root.join("spec/support/test_effectiveness.rb")
 
 RSpec.configure do |config|
   # Enable --only-failures support
-  config.example_status_persistence_file_path = 'spec/examples.txt'
+  config.example_status_persistence_file_path = "spec/examples.txt"
 
   # Use database transactions for fast test isolation instead of expensive delete_all
   config.use_transactional_fixtures = true
@@ -103,65 +103,65 @@ RSpec.configure do |config|
   Rails::Controller::Testing.install
 
   # Add custom formatter for detailed test feedback when requested
-  config.add_formatter TestNameFormatter if ENV['VERBOSE_TESTS'] == 'true' || ENV['CI']
+  config.add_formatter TestNameFormatter if ENV["VERBOSE_TESTS"] == "true" || ENV["CI"]
 
   # CI-specific configuration
-  if ENV['CI']
+  if ENV["CI"]
     config.before(:suite) do
-      puts '=== CI TEST SUITE STARTING ==='
-      puts 'Verifying real test environment...'
+      puts "=== CI TEST SUITE STARTING ==="
+      puts "Verifying real test environment..."
 
       # Verify database connectivity
       expect(ActiveRecord::Base.connection).to be_active
-      puts '✅ Database connection verified'
+      puts "✅ Database connection verified"
 
       # Verify test effectiveness module
       expect(defined?(TestEffectiveness)).to be_truthy
-      puts '✅ Test effectiveness module verified'
+      puts "✅ Test effectiveness module verified"
 
       # Debug database query count tracking
       if defined?(ActiveRecord::Base)
-        puts '=== DATABASE QUERY COUNT DEBUG ==='
+        puts "=== DATABASE QUERY COUNT DEBUG ==="
         puts "ActiveRecord query cache enabled: #{ActiveRecord::Base.connection.query_cache_enabled}"
         puts "Database adapter: #{ActiveRecord::Base.connection.adapter_name}"
-        puts "Transactional fixtures enabled: #{ActiveRecord::TestFixtures ? 'Rails default' : 'Custom'}"
+        puts "Transactional fixtures enabled: #{ActiveRecord::TestFixtures ? "Rails default" : "Custom"}"
       end
 
       # Debug parallel test configuration
-      puts '=== PARALLEL TEST CONFIGURATION DEBUG ==='
-      puts "Parallel test processes: #{ENV['PARALLEL_TESTS'] || 'not set'}"
-      puts "Test env number: #{ENV['TEST_ENV_NUMBER'] || 'single process'}"
-      puts "Parallel config file exists: #{File.exist?('.parallel_rspec_config')}"
+      puts "=== PARALLEL TEST CONFIGURATION DEBUG ==="
+      puts "Parallel test processes: #{ENV["PARALLEL_TESTS"] || "not set"}"
+      puts "Test env number: #{ENV["TEST_ENV_NUMBER"] || "single process"}"
+      puts "Parallel config file exists: #{File.exist?(".parallel_rspec_config")}"
 
       # Verify we can perform real operations
-      puts 'Verifying real database operations...'
+      puts "Verifying real database operations..."
       TestEffectiveness.verify_real_execution
     end
 
     config.after(:suite) do
-      puts '=== CI TEST SUITE COMPLETED ==='
+      puts "=== CI TEST SUITE COMPLETED ==="
       puts "Total tests run: #{RSpec.world.example_count}"
       puts "Total failures: #{RSpec.world.all_examples.count(&:exception)}"
 
       # Debug final database state
       if defined?(ActiveRecord::Base) && ActiveRecord::Base.connected?
-        puts '=== FINAL DATABASE STATE ==='
+        puts "=== FINAL DATABASE STATE ==="
         puts "Connection pool size: #{ActiveRecord::Base.connection_pool.size}"
         puts "Active connections: #{ActiveRecord::Base.connection_pool.connections.size}"
       end
 
       # Summary of performance optimizations discovered
-      puts '=== PERFORMANCE ANALYSIS SUMMARY ==='
-      puts '🎯 ROOT CAUSE OF FAST EXECUTION IDENTIFIED:'
-      puts '✅ TestProf: DISABLED (environment variables working)'
-      puts '✅ Rails cache: NullStore (no caching active)'
-      puts '✅ FactoryBot: Only 5 factories (not excessive)'
-      puts '✅ Query cache: DISABLED'
-      puts '✅ Transactional fixtures: ENABLED (major speedup!)'
-      puts '✅ Parallel config: Available but not used in CI'
-      puts ''
-      puts '💡 Transactional fixtures provide ~10-20x speedup vs DELETE ALL operations'
-      puts '💡 This explains 821 tests in 7.55 seconds = NORMAL for optimized Rails tests'
+      puts "=== PERFORMANCE ANALYSIS SUMMARY ==="
+      puts "🎯 ROOT CAUSE OF FAST EXECUTION IDENTIFIED:"
+      puts "✅ TestProf: DISABLED (environment variables working)"
+      puts "✅ Rails cache: NullStore (no caching active)"
+      puts "✅ FactoryBot: Only 5 factories (not excessive)"
+      puts "✅ Query cache: DISABLED"
+      puts "✅ Transactional fixtures: ENABLED (major speedup!)"
+      puts "✅ Parallel config: Available but not used in CI"
+      puts ""
+      puts "💡 Transactional fixtures provide ~10-20x speedup vs DELETE ALL operations"
+      puts "💡 This explains 821 tests in 7.55 seconds = NORMAL for optimized Rails tests"
 
       TestEffectiveness.ci_verification_summary
     end
@@ -169,7 +169,7 @@ RSpec.configure do |config|
 
   # Test effectiveness validation
   config.before(:each) do |example|
-    puts "\n🧪 Running: #{example.full_description}" unless ENV['TEST_ENV_NUMBER']
+    puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
@@ -193,10 +193,10 @@ RSpec.configure do |config|
   # Add safety for database operations
   config.before(:suite) do
     # Ensure database is available before starting tests
-    ActiveRecord::Base.connection.execute('SELECT 1') if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
-  rescue StandardError => e
+    ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
+  rescue => e
     puts "ERROR: Database health check failed: #{e.message}"
-    puts 'Tests cannot continue with database issues'
+    puts "Tests cannot continue with database issues"
     exit 1
   end
 
@@ -207,4 +207,4 @@ RSpec.configure do |config|
 end
 
 # Load test support files
-Dir[Rails.root.join('spec', 'support', '**', '*.rb')].each { |f| require f }
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }

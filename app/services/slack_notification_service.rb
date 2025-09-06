@@ -175,7 +175,7 @@ class SlackNotificationService
     end
 
     def format_signal_message(signal_data)
-      return { text: "🎯 New Trading Signal: N/A" } unless signal_data.present? && signal_data.is_a?(Hash)
+      return {text: "🎯 New Trading Signal: N/A"} unless signal_data.present? && signal_data.is_a?(Hash)
 
       symbol = signal_data[:symbol] || signal_data[:product_id] || "N/A"
       side = signal_data[:side] || "N/A"
