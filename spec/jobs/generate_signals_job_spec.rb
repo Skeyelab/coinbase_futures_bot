@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe GenerateSignalsJob, type: :job do
   let(:job) { described_class.new }
   let(:mock_strategy) { instance_double(Strategy::MultiTimeframeSignal) }
-  let(:trading_pair) { create(:trading_pair, enabled: true, product_id: "BTC-29DEC24-CDE") }
+  let!(:trading_pair) { create(:trading_pair, enabled: true, product_id: "BTC-29DEC24-CDE") }
   let(:mock_signal) do
     {
       side: "long",
@@ -22,14 +22,14 @@ RSpec.describe GenerateSignalsJob, type: :job do
     allow(SlackNotificationService).to receive(:signal_generated)
     # Allow puts to be called without mocking it
     allow(job).to receive(:puts).and_call_original
-    # Mock the default_equity_usd method
-    allow(job).to receive(:default_equity_usd).and_return(10_000.0)
   end
 
   describe "#perform" do
     context "with default equity" do
       before do
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        # Mock the default_equity_usd method for this context
+        allow(job).to receive(:default_equity_usd).and_return(10_000.0)
       end
 
       it "initializes strategy with correct parameters" do
@@ -139,6 +139,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       before do
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        # Mock the default_equity_usd method for this context
+        allow(job).to receive(:default_equity_usd).and_return(10_000.0)
       end
 
       it "processes all enabled pairs" do
@@ -196,6 +198,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         allow(Strategy::MultiTimeframeSignal).to receive(:new).and_raise(StandardError.new("Strategy init failed"))
         allow(mock_strategy).to receive(:signal).and_return(nil)
+        # Mock the default_equity_usd method for this context
+        allow(job).to receive(:default_equity_usd).and_return(10_000.0)
       end
 
       it "raises the error" do
@@ -206,6 +210,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
     context "when signal generation fails" do
       before do
         allow(mock_strategy).to receive(:signal).and_raise(StandardError.new("Signal generation failed"))
+        # Mock the default_equity_usd method for this context
+        allow(job).to receive(:default_equity_usd).and_return(10_000.0)
       end
 
       it "raises the error" do
@@ -217,6 +223,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
         allow(SlackNotificationService).to receive(:signal_generated).and_raise(StandardError.new("Slack error"))
+        # Mock the default_equity_usd method for this context
+        allow(job).to receive(:default_equity_usd).and_return(10_000.0)
       end
 
       it "raises the error" do

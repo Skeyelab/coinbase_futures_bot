@@ -207,9 +207,6 @@ GEM
       racc (~> 1.4)
     ostruct (0.6.3)
     parallel (1.27.0)
-    parallel_rspec (2.5.0)
-      rake (> 10.0)
-      rspec
     parallel_tests (5.4.0)
       parallel
     parser (3.3.9.0)
@@ -284,10 +281,6 @@ GEM
     reline (0.6.2)
       io-console (~> 0.5)
     rexml (3.4.2)
-    rspec (3.13.1)
-      rspec-core (~> 3.13.0)
-      rspec-expectations (~> 3.13.0)
-      rspec-mocks (~> 3.13.0)
     rspec-core (3.13.5)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.5)
@@ -416,7 +409,6 @@ DEPENDENCIES
   good_job (~> 4.11)
   jwt (~> 3.1)
   kaminari (~> 1.2)
-  parallel_rspec
   parallel_tests
   pg (~> 1.1)
   puma (>= 5.0)

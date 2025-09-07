@@ -120,9 +120,10 @@ class SignalController < ApplicationController
 
   # GET /signals/active - Get active signals only
   def active
+    limit = safe_param_to_i(params[:limit], 100)
     signals = SignalAlert.active
       .order(confidence: :desc, alert_timestamp: :desc)
-      .limit(params[:limit] || 100)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
@@ -134,33 +135,35 @@ class SignalController < ApplicationController
 
   # GET /signals/high_confidence - Get high confidence signals only
   def high_confidence
-    threshold = params[:threshold] || 70
+    threshold = safe_param_to_f(params[:threshold], 70)
+    limit = safe_param_to_i(params[:limit], 50)
     signals = SignalAlert.active
       .high_confidence(threshold)
       .order(confidence: :desc, alert_timestamp: :desc)
-      .limit(params[:limit] || 50)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
-      threshold: threshold,
+      threshold: params[:threshold] || "70", # Echo back original parameter or default as string
       count: signals.count
     }
   end
 
   # GET /signals/recent - Get recently generated signals
   def recent
-    hours = params[:hours] || 1
+    hours = safe_param_to_i(params[:hours], 1)
+    limit = safe_param_to_i(params[:limit], 100)
     signals = SignalAlert.recent(hours)
       .order(alert_timestamp: :desc)
-      .limit(params[:limit] || 100)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
-      hours: hours,
+      hours: params[:hours] || "1", # Echo back original parameter or default as string
       count: signals.count
     }
   end
@@ -184,7 +187,7 @@ class SignalController < ApplicationController
         .count,
       average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
         .average(:confidence)&.to_f&.round(2),
-      time_range_hours: time_range
+      time_range_hours: time_range.to_s
     }
 
     render json: stats
@@ -246,10 +249,16 @@ class SignalController < ApplicationController
     signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type]
 
     # Filter by minimum confidence
-    signals = signals.where("confidence >= ?", params[:min_confidence]) if params[:min_confidence]
+    if params[:min_confidence].present?
+      min_confidence = params[:min_confidence].to_f
+      signals = signals.where("confidence >= ?", min_confidence) if min_confidence > 0
+    end
 
     # Filter by maximum confidence
-    signals = signals.where("confidence <= ?", params[:max_confidence]) if params[:max_confidence]
+    if params[:max_confidence].present?
+      max_confidence = params[:max_confidence].to_f
+      signals = signals.where("confidence <= ?", max_confidence) if max_confidence > 0
+    end
 
     signals
   end
@@ -259,7 +268,8 @@ class SignalController < ApplicationController
     api_key = request.headers["X-API-Key"] || params[:api_key]
     expected_key = ENV["SIGNALS_API_KEY"]
 
-    return unless expected_key && api_key != expected_key
+    # Allow request if no API key is configured OR if API key matches
+    return if expected_key.nil? || api_key == expected_key
 
     render json: {error: "Unauthorized"}, status: :unauthorized
   end
@@ -268,5 +278,19 @@ class SignalController < ApplicationController
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
+  end
+
+  # Helper method to safely convert parameters to numbers
+  def safe_param_to_i(param, default = nil)
+    return default if param.blank?
+
+    param.to_i.positive? ? param.to_i : default
+  end
+
+  def safe_param_to_f(param, default = nil)
+    return default if param.blank?
+
+    value = param.to_f
+    value.positive? ? value : default
   end
 end

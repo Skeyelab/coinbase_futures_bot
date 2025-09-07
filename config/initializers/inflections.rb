@@ -14,3 +14,9 @@
 # ActiveSupport::Inflector.inflections(:en) do |inflect|
 #   inflect.acronym "RESTful"
 # end
+
+# Custom inflections for the application
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  # Handle signals -> signal controller mapping
+  inflect.irregular "signal", "signals"
+end

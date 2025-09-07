@@ -86,6 +86,9 @@ Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { |f| require f }
 require Rails.root.join("spec/support/test_effectiveness.rb")
 
 RSpec.configure do |config|
+  # Enable --only-failures support
+  config.example_status_persistence_file_path = "spec/examples.txt"
+
   # Use database transactions for fast test isolation instead of expensive delete_all
   config.use_transactional_fixtures = true
   config.use_instantiated_fixtures = false
@@ -99,8 +102,8 @@ RSpec.configure do |config|
   # Enable controller testing features for Rails 8
   Rails::Controller::Testing.install
 
-  # Add custom formatter for clear test identification
-  config.add_formatter TestNameFormatter
+  # Add custom formatter for detailed test feedback when requested
+  config.add_formatter TestNameFormatter if ENV["VERBOSE_TESTS"] == "true" || ENV["CI"]
 
   # CI-specific configuration
   if ENV["CI"]
@@ -202,3 +205,6 @@ RSpec.configure do |config|
 
   # Host authorization is disabled in test environment via config.hosts = nil
 end
+
+# Load test support files
+Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }

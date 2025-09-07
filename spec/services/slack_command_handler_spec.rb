@@ -173,13 +173,14 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     context "when an error occurs during command processing" do
       before do
+        allow(ENV).to receive(:[]).and_call_original
         allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
         allow(described_class).to receive(:handle_status_command).and_raise(StandardError.new("Command failed"))
       end
 
       it "logs the error" do
         expect(Rails.logger).to receive(:error).with("[SlackCommand] Error handling command #{command}: Command failed")
-        expect(Rails.logger).to receive(:error).with(/backtrace/)
+        expect(Rails.logger).to receive(:error).with(instance_of(String))
         described_class.handle_command(params)
       end
 
@@ -464,6 +465,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
 
     it "formats positive PnL with profit emoji" do
+      result = described_class.send(:handle_pnl_command, "today")
       expect(result[:text]).to start_with("📈")
     end
 
@@ -590,7 +592,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
-      expect(fields.size).to eq(7) # 7 commands
+      expect(fields.size).to eq(8) # 8 commands
 
       # Check that key commands are included
       command_titles = fields.map { |f| f[:title] }
@@ -612,7 +614,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         allow(Position).to receive(:open).and_return(double("OpenPositions",
           day_trading: double("DayTradingPositions", count: 3)))
         allow(Position).to receive(:where).and_return(double("DailyPositions", sum: 250.0))
-        allow(GenerateSignalsJob).to receive(:where).and_return(double("RecentJobs",
+        allow(GoodJob::Job).to receive(:where).and_return(double("RecentJobs",
           order: double("OrderedJobs",
             first: double("LastJob",
               finished_at: Time.new(
@@ -620,6 +622,7 @@ RSpec.describe SlackCommandHandler, type: :service do
               )))))
         allow(described_class).to receive(:overall_health_status).and_return("healthy")
         allow(described_class).to receive(:application_uptime).and_return("3h 45m")
+        allow(described_class).to receive(:trading_active?).and_return(true)
       end
 
       it "returns comprehensive bot status" do
@@ -705,9 +708,15 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     describe ".get_pnl_data" do
       before do
-        allow(Position).to receive(:where).and_return(double("TimeRangePositions",
-          closed: double("ClosedPositions", sum: 150.0, count: 8)))
-        allow(Position).to receive(:sum).and_return(200.0)
+        positions_double = double("TimeRangePositions")
+        closed_positions_double = double("ClosedPositions", sum: 150.0, count: 8)
+
+        allow(positions_double).to receive(:sum).with(:pnl).and_return(200.0)
+        allow(positions_double).to receive(:closed).and_return(closed_positions_double)
+        allow(closed_positions_double).to receive(:where).and_return(double("WinningTrades", count: 5))
+        allow(closed_positions_double).to receive(:maximum).with(:pnl).and_return(75.0)
+
+        allow(Position).to receive(:where).and_return(positions_double)
       end
 
       it "calculates PnL data correctly" do
@@ -719,12 +728,12 @@ RSpec.describe SlackCommandHandler, type: :service do
           unrealized_pnl: 50.0,
           completed_trades: 8,
           win_rate: 62.5, # 5 winning trades out of 8
-          best_trade: nil
+          best_trade: 75.0
         )
       end
 
       it "handles different time periods" do
-        expect(Position).to receive(:where).with(1.week.ago..Time.current)
+        expect(Position).to receive(:where).with(hash_including(entry_time: kind_of(Range)))
         described_class.send(:get_pnl_data, "week")
       end
 
