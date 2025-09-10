@@ -63,7 +63,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
       allow(ENV).to receive(:[]).with("HOURS").and_return(nil)
       allow(ENV).to receive(:fetch).and_call_original
       allow(ENV).to receive(:fetch).with("HOURS", "24").and_return("24")
-      allow(ENV).to receive(:fetch).with("SIGNAL_EVALUATION_INTERVAL", "30").and_return("30")
+      allow(ENV).to receive(:fetch).with("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").and_return("30")
     end
 
     describe "evaluate task logic" do
@@ -362,14 +362,14 @@ RSpec.describe "Realtime Signals Rake Tasks" do
 
       describe "#start_signal_evaluation" do
         it "starts real-time signal evaluation with configured interval" do
-          allow(ENV).to receive(:fetch).with("SIGNAL_EVALUATION_INTERVAL", "30").and_return("45")
+          allow(ENV).to receive(:fetch).with("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").and_return("45")
           allow(RealTimeSignalJob).to receive(:send).with(:start_realtime_evaluation, interval_seconds: 45)
 
           expect(RealTimeSignalJob).to receive(:send).with(:start_realtime_evaluation, interval_seconds: 45)
 
           # Test the core evaluation start logic
           Rails.logger.info("[RTS] Starting real-time signal evaluation...")
-          RealTimeSignalJob.send(:start_realtime_evaluation, interval_seconds: ENV.fetch("SIGNAL_EVALUATION_INTERVAL",
+          RealTimeSignalJob.send(:start_realtime_evaluation, interval_seconds: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL",
             "30").to_i)
         end
       end

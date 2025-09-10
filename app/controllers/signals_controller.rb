@@ -2,7 +2,7 @@
 
 # API controller for real-time trading signals
 # Provides REST endpoints to access signal alerts and trigger evaluations
-class SignalController < ApplicationController
+class SignalsController < ApplicationController
   before_action :authenticate_request, except: [:health]
   before_action :set_cors_headers
 
@@ -120,7 +120,11 @@ class SignalController < ApplicationController
 
   # GET /signals/active - Get active signals only
   def active
-    limit = safe_param_to_i(params[:limit], 100)
+    limit = (params[:limit] || 100).to_i
+
+    # Validate limit parameter (1-1000)
+    limit = 100 if limit < 1 || limit > 1000
+
     signals = SignalAlert.active
       .order(confidence: :desc, alert_timestamp: :desc)
       .limit(limit)
@@ -129,14 +133,22 @@ class SignalController < ApplicationController
 
     render json: {
       signals: signals.map(&:to_api_response),
-      count: signals.count
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/high_confidence - Get high confidence signals only
   def high_confidence
-    threshold = safe_param_to_f(params[:threshold], 70)
-    limit = safe_param_to_i(params[:limit], 50)
+    threshold = (params[:threshold] || 70).to_i
+    limit = (params[:limit] || 50).to_i
+
+    # Validate threshold parameter (0-100)
+    threshold = 70 if threshold < 0 || threshold > 100
+
+    # Validate limit parameter (1-1000)
+    limit = 50 if limit < 1 || limit > 1000
+
     signals = SignalAlert.active
       .high_confidence(threshold)
       .order(confidence: :desc, alert_timestamp: :desc)
@@ -146,15 +158,23 @@ class SignalController < ApplicationController
 
     render json: {
       signals: signals.map(&:to_api_response),
-      threshold: threshold.to_i.to_s, # Use processed value as integer string
-      count: signals.count
+      threshold: threshold,
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/recent - Get recently generated signals
   def recent
-    hours = safe_param_to_i(params[:hours], 1)
-    limit = safe_param_to_i(params[:limit], 100)
+    hours = (params[:hours] || 1).to_i
+    limit = (params[:limit] || 100).to_i
+
+    # Validate hours parameter (1-168 hours = 1 week)
+    hours = 1 if hours < 1 || hours > 168
+
+    # Validate limit parameter (1-1000)
+    limit = 100 if limit < 1 || limit > 1000
+
     signals = SignalAlert.recent(hours)
       .order(alert_timestamp: :desc)
       .limit(limit)
@@ -163,14 +183,19 @@ class SignalController < ApplicationController
 
     render json: {
       signals: signals.map(&:to_api_response),
-      hours: hours.to_s, # Use processed value as string
-      count: signals.count
+      hours: hours,
+      count: signals.count,
+      limit: limit
     }
   end
 
   # GET /signals/stats - Get signal statistics
   def stats
-    time_range = safe_param_to_i(params[:hours], 24)
+    time_range = (params[:hours] || 24).to_i
+
+    # Validate time_range parameter (1-168 hours = 1 week)
+    time_range = 24 if time_range < 1 || time_range > 168
+
     start_time = time_range.hours.ago
 
     stats = {
@@ -187,7 +212,7 @@ class SignalController < ApplicationController
         .count,
       average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
         .average(:confidence)&.to_f&.round(2),
-      time_range_hours: time_range.to_s
+      time_range_hours: time_range
     }
 
     render json: stats
@@ -237,27 +262,27 @@ class SignalController < ApplicationController
 
   def filter_signals(signals)
     # Filter by symbol
-    signals = signals.for_symbol(params[:symbol]) if params[:symbol]
+    signals = signals.for_symbol(params[:symbol]) if params[:symbol].present?
 
     # Filter by strategy
-    signals = signals.by_strategy(params[:strategy]) if params[:strategy]
+    signals = signals.by_strategy(params[:strategy]) if params[:strategy].present?
 
     # Filter by side
-    signals = signals.by_side(params[:side]) if params[:side]
+    signals = signals.by_side(params[:side]) if params[:side].present?
 
     # Filter by signal type
-    signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type]
+    signals = signals.where(signal_type: params[:signal_type]) if params[:signal_type].present?
 
-    # Filter by minimum confidence
-    if params[:min_confidence].present?
-      min_confidence = params[:min_confidence].to_f
-      signals = signals.where("confidence >= ?", min_confidence) if min_confidence > 0
+    # Filter by minimum confidence (validate numeric)
+    if params[:min_confidence].present? && params[:min_confidence].to_s.match?(/\A\d+(\.\d+)?\z/)
+      min_conf = params[:min_confidence].to_f
+      signals = signals.where("confidence >= ?", min_conf) if min_conf.between?(0, 100)
     end
 
-    # Filter by maximum confidence
-    if params[:max_confidence].present?
-      max_confidence = params[:max_confidence].to_f
-      signals = signals.where("confidence <= ?", max_confidence) if max_confidence > 0
+    # Filter by maximum confidence (validate numeric)
+    if params[:max_confidence].present? && params[:max_confidence].to_s.match?(/\A\d+(\.\d+)?\z/)
+      max_conf = params[:max_confidence].to_f
+      signals = signals.where("confidence <= ?", max_conf) if max_conf.between?(0, 100)
     end
 
     signals
@@ -268,8 +293,7 @@ class SignalController < ApplicationController
     api_key = request.headers["X-API-Key"] || params[:api_key]
     expected_key = ENV["SIGNALS_API_KEY"]
 
-    # Allow request if no API key is configured OR if API key matches
-    return if expected_key.nil? || api_key == expected_key
+    return if api_key == expected_key
 
     render json: {error: "Unauthorized"}, status: :unauthorized
   end
@@ -278,19 +302,5 @@ class SignalController < ApplicationController
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
-  end
-
-  # Helper method to safely convert parameters to numbers
-  def safe_param_to_i(param, default = nil)
-    return default if param.blank?
-
-    param.to_i.positive? ? param.to_i : default
-  end
-
-  def safe_param_to_f(param, default = nil)
-    return default if param.blank?
-
-    value = param.to_f
-    value.positive? ? value : default
   end
 end

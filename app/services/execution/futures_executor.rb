@@ -36,10 +36,10 @@ module Execution
 
     # Check if any contracts are expiring soon and handle rollover
     def check_and_perform_rollover
-      if @contract_manager.rollover_needed?(days_before_expiry: 3)
-        @logger.info("[EXEC] Contract rollover needed")
-        perform_rollover
-      end
+      return unless @contract_manager.rollover_needed?(days_before_expiry: 3)
+
+      @logger.info("[EXEC] Contract rollover needed")
+      perform_rollover
     end
 
     # Perform contract rollover - close positions in expiring contracts and move to current month
@@ -94,12 +94,11 @@ module Execution
       # If it's already a specific current month contract, check if it's still valid
       if product_id.match?(/\d{2}[A-Z]{3}\d{2}/)
         contract = TradingPair.find_by(product_id: product_id)
-        if contract && !contract.expired?
-          return product_id
-        else
-          @logger.warn("[EXEC] Contract #{product_id} is expired or not found")
-          return nil
-        end
+        return product_id if contract && !contract.expired?
+
+        @logger.warn("[EXEC] Contract #{product_id} is expired or not found")
+        return nil
+
       end
 
       # If it's an asset symbol, find best available contract
@@ -131,7 +130,7 @@ module Execution
     def extract_asset_from_product_id(product_id)
       case product_id
       when /^(BTC|ETH)(-USD)?$/
-        $1
+        ::Regexp.last_match(1)
       when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
         product_id.start_with?("BIT") ? "BTC" : "ETH"
       end

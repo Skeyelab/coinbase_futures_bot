@@ -1,8 +1,6 @@
 ---
 alwaysApply: true
-description: Require feature work to be done via pull requests with CI passing and session notes updated.
 ---
-
 # Pull Request policy
 
 - All substantive changes (features, refactors, deps, config) should be done in branches and merged via PRs.

@@ -20,7 +20,7 @@ jobs:
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2.2'
+          ruby-version-file: '.ruby-version'
           bundler-cache: true
 
       - name: Lint code
@@ -34,7 +34,7 @@ jobs:
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2.2'
+          ruby-version-file: '.ruby-version'
           bundler-cache: true
 
       - name: Static security scan
@@ -64,7 +64,7 @@ jobs:
 
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2.2'
+          ruby-version-file: '.ruby-version'
           bundler-cache: true
 
       - name: Install system dependencies
@@ -185,7 +185,7 @@ jobs:
 
               # Verify it exists
               found = Position.find_by(product_id: 'CI-VERIFY-TEST')
-              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')'
+              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')
 
               # Clean up
               test_pos.destroy
