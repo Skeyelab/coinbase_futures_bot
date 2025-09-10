@@ -96,7 +96,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         let(:command) { "/bot-pnl" }
 
         it "calls handle_pnl_command with default period" do
-          expect(described_class).to receive(:handle_pnl_command).with("")
+          expect(described_class).to receive(:handle_pnl_command).with("today")
           described_class.handle_command(params.merge(command: command, text: ""))
         end
 
@@ -726,7 +726,7 @@ RSpec.describe SlackCommandHandler, type: :service do
           sum: 150.0,
           count: 8,
           where: double("WinningTrades", count: 5),
-          maximum: nil)
+          maximum: 75.0)
 
         time_range_positions = double("TimeRangePositions",
           closed: closed_positions,

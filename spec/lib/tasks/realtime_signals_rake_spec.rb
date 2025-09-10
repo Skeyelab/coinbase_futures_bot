@@ -30,13 +30,13 @@ RSpec.describe "Realtime Signals Rake Tasks" do
     it "includes proper task descriptions" do
       rake_content = File.read(rake_file_path)
 
-      expect(rake_content).to include("desc 'Start real-time signal evaluation system'")
-      expect(rake_content).to include("desc 'Start real-time signal evaluation job only (for use with existing market data)'")
-      expect(rake_content).to include("desc 'Evaluate signals once for all pairs'")
-      expect(rake_content).to include("desc 'Evaluate signals for specific symbol'")
-      expect(rake_content).to include("desc 'Show real-time signal statistics'")
-      expect(rake_content).to include("desc 'Clean up expired signal alerts'")
-      expect(rake_content).to include("desc 'Cancel all active signal alerts'")
+      expect(rake_content).to include('desc "Start real-time signal evaluation system"')
+      expect(rake_content).to include('desc "Start real-time signal evaluation job only (for use with existing market data)"')
+      expect(rake_content).to include('desc "Evaluate signals once for all pairs"')
+      expect(rake_content).to include('desc "Evaluate signals for specific symbol"')
+      expect(rake_content).to include('desc "Show real-time signal statistics"')
+      expect(rake_content).to include('desc "Clean up expired signal alerts"')
+      expect(rake_content).to include('desc "Cancel all active signal alerts"')
     end
 
     it "includes environment loading for tasks" do
