@@ -16,8 +16,11 @@ class ChangedTestFilesFinder
     changed_files = get_changed_files
     test_files = find_test_files_for_changes(changed_files)
 
-    puts "Changed files: #{changed_files.join(", ")}"
-    puts "Related test files: #{test_files.join(", ")}"
+    # Only output debug messages if not in CI mode
+    unless ENV["CI"] == "true"
+      puts "Changed files: #{changed_files.join(", ")}"
+      puts "Related test files: #{test_files.join(", ")}"
+    end
 
     # Output as JSON for CI consumption
     {
