@@ -85,7 +85,19 @@ class SentryDatabaseMonitoring
         binds: payload[:binds]&.map(&:value)&.first(10)
       })
 
-      Sentry.capture_exception(payload[:exception])
+      # Handle both exception objects and exception arrays
+      exception = payload[:exception]
+      if exception.is_a?(Array) && exception.length >= 2
+        # Create a proper exception object from the array format
+        exception_class = begin
+          exception[0].constantize
+        rescue
+          StandardError
+        end
+        exception_message = exception[1]
+        exception = exception_class.new(exception_message)
+      end
+      Sentry.capture_exception(exception)
     end
   end
 
