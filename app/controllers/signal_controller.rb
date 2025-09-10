@@ -146,7 +146,7 @@ class SignalController < ApplicationController
 
     render json: {
       signals: signals.map(&:to_api_response),
-      threshold: params[:threshold] || "70", # Echo back original parameter or default as string
+      threshold: threshold.to_i.to_s, # Use processed value as integer string
       count: signals.count
     }
   end
@@ -163,15 +163,15 @@ class SignalController < ApplicationController
 
     render json: {
       signals: signals.map(&:to_api_response),
-      hours: params[:hours] || "1", # Echo back original parameter or default as string
+      hours: hours.to_s, # Use processed value as string
       count: signals.count
     }
   end
 
   # GET /signals/stats - Get signal statistics
   def stats
-    time_range = params[:hours] || 24
-    start_time = time_range.to_i.hours.ago
+    time_range = safe_param_to_i(params[:hours], 24)
+    start_time = time_range.hours.ago
 
     stats = {
       active_signals: SignalAlert.active.count,

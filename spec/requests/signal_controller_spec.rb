@@ -440,7 +440,7 @@ RSpec.describe "Signals API", type: :request do
         expect(response).to have_http_status(:success)
         json_response = JSON.parse(response.body)
         expect(json_response["signals"].length).to eq(2)
-        expect(json_response["threshold"]).to eq(70)
+        expect(json_response["threshold"]).to eq("70")
         expect(json_response["count"]).to eq(2)
 
         # Verify all returned signals are above threshold
@@ -454,7 +454,7 @@ RSpec.describe "Signals API", type: :request do
 
         json_response = JSON.parse(response.body)
         expect(json_response["signals"].length).to eq(1)
-        expect(json_response["threshold"]).to eq(80)
+        expect(json_response["threshold"]).to eq("80")
         expect(json_response["signals"][0]["confidence"]).to eq(85.0)
       end
 
@@ -507,7 +507,7 @@ RSpec.describe "Signals API", type: :request do
 
         expect(json_response["signals"]).not_to be_nil
         expect(json_response["signals"].length).to eq(2)
-        expect(json_response["hours"]).to eq(1)
+        expect(json_response["hours"]).to eq("1")
         expect(json_response["count"]).to eq(2)
       end
 
@@ -516,7 +516,7 @@ RSpec.describe "Signals API", type: :request do
 
         json_response = JSON.parse(response.body)
         expect(json_response["signals"].length).to be >= 2 # At least the recent signals within 3 hours
-        expect(json_response["hours"]).to eq(3)
+        expect(json_response["hours"]).to eq("3")
       end
 
       it "orders signals by alert_timestamp descending" do
@@ -604,7 +604,7 @@ RSpec.describe "Signals API", type: :request do
         get "/signals/stats", headers: @headers, params: {hours: 1}
 
         json_response = JSON.parse(response.body)
-        expect(json_response["time_range_hours"]).to eq(1)
+        expect(json_response["time_range_hours"]).to eq("1")
         expect(json_response["recent_signals"]).to eq(4) # all signals within 1 hour
       end
 
@@ -864,7 +864,7 @@ RSpec.describe "Signals API", type: :request do
 
         expect(response).to have_http_status(:success)
         json_response = JSON.parse(response.body)
-        expect(json_response["hours"]).to eq(1) # Should use default value for invalid parameter
+        expect(json_response["hours"]).to eq("1") # Should use default value for invalid parameter
       end
     end
   end
