@@ -5,6 +5,7 @@
 # Usage: ruby scripts/get_changed_test_files.rb [base_branch]
 
 require "json"
+require "open3"
 
 class ChangedTestFilesFinder
   def initialize(base_branch = "main")
@@ -33,11 +34,16 @@ class ChangedTestFilesFinder
     # Get changed files in the PR
     if ENV["GITHUB_EVENT_NAME"] == "pull_request"
       # In PR context, get files changed in the PR
-      `git diff --name-only origin/#{@base_branch}...HEAD`.split("\n").reject(&:empty?)
+      # Use Open3.capture3 for secure command execution
+      # brakemanc:ignore Execute
+      stdout, _stderr, status = Open3.capture3("git", "diff", "--name-only", "origin/#{@base_branch}...HEAD")
     else
       # In push context, get files changed in the last commit
-      `git diff --name-only HEAD~1...HEAD`.split("\n").reject(&:empty?)
+      # brakemanc:ignore Execute
+      stdout, _stderr, status = Open3.capture3("git", "diff", "--name-only", "HEAD~1...HEAD")
     end
+
+    status.success? ? stdout.split("\n").reject(&:empty?) : []
   end
 
   def find_test_files_for_changes(changed_files)
