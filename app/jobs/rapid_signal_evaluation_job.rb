@@ -3,11 +3,12 @@
 class RapidSignalEvaluationJob < ApplicationJob
   queue_as :default
 
-  def perform(product_id:, current_price:, asset:)
+  def perform(product_id:, current_price:, asset:, day_trading: nil)
     @logger = Rails.logger
     @product_id = product_id
     @current_price = current_price.to_f
     @asset = asset
+    @day_trading = day_trading.nil? ? Rails.application.config.default_day_trading : day_trading
 
     @logger.debug("[RSE] Evaluating rapid signals for #{@product_id} at $#{@current_price}")
 
@@ -84,7 +85,7 @@ class RapidSignalEvaluationJob < ApplicationJob
       side: signal[:side],
       size: signal[:quantity],
       type: :market, # Use market orders for rapid execution
-      day_trading: true,
+      day_trading: @day_trading,
       take_profit: signal[:tp],
       stop_loss: signal[:sl]
     )
@@ -100,7 +101,7 @@ class RapidSignalEvaluationJob < ApplicationJob
         entry_price: signal[:price],
         entry_time: Time.current,
         status: "OPEN",
-        day_trading: true,
+        day_trading: @day_trading,
         take_profit: signal[:tp],
         stop_loss: signal[:sl]
       )

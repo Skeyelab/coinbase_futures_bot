@@ -26,6 +26,37 @@
 
 ### Session log
 
+#### 2025-09-10 20:15 UTC
+- Context: Implemented position type configuration for swing trading (Linear issue FUT-36)
+- Changes:
+  - Added `DEFAULT_DAY_TRADING` environment variable configuration in `config/application.rb`
+  - Updated Position model to use configuration default instead of hardcoded `true`
+  - Modified `RapidSignalEvaluationJob` to accept optional `day_trading` parameter
+  - Updated `Trading::CoinbasePositions` service to respect configuration defaults
+  - Added factory traits for swing trading positions (`:swing_trading`, `:multi_day`)
+  - Created comprehensive tests for backward compatibility and new functionality
+- Commands run:
+  - `bundle install`
+  - `bundle exec rspec spec/jobs/rapid_signal_evaluation_job_spec.rb`
+  - `bundle exec rspec spec/models/position_spec.rb`
+  - `bundle exec rspec spec/services/trading/coinbase_positions_integration_spec.rb`
+  - `bundle exec rspec spec/factories/positions_spec.rb`
+  - `bin/standardrb --fix`
+- Files touched:
+  - `config/application.rb`
+  - `app/models/position.rb`
+  - `app/jobs/rapid_signal_evaluation_job.rb`
+  - `app/services/trading/coinbase_positions.rb`
+  - `spec/factories/positions.rb`
+  - `spec/jobs/rapid_signal_evaluation_job_spec.rb` (new)
+  - `spec/factories/positions_spec.rb` (new)
+  - `spec/models/position_spec.rb`
+  - `spec/services/trading/coinbase_positions_integration_spec.rb`
+- Next steps:
+  - Implement margin window considerations for overnight positions
+  - Add expiry buffer logic for swing trading positions
+  - Integrate with Coinbase Futures Position API for real-time data
+
 #### 2025-01-10 20:45 UTC
 - Context: Fixed all GitHub workflow test failures from run 17622971950
 - Changes:

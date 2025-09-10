@@ -59,6 +59,9 @@ module CoinbaseFuturesBot
     config.middleware.use ActionDispatch::Session::CookieStore
     config.middleware.use ActionDispatch::Flash
 
+    # Position configuration
+    config.default_day_trading = ENV.fetch("DEFAULT_DAY_TRADING", "true").downcase == "true"
+
     # Subscribe to database query events for Sentry monitoring
     config.after_initialize do
       if defined?(Sentry) && ENV["SENTRY_DSN"].present?
