@@ -6,7 +6,7 @@
 class RealTimeSignalJob < ApplicationJob
   queue_as :realtime_signals
 
-  def perform(*args)
+  def perform(*)
     evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
 
     # Evaluate all enabled trading pairs
@@ -84,28 +84,30 @@ class RealTimeSignalJob < ApplicationJob
   end
 
   # Class methods for job management
-  def self.schedule_realtime_evaluation(interval_seconds: 30)
-    # Remove existing scheduled jobs for this class
-    GoodJob::Job.where(job_class: name, finished_at: nil).delete_all
+  class << self
+    private
 
-    # Schedule new job to run every interval
-    set(wait: interval_seconds.seconds).perform_later
-  end
-  private_class_method :schedule_realtime_evaluation
+    def schedule_realtime_evaluation(interval_seconds: 30)
+      # Remove existing scheduled jobs for this class
+      GoodJob::Job.where(job_class: name, finished_at: nil).delete_all
 
-  def self.start_realtime_evaluation(interval_seconds: 30)
-    Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
+      # Schedule new job to run every interval
+      set(wait: interval_seconds.seconds).perform_later
+    end
 
-    # Schedule the first job
-    schedule_realtime_evaluation(interval_seconds: interval_seconds)
+    def start_realtime_evaluation(interval_seconds: 30)
+      Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
 
-    # Start a loop that continuously schedules the next job
-    Thread.new do
-      loop do
-        sleep interval_seconds
-        schedule_realtime_evaluation(interval_seconds: interval_seconds)
+      # Schedule the first job
+      schedule_realtime_evaluation(interval_seconds: interval_seconds)
+
+      # Start a loop that continuously schedules the next job
+      Thread.new do
+        loop do
+          sleep interval_seconds
+          schedule_realtime_evaluation(interval_seconds: interval_seconds)
+        end
       end
     end
   end
-  private_class_method :start_realtime_evaluation
 end

@@ -9,8 +9,8 @@ class SignalController < ApplicationController
   # GET /signals - List all active signals
   def index
     signals = SignalAlert.includes(:trading_pair)
-                         .active
-                         .order(confidence: :desc, alert_timestamp: :desc)
+      .active
+      .order(confidence: :desc, alert_timestamp: :desc)
 
     # Apply filters
     signals = filter_signals(signals)
@@ -34,19 +34,19 @@ class SignalController < ApplicationController
     signal = SignalAlert.find(params[:id])
     render json: signal.to_api_response
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # POST /signals/evaluate - Trigger real-time signal evaluation
   def evaluate
     # Add Sentry breadcrumb for signal evaluation
     SentryHelper.add_breadcrumb(
-      message: 'Signal evaluation requested',
-      category: 'trading',
-      level: 'info',
+      message: "Signal evaluation requested",
+      category: "trading",
+      level: "info",
       data: {
-        controller: 'signal',
-        action: 'evaluate',
+        controller: "signal",
+        action: "evaluate",
         symbol: params[:symbol]
       }
     )
@@ -61,27 +61,27 @@ class SignalController < ApplicationController
 
         # Track successful signal evaluation
         SentryHelper.add_breadcrumb(
-          message: 'Signal evaluation completed',
-          category: 'trading',
-          level: 'info',
+          message: "Signal evaluation completed",
+          category: "trading",
+          level: "info",
           data: {
             symbol: params[:symbol],
-            evaluation_type: 'single_pair'
+            evaluation_type: "single_pair"
           }
         )
 
-        render json: { message: "Evaluated signals for #{params[:symbol]}" }
+        render json: {message: "Evaluated signals for #{params[:symbol]}"}
       else
         # Track trading pair not found errors
         Sentry.with_scope do |scope|
-          scope.set_tag('controller', 'signal')
-          scope.set_tag('error_type', 'trading_pair_not_found')
-          scope.set_context('request', { symbol: params[:symbol] })
+          scope.set_tag("controller", "signal")
+          scope.set_tag("error_type", "trading_pair_not_found")
+          scope.set_context("request", {symbol: params[:symbol]})
 
-          Sentry.capture_message('Trading pair not found for signal evaluation', level: 'warning')
+          Sentry.capture_message("Trading pair not found for signal evaluation", level: "warning")
         end
 
-        render json: { error: "Trading pair not found: #{params[:symbol]}" }, status: :not_found
+        render json: {error: "Trading pair not found: #{params[:symbol]}"}, status: :not_found
       end
     else
       # Evaluate all pairs
@@ -89,28 +89,28 @@ class SignalController < ApplicationController
 
       # Track successful bulk evaluation
       SentryHelper.add_breadcrumb(
-        message: 'Bulk signal evaluation completed',
-        category: 'trading',
-        level: 'info',
+        message: "Bulk signal evaluation completed",
+        category: "trading",
+        level: "info",
         data: {
-          evaluation_type: 'all_pairs'
+          evaluation_type: "all_pairs"
         }
       )
 
-      render json: { message: 'Evaluated signals for all enabled trading pairs' }
+      render json: {message: "Evaluated signals for all enabled trading pairs"}
     end
-  rescue StandardError => e
+  rescue => e
     # Enhanced error tracking for signal evaluation failures
     Sentry.with_scope do |scope|
-      scope.set_tag('controller', 'signal')
-      scope.set_tag('action', 'evaluate')
-      scope.set_tag('error_type', 'signal_evaluation_error')
-      scope.set_tag('critical', 'true')
+      scope.set_tag("controller", "signal")
+      scope.set_tag("action", "evaluate")
+      scope.set_tag("error_type", "signal_evaluation_error")
+      scope.set_tag("critical", "true")
 
-      scope.set_context('signal_evaluation', {
-                          symbol: params[:symbol],
-                          evaluation_type: params[:symbol] ? 'single_pair' : 'all_pairs'
-                        })
+      scope.set_context("signal_evaluation", {
+        symbol: params[:symbol],
+        evaluation_type: params[:symbol] ? "single_pair" : "all_pairs"
+      })
 
       Sentry.capture_exception(e)
     end
@@ -122,8 +122,8 @@ class SignalController < ApplicationController
   def active
     limit = safe_param_to_i(params[:limit], 100)
     signals = SignalAlert.active
-                         .order(confidence: :desc, alert_timestamp: :desc)
-                         .limit(limit)
+      .order(confidence: :desc, alert_timestamp: :desc)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
@@ -138,15 +138,15 @@ class SignalController < ApplicationController
     threshold = safe_param_to_f(params[:threshold], 70)
     limit = safe_param_to_i(params[:limit], 50)
     signals = SignalAlert.active
-                         .high_confidence(threshold)
-                         .order(confidence: :desc, alert_timestamp: :desc)
-                         .limit(limit)
+      .high_confidence(threshold)
+      .order(confidence: :desc, alert_timestamp: :desc)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
-      threshold: params[:threshold] || '70', # Echo back original parameter or default as string
+      threshold: params[:threshold] || "70", # Echo back original parameter or default as string
       count: signals.count
     }
   end
@@ -156,14 +156,14 @@ class SignalController < ApplicationController
     hours = safe_param_to_i(params[:hours], 1)
     limit = safe_param_to_i(params[:limit], 100)
     signals = SignalAlert.recent(hours)
-                         .order(alert_timestamp: :desc)
-                         .limit(limit)
+      .order(alert_timestamp: :desc)
+      .limit(limit)
 
     signals = filter_signals(signals)
 
     render json: {
       signals: signals.map(&:to_api_response),
-      hours: params[:hours] || '1', # Echo back original parameter or default as string
+      hours: params[:hours] || "1", # Echo back original parameter or default as string
       count: signals.count
     }
   end
@@ -175,18 +175,18 @@ class SignalController < ApplicationController
 
     stats = {
       active_signals: SignalAlert.active.count,
-      recent_signals: SignalAlert.where('alert_timestamp >= ?', start_time).count,
-      triggered_signals: SignalAlert.where('alert_timestamp >= ? AND alert_status = ?', start_time, 'triggered').count,
-      expired_signals: SignalAlert.where('alert_timestamp >= ? AND alert_status = ?', start_time, 'expired').count,
-      high_confidence_signals: SignalAlert.where('alert_timestamp >= ? AND confidence >= ?', start_time, 70).count,
-      signals_by_symbol: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                    .group(:symbol)
-                                    .count,
-      signals_by_strategy: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                      .group(:strategy_name)
-                                      .count,
-      average_confidence: SignalAlert.where('alert_timestamp >= ?', start_time)
-                                     .average(:confidence)&.to_f&.round(2),
+      recent_signals: SignalAlert.where("alert_timestamp >= ?", start_time).count,
+      triggered_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time, "triggered").count,
+      expired_signals: SignalAlert.where("alert_timestamp >= ? AND alert_status = ?", start_time, "expired").count,
+      high_confidence_signals: SignalAlert.where("alert_timestamp >= ? AND confidence >= ?", start_time, 70).count,
+      signals_by_symbol: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .group(:symbol)
+        .count,
+      signals_by_strategy: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .group(:strategy_name)
+        .count,
+      average_confidence: SignalAlert.where("alert_timestamp >= ?", start_time)
+        .average(:confidence)&.to_f&.round(2),
       time_range_hours: time_range.to_s
     }
 
@@ -199,11 +199,11 @@ class SignalController < ApplicationController
     signal.trigger!
 
     render json: {
-      message: 'Signal marked as triggered',
+      message: "Signal marked as triggered",
       signal: signal.to_api_response
     }
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # POST /signals/:id/cancel - Cancel signal
@@ -212,20 +212,20 @@ class SignalController < ApplicationController
     signal.cancel!
 
     render json: {
-      message: 'Signal cancelled',
+      message: "Signal cancelled",
       signal: signal.to_api_response
     }
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Signal not found' }, status: :not_found
+    render json: {error: "Signal not found"}, status: :not_found
   end
 
   # GET /signals/health - Health check for signal system
   def health
     last_signal = SignalAlert.order(:alert_timestamp).last
-    recent_signals_count = SignalAlert.where('alert_timestamp >= ?', 1.hour.ago).count
+    recent_signals_count = SignalAlert.where("alert_timestamp >= ?", 1.hour.ago).count
 
     render json: {
-      status: 'healthy',
+      status: "healthy",
       last_signal_timestamp: last_signal&.alert_timestamp,
       recent_signals_count: recent_signals_count,
       active_signals_count: SignalAlert.active.count,
@@ -251,13 +251,13 @@ class SignalController < ApplicationController
     # Filter by minimum confidence
     if params[:min_confidence].present?
       min_confidence = params[:min_confidence].to_f
-      signals = signals.where('confidence >= ?', min_confidence) if min_confidence > 0
+      signals = signals.where("confidence >= ?", min_confidence) if min_confidence > 0
     end
 
     # Filter by maximum confidence
     if params[:max_confidence].present?
       max_confidence = params[:max_confidence].to_f
-      signals = signals.where('confidence <= ?', max_confidence) if max_confidence > 0
+      signals = signals.where("confidence <= ?", max_confidence) if max_confidence > 0
     end
 
     signals
@@ -265,19 +265,19 @@ class SignalController < ApplicationController
 
   def authenticate_request
     # Simple API key authentication
-    api_key = request.headers['X-API-Key'] || params[:api_key]
-    expected_key = ENV['SIGNALS_API_KEY']
+    api_key = request.headers["X-API-Key"] || params[:api_key]
+    expected_key = ENV["SIGNALS_API_KEY"]
 
     # Allow request if no API key is configured OR if API key matches
     return if expected_key.nil? || api_key == expected_key
 
-    render json: { error: 'Unauthorized' }, status: :unauthorized
+    render json: {error: "Unauthorized"}, status: :unauthorized
   end
 
   def set_cors_headers
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-API-Key'
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
   end
 
   # Helper method to safely convert parameters to numbers

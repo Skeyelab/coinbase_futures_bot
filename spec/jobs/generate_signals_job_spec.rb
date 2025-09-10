@@ -27,6 +27,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
   describe "#perform" do
     context "with default equity" do
       before do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("SIGNAL_EQUITY_USD").and_return(nil)
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
         # Mock the default_equity_usd method for this context
         allow(job).to receive(:default_equity_usd).and_return(10_000.0)
@@ -144,7 +146,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
       end
 
       it "processes all enabled pairs" do
-        expect(mock_strategy).to receive(:signal).twice
+        enabled_count = TradingPair.enabled.count
+        expect(mock_strategy).to receive(:signal).exactly(enabled_count).times
 
         job.perform
       end
@@ -194,6 +197,17 @@ RSpec.describe GenerateSignalsJob, type: :job do
   end
 
   describe "error handling" do
+    before do
+      # Mock TradingPair.enabled to return only our test trading pair
+      allow(TradingPair).to receive(:enabled) do
+        double.tap do |relation|
+          allow(relation).to receive(:find_each) do |&block|
+            block.call(trading_pair)
+          end
+        end
+      end
+    end
+
     context "when strategy initialization fails" do
       before do
         allow(Strategy::MultiTimeframeSignal).to receive(:new).and_raise(StandardError.new("Strategy init failed"))

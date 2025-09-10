@@ -174,7 +174,8 @@ namespace :realtime do
     Rails.logger.info("[RTS] Starting real-time signal evaluation...")
 
     # Start the real-time signal evaluation
-    RealTimeSignalJob.start_realtime_evaluation(interval_seconds: ENV.fetch("SIGNAL_EVALUATION_INTERVAL", "30").to_i)
+    RealTimeSignalJob.start_realtime_evaluation(interval_seconds: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL",
+      "30").to_i)
   end
 
   def trap_signals
