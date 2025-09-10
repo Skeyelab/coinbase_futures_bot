@@ -22,7 +22,8 @@ class SlackCommandHandler
       when "/bot-positions"
         handle_positions_command(text)
       when "/bot-pnl"
-        handle_pnl_command(text)
+        period = text.blank? ? "today" : text
+        handle_pnl_command(period)
       when "/bot-health"
         handle_health_command
       when "/bot-stop"
@@ -419,7 +420,8 @@ class SlackCommandHandler
     def get_bot_status
       positions = Position.open.day_trading.count
       daily_pnl = Position.where(entry_time: Date.current.beginning_of_day..Time.current).sum(:pnl)
-      last_signal = GenerateSignalsJob.where(finished_at: Date.current.beginning_of_day..Time.current)
+      last_signal = GoodJob::Job.where(job_class: "GenerateSignalsJob",
+        finished_at: Date.current.beginning_of_day..Time.current)
         .order(finished_at: :desc)
         .first
 
