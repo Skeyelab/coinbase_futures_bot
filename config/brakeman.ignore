@@ -1,0 +1,29 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Command Injection",
+      "warning_code": 14,
+      "fingerprint": "dbffbf92a32f451d86c67db25ad0d68e210424d70b5eb46ea7c7dfa4ce49adc0",
+      "check_name": "Execute",
+      "message": "Possible command injection",
+      "file": "scripts/get_changed_test_files.rb",
+      "line": 39,
+      "link": "https://brakemanscanner.org/docs/warning_types/command_injection/",
+      "code": "Open3.capture3(\"git\", \"diff\", \"--name-only\", \"origin/#{base_branch}...HEAD\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "ChangedTestFilesFinder",
+        "method": "get_changed_files"
+      },
+      "user_input": "base_branch",
+      "confidence": "Medium",
+      "cwe_id": [
+        77
+      ],
+      "note": "False positive - using Open3.capture3 with separate arguments is secure"
+    }
+  ],
+  "updated": "2025-09-10T20:26:00Z",
+  "brakeman_version": "7.1.0"
+}
