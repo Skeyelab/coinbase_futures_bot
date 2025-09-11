@@ -51,6 +51,27 @@
   - Monitor PR #77 CI run to verify optimization works correctly
   - Merge PR after verification
 
+#### 2025-09-11 03:30 UTC
+- Context: Integrated coverage badge generation into main CI workflow to fix persistent failures
+- Changes:
+  - Moved coverage badge generation from separate workflow to end of CI flow
+  - Eliminated cross-branch artifact access issues
+  - Simplified workflow management by having single CI workflow
+  - Coverage badge now runs as final step after successful tests
+  - Removed separate coverage-badge.yml workflow file
+- Commands run:
+  - `rm .github/workflows/coverage-badge.yml`
+  - `bin/standardrb --fix`
+  - `git add .github/workflows/ci.yml && git rm .github/workflows/coverage-badge.yml`
+  - `git commit -m "feat(ci): integrate coverage badge generation into main CI workflow"`
+  - `git push`
+- Files touched:
+  - `.github/workflows/ci.yml` (modified)
+  - `.github/workflows/coverage-badge.yml` (deleted)
+- Next steps:
+  - Monitor PR #77 CI run to verify both optimizations work correctly
+  - Merge PR after verification
+
 #### 2025-09-10 20:15 UTC
 - Context: Implemented position type configuration for swing trading (Linear issue FUT-36)
 - Changes:
