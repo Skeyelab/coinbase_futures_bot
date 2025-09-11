@@ -62,6 +62,16 @@ module CoinbaseFuturesBot
     # Position configuration
     config.default_day_trading = ENV.fetch("DEFAULT_DAY_TRADING", "true").downcase == "true"
 
+    # Swing trading configuration
+    config.swing_trading_config = {
+      max_hold_days: ENV.fetch('SWING_MAX_HOLD_DAYS', 5).to_i,
+      expiry_buffer_days: ENV.fetch('SWING_EXPIRY_BUFFER_DAYS', 2).to_i,
+      max_overnight_exposure: ENV.fetch('SWING_MAX_EXPOSURE', 0.3).to_f,
+      enable_contract_roll: ENV.fetch('SWING_ENABLE_ROLL', false).to_s.downcase == 'true',
+      margin_safety_buffer: ENV.fetch('SWING_MARGIN_BUFFER', 0.2).to_f,  # 20% margin buffer
+      max_leverage_overnight: ENV.fetch('SWING_MAX_LEVERAGE', 3).to_i    # Max 3x leverage overnight
+    }
+
     # Subscribe to database query events for Sentry monitoring
     config.after_initialize do
       if defined?(Sentry) && ENV["SENTRY_DSN"].present?

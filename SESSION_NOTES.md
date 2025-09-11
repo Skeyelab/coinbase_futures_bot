@@ -26,6 +26,37 @@
 
 ### Session log
 
+#### 2025-09-11 02:54 UTC
+- Context: Implemented Swing Position Manager Service (Linear issue FUT-37)
+- Changes:
+  - Created `SwingPositionManager` service with comprehensive position lifecycle management
+  - Added swing trading configuration to `config/application.rb` with environment variable support
+  - Created background jobs: `SwingPositionManagementJob` and `SwingRiskMonitoringJob`
+  - Added swing trading cron schedules to GoodJob configuration
+  - Enhanced Position model with additional scopes for swing trading
+  - Created comprehensive Rake tasks for swing position management
+  - Implemented Coinbase Futures Balance and Margin API integration
+  - Added risk controls for overnight exposure, leverage limits, and margin safety buffers
+- Commands run:
+  - `bundle exec rspec spec/services/trading/swing_position_manager_spec.rb`
+  - `bundle exec rspec spec/jobs/swing_position_management_job_spec.rb`
+  - `bundle exec rspec spec/jobs/swing_risk_monitoring_job_spec.rb`
+- Files touched:
+  - `app/services/trading/swing_position_manager.rb` (new)
+  - `app/jobs/swing_position_management_job.rb` (new)
+  - `app/jobs/swing_risk_monitoring_job.rb` (new)
+  - `spec/services/trading/swing_position_manager_spec.rb` (new)
+  - `spec/jobs/swing_position_management_job_spec.rb` (new)
+  - `spec/jobs/swing_risk_monitoring_job_spec.rb` (new)
+  - `lib/tasks/swing_trading.rake` (new)
+  - `config/application.rb`
+  - `config/initializers/good_job.rb`
+  - `app/models/position.rb`
+- Next steps:
+  - Test swing position manager integration with live Coinbase API
+  - Verify separation between day trading and swing position management
+  - Monitor background job execution and performance
+
 #### 2025-09-10 20:15 UTC
 - Context: Implemented position type configuration for swing trading (Linear issue FUT-36)
 - Changes:
