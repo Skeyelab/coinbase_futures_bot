@@ -34,14 +34,18 @@
   - Run changed file tests first for fast feedback (break early on failure)
   - Run full test suite with coverage only if changed file tests pass
   - Removed redundant job and updated dependencies
+  - Updated CI workflow to include run number in coverage artifact name (`coverage-reports-${{ github.run_number }}`)
+  - Added error handling and better logging to coverage badge workflow
+  - Fixed artifact name mismatch between CI upload and coverage badge download
 - Commands run:
   - `git checkout -b optimize-ci-workflow`
   - `bin/standardrb --fix`
-  - `git add .github/workflows/ci.yml`
+  - `git add .github/workflows/ci.yml .github/workflows/coverage-badge.yml`
   - `git commit -m "feat(ci): optimize workflow to eliminate duplicate test environment builds"`
   - `git push -u origin optimize-ci-workflow`
 - Files touched:
   - `.github/workflows/ci.yml`
+  - `.github/workflows/coverage-badge.yml`
 - Pull request: [PR #77](https://github.com/Skeyelab/coinbase_futures_bot/pull/77)
 - Next steps:
   - Monitor PR #77 CI run to verify optimization works correctly
