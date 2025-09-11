@@ -63,5 +63,15 @@ FactoryBot.define do
     trait :recent do
       entry_time { 12.hours.ago }
     end
+
+    trait :swing_trading do
+      day_trading { false }
+    end
+
+    trait :multi_day do
+      day_trading { false }
+      entry_time { 3.days.ago }
+      status { "OPEN" }
+    end
   end
 end

@@ -97,8 +97,10 @@ module Trading
     # price: required for limit orders
     # type: :market or :limit
     # Returns order result hash
-    def open_position(product_id:, side:, size:, type: :market, price: nil, day_trading: true, take_profit: nil,
+    def open_position(product_id:, side:, size:, type: :market, price: nil, day_trading: nil, take_profit: nil,
       stop_loss: nil)
+      # Use configuration default if not specified
+      day_trading = Rails.application.config.default_day_trading if day_trading.nil?
       raise "Authentication required" unless @authenticated
 
       order_body = build_order_body(product_id: product_id, side: side, size: size, type: type, price: price)

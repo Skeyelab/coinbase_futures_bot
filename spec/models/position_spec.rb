@@ -160,7 +160,8 @@ RSpec.describe Position, type: :model do
       expect(position.errors[:status]).to include("is not included in the list")
     end
 
-    it "sets day_trading via callback if not provided" do
+    it "sets day_trading via callback if not provided (defaults to true)" do
+      allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
       position = Position.new(
         product_id: "BIT-29AUG25-CDE",
         side: "LONG",
@@ -172,6 +173,36 @@ RSpec.describe Position, type: :model do
       expect(position.day_trading).to be_nil
       position.valid?
       expect(position.day_trading).to be true
+    end
+
+    it "sets day_trading via callback to false when DEFAULT_DAY_TRADING is false" do
+      allow(Rails.application.config).to receive(:default_day_trading).and_return(false)
+      position = Position.new(
+        product_id: "BIT-29AUG25-CDE",
+        side: "LONG",
+        size: 2.0,
+        entry_price: 50000.0,
+        entry_time: Time.current,
+        status: "OPEN"
+      )
+      expect(position.day_trading).to be_nil
+      position.valid?
+      expect(position.day_trading).to be false
+    end
+
+    it "respects explicit day_trading value regardless of configuration" do
+      allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
+      position = Position.new(
+        product_id: "BIT-29AUG25-CDE",
+        side: "LONG",
+        size: 2.0,
+        entry_price: 50000.0,
+        entry_time: Time.current,
+        status: "OPEN",
+        day_trading: false
+      )
+      position.valid?
+      expect(position.day_trading).to be false
     end
   end
 
@@ -544,9 +575,13 @@ RSpec.describe Position, type: :model do
         close_price = 50000.0
         reason = "Test closure"
 
+        # Count open day trading positions before closure
+        initial_open_count = Position.day_trading.open.count
+
         closed_count = Position.close_all_day_trading_positions(close_price, reason)
 
-        expect(closed_count).to eq(2) # day_trading_open and yesterday_open
+        # Should close all open day trading positions
+        expect(closed_count).to eq(initial_open_count)
         expect(Position.open_day_trading_positions.count).to eq(0)
       end
     end

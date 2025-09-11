@@ -191,6 +191,70 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     end
   end
 
+  describe "day trading configuration behavior" do
+    context "when DEFAULT_DAY_TRADING is true" do
+      before do
+        allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
+      end
+
+      it "creates day trading positions by default" do
+        service.open_position(
+          product_id: product_id,
+          side: "LONG",
+          size: 1.0,
+          price: 50_000.0
+        )
+
+        position = Position.last
+        expect(position.day_trading).to be true
+      end
+
+      it "allows explicit swing trading override" do
+        service.open_position(
+          product_id: product_id,
+          side: "LONG",
+          size: 1.0,
+          price: 50_000.0,
+          day_trading: false
+        )
+
+        position = Position.last
+        expect(position.day_trading).to be false
+      end
+    end
+
+    context "when DEFAULT_DAY_TRADING is false" do
+      before do
+        allow(Rails.application.config).to receive(:default_day_trading).and_return(false)
+      end
+
+      it "creates swing trading positions by default" do
+        service.open_position(
+          product_id: product_id,
+          side: "LONG",
+          size: 1.0,
+          price: 50_000.0
+        )
+
+        position = Position.last
+        expect(position.day_trading).to be false
+      end
+
+      it "allows explicit day trading override" do
+        service.open_position(
+          product_id: product_id,
+          side: "LONG",
+          size: 1.0,
+          price: 50_000.0,
+          day_trading: true
+        )
+
+        position = Position.last
+        expect(position.day_trading).to be true
+      end
+    end
+  end
+
   describe "day trading specific behavior" do
     it "creates positions with day_trading flag set to true by default" do
       service.open_position(
