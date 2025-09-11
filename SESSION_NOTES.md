@@ -51,6 +51,22 @@
   - Monitor PR #77 CI run to verify optimization works correctly
   - Merge PR after verification
 
+#### 2025-09-11 03:45 UTC
+- Context: Fixed coverage badge generation to use correct SimpleCov JSON format
+- Changes:
+  - Updated coverage badge script to look for coverage/coverage.json instead of coverage/.resultset.json
+  - Use SimpleCov's metrics.covered_percent field for accurate coverage percentage
+  - Fixed coverage badge generation failure due to incorrect file format expectation
+- Commands run:
+  - `bin/standardrb --fix`
+  - `git add .github/workflows/ci.yml`
+  - `git commit -m "fix(ci): correct coverage badge generation to use SimpleCov JSON format"`
+  - `git push`
+- Files touched:
+  - `.github/workflows/ci.yml`
+- Next steps:
+  - Monitor next CI run to verify coverage badge generation works correctly
+
 #### 2025-09-11 03:30 UTC
 - Context: Integrated coverage badge generation into main CI workflow to fix persistent failures
 - Changes:
