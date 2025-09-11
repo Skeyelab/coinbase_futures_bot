@@ -22,10 +22,15 @@ jobs:
         with:
           name: coverage-reports-${{ github.event.workflow_run.run_number }}
           path: coverage/
+        continue-on-error: true
 
       - name: Generate coverage badge
         run: |
+          echo "=== COVERAGE BADGE GENERATION ==="
+          echo "Looking for coverage data in: coverage/.resultset.json"
+          
           if [ -f "coverage/.resultset.json" ]; then
+            echo "✅ Coverage data found"
             # Extract line coverage percentage
             LINE_COVERAGE=$(ruby -rjson -e "
               data = JSON.parse(File.read('coverage/.resultset.json'))
@@ -79,5 +84,9 @@ jobs:
               echo "Coverage badge updated and pushed"
             fi
           else
-            echo "Coverage data not found"
+            echo "❌ Coverage data not found"
+            echo "Available files in coverage directory:"
+            ls -la coverage/ || echo "Coverage directory does not exist"
+            echo "This usually means the CI workflow didn't generate coverage data or the artifact name mismatch"
+            exit 1
           fi
