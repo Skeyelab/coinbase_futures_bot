@@ -427,11 +427,16 @@ jobs:
           path: coverage/
         continue-on-error: true
 
+      - name: Configure Git
+        run: |
+          git config --global user.email "eric@skeyelab.com"
+          git config --global user.name "GitHub Actions Bot"
+
       - name: Generate coverage badge
         run: |
           echo "=== COVERAGE BADGE GENERATION ==="
           echo "Looking for coverage data in: coverage/coverage.json"
-          
+
           if [ -f "coverage/coverage.json" ]; then
             echo "✅ Coverage data found"
             # Extract line coverage percentage from SimpleCov JSON format
