@@ -421,6 +421,19 @@ jobs:
         run: |
           git config --global user.email "eric@skeyelab.com"
           git config --global user.name "GitHub Actions Bot"
+          
+      - name: Checkout to branch
+        run: |
+          # Get the current branch name from the PR or push event
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH_NAME="${{ github.head_ref }}"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+          fi
+          
+          # Checkout to the actual branch instead of detached HEAD
+          git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
+          echo "Checked out to branch: $BRANCH_NAME"
 
       - name: Generate coverage badge
         run: |
