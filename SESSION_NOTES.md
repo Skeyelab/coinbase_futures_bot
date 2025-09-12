@@ -26,23 +26,67 @@
 
 ### Session log
 
-#### 2025-09-11 03:00 UTC
-- Context: Fixed coverage badge workflow failure due to artifact name mismatch
+#### 2025-09-11 03:15 UTC
+- Context: Optimized CI workflow to eliminate duplicate test environment builds
 - Changes:
+  - Combined `changed-files-test` and `test` jobs into single optimized job
+  - Build test environment only once instead of twice
+  - Run changed file tests first for fast feedback (break early on failure)
+  - Run full test suite with coverage only if changed file tests pass
+  - Removed redundant job and updated dependencies
   - Updated CI workflow to include run number in coverage artifact name (`coverage-reports-${{ github.run_number }}`)
   - Added error handling and better logging to coverage badge workflow
   - Fixed artifact name mismatch between CI upload and coverage badge download
 - Commands run:
+  - `git checkout -b optimize-ci-workflow`
   - `bin/standardrb --fix`
   - `git add .github/workflows/ci.yml .github/workflows/coverage-badge.yml`
-  - `git commit -m "fix(ci): resolve coverage badge artifact name mismatch"`
-  - `git push`
+  - `git commit -m "feat(ci): optimize workflow to eliminate duplicate test environment builds"`
+  - `git push -u origin optimize-ci-workflow`
 - Files touched:
   - `.github/workflows/ci.yml`
   - `.github/workflows/coverage-badge.yml`
+- Pull request: [PR #77](https://github.com/Skeyelab/coinbase_futures_bot/pull/77)
 - Next steps:
-  - Monitor next CI run to verify coverage badge workflow succeeds
-  - Consider adding more robust artifact handling for edge cases
+  - Monitor PR #77 CI run to verify optimization works correctly
+  - Merge PR after verification
+
+#### 2025-09-11 03:45 UTC
+- Context: Fixed coverage badge generation to use correct SimpleCov JSON format
+- Changes:
+  - Updated coverage badge script to look for coverage/coverage.json instead of coverage/.resultset.json
+  - Use SimpleCov's metrics.covered_percent field for accurate coverage percentage
+  - Fixed coverage badge generation failure due to incorrect file format expectation
+- Commands run:
+  - `bin/standardrb --fix`
+  - `git add .github/workflows/ci.yml`
+  - `git commit -m "fix(ci): correct coverage badge generation to use SimpleCov JSON format"`
+  - `git push`
+- Files touched:
+  - `.github/workflows/ci.yml`
+- Next steps:
+  - Monitor next CI run to verify coverage badge generation works correctly
+
+#### 2025-09-11 03:30 UTC
+- Context: Integrated coverage badge generation into main CI workflow to fix persistent failures
+- Changes:
+  - Moved coverage badge generation from separate workflow to end of CI flow
+  - Eliminated cross-branch artifact access issues
+  - Simplified workflow management by having single CI workflow
+  - Coverage badge now runs as final step after successful tests
+  - Removed separate coverage-badge.yml workflow file
+- Commands run:
+  - `rm .github/workflows/coverage-badge.yml`
+  - `bin/standardrb --fix`
+  - `git add .github/workflows/ci.yml && git rm .github/workflows/coverage-badge.yml`
+  - `git commit -m "feat(ci): integrate coverage badge generation into main CI workflow"`
+  - `git push`
+- Files touched:
+  - `.github/workflows/ci.yml` (modified)
+  - `.github/workflows/coverage-badge.yml` (deleted)
+- Next steps:
+  - Monitor PR #77 CI run to verify both optimizations work correctly
+  - Merge PR after verification
 
 #### 2025-09-11 02:54 UTC
 - Context: Implemented Swing Position Manager Service (Linear issue FUT-37)

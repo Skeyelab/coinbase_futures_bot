@@ -1,7 +1,6 @@
 # Coinbase Futures Bot
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
-[![codecov](https://codecov.io/gh/Skeyelab/coinbase_futures_bot/branch/main/graph/badge.svg)](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
 
 An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
 
@@ -34,9 +33,9 @@ This project maintains a comprehensive test suite with **141 test examples** cov
 
 ### Coverage Reports
 
-- **Online**: [Codecov Dashboard](https://codecov.io/gh/Skeyelab/coinbase_futures_bot)
-- **Local**: Generated automatically when running tests with coverage
+- **Local**: Generated automatically when running tests with SimpleCov
 - **HTML Report**: View detailed coverage at `coverage/index.html`
+- **CI Coverage**: Coverage data is generated in CI and available as artifacts
 
 ### Running Tests with Coverage
 
@@ -78,15 +77,14 @@ The test suite focuses on the most critical components:
 - **Market Data Integration**: WebSocket subscriber testing with VCR-recorded API responses
 - **Risk Management**: Position sizing, stop losses, and trade execution validation
 
-### Codecov Setup
+### Coverage in CI
 
-To enable Codecov uploads in CI:
+Coverage data is automatically generated during CI runs and available as downloadable artifacts. The CI workflow:
 
-1. Sign up at [codecov.io](https://codecov.io)
-2. Add your repository
-3. Get your repository token
-4. Add `CODECOV_TOKEN` to GitHub repository secrets
-5. CI will automatically upload coverage reports
+1. Runs the full test suite with SimpleCov enabled
+2. Generates coverage reports and HTML output
+3. Uploads coverage artifacts for download
+4. Displays coverage percentage in the workflow logs
 
 ## Prerequisites
 - Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
