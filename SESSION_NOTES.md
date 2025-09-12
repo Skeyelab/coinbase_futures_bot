@@ -26,6 +26,24 @@
 
 ### Session log
 
+#### 2025-09-11 03:00 UTC
+- Context: Fixed coverage badge workflow failure due to artifact name mismatch
+- Changes:
+  - Updated CI workflow to include run number in coverage artifact name (`coverage-reports-${{ github.run_number }}`)
+  - Added error handling and better logging to coverage badge workflow
+  - Fixed artifact name mismatch between CI upload and coverage badge download
+- Commands run:
+  - `bin/standardrb --fix`
+  - `git add .github/workflows/ci.yml .github/workflows/coverage-badge.yml`
+  - `git commit -m "fix(ci): resolve coverage badge artifact name mismatch"`
+  - `git push`
+- Files touched:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/coverage-badge.yml`
+- Next steps:
+  - Monitor next CI run to verify coverage badge workflow succeeds
+  - Consider adding more robust artifact handling for edge cases
+
 #### 2025-09-11 02:54 UTC
 - Context: Implemented Swing Position Manager Service (Linear issue FUT-37)
 - Changes:
