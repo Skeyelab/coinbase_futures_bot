@@ -28,7 +28,7 @@ class SwingRiskMonitoringJob < ApplicationJob
     if balance_summary[:error]
       @logger.error("Failed to retrieve balance information: #{balance_summary[:error]}")
     else
-      margin_utilization = balance_summary[:total_usd_balance] > 0 ? 
+      margin_utilization = (balance_summary[:total_usd_balance] > 0) ?
         (balance_summary[:initial_margin] / balance_summary[:total_usd_balance]) : 0
 
       @logger.info("Margin utilization: #{(margin_utilization * 100).round(2)}%, " \
@@ -47,7 +47,7 @@ class SwingRiskMonitoringJob < ApplicationJob
 
     # Monitor positions approaching risk thresholds
     risk_metrics = position_summary[:risk_metrics]
-    
+
     if risk_metrics[:positions_approaching_expiry] > 0
       @logger.warn("#{risk_metrics[:positions_approaching_expiry]} swing positions approaching contract expiry")
     end
@@ -59,7 +59,7 @@ class SwingRiskMonitoringJob < ApplicationJob
     # Monitor asset concentration risk
     if risk_metrics[:max_asset_concentration] && risk_metrics[:max_asset_concentration] > 0.6
       @logger.warn("High asset concentration risk: #{(risk_metrics[:max_asset_concentration] * 100).round(1)}%")
-      
+
       SlackNotificationService.alert(
         "info",
         "Swing Trading Asset Concentration Warning",
@@ -79,7 +79,6 @@ class SwingRiskMonitoringJob < ApplicationJob
     end
 
     @logger.info("Swing risk monitoring job completed successfully")
-
   rescue => e
     @logger.error("Swing risk monitoring job failed: #{e.message}")
     @logger.error(e.backtrace.join("\n"))
@@ -106,7 +105,7 @@ class SwingRiskMonitoringJob < ApplicationJob
     return unless Time.current.hour == 10 && Time.current.min < 30
 
     summary_text = build_summary_text(position_summary, balance_summary)
-    
+
     SlackNotificationService.alert(
       "info",
       "Daily Swing Trading Summary",
@@ -135,13 +134,13 @@ class SwingRiskMonitoringJob < ApplicationJob
     # Risk alerts
     risk_metrics = position_summary[:risk_metrics]
     alerts = []
-    
+
     alerts << "#{risk_metrics[:positions_approaching_expiry]} approaching expiry" if risk_metrics[:positions_approaching_expiry] > 0
     alerts << "#{risk_metrics[:positions_exceeding_max_hold]} exceeding max hold" if risk_metrics[:positions_exceeding_max_hold] > 0
     alerts << "High asset concentration (#{(risk_metrics[:max_asset_concentration] * 100).round(1)}%)" if risk_metrics[:max_asset_concentration] && risk_metrics[:max_asset_concentration] > 0.5
 
     if alerts.any?
-      text += "\n⚠️ **Alerts**: #{alerts.join(', ')}"
+      text += "\n⚠️ **Alerts**: #{alerts.join(", ")}"
     end
 
     text

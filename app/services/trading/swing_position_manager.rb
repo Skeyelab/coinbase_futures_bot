@@ -71,17 +71,15 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          current_price = get_current_price(position.product_id)
-          if current_price
-            close_swing_position(position, current_price, "Contract expiry approaching")
-            closed_count += 1
-          else
-            @logger.warn("Could not get current price for #{position.product_id}, skipping closure")
-          end
-        rescue => e
-          @logger.error("Failed to close expiring position #{position.id}: #{e.message}")
+        current_price = get_current_price(position.product_id)
+        if current_price
+          close_swing_position(position, current_price, "Contract expiry approaching")
+          closed_count += 1
+        else
+          @logger.warn("Could not get current price for #{position.product_id}, skipping closure")
         end
+      rescue => e
+        @logger.error("Failed to close expiring position #{position.id}: #{e.message}")
       end
 
       @logger.info("Successfully closed #{closed_count} positions approaching expiry")
@@ -97,17 +95,15 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          current_price = get_current_price(position.product_id)
-          if current_price
-            close_swing_position(position, current_price, "Maximum holding period exceeded")
-            closed_count += 1
-          else
-            @logger.warn("Could not get current price for #{position.product_id}, skipping closure")
-          end
-        rescue => e
-          @logger.error("Failed to close max hold position #{position.id}: #{e.message}")
+        current_price = get_current_price(position.product_id)
+        if current_price
+          close_swing_position(position, current_price, "Maximum holding period exceeded")
+          closed_count += 1
+        else
+          @logger.warn("Could not get current price for #{position.product_id}, skipping closure")
         end
+      rescue => e
+        @logger.error("Failed to close max hold position #{position.id}: #{e.message}")
       end
 
       @logger.info("Successfully closed #{closed_count} positions exceeding max hold")
@@ -144,7 +140,7 @@ module Trading
     # Get comprehensive summary of all swing positions
     def get_swing_position_summary
       positions = Position.swing_trading.open.includes(:trading_pair)
-      
+
       summary = {
         total_positions: positions.count,
         total_exposure: 0.0,
@@ -234,7 +230,7 @@ module Trading
       return {error: balance_summary[:error]} if balance_summary[:error]
 
       position_summary = get_swing_position_summary
-      
+
       violations = []
 
       # Check maximum overnight exposure
@@ -278,7 +274,7 @@ module Trading
         risk_status: violations.empty? ? "acceptable" : "violations_detected",
         total_exposure: position_summary[:total_exposure],
         available_margin: available_margin,
-        leverage: balance_summary[:total_usd_balance] > 0 ? (position_summary[:total_exposure] / balance_summary[:total_usd_balance]).round(2) : 0
+        leverage: (balance_summary[:total_usd_balance] > 0) ? (position_summary[:total_exposure] / balance_summary[:total_usd_balance]).round(2) : 0
       }
     end
 
@@ -291,19 +287,16 @@ module Trading
       closed_count = 0
 
       positions.each do |position|
-        begin
-          current_price = get_current_price(position.product_id)
-          if current_price
-            close_swing_position(position, current_price, reason)
-            closed_count += 1
-          else
-            # Force close even without current price using entry price
-            position.force_close!(position.entry_price, reason)
-            closed_count += 1
-          end
-        rescue => e
-          @logger.error("Failed to force close swing position #{position.id}: #{e.message}")
+        current_price = get_current_price(position.product_id)
+        if current_price
+          close_swing_position(position, current_price, reason)
+        else
+          # Force close even without current price using entry price
+          position.force_close!(position.entry_price, reason)
         end
+        closed_count += 1
+      rescue => e
+        @logger.error("Failed to force close swing position #{position.id}: #{e.message}")
       end
 
       @logger.warn("Force closed #{closed_count} swing positions")
@@ -315,7 +308,7 @@ module Trading
     # Close a single swing position
     def close_swing_position(position, current_price, reason)
       @logger.info("Closing swing position #{position.id}: #{reason}")
-      
+
       # Use Coinbase API to close the position
       result = @positions_service.close_position(
         product_id: position.product_id,
@@ -340,7 +333,7 @@ module Trading
         params = {product_id: product_id, limit: 1}
         resp = @positions_service.send(:authenticated_get, path, params)
         data = JSON.parse(resp.body)
-        
+
         if data["pricebook"] && data["pricebook"]["bids"]&.any? && data["pricebook"]["asks"]&.any?
           bid = data["pricebook"]["bids"][0]["price"].to_f
           ask = data["pricebook"]["asks"][0]["price"].to_f
@@ -369,7 +362,7 @@ module Trading
       # Asset concentration risk
       if summary[:positions_by_asset].any?
         max_asset_exposure = summary[:positions_by_asset].values.map { |data| data[:exposure] }.max
-        metrics[:max_asset_concentration] = summary[:total_exposure] > 0 ? (max_asset_exposure / summary[:total_exposure]) : 0
+        metrics[:max_asset_concentration] = (summary[:total_exposure] > 0) ? (max_asset_exposure / summary[:total_exposure]) : 0
       end
 
       metrics
@@ -378,12 +371,12 @@ module Trading
     # Default configuration if not set in application config
     def default_config
       {
-        max_hold_days: ENV.fetch('SWING_MAX_HOLD_DAYS', 5).to_i,
-        expiry_buffer_days: ENV.fetch('SWING_EXPIRY_BUFFER_DAYS', 2).to_i,
-        max_overnight_exposure: ENV.fetch('SWING_MAX_EXPOSURE', 0.3).to_f,
-        enable_contract_roll: ENV.fetch('SWING_ENABLE_ROLL', false),
-        margin_safety_buffer: ENV.fetch('SWING_MARGIN_BUFFER', 0.2).to_f,
-        max_leverage_overnight: ENV.fetch('SWING_MAX_LEVERAGE', 3).to_i
+        max_hold_days: ENV.fetch("SWING_MAX_HOLD_DAYS", 5).to_i,
+        expiry_buffer_days: ENV.fetch("SWING_EXPIRY_BUFFER_DAYS", 2).to_i,
+        max_overnight_exposure: ENV.fetch("SWING_MAX_EXPOSURE", 0.3).to_f,
+        enable_contract_roll: ENV.fetch("SWING_ENABLE_ROLL", false),
+        margin_safety_buffer: ENV.fetch("SWING_MARGIN_BUFFER", 0.2).to_f,
+        max_leverage_overnight: ENV.fetch("SWING_MAX_LEVERAGE", 3).to_i
       }
     end
   end

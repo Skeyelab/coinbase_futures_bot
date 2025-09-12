@@ -28,7 +28,7 @@ namespace :swing_trading do
       puts "  Positions approaching expiry: #{metrics[:positions_approaching_expiry]}"
       puts "  Positions exceeding max hold: #{metrics[:positions_exceeding_max_hold]}"
       puts "  TP/SL triggered positions: #{metrics[:tp_sl_triggered_positions]}"
-      
+
       if metrics[:max_asset_concentration]
         puts "  Max asset concentration: #{(metrics[:max_asset_concentration] * 100).round(1)}%"
       end
@@ -37,9 +37,9 @@ namespace :swing_trading do
     puts "\nPosition Details:"
     if summary[:positions].any?
       summary[:positions].each do |pos|
-        pnl_color = pos[:unrealized_pnl] >= 0 ? "+" : ""
+        pnl_color = (pos[:unrealized_pnl] >= 0) ? "+" : ""
         puts "  #{pos[:product_id]} | #{pos[:side]} #{pos[:size]} | Entry: $#{pos[:entry_price]} | " \
-             "Current: $#{pos[:current_price] || 'N/A'} | PnL: #{pnl_color}$#{pos[:unrealized_pnl].round(2)} | " \
+             "Current: $#{pos[:current_price] || "N/A"} | PnL: #{pnl_color}$#{pos[:unrealized_pnl].round(2)} | " \
              "Age: #{pos[:duration_hours]&.round(1)}h"
       end
     else
@@ -69,12 +69,12 @@ namespace :swing_trading do
     puts "Unrealized PnL: $#{balance[:unrealized_pnl].round(2)}"
     puts "Liquidation Threshold: $#{balance[:liquidation_threshold].round(2)}"
     puts "Liquidation Buffer: $#{balance[:liquidation_buffer_amount].round(2)} (#{(balance[:liquidation_buffer_percentage] * 100).round(1)}%)"
-    puts "Overnight Margin Enabled: #{balance[:overnight_margin_enabled] ? '✅' : '❌'}"
+    puts "Overnight Margin Enabled: #{balance[:overnight_margin_enabled] ? "✅" : "❌"}"
 
     if balance[:margin_window].any?
       puts "\nMargin Window:"
-      puts "  Type: #{balance[:margin_window]['margin_window_type']}"
-      puts "  End Time: #{balance[:margin_window]['end_time']}" if balance[:margin_window]['end_time']
+      puts "  Type: #{balance[:margin_window]["margin_window_type"]}"
+      puts "  End Time: #{balance[:margin_window]["end_time"]}" if balance[:margin_window]["end_time"]
     end
     puts
   end
@@ -112,7 +112,7 @@ namespace :swing_trading do
   desc "Close swing positions approaching contract expiry"
   task close_expiring: :environment do
     manager = Trading::SwingPositionManager.new
-    
+
     positions = manager.positions_approaching_expiry
     puts "\n📅 Positions Approaching Contract Expiry"
     puts "=" * 50
@@ -131,7 +131,7 @@ namespace :swing_trading do
   desc "Close swing positions exceeding maximum hold period"
   task close_max_hold: :environment do
     manager = Trading::SwingPositionManager.new
-    
+
     positions = manager.positions_exceeding_max_hold
     puts "\n⏰ Positions Exceeding Maximum Hold Period"
     puts "=" * 50
@@ -150,7 +150,7 @@ namespace :swing_trading do
   desc "Check and close swing positions that hit TP/SL"
   task check_tp_sl: :environment do
     manager = Trading::SwingPositionManager.new
-    
+
     triggered = manager.check_swing_tp_sl_triggers
     puts "\n🎯 Take Profit / Stop Loss Check"
     puts "=" * 50
@@ -175,9 +175,9 @@ namespace :swing_trading do
   desc "Force close all swing positions (EMERGENCY USE ONLY)"
   task force_close_all: :environment do
     print "⚠️  WARNING: This will close ALL open swing positions. Are you sure? (y/N): "
-    confirmation = STDIN.gets.chomp.downcase
+    confirmation = $stdin.gets.chomp.downcase
 
-    unless confirmation == 'y' || confirmation == 'yes'
+    unless confirmation == "y" || confirmation == "yes"
       puts "Operation cancelled"
       exit 0
     end
@@ -236,7 +236,7 @@ namespace :swing_trading do
     puts "Max Hold Days: #{config[:max_hold_days]}"
     puts "Expiry Buffer Days: #{config[:expiry_buffer_days]}"
     puts "Max Overnight Exposure: #{(config[:max_overnight_exposure] * 100).round(1)}%"
-    puts "Enable Contract Roll: #{config[:enable_contract_roll] ? '✅' : '❌'}"
+    puts "Enable Contract Roll: #{config[:enable_contract_roll] ? "✅" : "❌"}"
     puts "Margin Safety Buffer: #{(config[:margin_safety_buffer] * 100).round(1)}%"
     puts "Max Leverage Overnight: #{config[:max_leverage_overnight]}x"
     puts

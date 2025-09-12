@@ -24,7 +24,7 @@ class SwingPositionManagementJob < ApplicationJob
     expiring_positions = @manager.positions_approaching_expiry
     if expiring_positions.any?
       @logger.warn("Found #{expiring_positions.size} swing positions approaching contract expiry")
-      
+
       SentryHelper.add_breadcrumb(
         message: "Closing swing positions approaching expiry",
         category: "trading",
@@ -59,7 +59,7 @@ class SwingPositionManagementJob < ApplicationJob
     max_hold_positions = @manager.positions_exceeding_max_hold
     if max_hold_positions.any?
       @logger.warn("Found #{max_hold_positions.size} swing positions exceeding max hold period")
-      
+
       closed_count = @manager.close_max_hold_positions
       @logger.info("Closed #{closed_count} positions exceeding max hold")
 
@@ -76,7 +76,7 @@ class SwingPositionManagementJob < ApplicationJob
     tp_sl_triggers = @manager.check_swing_tp_sl_triggers
     if tp_sl_triggers.any?
       @logger.info("Found #{tp_sl_triggers.size} swing positions with TP/SL triggers")
-      
+
       closed_count = @manager.close_tp_sl_positions
       @logger.info("Closed #{closed_count} positions via TP/SL")
 
@@ -93,13 +93,13 @@ class SwingPositionManagementJob < ApplicationJob
     risk_check = @manager.check_swing_risk_limits
     if risk_check[:risk_status] == "violations_detected"
       @logger.warn("Swing trading risk limit violations detected")
-      
+
       violations = risk_check[:violations].map { |v| v[:message] }.join("; ")
-      
+
       Sentry.with_scope do |scope|
         scope.set_tag("trading_operation", "swing_risk_violation")
         scope.set_context("risk_violations", risk_check[:violations])
-        
+
         Sentry.capture_message("Swing trading risk limit violations detected", level: "warning")
       end
 
@@ -111,7 +111,6 @@ class SwingPositionManagementJob < ApplicationJob
     end
 
     @logger.info("Swing position management job completed successfully")
-
   rescue => e
     @logger.error("Swing position management job failed: #{e.message}")
     @logger.error(e.backtrace.join("\n"))
