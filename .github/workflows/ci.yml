@@ -430,10 +430,19 @@ jobs:
           else
             BRANCH_NAME="${{ github.ref_name }}"
           fi
-
+          
+          # Debug: show the branch name
+          echo "Event name: ${{ github.event_name }}"
+          echo "Branch name: '$BRANCH_NAME'"
+          echo "GitHub head ref: '${{ github.head_ref }}'"
+          echo "GitHub ref name: '${{ github.ref_name }}'"
+          
           # Checkout to the actual branch instead of detached HEAD
           git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
           echo "Checked out to branch: $BRANCH_NAME"
+          
+          # Export the branch name for later use
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
       - name: Generate coverage badge
         run: |
@@ -487,7 +496,7 @@ jobs:
               echo "No changes to commit"
             else
               git commit -m "docs: update coverage badge [skip ci]"
-              git push --set-upstream origin "$BRANCH_NAME"
+              git push --set-upstream origin "${{ env.BRANCH_NAME }}"
               echo "Coverage badge updated and pushed"
             fi
           else
