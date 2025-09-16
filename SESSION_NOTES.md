@@ -1,7 +1,7 @@
 ### Setup summary
 
 - **Project path**: `/Users/edahl/Documents/Github/coinbase_futures_bot`
-- **Ruby/RVM**: `ruby-3.2.2` with gemset `coinbase_futures_bot` (Rails 8 requires >= 3.2; 3.2.4 compile failed locally)
+- **Ruby/RVM**: `ruby-3.2.4` with gemset `coinbase_futures_bot` (Rails 8 requires >= 3.2; compiled with OpenSSL 3.x support)
 - **Rails**: `7.2.2.1` (API-only)
 - **DB**: PostgreSQL via `ENV['DATABASE_URL']` (dev/test respect `PGDATABASE`)
 - **Env**: `.env` (gitignored) holds `DATABASE_URL`
@@ -25,6 +25,27 @@
 - Configure branch protection required checks after CI green
 
 ### Session log
+
+#### 2025-01-18 21:15 UTC
+- Context: Ruby installation issue resolved - OpenSSL compatibility problem with Ruby 3.2.2/3.2.4 compilation
+- Changes:
+  - Updated `.ruby-version` from `ruby-3.2.2` to `ruby-3.2.4`
+  - Successfully installed Ruby 3.2.4 with OpenSSL 3.x support using `rvm install "ruby-3.2.4" --with-openssl-dir=/opt/homebrew/opt/openssl@3`
+  - Ran `bundle install` successfully - all gems installed
+  - Verified Rails 8.0.2.1 works correctly
+  - Applied StandardRB formatting
+- Commands run:
+  - `rvm install "ruby-3.2.4" --with-openssl-dir=/opt/homebrew/opt/openssl@3`
+  - `rvm use ruby-3.2.4`
+  - `bundle install`
+  - `bundle exec rails --version`
+  - `bin/standardrb --fix`
+- Files touched:
+  - `.ruby-version` (updated to ruby-3.2.4)
+  - `SESSION_NOTES.md` (updated setup summary and added session log)
+- Next steps:
+  - Ruby environment is now fully functional
+  - Ready to continue development work
 
 #### 2025-09-11 03:17 UTC
 - Context: Merged latest main branch changes into swing position manager feature branch
