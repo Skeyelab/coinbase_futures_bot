@@ -110,7 +110,7 @@ RSpec.describe SwingPositionManagementJob, type: :job do
         {
           risk_status: "violations_detected",
           violations: [
-            {type: "max_exposure_exceeded", message: "Total exposure exceeds 30% limit"}
+            {type: "max_exposure_exceeded", message: "Total swing position exposure exceeds 30.0% limit"}
           ]
         }
       end
