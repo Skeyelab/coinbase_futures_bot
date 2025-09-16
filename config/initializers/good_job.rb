@@ -58,6 +58,16 @@ Rails.application.configure do
     health_check: {
       cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
       class: "HealthCheckJob"
+    },
+    # Swing position management - run every 4 hours (24/7 for overnight positions)
+    swing_position_management: {
+      cron: ENV.fetch("SWING_POSITION_MANAGEMENT_CRON", "0 */4 * * *"), # every 4 hours
+      class: "SwingPositionManagementJob"
+    },
+    # Swing risk monitoring - run every 2 hours during business hours
+    swing_risk_monitoring: {
+      cron: ENV.fetch("SWING_RISK_MONITORING_CRON", "0 */2 9-17 * * 1-5"), # every 2 hours, 9AM-5PM, Mon-Fri
+      class: "SwingRiskMonitoringJob"
     }
   }
 end

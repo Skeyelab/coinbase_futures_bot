@@ -22,6 +22,8 @@ class Position < ApplicationRecord
   scope :opened_today, -> { where("DATE(entry_time) = ?", Date.current) }
   scope :opened_yesterday, -> { where("entry_time < ? AND entry_time >= ?", 24.hours.ago, 48.hours.ago) }
   scope :expiring_soon, -> { day_trading.opened_yesterday.open }
+  scope :older_than, ->(hours) { where("entry_time < ?", hours.hours.ago) }
+  scope :open_swing_positions, -> { swing_trading.open }
 
   # Callbacks
   before_validation :set_defaults
