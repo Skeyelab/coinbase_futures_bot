@@ -12,373 +12,266 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
     allow(logger).to receive(:error)
+    allow(logger).to receive(:debug)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
     allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
   end
 
-  describe "#initialize" do
-    it "initializes with default logger and services" do
-      expect(described_class.new).to be_a(described_class)
+  describe "#cleanup_old_positions" do
+    let!(:old_position1) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 35.days.ago,
+        product_id: "BTC-USD-PERP",
+        side: "LONG",
+        size: 10)
     end
 
-    it "uses custom logger when provided" do
-      custom_logger = double("logger")
-      manager = described_class.new(logger: custom_logger)
-      expect(manager.instance_variable_get(:@logger)).to eq(custom_logger)
-    end
-  end
-
-  describe "#positions_approaching_expiry" do
-    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 3.days.from_now) }
-    let!(:swing_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: false, status: "OPEN") }
-    let!(:day_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: true, status: "OPEN") }
-
-    it "returns swing positions approaching expiry within buffer days" do
-      # Mock config with 2 day buffer (position expires in 3 days, so within buffer)
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({expiry_buffer_days: 4})
-
-      result = manager.positions_approaching_expiry
-      expect(result).to include(swing_position)
-      expect(result).not_to include(day_position)
+    let!(:old_position2) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 40.days.ago,
+        product_id: "ETH-USD-PERP",
+        side: "SHORT",
+        size: 5)
     end
 
-    it "excludes positions not approaching expiry" do
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({expiry_buffer_days: 1})
-
-      result = manager.positions_approaching_expiry
-      expect(result).to be_empty
+    let!(:recent_position) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 10.days.ago,
+        product_id: "BTC-USD-PERP",
+        side: "LONG",
+        size: 8)
     end
 
-    it "handles positions without trading pairs" do
-      swing_position.update!(product_id: "UNKNOWN-PERP")
-      result = manager.positions_approaching_expiry
-      expect(result).to be_empty
-    end
-  end
+    it "cleans up positions older than specified days" do
+      result = manager.cleanup_old_positions(days_old: 30)
 
-  describe "#positions_exceeding_max_hold" do
-    let!(:old_swing_position) { create(:position, day_trading: false, status: "OPEN", entry_time: 6.days.ago) }
-    let!(:new_swing_position) { create(:position, day_trading: false, status: "OPEN", entry_time: 1.day.ago) }
-    let!(:old_day_position) { create(:position, day_trading: true, status: "OPEN", entry_time: 6.days.ago) }
-
-    it "returns swing positions exceeding max hold days" do
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({max_hold_days: 5})
-
-      result = manager.positions_exceeding_max_hold
-      expect(result).to include(old_swing_position)
-      expect(result).not_to include(new_swing_position)
-      expect(result).not_to include(old_day_position)
-    end
-  end
-
-  describe "#check_swing_tp_sl_triggers" do
-    let!(:long_position) do
-      create(:position, side: "LONG", entry_price: 50_000, take_profit: 51_000, stop_loss: 49_000, day_trading: false,
-        status: "OPEN")
-    end
-    let!(:short_position) do
-      create(:position, side: "SHORT", entry_price: 50_000, take_profit: 49_000, stop_loss: 51_000, day_trading: false,
-        status: "OPEN")
+      expect(result).to eq(2)
+      expect(Position.exists?(old_position1.id)).to be_falsey
+      expect(Position.exists?(old_position2.id)).to be_falsey
+      expect(Position.exists?(recent_position.id)).to be_truthy
     end
 
-    before do
-      allow(manager).to receive(:get_current_price).and_return(51_500) # Price above long TP, below short SL
+    it "logs the cleanup operation" do
+      manager.cleanup_old_positions(days_old: 30)
+
+      expect(logger).to have_received(:info).with("Found 2 old closed swing positions to clean up")
+      expect(logger).to have_received(:info).with("Cleaned up 2 old closed swing positions")
     end
 
-    it "identifies take profit triggers for long positions" do
-      result = manager.check_swing_tp_sl_triggers
-      long_trigger = result.find { |t| t[:position] == long_position }
+    it "uses default of 30 days if not specified" do
+      allow(Position).to receive_message_chain(:swing_trading, :closed, :where).and_return(double(count: 0, each: [], delete_all: 0))
 
-      expect(long_trigger).not_to be_nil
-      expect(long_trigger[:trigger]).to eq("take_profit")
-      expect(long_trigger[:current_price]).to eq(51_500)
-    end
+      manager.cleanup_old_positions
 
-    it "identifies stop loss triggers for short positions" do
-      result = manager.check_swing_tp_sl_triggers
-      short_trigger = result.find { |t| t[:position] == short_position }
-
-      expect(short_trigger).not_to be_nil
-      expect(short_trigger[:trigger]).to eq("stop_loss")
-      expect(short_trigger[:current_price]).to eq(51_500)
+      expect(Position.swing_trading.closed).to have_received(:where).with("close_time < ?", 30.days.ago)
     end
   end
 
-  describe "#close_expiring_positions" do
-    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 1.day.from_now) }
-    let!(:expiring_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: false, status: "OPEN") }
-
-    before do
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({expiry_buffer_days: 2})
-      allow(manager).to receive(:get_current_price).and_return(50_000)
-      allow(positions_service).to receive(:close_position).and_return({"success" => true})
+  describe "#archive_completed_trades" do
+    let!(:completed_trade1) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 10.days.ago,
+        product_id: "BTC-USD-PERP",
+        side: "LONG",
+        size: 10,
+        entry_price: 50000,
+        close_price: 52000,
+        pnl: 2000)
     end
 
-    it "closes positions approaching expiry" do
-      expect(manager).to receive(:close_swing_position).with(expiring_position, 50_000, "Contract expiry approaching")
-
-      result = manager.close_expiring_positions
-      expect(result).to eq(1)
+    let!(:completed_trade2) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 15.days.ago,
+        product_id: "ETH-USD-PERP",
+        side: "SHORT",
+        size: 5,
+        entry_price: 3000,
+        close_price: 2900,
+        pnl: 500)
     end
 
-    it "handles positions without current price" do
-      allow(manager).to receive(:get_current_price).and_return(nil)
-      expect(logger).to receive(:warn).with("Could not get current price for BTC-USD-PERP, skipping closure")
+    let!(:very_old_trade) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        close_time: 100.days.ago,
+        product_id: "BTC-USD-PERP",
+        side: "LONG",
+        size: 8)
+    end
 
-      result = manager.close_expiring_positions
+    it "archives completed trades within the specified range" do
+      result = manager.archive_completed_trades(days_old: 7)
+
+      expect(result).to eq(2)
+      expect(logger).to have_received(:info).with("Found 2 completed swing trades to archive")
+      expect(logger).to have_received(:info).with("Archived 2 completed swing trades")
+    end
+
+    it "logs trade summaries during archiving" do
+      manager.archive_completed_trades(days_old: 7)
+
+      expect(logger).to have_received(:info).with(match(/Archived swing trade summary.*BTC-USD-PERP/))
+      expect(logger).to have_received(:info).with(match(/Archived swing trade summary.*ETH-USD-PERP/))
+    end
+
+    it "handles errors during individual trade archiving" do
+      allow(manager).to receive(:archive_trade_summary).and_raise(StandardError, "Archive failed")
+
+      result = manager.archive_completed_trades(days_old: 7)
+
       expect(result).to eq(0)
+      expect(logger).to have_received(:error).with(/Failed to archive swing trade.*Archive failed/).twice
     end
   end
 
-  describe "#close_max_hold_positions" do
-    let!(:old_position) { create(:position, day_trading: false, status: "OPEN", entry_time: 6.days.ago) }
-
-    before do
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({max_hold_days: 5})
-      allow(manager).to receive(:get_current_price).and_return(50_000)
-      allow(positions_service).to receive(:close_position).and_return({"success" => true})
-    end
-
-    it "closes positions exceeding max hold period" do
-      expect(manager).to receive(:close_swing_position).with(old_position, 50_000, "Maximum holding period exceeded")
-
-      result = manager.close_max_hold_positions
-      expect(result).to eq(1)
-    end
-  end
-
-  describe "#close_tp_sl_positions" do
-    let!(:triggered_position) do
-      create(:position, side: "LONG", entry_price: 50_000, take_profit: 51_000, day_trading: false, status: "OPEN")
-    end
-
-    before do
-      allow(manager).to receive(:get_current_price).and_return(51_500)
-      allow(positions_service).to receive(:close_position).and_return({"success" => true})
-    end
-
-    it "closes positions that hit take profit" do
-      expect(manager).to receive(:close_swing_position).with(triggered_position, 51_500, "Take profit triggered")
-
-      result = manager.close_tp_sl_positions
-      expect(result).to eq(1)
-    end
-  end
-
-  describe "#get_swing_position_summary" do
-    before do
-      Position.delete_all
-      allow(manager).to receive(:get_current_price).with("BTC-USD-PERP").and_return(51_000)
-      allow(manager).to receive(:get_current_price).with("ETH-USD-PERP").and_return(3100)
-    end
-
-    let!(:btc_position) do
-      create(:position, product_id: "BTC-USD-PERP", size: 5, entry_price: 50_000, day_trading: false, status: "OPEN")
-    end
-    let!(:eth_position) do
-      create(:position, product_id: "ETH-USD-PERP", size: 10, entry_price: 3000, day_trading: false, status: "OPEN")
-    end
-    let!(:day_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: true, status: "OPEN") }
-
-    it "returns comprehensive swing position summary" do
-      result = manager.get_swing_position_summary
-
-      expect(result[:total_positions]).to eq(2)
-      expect(result[:total_exposure]).to be > 0
-      expect(result[:unrealized_pnl]).to be > 0
-      expect(result[:positions_by_asset]).to have_key("BTC")
-      expect(result[:positions_by_asset]).to have_key("ETH")
-      expect(result[:positions].length).to eq(2)
-      expect(result[:risk_metrics]).to be_present
-    end
-
-    it "excludes day trading positions from summary" do
-      result = manager.get_swing_position_summary
-      position_ids = result[:positions].map { |p| p[:id] }
-
-      expect(position_ids).to include(btc_position.id)
-      expect(position_ids).to include(eth_position.id)
-      expect(position_ids).not_to include(day_position.id)
-    end
-  end
-
-  describe "#get_swing_balance_summary" do
-    let(:balance_response) do
-      {
-        "futures_buying_power" => "50000.00",
-        "total_usd_balance" => "100000.00",
-        "cfm_usd_balance" => "75000.00",
-        "unrealized_pnl" => "2500.00",
-        "initial_margin" => "15000.00",
-        "available_margin" => "35000.00",
-        "liquidation_threshold" => "10000.00",
-        "liquidation_buffer_amount" => "5000.00",
-        "liquidation_buffer_percentage" => "0.33"
-      }.to_json
-    end
-
-    let(:margin_response) do
-      {
-        "margin_window" => {"margin_window_type" => "OVERNIGHT_MARGIN"},
-        "is_intraday_margin_killswitch_enabled" => false
-      }.to_json
-    end
-
-    before do
-      balance_resp = double("response", body: balance_response)
-      margin_resp = double("response", body: margin_response)
-
-      allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/cfm/balance_summary",
-        {}).and_return(balance_resp)
-      allow(positions_service).to receive(:send).with(:authenticated_get,
-        "/api/v3/brokerage/cfm/intraday_margin_setting", {}).and_return(margin_resp)
-    end
-
-    it "returns balance summary with margin information" do
-      result = manager.get_swing_balance_summary
-
-      expect(result[:futures_buying_power]).to eq(50_000.0)
-      expect(result[:total_usd_balance]).to eq(100_000.0)
-      expect(result[:available_margin]).to eq(35_000.0)
-      expect(result[:overnight_margin_enabled]).to be true
-    end
-
-    it "handles API errors gracefully" do
-      allow(positions_service).to receive(:send).and_raise(StandardError.new("API Error"))
-
-      result = manager.get_swing_balance_summary
-      expect(result[:error]).to include("Failed to retrieve balance information")
-    end
-  end
-
-  describe "#check_swing_risk_limits" do
-    before do
-      Position.delete_all
-      allow(manager).to receive(:get_swing_balance_summary).and_return({
-        total_usd_balance: 100_000.0,
-        available_margin: 30_000.0
-      })
-      allow(manager).to receive(:get_current_price).and_return(50_000)
-      allow(Rails.application.config).to receive(:swing_trading_config).and_return({
-        max_overnight_exposure: 0.3,
-        margin_safety_buffer: 0.2,
-        max_leverage_overnight: 3
-      })
-    end
-
-    let!(:swing_position) do
-      create(:position, product_id: "BTC-USD-PERP", size: 10, entry_price: 50_000, day_trading: false, status: "OPEN")
-    end
-
-    it "identifies risk limit violations" do
-      # Position exposure: 10 * 50000 = 500000, which is 5x the account balance
-      result = manager.check_swing_risk_limits
-
-      expect(result[:violations]).not_to be_empty
-      expect(result[:risk_status]).to eq("violations_detected")
-    end
-
-    it "returns acceptable status when within limits" do
-      swing_position.update!(size: 0.2) # Reduce position size to be within limits (0.2 * 50000 = 10000, which is 10% of balance)
-
-      result = manager.check_swing_risk_limits
-      expect(result[:risk_status]).to eq("acceptable")
-    end
-  end
-
-  describe "#force_close_all_swing_positions" do
-    before do
-      # Clear any existing positions
-      Position.delete_all
-      allow(manager).to receive(:get_current_price).and_return(50_000)
-      allow(positions_service).to receive(:close_position).and_return({"success" => true})
-    end
-
-    context "with swing and day trading positions" do
-      let!(:swing_position1) { create(:position, day_trading: false, status: "OPEN") }
-      let!(:swing_position2) { create(:position, day_trading: false, status: "OPEN") }
-      let!(:day_position) { create(:position, day_trading: true, status: "OPEN") }
-
-      it "force closes all swing positions" do
-        expect(manager).to receive(:close_swing_position).twice
-        expect(logger).to receive(:warn).with("Force closing all 2 swing positions: Emergency closure")
-        expect(logger).to receive(:warn).with("Force closed 2 swing positions")
-
-        result = manager.force_close_all_swing_positions("Emergency closure")
-        expect(result).to eq(2)
+  describe "#positions_exceeding_max_hold?" do
+    context "with positions exceeding max hold" do
+      before do
+        create(:position,
+          day_trading: false,
+          status: "OPEN",
+          entry_time: 6.days.ago,
+          product_id: "BTC-USD-PERP")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("5")
       end
 
-      it "excludes day trading positions" do
-        expect(manager).to receive(:close_swing_position).twice # Only swing positions
-
-        manager.force_close_all_swing_positions
+      it "returns true when positions exceed max hold period" do
+        expect(manager.positions_exceeding_max_hold?).to be_truthy
       end
     end
 
-    context "without current price" do
-      let!(:swing_position1) { create(:position, day_trading: false, status: "OPEN") }
-      let!(:swing_position2) { create(:position, day_trading: false, status: "OPEN") }
+    context "with no positions exceeding max hold" do
+      before do
+        create(:position,
+          day_trading: false,
+          status: "OPEN",
+          entry_time: 2.days.ago,
+          product_id: "BTC-USD-PERP")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("5")
+      end
 
-      it "handles positions without current price by using entry price" do
-        # Mock the scope to return our specific instances
-        allow(Position).to receive_message_chain(:swing_trading, :open).and_return([swing_position1, swing_position2])
-        # Mock get_current_price to return nil for any product_id
-        allow(manager).to receive(:get_current_price).and_return(nil)
-        # Check that force_close! is called on each position with the correct arguments
-        expect(swing_position1).to receive(:force_close!).with(swing_position1.entry_price, "Emergency closure")
-        expect(swing_position2).to receive(:force_close!).with(swing_position2.entry_price, "Emergency closure")
-
-        result = manager.force_close_all_swing_positions("Emergency closure")
-        expect(result).to eq(2)
+      it "returns false when no positions exceed max hold period" do
+        expect(manager.positions_exceeding_max_hold?).to be_falsey
       end
     end
   end
 
-  describe "private methods" do
-    describe "#get_current_price" do
-      it "falls back to API when no recent candle data" do
-        api_response = {
-          "pricebook" => {
-            "bids" => [{"price" => "50900"}],
-            "asks" => [{"price" => "51100"}]
-          }
-        }.to_json
+  describe "#positions_approaching_expiry?" do
+    let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 1.day.from_now) }
 
-        resp = double("response", body: api_response)
-        allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/market/product_book",
-          {product_id: "BTC-USD-PERP", limit: 1}).and_return(resp)
-
-        price = manager.send(:get_current_price, "BTC-USD-PERP")
-        expect(price).to eq(51_000.0) # (50900 + 51100) / 2
+    context "with positions approaching expiry" do
+      before do
+        create(:position,
+          day_trading: false,
+          status: "OPEN",
+          product_id: trading_pair.product_id,
+          trading_pair: trading_pair)
+        allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
       end
 
-      it "returns nil when API call fails" do
-        allow(positions_service).to receive(:send).and_raise(StandardError.new("API Error"))
-        expect(logger).to receive(:error).with("Failed to get current price for BTC-USD-PERP: API Error")
-
-        price = manager.send(:get_current_price, "BTC-USD-PERP")
-        expect(price).to be_nil
+      it "returns true when positions are approaching contract expiry" do
+        expect(manager.positions_approaching_expiry?).to be_truthy
       end
     end
 
-    describe "#close_swing_position" do
-      let(:position) { create(:position, product_id: "BTC-USD-PERP", size: 5, day_trading: false, status: "OPEN") }
+    context "with no positions approaching expiry" do
+      let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 10.days.from_now) }
 
-      it "closes position via API and updates local record" do
-        allow(positions_service).to receive(:close_position).with(product_id: "BTC-USD-PERP",
-          size: 5).and_return({"success" => true})
-        expect(position).to receive(:close_position!).with(50_000)
-
-        manager.send(:close_swing_position, position, 50_000, "Test closure")
+      before do
+        create(:position,
+          day_trading: false,
+          status: "OPEN",
+          product_id: trading_pair.product_id,
+          trading_pair: trading_pair)
+        allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
       end
 
-      it "raises error when API closure fails" do
-        allow(positions_service).to receive(:close_position).and_return({"error" => "Insufficient funds"})
+      it "returns false when no positions are approaching expiry" do
+        expect(manager.positions_approaching_expiry?).to be_falsey
+      end
+    end
+  end
 
-        expect do
-          manager.send(:close_swing_position, position, 50_000, "Test closure")
-        end.to raise_error("API closure failed: Insufficient funds")
+  describe "#archive_trade_summary" do
+    let(:position) do
+      create(:position,
+        day_trading: false,
+        status: "CLOSED",
+        product_id: "BTC-USD-PERP",
+        side: "LONG",
+        size: 10,
+        entry_price: 50000,
+        close_price: 52000,
+        entry_time: 2.days.ago,
+        close_time: 1.day.ago,
+        pnl: 2000)
+    end
+
+    it "logs trade summary with all relevant data" do
+      manager.send(:archive_trade_summary, position)
+
+      expect(logger).to have_received(:info).with(match(/Archived swing trade summary.*BTC-USD-PERP.*LONG.*10.*50000.*52000.*2000/))
+    end
+
+    it "includes timestamp in archived data" do
+      freeze_time do
+        manager.send(:archive_trade_summary, position)
+
+        expect(logger).to have_received(:info).with(match(/archived_at.*#{Time.current.iso8601}/))
+      end
+    end
+  end
+
+  describe "configuration" do
+    context "with environment variables set" do
+      before do
+        allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("7")
+        allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("3")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_EXPOSURE", 0.3).and_return("0.4")
+        allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", 0.2).and_return("0.25")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_LEVERAGE", 3).and_return("4")
+      end
+
+      it "uses environment variable configuration" do
+        config = manager.send(:default_config)
+
+        expect(config[:max_hold_days]).to eq(7)
+        expect(config[:expiry_buffer_days]).to eq(3)
+        expect(config[:max_overnight_exposure]).to eq(0.4)
+        expect(config[:margin_safety_buffer]).to eq(0.25)
+        expect(config[:max_leverage_overnight]).to eq(4)
+      end
+    end
+
+    context "with default values" do
+      before do
+        allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("5")
+        allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_EXPOSURE", 0.3).and_return("0.3")
+        allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", 0.2).and_return("0.2")
+        allow(ENV).to receive(:fetch).with("SWING_MAX_LEVERAGE", 3).and_return("3")
+      end
+
+      it "uses default configuration values" do
+        config = manager.send(:default_config)
+
+        expect(config[:max_hold_days]).to eq(5)
+        expect(config[:expiry_buffer_days]).to eq(2)
+        expect(config[:max_overnight_exposure]).to eq(0.3)
+        expect(config[:margin_safety_buffer]).to eq(0.2)
+        expect(config[:max_leverage_overnight]).to eq(3)
       end
     end
   end

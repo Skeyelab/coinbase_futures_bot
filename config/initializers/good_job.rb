@@ -68,6 +68,16 @@ Rails.application.configure do
     swing_risk_monitoring: {
       cron: ENV.fetch("SWING_RISK_MONITORING_CRON", "0 */2 9-17 * * 1-5"), # every 2 hours, 9AM-5PM, Mon-Fri
       class: "SwingRiskMonitoringJob"
+    },
+    # Swing position cleanup - run daily at 2 AM UTC
+    swing_position_cleanup: {
+      cron: ENV.fetch("SWING_POSITION_CLEANUP_CRON", "0 2 * * *"), # daily at 2 AM UTC
+      class: "SwingPositionCleanupJob"
+    },
+    # Margin window monitoring - run every 30 minutes during market hours
+    margin_window_monitoring: {
+      cron: ENV.fetch("MARGIN_WINDOW_MONITORING_CRON", "*/30 9-17 * * 1-5"), # every 30 min during market hours
+      class: "MarginWindowMonitoringJob"
     }
   }
 end

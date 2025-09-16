@@ -92,8 +92,11 @@ class HealthCheckJob < ApplicationJob
     # Recent signal generation
     health_checks[:recent_signals] = check_recent_signals
 
-    # Position count
+    # Position count (both day trading and swing)
     health_checks[:open_positions] = count_open_positions
+
+    # Swing position monitoring
+    health_checks[:swing_positions] = check_swing_positions_health
 
     # Calculate overall health
     health_checks[:overall_health] = calculate_overall_health(health_checks)
@@ -147,6 +150,7 @@ class HealthCheckJob < ApplicationJob
     critical_job_classes = %w[
       GenerateSignalsJob
       DayTradingPositionManagementJob
+      SwingPositionManagementJob
       FetchCandlesJob
     ]
 
@@ -207,9 +211,36 @@ class HealthCheckJob < ApplicationJob
   end
 
   def count_open_positions
-    Position.open.day_trading.count
+    {
+      day_trading: Position.open.day_trading.count,
+      swing_trading: Position.swing_trading.open.count,
+      total: Position.open.count
+    }
   rescue
-    0
+    {day_trading: 0, swing_trading: 0, total: 0}
+  end
+
+  def check_swing_positions_health
+    swing_manager = Trading::SwingPositionManager.new(logger: logger)
+
+    # Get swing position summary
+    summary = swing_manager.get_swing_position_summary
+
+    # Check for risk violations
+    risk_check = swing_manager.check_swing_risk_limits
+
+    {
+      total_positions: summary[:total_positions],
+      total_exposure: summary[:total_exposure].round(2),
+      unrealized_pnl: summary[:unrealized_pnl].round(2),
+      risk_status: risk_check[:risk_status],
+      positions_approaching_expiry: swing_manager.positions_approaching_expiry.count,
+      positions_exceeding_max_hold: swing_manager.positions_exceeding_max_hold.count,
+      healthy: risk_check[:risk_status] == "acceptable"
+    }
+  rescue => e
+    logger.warn("Swing position health check failed: #{e.message}")
+    {error: e.message, healthy: false}
   end
 
   def calculate_overall_health(checks)
