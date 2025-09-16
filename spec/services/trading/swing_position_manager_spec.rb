@@ -321,8 +321,8 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
       let!(:swing_position2) { create(:position, day_trading: false, status: "OPEN") }
 
       it "handles positions without current price by using entry price" do
-        allow(manager).to receive(:get_current_price).with(swing_position1.product_id).and_return(nil)
-        allow(manager).to receive(:get_current_price).with(swing_position2.product_id).and_return(nil)
+        # Mock get_current_price to return nil for any product_id
+        allow(manager).to receive(:get_current_price).and_return(nil)
         expect(swing_position1).to receive(:force_close!).with(swing_position1.entry_price, "Emergency closure")
         expect(swing_position2).to receive(:force_close!).with(swing_position2.entry_price, "Emergency closure")
 
