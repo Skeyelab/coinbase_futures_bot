@@ -323,9 +323,9 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
       it "handles positions without current price by using entry price" do
         # Mock get_current_price to return nil for any product_id
         allow(manager).to receive(:get_current_price).and_return(nil)
-        # Check that force_close! is called on Position instances with the correct arguments
-        expect_any_instance_of(Position).to receive(:force_close!).with(swing_position1.entry_price,
-          "Emergency closure").exactly(2).times
+        # Check that force_close! is called on each position with the correct arguments
+        expect(swing_position1).to receive(:force_close!).with(swing_position1.entry_price, "Emergency closure")
+        expect(swing_position2).to receive(:force_close!).with(swing_position2.entry_price, "Emergency closure")
 
         result = manager.force_close_all_swing_positions("Emergency closure")
         expect(result).to eq(2)
