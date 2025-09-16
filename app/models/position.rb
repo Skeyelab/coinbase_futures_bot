@@ -4,25 +4,25 @@ class Position < ApplicationRecord
   include SentryTrackable
   # Validations
   validates :product_id, presence: true
-  validates :side, presence: true, inclusion: {in: %w[LONG SHORT]}
-  validates :size, presence: true, numericality: {greater_than: 0}
-  validates :entry_price, presence: true, numericality: {greater_than: 0}
+  validates :side, presence: true, inclusion: { in: %w[LONG SHORT] }
+  validates :size, presence: true, numericality: { greater_than: 0 }
+  validates :entry_price, presence: true, numericality: { greater_than: 0 }
   validates :entry_time, presence: true
-  validates :status, presence: true, inclusion: {in: %w[OPEN CLOSED]}
-  validates :day_trading, inclusion: {in: [true, false]}
+  validates :status, presence: true, inclusion: { in: %w[OPEN CLOSED] }
+  validates :day_trading, inclusion: { in: [true, false] }
 
   # Scopes
-  scope :open, -> { where(status: "OPEN") }
-  scope :closed, -> { where(status: "CLOSED") }
+  scope :open, -> { where(status: 'OPEN') }
+  scope :closed, -> { where(status: 'CLOSED') }
   scope :day_trading, -> { where(day_trading: true) }
   scope :swing_trading, -> { where(day_trading: false) }
   scope :by_product, ->(product_id) { where(product_id: product_id) }
   scope :by_side, ->(side) { where(side: side) }
-  scope :by_asset, ->(asset) { where("product_id LIKE ?", "#{asset}%") }
-  scope :opened_today, -> { where("DATE(entry_time) = ?", Date.current) }
-  scope :opened_yesterday, -> { where("entry_time < ? AND entry_time >= ?", 24.hours.ago, 48.hours.ago) }
+  scope :by_asset, ->(asset) { where('product_id LIKE ?', "#{asset}%") }
+  scope :opened_today, -> { where('DATE(entry_time) = ?', Date.current) }
+  scope :opened_yesterday, -> { where('entry_time < ? AND entry_time >= ?', 24.hours.ago, 48.hours.ago) }
   scope :expiring_soon, -> { day_trading.opened_yesterday.open }
-  scope :older_than, ->(hours) { where("entry_time < ?", hours.hours.ago) }
+  scope :older_than, ->(hours) { where('entry_time < ?', hours.hours.ago) }
   scope :open_swing_positions, -> { swing_trading.open }
 
   # Callbacks
@@ -35,19 +35,19 @@ class Position < ApplicationRecord
 
   # Instance methods
   def open?
-    status == "OPEN"
+    status == 'OPEN'
   end
 
   def closed?
-    status == "CLOSED"
+    status == 'CLOSED'
   end
 
   def long?
-    side == "LONG"
+    side == 'LONG'
   end
 
   def short?
-    side == "SHORT"
+    side == 'SHORT'
   end
 
   def duration
@@ -96,6 +96,18 @@ class Position < ApplicationRecord
     end
   end
 
+  def pnl_percentage
+    return nil unless closed? && entry_price && close_price && pnl
+
+    percentage = if long?
+                   ((close_price - entry_price) / entry_price) * 100
+                 else
+                   ((entry_price - close_price) / entry_price) * 100
+                 end
+
+    percentage.round(2)
+  end
+
   def hit_take_profit?(current_price)
     return false unless take_profit && current_price
     return false unless entry_price
@@ -120,15 +132,15 @@ class Position < ApplicationRecord
 
   def close_position!(close_price, close_time = Time.current)
     update!(
-      status: "CLOSED",
+      status: 'CLOSED',
       close_time: close_time,
       pnl: calculate_pnl(close_price)
     )
   end
 
-  def force_close!(close_price, reason = "Day trading closure", close_time = Time.current)
+  def force_close!(close_price, reason = 'Day trading closure', close_time = Time.current)
     update!(
-      status: "CLOSED",
+      status: 'CLOSED',
       close_time: close_time,
       pnl: calculate_pnl(close_price)
     )
@@ -145,17 +157,17 @@ class Position < ApplicationRecord
   end
 
   def self.positions_approaching_closure
-    day_trading.open.where("entry_time < ?", 23.hours.ago)
+    day_trading.open.where('entry_time < ?', 23.hours.ago)
   end
 
-  def self.close_all_day_trading_positions(close_price, reason = "End of day closure")
+  def self.close_all_day_trading_positions(close_price, reason = 'End of day closure')
     positions = day_trading.open
     closed_count = 0
 
     positions.each do |position|
       position.force_close!(close_price, reason)
       closed_count += 1
-    rescue => e
+    rescue StandardError => e
       Rails.logger.error("Failed to close position #{position.id}: #{e.message}")
     end
 
@@ -164,7 +176,7 @@ class Position < ApplicationRecord
   end
 
   def self.cleanup_old_positions(days_old = 30)
-    old_positions = closed.where("close_time < ?", days_old.days.ago)
+    old_positions = closed.where('close_time < ?', days_old.days.ago)
     count = old_positions.count
     old_positions.destroy_all
     Rails.logger.info("Cleaned up #{count} old closed positions")
@@ -174,7 +186,7 @@ class Position < ApplicationRecord
   private
 
   def set_defaults
-    self.status ||= "OPEN"
+    self.status ||= 'OPEN'
     self.entry_time ||= Time.current
     self.day_trading = Rails.application.config.default_day_trading if day_trading.nil?
   end
@@ -184,7 +196,7 @@ class Position < ApplicationRecord
   end
 
   def log_position_updated
-    return unless saved_change_to_status? && status == "CLOSED"
+    return unless saved_change_to_status? && status == 'CLOSED'
 
     Rails.logger.info("Position closed: #{side} #{size} #{product_id} with PnL: #{pnl}")
   end
