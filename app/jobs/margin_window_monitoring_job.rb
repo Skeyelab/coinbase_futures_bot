@@ -203,10 +203,10 @@ class MarginWindowMonitoringJob < ApplicationJob
 
     # Use higher margin requirements for overnight window
     margin_rate = if margin_window.dig('margin_window', 'margin_window_type') == 'OVERNIGHT_MARGIN'
-      0.20 # 20% margin for overnight
-    else
-      0.10 # 10% margin for intraday
-    end
+                    0.20 # 20% margin for overnight
+                  else
+                    0.10 # 10% margin for intraday
+                  end
 
     position_value * margin_rate
   end

@@ -146,5 +146,4 @@ class SwingPositionCleanupJob < ApplicationJob
       )
     end
   end
-
 end

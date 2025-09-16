@@ -354,7 +354,6 @@ module Trading
       positions_approaching_expiry.any?
     end
 
-
     private
 
     # Close a single swing position
