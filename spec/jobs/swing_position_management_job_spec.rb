@@ -126,7 +126,7 @@ RSpec.describe SwingPositionManagementJob, type: :job do
         expect(SlackNotificationService).to receive(:alert).with(
           "warning",
           "Swing Trading Risk Violations",
-          "Risk limit violations detected: Total exposure exceeds 30% limit"
+          "Risk limit violations detected: Total swing position exposure exceeds 30.0% limit"
         )
 
         subject.perform

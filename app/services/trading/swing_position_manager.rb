@@ -22,9 +22,9 @@ module Trading
       expiring_positions = []
 
       swing_positions.each do |position|
-        next unless position.trading_pair&.expiry_date
+        next unless position.trading_pair&.expiration_date
 
-        days_to_expiry = (position.trading_pair.expiry_date.to_date - Date.current).to_i
+        days_to_expiry = (position.trading_pair.expiration_date.to_date - Date.current).to_i
         if days_to_expiry <= @config[:expiry_buffer_days]
           expiring_positions << position
         end
@@ -177,8 +177,8 @@ module Trading
           unrealized_pnl: current_pnl,
           take_profit: position.take_profit,
           stop_loss: position.stop_loss,
-          contract_expiry: position.trading_pair&.expiry_date,
-          days_to_expiry: position.trading_pair&.expiry_date ? (position.trading_pair.expiry_date.to_date - Date.current).to_i : nil
+          contract_expiry: position.trading_pair&.expiration_date,
+          days_to_expiry: position.trading_pair&.expiration_date ? (position.trading_pair.expiration_date.to_date - Date.current).to_i : nil
         }
 
         summary[:positions] << position_data
@@ -206,15 +206,15 @@ module Trading
         margin_data = JSON.parse(margin_resp.body)
 
         {
-          futures_buying_power: balance_data["futures_buying_power"]&.to_f || 0.0,
-          total_usd_balance: balance_data["total_usd_balance"]&.to_f || 0.0,
-          cfm_usd_balance: balance_data["cfm_usd_balance"]&.to_f || 0.0,
-          unrealized_pnl: balance_data["unrealized_pnl"]&.to_f || 0.0,
-          initial_margin: balance_data["initial_margin"]&.to_f || 0.0,
-          available_margin: balance_data["available_margin"]&.to_f || 0.0,
-          liquidation_threshold: balance_data["liquidation_threshold"]&.to_f || 0.0,
-          liquidation_buffer_amount: balance_data["liquidation_buffer_amount"]&.to_f || 0.0,
-          liquidation_buffer_percentage: balance_data["liquidation_buffer_percentage"]&.to_f || 0.0,
+          futures_buying_power: balance_data.dig("futures_buying_power")&.to_f || 0.0,
+          total_usd_balance: balance_data.dig("total_usd_balance")&.to_f || 0.0,
+          cfm_usd_balance: balance_data.dig("cfm_usd_balance")&.to_f || 0.0,
+          unrealized_pnl: balance_data.dig("unrealized_pnl")&.to_f || 0.0,
+          initial_margin: balance_data.dig("initial_margin")&.to_f || 0.0,
+          available_margin: balance_data.dig("available_margin")&.to_f || 0.0,
+          liquidation_threshold: balance_data.dig("liquidation_threshold")&.to_f || 0.0,
+          liquidation_buffer_amount: balance_data.dig("liquidation_buffer_amount")&.to_f || 0.0,
+          liquidation_buffer_percentage: balance_data.dig("liquidation_buffer_percentage")&.to_f || 0.0,
           margin_window: margin_data["margin_window"] || {},
           overnight_margin_enabled: margin_data["is_intraday_margin_killswitch_enabled"] == false
         }

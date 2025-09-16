@@ -30,7 +30,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
   end
 
   describe "#positions_approaching_expiry" do
-    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiry_date: 3.days.from_now) }
+    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 3.days.from_now) }
     let!(:swing_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: false, status: "OPEN") }
     let!(:day_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: true, status: "OPEN") }
 
@@ -100,7 +100,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
   end
 
   describe "#close_expiring_positions" do
-    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiry_date: 1.day.from_now) }
+    let!(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 1.day.from_now) }
     let!(:expiring_position) { create(:position, product_id: "BTC-USD-PERP", day_trading: false, status: "OPEN") }
 
     before do
@@ -264,7 +264,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     end
 
     it "returns acceptable status when within limits" do
-      swing_position.update!(size: 1) # Reduce position size to be within limits
+      swing_position.update!(size: 0.2) # Reduce position size to be within limits (0.2 * 50000 = 10000, which is 10% of balance)
 
       result = manager.check_swing_risk_limits
       expect(result[:risk_status]).to eq("acceptable")
@@ -306,8 +306,8 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
 
       it "handles positions without current price by using entry price" do
         allow(manager).to receive(:get_current_price).and_return(nil)
-        expect(swing_position1).to receive(:force_close!)
-        expect(swing_position2).to receive(:force_close!)
+        expect(swing_position1).to receive(:force_close!).with(swing_position1.entry_price, "Emergency closure")
+        expect(swing_position2).to receive(:force_close!).with(swing_position2.entry_price, "Emergency closure")
 
         result = manager.force_close_all_swing_positions
         expect(result).to eq(2)
