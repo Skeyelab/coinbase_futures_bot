@@ -148,4 +148,17 @@ class SwingPositionCleanupJob < ApplicationJob
       )
     end
   end
+
+  # Public methods for testing
+  def cleanup_stale_tick_data
+    # Delete tick data older than 7 days
+    cutoff_time = 7.days.ago
+    Tick.where("observed_at < ?", cutoff_time).delete_all
+  end
+
+  def cleanup_old_signal_alerts
+    # Delete signal alerts older than 14 days
+    cutoff_time = 14.days.ago
+    SignalAlert.where("alert_timestamp < ?", cutoff_time).delete_all
+  end
 end
