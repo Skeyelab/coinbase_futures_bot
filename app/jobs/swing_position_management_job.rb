@@ -98,7 +98,7 @@ class SwingPositionManagementJob < ApplicationJob
 
       Sentry.with_scope do |scope|
         scope.set_tag("trading_operation", "swing_risk_violation")
-        scope.set_context("risk_violations", { violations: risk_check[:violations] })
+        scope.set_context("risk_violations", {violations: risk_check[:violations]})
 
         Sentry.capture_message("Swing trading risk limit violations detected", level: "warning")
       end

@@ -28,8 +28,11 @@ class SwingRiskMonitoringJob < ApplicationJob
     if balance_summary[:error]
       @logger.error("Failed to retrieve balance information: #{balance_summary[:error]}")
     else
-      margin_utilization = (balance_summary[:total_usd_balance] > 0) ?
-        (balance_summary[:initial_margin] / balance_summary[:total_usd_balance]) : 0
+      margin_utilization = if balance_summary[:total_usd_balance] > 0
+        (balance_summary[:initial_margin] / balance_summary[:total_usd_balance])
+      else
+        0
+      end
 
       @logger.info("Margin utilization: #{(margin_utilization * 100).round(2)}%, " \
                   "Available margin: $#{balance_summary[:available_margin].round(2)}")
@@ -135,13 +138,17 @@ class SwingRiskMonitoringJob < ApplicationJob
     risk_metrics = position_summary[:risk_metrics]
     alerts = []
 
-    alerts << "#{risk_metrics[:positions_approaching_expiry]} approaching expiry" if risk_metrics[:positions_approaching_expiry] > 0
-    alerts << "#{risk_metrics[:positions_exceeding_max_hold]} exceeding max hold" if risk_metrics[:positions_exceeding_max_hold] > 0
-    alerts << "High asset concentration (#{(risk_metrics[:max_asset_concentration] * 100).round(1)}%)" if risk_metrics[:max_asset_concentration] && risk_metrics[:max_asset_concentration] > 0.5
-
-    if alerts.any?
-      text += "\n⚠️ **Alerts**: #{alerts.join(", ")}"
+    if risk_metrics[:positions_approaching_expiry] > 0
+      alerts << "#{risk_metrics[:positions_approaching_expiry]} approaching expiry"
     end
+    if risk_metrics[:positions_exceeding_max_hold] > 0
+      alerts << "#{risk_metrics[:positions_exceeding_max_hold]} exceeding max hold"
+    end
+    if risk_metrics[:max_asset_concentration] && risk_metrics[:max_asset_concentration] > 0.5
+      alerts << "High asset concentration (#{(risk_metrics[:max_asset_concentration] * 100).round(1)}%)"
+    end
+
+    text += "\n⚠️ **Alerts**: #{alerts.join(", ")}" if alerts.any?
 
     text
   end
