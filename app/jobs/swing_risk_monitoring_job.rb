@@ -102,7 +102,7 @@ class SwingRiskMonitoringJob < ApplicationJob
     return if position_summary[:total_positions] == 0
 
     # Only send summary once per day at 10 AM
-    return unless Time.current.hour == 10 && Time.current.min < 30
+    return unless Time.zone.now.hour == 10 && Time.zone.now.min < 30
 
     summary_text = build_summary_text(position_summary, balance_summary)
 
