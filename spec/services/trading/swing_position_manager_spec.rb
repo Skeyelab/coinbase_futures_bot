@@ -66,11 +66,13 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     end
 
     it "uses default of 30 days if not specified" do
-      allow(Position).to receive_message_chain(:swing_trading, :closed, :where).and_return(double(count: 0, each: [], delete_all: 0))
+      allow(Position).to receive_message_chain(:swing_trading, :closed,
+        :where).and_return(double(count: 0, each: [], delete_all: 0))
 
       manager.cleanup_old_positions
 
-      expect(Position.swing_trading.closed).to have_received(:where).with("close_time < ?", 30.days.ago)
+      expect(Position.swing_trading.closed).to have_received(:where).with("close_time < ?",
+        be_within(1.second).of(30.days.ago))
     end
   end
 
@@ -83,8 +85,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         product_id: "BTC-USD-PERP",
         side: "LONG",
         size: 10,
-        entry_price: 50000,
-        close_price: 52000,
+        entry_price: 50_000,
         pnl: 2000)
     end
 
@@ -97,7 +98,6 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         side: "SHORT",
         size: 5,
         entry_price: 3000,
-        close_price: 2900,
         pnl: 500)
     end
 
@@ -212,8 +212,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         product_id: "BTC-USD-PERP",
         side: "LONG",
         size: 10,
-        entry_price: 50000,
-        close_price: 52000,
+        entry_price: 50_000,
         entry_time: 2.days.ago,
         close_time: 1.day.ago,
         pnl: 2000)
@@ -222,15 +221,17 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     it "logs trade summary with all relevant data" do
       manager.send(:archive_trade_summary, position)
 
-      expect(logger).to have_received(:info).with(match(/Archived swing trade summary.*BTC-USD-PERP.*LONG.*10.*50000.*52000.*2000/))
+      expect(logger).to have_received(:info).with(match(/Archived swing trade summary.*BTC-USD-PERP.*LONG.*10.*50000.*2000/))
     end
 
     it "includes timestamp in archived data" do
-      freeze_time do
-        manager.send(:archive_trade_summary, position)
+      # Use a fixed time to avoid timing issues
+      fixed_time = Time.parse("2025-01-18 12:00:00 UTC")
+      allow(Time).to receive(:current).and_return(fixed_time)
 
-        expect(logger).to have_received(:info).with(match(/archived_at.*#{Time.current.iso8601}/))
-      end
+      manager.send(:archive_trade_summary, position)
+
+      expect(logger).to have_received(:info).with(match(/archived_at.*#{fixed_time.iso8601}/))
     end
   end
 
@@ -240,6 +241,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("7")
         allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("3")
         allow(ENV).to receive(:fetch).with("SWING_MAX_EXPOSURE", 0.3).and_return("0.4")
+        allow(ENV).to receive(:fetch).with("SWING_ENABLE_ROLL", false).and_return("true")
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", 0.2).and_return("0.25")
         allow(ENV).to receive(:fetch).with("SWING_MAX_LEVERAGE", 3).and_return("4")
       end
@@ -250,6 +252,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         expect(config[:max_hold_days]).to eq(7)
         expect(config[:expiry_buffer_days]).to eq(3)
         expect(config[:max_overnight_exposure]).to eq(0.4)
+        expect(config[:enable_contract_roll]).to eq("true")
         expect(config[:margin_safety_buffer]).to eq(0.25)
         expect(config[:max_leverage_overnight]).to eq(4)
       end
@@ -260,6 +263,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         allow(ENV).to receive(:fetch).with("SWING_MAX_HOLD_DAYS", 5).and_return("5")
         allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
         allow(ENV).to receive(:fetch).with("SWING_MAX_EXPOSURE", 0.3).and_return("0.3")
+        allow(ENV).to receive(:fetch).with("SWING_ENABLE_ROLL", false).and_return("false")
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", 0.2).and_return("0.2")
         allow(ENV).to receive(:fetch).with("SWING_MAX_LEVERAGE", 3).and_return("3")
       end
@@ -270,6 +274,7 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
         expect(config[:max_hold_days]).to eq(5)
         expect(config[:expiry_buffer_days]).to eq(2)
         expect(config[:max_overnight_exposure]).to eq(0.3)
+        expect(config[:enable_contract_roll]).to eq("false")
         expect(config[:margin_safety_buffer]).to eq(0.2)
         expect(config[:max_leverage_overnight]).to eq(3)
       end

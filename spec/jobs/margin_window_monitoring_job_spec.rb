@@ -136,7 +136,13 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
       before do
         allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
         allow(positions_service).to receive(:send).and_raise(api_error)
-        allow(Sentry).to receive(:with_scope).and_yield(double(set_tag: nil, set_context: nil))
+        sentry_scope = double("sentry_scope")
+        allow(sentry_scope).to receive(:set_tag)
+        allow(sentry_scope).to receive(:set_context)
+        allow(sentry_scope).to receive(:set_transaction_name)
+        allow(sentry_scope).to receive(:transaction_name)
+        allow(sentry_scope).to receive(:transaction_source)
+        allow(Sentry).to receive(:with_scope).and_yield(sentry_scope)
         allow(Sentry).to receive(:capture_exception)
         allow(SlackNotificationService).to receive(:alert)
       end
@@ -144,7 +150,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
       it "handles API failures gracefully" do
         expect { described_class.perform_now }.to raise_error(api_error)
 
-        expect(Sentry).to have_received(:capture_exception).with(api_error)
+        expect(Sentry).to have_received(:capture_exception).with(api_error).at_least(:once)
         expect(SlackNotificationService).to have_received(:alert).with(
           "critical",
           "Margin Window Monitoring Job Failed",
@@ -154,7 +160,11 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
     end
 
     context "with swing positions and margin violations" do
-      let(:position) { double("Position", id: 1, product_id: "BTC-USD-PERP", size: 10, entry_price: 50_000) }
+      let(:trading_pair) { double("TradingPair", expiration_date: 1.month.from_now) }
+      let(:position) do
+        double("Position", id: 1, product_id: "BTC-USD-PERP", size: 10, entry_price: 50_000, calculate_pnl: 100.0,
+          side: "long", entry_time: Time.current, age_in_hours: 24.5, take_profit: 55_000, stop_loss: 45_000, trading_pair: trading_pair, hit_take_profit?: false, hit_stop_loss?: false)
+      end
       let(:balance_summary) do
         {
           total_usd_balance: 100_000.0,
@@ -177,10 +187,21 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
           .and_return(double(body: margin_window_data.to_json))
         allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/cfm/balance_summary", {})
           .and_return(double(body: balance_summary.to_json))
+        allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/market/product_book",
+          {limit: 1, product_id: "BTC-USD-PERP"})
+          .and_return(double(body: {pricebook: {bids: [{price: "50000.0"}],
+                                                asks: [{price: "50001.0"}]}}.to_json))
+        allow(Position).to receive_message_chain(:swing_trading, :open, :where, :includes).and_return([position])
         allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([position])
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", "0.2").and_return("0.2")
         allow(SlackNotificationService).to receive(:alert)
-        allow(Sentry).to receive(:with_scope).and_yield(double(set_tag: nil, set_context: nil))
+        sentry_scope = double("sentry_scope")
+        allow(sentry_scope).to receive(:set_tag)
+        allow(sentry_scope).to receive(:set_context)
+        allow(sentry_scope).to receive(:set_transaction_name)
+        allow(sentry_scope).to receive(:transaction_name)
+        allow(sentry_scope).to receive(:transaction_source)
+        allow(Sentry).to receive(:with_scope).and_yield(sentry_scope)
         allow(Sentry).to receive(:capture_message)
       end
 

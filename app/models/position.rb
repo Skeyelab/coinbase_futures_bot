@@ -97,13 +97,13 @@ class Position < ApplicationRecord
   end
 
   def pnl_percentage
-    return nil unless closed? && entry_price && close_price && pnl
+    return nil unless closed? && entry_price && pnl
 
-    percentage = if long?
-      ((close_price - entry_price) / entry_price) * 100
-    else
-      ((entry_price - close_price) / entry_price) * 100
-    end
+    # Calculate percentage based on PnL and position size
+    # PnL = (exit_price - entry_price) * size for long positions
+    # PnL = (entry_price - exit_price) * size for short positions
+    # So percentage = (PnL / (entry_price * size)) * 100
+    percentage = (pnl / (entry_price * size)) * 100
 
     percentage.round(2)
   end

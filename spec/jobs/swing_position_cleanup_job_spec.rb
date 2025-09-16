@@ -11,6 +11,7 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
     allow(logger).to receive(:error)
+    allow(logger).to receive(:debug)
     allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
     allow(SentryHelper).to receive(:add_breadcrumb)
   end
@@ -86,19 +87,27 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
       let(:job_error) { StandardError.new("Critical job failure") }
 
       before do
-        allow(swing_manager).to receive(:cleanup_old_positions).and_raise(job_error)
-        allow(swing_manager).to receive(:archive_completed_trades)
+        allow(Trading::SwingPositionManager).to receive(:new).and_raise(job_error)
         allow(Tick).to receive_message_chain(:where, :delete_all)
         allow(SignalAlert).to receive_message_chain(:where, :delete_all)
-        allow(Sentry).to receive(:with_scope).and_yield(double(set_tag: nil, set_context: nil))
+
+        # Mock Sentry properly
+        sentry_scope = double("sentry_scope")
+        allow(sentry_scope).to receive(:set_tag)
+        allow(sentry_scope).to receive(:set_context)
+        allow(sentry_scope).to receive(:set_transaction_name)
+        allow(sentry_scope).to receive(:transaction_name)
+        allow(sentry_scope).to receive(:transaction_source)
+        allow(Sentry).to receive(:with_scope).and_yield(sentry_scope)
         allow(Sentry).to receive(:capture_exception)
+
         allow(SlackNotificationService).to receive(:alert)
       end
 
       it "reports the failure to Sentry and Slack" do
         expect { described_class.perform_now }.to raise_error(job_error)
 
-        expect(Sentry).to have_received(:capture_exception).with(job_error)
+        expect(Sentry).to have_received(:capture_exception).with(job_error).at_least(:once)
         expect(SlackNotificationService).to have_received(:alert).with(
           "warning",
           "Swing Position Cleanup Job Failed",
@@ -139,6 +148,10 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
 
     describe "#cleanup_stale_tick_data" do
       it "deletes tick data older than 7 days" do
+        # Use a fixed time to avoid timing issues
+        fixed_time = Time.parse("2025-01-18 12:00:00 UTC")
+        allow(Time).to receive(:current).and_return(fixed_time)
+
         cutoff_time = 7.days.ago
         tick_relation = double("tick_relation")
 
@@ -154,6 +167,10 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
 
     describe "#cleanup_old_signal_alerts" do
       it "deletes signal alerts older than 14 days" do
+        # Use a fixed time to avoid timing issues
+        fixed_time = Time.parse("2025-01-18 12:00:00 UTC")
+        allow(Time).to receive(:current).and_return(fixed_time)
+
         cutoff_time = 14.days.ago
         alert_relation = double("alert_relation")
 

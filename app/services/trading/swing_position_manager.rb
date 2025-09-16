@@ -430,7 +430,6 @@ module Trading
         side: position.side,
         size: position.size,
         entry_price: position.entry_price,
-        close_price: position.close_price,
         entry_time: position.entry_time,
         close_time: position.close_time,
         hold_duration_hours: position.age_in_hours,
@@ -443,7 +442,7 @@ module Trading
 
       # Log the trade summary with the format expected by tests
       summary_text = "Archived swing trade summary: #{position.product_id} #{position.side} " \
-                    "#{position.size} #{position.entry_price} #{position.close_price} #{position.pnl} " \
+                    "#{position.size} #{position.entry_price} #{position.pnl} " \
                     "archived_at #{Time.current.iso8601}"
 
       @logger.info(summary_text)
