@@ -15,11 +15,11 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     allow(logger).to receive(:debug)
     allow(logger).to receive(:warn)
     allow(logger).to receive(:error)
-    
+
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
     allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_return(spot_subscriber)
     allow(spot_subscriber).to receive(:start)
-    
+
     # Mock Rails.cache
     allow(Rails.cache).to receive(:read)
     allow(Rails.cache).to receive(:write)
@@ -39,15 +39,15 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "with default product IDs" do
       it "starts monitoring with default BTC and ETH products" do
         expect(logger).to receive(:info).with("[RTM] Starting real-time monitoring for BTC-USD, ETH-USD")
-        
+
         expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(
           product_ids: ["BTC-USD", "ETH-USD"],
           logger: logger,
           on_ticker: kind_of(Proc)
         ).and_return(spot_subscriber)
-        
+
         expect(spot_subscriber).to receive(:start)
-        
+
         job.perform
       end
     end
@@ -57,15 +57,15 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "starts monitoring with specified products" do
         expect(logger).to receive(:info).with("[RTM] Starting real-time monitoring for BTC-USD")
-        
+
         expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(
           product_ids: custom_products,
           logger: logger,
           on_ticker: kind_of(Proc)
         ).and_return(spot_subscriber)
-        
+
         expect(spot_subscriber).to receive(:start)
-        
+
         job.perform(product_ids: custom_products)
       end
     end
@@ -73,13 +73,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "with string product ID" do
       it "converts single product ID to array" do
         expect(logger).to receive(:info).with("[RTM] Starting real-time monitoring for BTC-USD")
-        
+
         expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(
           product_ids: ["BTC-USD"],
           logger: logger,
           on_ticker: kind_of(Proc)
         ).and_return(spot_subscriber)
-        
+
         job.perform(product_ids: "BTC-USD")
       end
     end
@@ -91,14 +91,14 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
     it "sets up ticker callback for real-time processing" do
       captured_callback = nil
-      
+
       expect(MarketData::CoinbaseSpotSubscriber).to receive(:new) do |args|
         captured_callback = args[:on_ticker]
         spot_subscriber
       end
-      
+
       job.perform
-      
+
       expect(captured_callback).to be_a(Proc)
     end
   end
@@ -120,32 +120,32 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "with valid ticker data" do
       it "logs debug information for tick processing" do
         expect(logger).to receive(:debug).with("[RTM] BTC-USD: $50000.0 at 2024-01-01T12:00:00Z")
-        
+
         allow(job).to receive(:create_tick_record)
         allow(job).to receive(:check_position_alerts)
         allow(job).to receive(:futures_relevant?).and_return(false)
         allow(job).to receive(:should_evaluate_signals?).and_return(false)
-        
+
         job.send(:process_real_time_tick, ticker_data)
       end
 
       it "creates tick record for valid data" do
         expect(job).to receive(:create_tick_record).with("BTC-USD", 50000.0, "2024-01-01T12:00:00Z")
-        
+
         allow(job).to receive(:check_position_alerts)
         allow(job).to receive(:futures_relevant?).and_return(false)
         allow(job).to receive(:should_evaluate_signals?).and_return(false)
-        
+
         job.send(:process_real_time_tick, ticker_data)
       end
 
       it "checks position alerts for the product" do
         expect(job).to receive(:check_position_alerts).with("BTC-USD", 50000.0)
-        
+
         allow(job).to receive(:create_tick_record)
         allow(job).to receive(:futures_relevant?).and_return(false)
         allow(job).to receive(:should_evaluate_signals?).and_return(false)
-        
+
         job.send(:process_real_time_tick, ticker_data)
       end
 
@@ -153,11 +153,11 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "updates futures monitoring" do
           allow(job).to receive(:futures_relevant?).with("BTC-USD").and_return(true)
           expect(job).to receive(:update_futures_monitoring).with("BTC-USD", 50000.0)
-          
+
           allow(job).to receive(:create_tick_record)
           allow(job).to receive(:check_position_alerts)
           allow(job).to receive(:should_evaluate_signals?).and_return(false)
-          
+
           job.send(:process_real_time_tick, ticker_data)
         end
       end
@@ -166,11 +166,11 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "evaluates rapid signals" do
           allow(job).to receive(:should_evaluate_signals?).with("BTC-USD", 50000.0).and_return(true)
           expect(job).to receive(:evaluate_rapid_signals).with("BTC-USD", 50000.0)
-          
+
           allow(job).to receive(:create_tick_record)
           allow(job).to receive(:check_position_alerts)
           allow(job).to receive(:futures_relevant?).and_return(false)
-          
+
           job.send(:process_real_time_tick, ticker_data)
         end
       end
@@ -186,7 +186,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "skips processing for invalid data: #{invalid_data}" do
           expect(job).not_to receive(:create_tick_record)
           expect(job).not_to receive(:check_position_alerts)
-          
+
           job.send(:process_real_time_tick, invalid_data)
         end
       end
@@ -210,7 +210,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         price: price,
         observed_at: parsed_time
       )
-      
+
       job.send(:create_tick_record, product_id, price, timestamp)
     end
 
@@ -219,9 +219,9 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "logs warning and continues processing" do
         allow(Tick).to receive(:create!).and_raise(error)
-        
+
         expect(logger).to receive(:warn).with("[RTM] Failed to store tick for BTC-USD: Database error")
-        
+
         expect {
           job.send(:create_tick_record, product_id, price, timestamp)
         }.not_to raise_error
@@ -249,18 +249,18 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "checks take profit and stop loss for each position" do
         expect(job).to receive(:check_take_profit_stop_loss).with(position1, price)
         expect(job).to receive(:check_take_profit_stop_loss).with(position2, price)
-        
+
         allow(job).to receive(:check_day_trading_time_limits)
-        
+
         job.send(:check_position_alerts, product_id, price)
       end
 
       it "checks day trading time limits for each position" do
         expect(job).to receive(:check_day_trading_time_limits).with(position1)
         expect(job).to receive(:check_day_trading_time_limits).with(position2)
-        
+
         allow(job).to receive(:check_take_profit_stop_loss)
-        
+
         job.send(:check_position_alerts, product_id, price)
       end
     end
@@ -272,7 +272,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "returns early without checking positions" do
         expect(Position).not_to receive(:open)
-        
+
         job.send(:check_position_alerts, product_id, price)
       end
     end
@@ -285,7 +285,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "does not perform position checks" do
         expect(job).not_to receive(:check_take_profit_stop_loss)
         expect(job).not_to receive(:check_day_trading_time_limits)
-        
+
         job.send(:check_position_alerts, product_id, price)
       end
     end
@@ -306,20 +306,20 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "triggers take profit when price hits target" do
           expect(logger).to receive(:info).with("[RTM] Take profit hit for LONG position #{position.product_id} at $51000.0")
           expect(job).to receive(:trigger_position_close).with(position, "take_profit")
-          
+
           job.send(:check_take_profit_stop_loss, position, 51000.0)
         end
 
         it "triggers stop loss when price hits target" do
           expect(logger).to receive(:info).with("[RTM] Stop loss hit for LONG position #{position.product_id} at $49000.0")
           expect(job).to receive(:trigger_position_close).with(position, "stop_loss")
-          
+
           job.send(:check_take_profit_stop_loss, position, 49000.0)
         end
 
         it "does nothing when price is between targets" do
           expect(job).not_to receive(:trigger_position_close)
-          
+
           job.send(:check_take_profit_stop_loss, position, 50500.0)
         end
       end
@@ -329,7 +329,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
         it "does nothing" do
           expect(job).not_to receive(:trigger_position_close)
-          
+
           job.send(:check_take_profit_stop_loss, position, current_price)
         end
       end
@@ -342,20 +342,20 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "triggers take profit when price hits target" do
           expect(logger).to receive(:info).with("[RTM] Take profit hit for SHORT position #{position.product_id} at $49000.0")
           expect(job).to receive(:trigger_position_close).with(position, "take_profit")
-          
+
           job.send(:check_take_profit_stop_loss, position, 49000.0)
         end
 
         it "triggers stop loss when price hits target" do
           expect(logger).to receive(:info).with("[RTM] Stop loss hit for SHORT position #{position.product_id} at $51000.0")
           expect(job).to receive(:trigger_position_close).with(position, "stop_loss")
-          
+
           job.send(:check_take_profit_stop_loss, position, 51000.0)
         end
 
         it "does nothing when price is between targets" do
           expect(job).not_to receive(:trigger_position_close)
-          
+
           job.send(:check_take_profit_stop_loss, position, 50500.0)
         end
       end
@@ -378,7 +378,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "triggers position close when exceeding 6-hour limit" do
         expect(logger).to receive(:warn).with("[RTM] Day trading position #{position.product_id} exceeded 6-hour limit")
         expect(job).to receive(:trigger_position_close).with(position, "time_limit")
-        
+
         job.send(:check_day_trading_time_limits, position)
       end
     end
@@ -392,7 +392,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "does not trigger position close" do
         expect(job).not_to receive(:trigger_position_close)
-        
+
         job.send(:check_day_trading_time_limits, position)
       end
     end
@@ -402,7 +402,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "does not check time limits" do
         expect(job).not_to receive(:trigger_position_close)
-        
+
         job.send(:check_day_trading_time_limits, position)
       end
     end
@@ -416,7 +416,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "does not trigger position close" do
         expect(job).not_to receive(:trigger_position_close)
-        
+
         job.send(:check_day_trading_time_limits, position)
       end
     end
@@ -432,7 +432,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         reason: reason,
         priority: "immediate"
       )
-      
+
       job.send(:trigger_position_close, position, reason)
     end
 
@@ -443,7 +443,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           reason: test_reason,
           priority: "immediate"
         )
-        
+
         job.send(:trigger_position_close, position, test_reason)
       end
     end
@@ -473,13 +473,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           futures_product_id: current_contract,
           spot_price: price
         )
-        
+
         allow(FuturesBasisMonitoringJob).to receive(:perform_later).with(
           spot_product_id: product_id,
           futures_product_id: upcoming_contract,
           spot_price: price
         )
-        
+
         job.send(:update_futures_monitoring, product_id, price)
       end
 
@@ -489,13 +489,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           futures_product_id: upcoming_contract,
           spot_price: price
         )
-        
+
         allow(FuturesBasisMonitoringJob).to receive(:perform_later).with(
           spot_product_id: product_id,
           futures_product_id: current_contract,
           spot_price: price
         )
-        
+
         job.send(:update_futures_monitoring, product_id, price)
       end
     end
@@ -512,7 +512,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           futures_product_id: current_contract,
           spot_price: price
         ).once
-        
+
         job.send(:update_futures_monitoring, product_id, price)
       end
     end
@@ -525,7 +525,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "does not enqueue any jobs" do
         expect(FuturesBasisMonitoringJob).not_to receive(:perform_later)
-        
+
         job.send(:update_futures_monitoring, product_id, price)
       end
     end
@@ -538,7 +538,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "returns early without processing" do
         expect(contract_manager).not_to receive(:current_month_contract)
         expect(FuturesBasisMonitoringJob).not_to receive(:perform_later)
-        
+
         job.send(:update_futures_monitoring, product_id, price)
       end
     end
@@ -559,16 +559,16 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "evaluates signals and updates cache" do
         cache_key = "last_signal_eval_#{product_id}"
         current_time = Time.current
-        
+
         allow(Time).to receive(:current).and_return(current_time)
-        
+
         expect(Rails.cache).to receive(:write).with(cache_key, current_time, expires_in: 1.minute)
         expect(RapidSignalEvaluationJob).to receive(:perform_later).with(
           product_id: product_id,
           current_price: price,
           asset: asset
         )
-        
+
         job.send(:evaluate_rapid_signals, product_id, price)
       end
     end
@@ -583,7 +583,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "does not evaluate signals again" do
         expect(RapidSignalEvaluationJob).not_to receive(:perform_later)
-        
+
         job.send(:evaluate_rapid_signals, product_id, price)
       end
     end
@@ -599,14 +599,14 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "evaluates signals and updates cache" do
         cache_key = "last_signal_eval_#{product_id}"
-        
+
         expect(Rails.cache).to receive(:write).with(cache_key, current_time, expires_in: 1.minute)
         expect(RapidSignalEvaluationJob).to receive(:perform_later).with(
           product_id: product_id,
           current_price: price,
           asset: asset
         )
-        
+
         job.send(:evaluate_rapid_signals, product_id, price)
       end
     end
@@ -618,7 +618,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
       it "returns early without evaluation" do
         expect(RapidSignalEvaluationJob).not_to receive(:perform_later)
-        
+
         job.send(:evaluate_rapid_signals, product_id, price)
       end
     end
@@ -640,10 +640,10 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "returns true during hour #{hour} ET" do
           et_time = Time.parse("2024-01-01 #{hour}:00:00 EST")
           utc_time = et_time.utc
-          
+
           allow(Time).to receive(:current).and_return(utc_time)
           allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(nil)
-          
+
           result = job.send(:should_evaluate_signals?, product_id, price)
           expect(result).to be true
         end
@@ -655,9 +655,9 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         it "returns false during hour #{hour} ET" do
           et_time = Time.parse("2024-01-01 #{hour}:00:00 EST")
           utc_time = et_time.utc
-          
+
           allow(Time).to receive(:current).and_return(utc_time)
-          
+
           result = job.send(:should_evaluate_signals?, product_id, price)
           expect(result).to be false
         end
@@ -672,9 +672,9 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "returns true when price change exceeds 0.1%" do
         # 0.2% price change
         significant_price = 50100.0 # 0.2% increase from 50000
-        
+
         allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(price)
-        
+
         result = job.send(:should_evaluate_signals?, product_id, significant_price)
         expect(result).to be true
       end
@@ -682,25 +682,25 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       it "returns false when price change is below 0.1%" do
         # 0.05% price change
         insignificant_price = 50025.0 # 0.05% increase from 50000
-        
+
         allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(price)
-        
+
         result = job.send(:should_evaluate_signals?, product_id, insignificant_price)
         expect(result).to be false
       end
 
       it "returns true for first price (no cached price)" do
         allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(nil)
-        
+
         result = job.send(:should_evaluate_signals?, product_id, price)
         expect(result).to be true
       end
 
       it "caches the current price for future comparisons" do
         allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(nil)
-        
+
         expect(Rails.cache).to receive(:write).with("last_price_#{product_id}", price, expires_in: 5.minutes)
-        
+
         job.send(:should_evaluate_signals?, product_id, price)
       end
     end
@@ -708,12 +708,12 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "with price decrease" do
       it "considers absolute value of price change" do
         allow(Time).to receive(:current).and_return(Time.parse("2024-01-01 14:00:00 UTC")) # 9 AM ET
-        
+
         # 0.2% price decrease
         decreased_price = 49900.0 # 0.2% decrease from 50000
-        
+
         allow(Rails.cache).to receive(:read).with("last_price_#{product_id}").and_return(price)
-        
+
         result = job.send(:should_evaluate_signals?, product_id, decreased_price)
         expect(result).to be true
       end
@@ -768,7 +768,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     it "returns current time for nil timestamp" do
       current_time = Time.current
       allow(Time).to receive(:current).and_return(current_time)
-      
+
       result = job.send(:parse_timestamp, nil)
       expect(result).to eq(current_time)
     end
@@ -776,7 +776,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     it "returns current time for invalid timestamp" do
       current_time = Time.current
       allow(Time).to receive(:current).and_return(current_time)
-      
+
       result = job.send(:parse_timestamp, "invalid-timestamp")
       expect(result).to eq(current_time)
     end
@@ -788,7 +788,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         "2024-01-01 12:00:00",
         "Mon, 01 Jan 2024 12:00:00 GMT"
       ]
-      
+
       valid_timestamps.each do |timestamp|
         expect {
           result = job.send(:parse_timestamp, timestamp)
@@ -806,7 +806,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "when MarketData::CoinbaseSpotSubscriber initialization fails" do
       it "propagates the error" do
         allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_raise(StandardError.new("Connection error"))
-        
+
         expect {
           job.perform
         }.to raise_error(StandardError, "Connection error")
@@ -816,7 +816,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "when spot subscriber start fails" do
       it "propagates the error" do
         allow(spot_subscriber).to receive(:start).and_raise(StandardError.new("WebSocket error"))
-        
+
         expect {
           job.perform
         }.to raise_error(StandardError, "WebSocket error")
@@ -841,7 +841,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         allow(job).to receive(:check_position_alerts).and_raise(StandardError.new("Position error"))
         allow(job).to receive(:futures_relevant?).and_return(false)
         allow(job).to receive(:should_evaluate_signals?).and_return(false)
-        
+
         # Should not raise error - error handling should be internal
         expect {
           job.send(:process_real_time_tick, ticker_data)
@@ -862,7 +862,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     before do
       job.instance_variable_set(:@logger, logger)
       job.instance_variable_set(:@contract_manager, contract_manager)
-      
+
       # Mock all dependencies to focus on performance
       allow(job).to receive(:create_tick_record)
       allow(job).to receive(:check_position_alerts)
@@ -872,19 +872,19 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
     it "processes multiple ticks efficiently" do
       start_time = Time.current
-      
+
       100.times do |i|
         tick_data = ticker_data.merge("price" => (50000 + i).to_s)
         job.send(:process_real_time_tick, tick_data)
       end
-      
+
       processing_time = Time.current - start_time
       expect(processing_time).to be < 1.0 # Should process 100 ticks in under 1 second
     end
 
     it "handles rapid price updates without blocking" do
       prices = (50000..50100).to_a.sample(50)
-      
+
       expect {
         prices.each do |price|
           tick_data = ticker_data.merge("price" => price.to_s)
@@ -909,7 +909,7 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           logger: logger,
           on_ticker: kind_of(Proc)
         ).and_return(spot_subscriber)
-        
+
         job.perform
       end
 
@@ -932,23 +932,23 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
           reason: "take_profit",
           priority: "immediate"
         )
-        
+
         job.send(:trigger_position_close, position, "take_profit")
       end
 
       it "enqueues FuturesBasisMonitoringJob" do
         job.instance_variable_set(:@contract_manager, contract_manager)
-        
+
         allow(job).to receive(:extract_asset_from_product_id).with("BTC-USD").and_return("BTC")
         allow(contract_manager).to receive(:current_month_contract).with("BTC").and_return("BIT-29DEC24")
         allow(contract_manager).to receive(:upcoming_month_contract).with("BTC").and_return(nil)
-        
+
         expect(FuturesBasisMonitoringJob).to receive(:perform_later).with(
           spot_product_id: "BTC-USD",
           futures_product_id: "BIT-29DEC24",
           spot_price: 50000.0
         )
-        
+
         job.send(:update_futures_monitoring, "BTC-USD", 50000.0)
       end
 
@@ -956,13 +956,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         allow(job).to receive(:extract_asset_from_product_id).with("BTC-USD").and_return("BTC")
         allow(Rails.cache).to receive(:read).and_return(nil)
         allow(Rails.cache).to receive(:write)
-        
+
         expect(RapidSignalEvaluationJob).to receive(:perform_later).with(
           product_id: "BTC-USD",
           current_price: 50000.0,
           asset: "BTC"
         )
-        
+
         job.send(:evaluate_rapid_signals, "BTC-USD", 50000.0)
       end
     end
@@ -974,13 +974,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "for signal evaluation throttling" do
       it "uses cache to prevent excessive signal evaluation" do
         cache_key = "last_signal_eval_#{product_id}"
-        
+
         expect(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
         expect(Rails.cache).to receive(:write).with(cache_key, kind_of(Time), expires_in: 1.minute)
-        
+
         allow(job).to receive(:extract_asset_from_product_id).and_return("BTC")
         allow(RapidSignalEvaluationJob).to receive(:perform_later)
-        
+
         job.send(:evaluate_rapid_signals, product_id, 50000.0)
       end
     end
@@ -988,11 +988,11 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     context "for price change detection" do
       it "uses cache to store last price for comparison" do
         price_key = "last_price_#{product_id}"
-        
+
         allow(Time).to receive(:current).and_return(Time.parse("2024-01-01 14:00:00 UTC"))
         allow(Rails.cache).to receive(:read).with(price_key).and_return(nil)
         expect(Rails.cache).to receive(:write).with(price_key, 50000.0, expires_in: 5.minutes)
-        
+
         job.send(:should_evaluate_signals?, product_id, 50000.0)
       end
     end
@@ -1009,17 +1009,17 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     it "provides comprehensive position monitoring" do
       allow(job).to receive(:trigger_position_close)
       allow(position).to receive(:age_in_hours).and_return(7.0)
-      
+
       # Should log take profit hit
       expect(logger).to receive(:info).with("[RTM] Take profit hit for LONG position #{position.product_id} at $#{current_price}")
-      
+
       # Should also log time limit warning
       expect(logger).to receive(:warn).with("[RTM] Day trading position #{position.product_id} exceeded 6-hour limit")
-      
+
       # Should trigger both types of closure
       expect(job).to receive(:trigger_position_close).with(position, "take_profit")
       expect(job).to receive(:trigger_position_close).with(position, "time_limit")
-      
+
       job.send(:check_take_profit_stop_loss, position, current_price)
       job.send(:check_day_trading_time_limits, position)
     end
@@ -1030,14 +1030,14 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
         "price" => "50000.00",
         "time" => "2024-01-01T12:00:00Z"
       }
-      
+
       expect(logger).to receive(:debug).with("[RTM] BTC-USD: $50000.0 at 2024-01-01T12:00:00Z")
-      
+
       allow(job).to receive(:create_tick_record)
       allow(job).to receive(:check_position_alerts)
       allow(job).to receive(:futures_relevant?).and_return(false)
       allow(job).to receive(:should_evaluate_signals?).and_return(false)
-      
+
       job.send(:process_real_time_tick, ticker_data)
     end
   end
@@ -1047,12 +1047,12 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       product_id = "BTC-USD"
       price = 50000.0
       timestamp = "2024-01-01T12:00:00Z"
-      
+
       job.instance_variable_set(:@logger, logger)
-      
+
       # Mock successful tick creation
       expect(Tick).to receive(:create!).and_return(true)
-      
+
       expect {
         job.send(:create_tick_record, product_id, price, timestamp)
       }.not_to raise_error
@@ -1062,14 +1062,14 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
       product_id = "BTC-USD"
       price = 50000.0
       timestamp = "2024-01-01T12:00:00Z"
-      
+
       job.instance_variable_set(:@logger, logger)
-      
+
       # Mock tick creation failure
       allow(Tick).to receive(:create!).and_raise(StandardError.new("Database connection lost"))
-      
+
       expect(logger).to receive(:warn).with("[RTM] Failed to store tick for BTC-USD: Database connection lost")
-      
+
       expect {
         job.send(:create_tick_record, product_id, price, timestamp)
       }.not_to raise_error
@@ -1077,13 +1077,13 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
     it "monitors cache system health through signal evaluation" do
       allow(job).to receive(:extract_asset_from_product_id).and_return("BTC")
-      
+
       # Mock cache operations
       expect(Rails.cache).to receive(:read).with("last_signal_eval_BTC-USD")
       expect(Rails.cache).to receive(:write).with("last_signal_eval_BTC-USD", kind_of(Time), expires_in: 1.minute)
-      
+
       allow(RapidSignalEvaluationJob).to receive(:perform_later)
-      
+
       job.send(:evaluate_rapid_signals, "BTC-USD", 50000.0)
     end
   end
