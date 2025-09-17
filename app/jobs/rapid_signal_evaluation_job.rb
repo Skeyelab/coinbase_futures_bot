@@ -31,8 +31,13 @@ class RapidSignalEvaluationJob < ApplicationJob
     )
 
     # Get current month contract for execution
-    contract_manager = MarketData::FuturesContractManager.new(logger: @logger)
-    target_contract = contract_manager.current_month_contract(@asset)
+    begin
+      contract_manager = MarketData::FuturesContractManager.new(logger: @logger)
+      target_contract = contract_manager.current_month_contract(@asset)
+    rescue => e
+      @logger.error("[RSE] Error getting futures contract: #{e.message}")
+      return
+    end
 
     unless target_contract
       @logger.warn("[RSE] No current month contract found for #{@asset}")
@@ -40,8 +45,13 @@ class RapidSignalEvaluationJob < ApplicationJob
     end
 
     # Generate signal using spot price as reference
-    equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "50000").to_f # Increased for ~20 ETH capacity
-    signal = strategy.signal(symbol: @product_id, equity_usd: equity_usd)
+    begin
+      equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "50000").to_f # Increased for ~20 ETH capacity
+      signal = strategy.signal(symbol: @product_id, equity_usd: equity_usd)
+    rescue => e
+      @logger.error("[RSE] Error generating signal: #{e.message}")
+      return
+    end
 
     if signal && should_execute_signal?(signal)
       @logger.info("[RSE] Rapid signal generated for #{@product_id}: #{signal[:side]} #{signal[:quantity]} contracts")
@@ -51,6 +61,8 @@ class RapidSignalEvaluationJob < ApplicationJob
     else
       @logger.debug("[RSE] No actionable signal for #{@product_id}")
     end
+  rescue => e
+    @logger.error("[RSE] Unexpected error in rapid signal evaluation: #{e.message}")
   end
 
   private
