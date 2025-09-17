@@ -641,15 +641,15 @@ class SlackNotificationService
 
       emoji = case alert_type.to_s.downcase
       when "closure", "close"
-        "🔴"
+        "\u{1F534}"
       when "warning", "warn"
-        "⚠️"
+        "\u26A0\uFE0F"
       when "info"
-        "ℹ️"
+        "\u2139\uFE0F"
       when "risk"
-        "🚨"
+        "\u{1F6A8}"
       else
-        "📢"
+        "\u{1F4E2}"
       end
 
       color = case alert_type.to_s.downcase
@@ -707,7 +707,7 @@ class SlackNotificationService
       warnings = exposure_data[:warnings] || []
 
       color = warnings.any? ? "warning" : "good"
-      emoji = warnings.any? ? "⚠️" : "📊"
+      emoji = warnings.any? ? "\u26A0\uFE0F" : "\u{1F4CA}"
 
       {
         text: "#{emoji} Portfolio Exposure Report",
@@ -753,11 +753,11 @@ class SlackNotificationService
 
       emoji = case current_window.to_s.downcase
       when /intraday/
-        "🟢"
+        "\u{1F7E2}"
       when /overnight/
-        "🟡"
+        "\u{1F7E1}"
       else
-        "📊"
+        "\u{1F4CA}"
       end
 
       color = case current_window.to_s.downcase

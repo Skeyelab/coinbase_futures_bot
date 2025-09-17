@@ -26,6 +26,23 @@
 
 ### Session log
 
+#### 2025-09-17 20:10 UTC
+- Context: Fixed failing CalibrationJob tests from GitHub workflow run 17809119563 (reduced from 11 failures to 0 failures)
+- Changes:
+  - Fixed mock expectations in `spec/jobs/calibration_job_spec.rb` to match actual CalibrationJob implementation
+  - Updated strategy.signal mocks to expect hash parameters with `:candles`, `:symbol`, `:equity_usd` keys
+  - Fixed test data setup issues causing insufficient candle data in database queries
+  - Resolved duplicate trading pair creation conflicts between test contexts
+  - Updated parameter validation tests to work with mocked implementations
+- Commands run:
+  - `bundle exec rspec spec/jobs/calibration_job_spec.rb --format documentation`
+  - `bin/standardrb --fix`
+- Files touched:
+  - `spec/jobs/calibration_job_spec.rb`
+- Next steps:
+  - Commit the test fixes and push to branch
+  - Verify CI passes with the fixed tests
+
 #### 2025-09-17 19:48 UTC
 - Context: Completed comprehensive test coverage for CalibrationJob (Linear issue FUT-47)
 - Changes:
