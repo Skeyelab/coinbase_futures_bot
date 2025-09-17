@@ -680,6 +680,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
         it "retries up to max_retries times" do
           allow(described_class).to receive(:client).and_return(mock_client)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           expect(described_class).to receive(:send_message).exactly(4).times.and_call_original
           described_class.send(:send_message, message, channel: channel)
         end
@@ -695,6 +697,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
         it "logs max retries exceeded" do
           allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
 
           expect(Rails.logger).to receive(:error).with("[Slack] Failed to send message after 3 retries")
           described_class.send(:send_message, message, channel: channel)
@@ -705,12 +709,16 @@ RSpec.describe SlackNotificationService, type: :service do
             block.call(double("Scope", set_tag: nil, set_context: nil))
           end
           allow(Sentry).to receive(:capture_exception)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           expect(Sentry).to receive(:capture_message).with("Slack message failed after max retries", level: "error")
           described_class.send(:send_message, message, channel: channel)
         end
 
         it "returns false" do
           allow(described_class).to receive(:client).and_return(mock_client)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           result = described_class.send(:send_message, message, channel: channel)
           expect(result).to be false
         end
