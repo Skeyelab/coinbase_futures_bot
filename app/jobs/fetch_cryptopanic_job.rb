@@ -3,7 +3,7 @@
 class FetchCryptopanicJob < ApplicationJob
   queue_as :default
 
-  def perform(max_pages: 1)
+  def perform(max_pages: 2)
     client = Sentiment::CryptoPanicClient.new
     return unless client.enabled?
 

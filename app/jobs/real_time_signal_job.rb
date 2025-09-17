@@ -85,16 +85,6 @@ class RealTimeSignalJob < ApplicationJob
 
   # Class methods for job management
   class << self
-    private
-
-    def schedule_realtime_evaluation(interval_seconds: 30)
-      # Remove existing scheduled jobs for this class
-      GoodJob::Job.where(job_class: name, finished_at: nil).delete_all
-
-      # Schedule new job to run every interval
-      set(wait: interval_seconds.seconds).perform_later
-    end
-
     def start_realtime_evaluation(interval_seconds: 30)
       Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
 
@@ -108,6 +98,16 @@ class RealTimeSignalJob < ApplicationJob
           schedule_realtime_evaluation(interval_seconds: interval_seconds)
         end
       end
+    end
+
+    private
+
+    def schedule_realtime_evaluation(interval_seconds: 30)
+      # Remove existing scheduled jobs for this class
+      GoodJob::Job.where(job_class: name, finished_at: nil).delete_all
+
+      # Schedule new job to run every interval
+      set(wait: interval_seconds.seconds).perform_later
     end
   end
 end
