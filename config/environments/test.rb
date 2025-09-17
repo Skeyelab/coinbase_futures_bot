@@ -69,4 +69,8 @@ Rails.application.configure do
   # We still test Sentry integration in specific tests, but don't want the overhead
   # of Sentry tracking for every model operation during testing
   config.sentry_dsn = nil
+
+  # CRITICAL: Disable Slack notifications in test environment to prevent real messages
+  # Tests should use mocks instead of sending actual Slack messages
+  ENV["SLACK_ENABLED"] = "false" unless ENV["SLACK_ENABLED"] == "test_mock"
 end

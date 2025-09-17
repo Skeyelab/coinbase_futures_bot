@@ -747,7 +747,7 @@ class SlackNotificationService
     end
 
     def format_margin_window_message(window_data)
-      return {} unless window_data.present? && window_data.is_a?(Hash)
+      return {} unless window_data.is_a?(Hash)
 
       current_window = window_data[:current_window] || "Unknown"
 
