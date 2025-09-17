@@ -27,6 +27,10 @@ Rails.application.configure do
       cron: ENV.fetch("CALIBRATE_CRON", "0 2 * * *"), # daily at 02:00 UTC
       class: "CalibrationJob"
     },
+    news_fetch: {
+      cron: ENV.fetch("NEWS_FETCH_CRON", "*/2 * * * *"), # every 2 minutes
+      class: "FetchNewsJob"
+    },
     sentiment_fetch: {
       cron: ENV.fetch("SENTIMENT_FETCH_CRON", "*/2 * * * *"), # every 2 minutes
       class: "FetchCryptopanicJob"
