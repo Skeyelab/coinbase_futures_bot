@@ -9,8 +9,8 @@ RSpec.configure do |config|
     # Only mock SlackNotificationService methods for non-SlackNotificationService specs
     unless described_class == SlackNotificationService
       # Disable Slack globally in tests unless specifically testing Slack functionality
-      allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("false")
-      allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return(nil)
+      allow(ENV).to receive(:[]).with('SLACK_ENABLED').and_return('false')
+      allow(ENV).to receive(:[]).with('SLACK_BOT_TOKEN').and_return(nil)
 
       # Mock SlackNotificationService methods to prevent real calls
       allow(SlackNotificationService).to receive(:signal_generated).and_return(true)
@@ -29,6 +29,6 @@ RSpec.configure do |config|
     slack_client_mock = instance_double(Slack::Web::Client)
     allow(Slack::Web::Client).to receive(:new).and_return(slack_client_mock)
     allow(slack_client_mock).to receive(:chat_postMessage).and_return(true)
-    allow(slack_client_mock).to receive(:auth_test).and_return({"ok" => true})
+    allow(slack_client_mock).to receive(:auth_test).and_return({ 'ok' => true })
   end
 end
