@@ -660,9 +660,10 @@ RSpec.describe SlackNotificationService, type: :service do
 
       context "when retries are available" do
         it "retries with exponential backoff" do
-          expect(described_class).to receive(:sleep).with(2)
-          expect(described_class).to receive(:sleep).with(4)
-          expect(described_class).to receive(:sleep).with(8)
+          # Mock sleep to avoid actual delays in tests
+          expect(described_class).to receive(:sleep).with(2).and_return(true)
+          expect(described_class).to receive(:sleep).with(4).and_return(true)
+          expect(described_class).to receive(:sleep).with(8).and_return(true)
 
           # Allow the recursive call to eventually succeed
           call_count = 0
