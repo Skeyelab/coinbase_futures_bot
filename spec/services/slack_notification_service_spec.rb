@@ -16,6 +16,9 @@ RSpec.describe SlackNotificationService, type: :service do
 
     # Mock all ENV variables that might be accessed
     allow(ENV).to receive(:[]).and_call_original
+
+    # Mock sleep calls globally to avoid actual delays in tests
+    allow(described_class).to receive(:sleep).and_return(true)
   end
 
   after do
@@ -598,8 +601,7 @@ RSpec.describe SlackNotificationService, type: :service do
         expect(client).to receive(:chat_postMessage).with(
           channel: channel,
           text: message[:text],
-          attachments: message[:attachments],
-          blocks: message[:blocks]
+          attachments: message[:attachments]
         )
         described_class.send(:send_message, message, channel: channel)
       end
@@ -647,6 +649,8 @@ RSpec.describe SlackNotificationService, type: :service do
       end
       it "logs the error" do
         allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+        # Mock sleep to avoid actual delays in tests
+        allow(described_class).to receive(:sleep).and_return(true)
 
         expect(Rails.logger).to receive(:error).with("[Slack] API Error: API Error")
         described_class.send(:send_message, message, channel: channel)
@@ -654,6 +658,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
       it "sends error to Sentry" do
         allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+        # Mock sleep to avoid actual delays in tests
+        allow(described_class).to receive(:sleep).and_return(true)
 
         expect(Sentry).to receive(:with_scope)
         described_class.send(:send_message, message, channel: channel)
@@ -661,9 +667,10 @@ RSpec.describe SlackNotificationService, type: :service do
 
       context "when retries are available" do
         it "retries with exponential backoff" do
-          expect(described_class).to receive(:sleep).with(2)
-          expect(described_class).to receive(:sleep).with(4)
-          expect(described_class).to receive(:sleep).with(8)
+          # Mock sleep to avoid actual delays in tests
+          expect(described_class).to receive(:sleep).with(2).and_return(true)
+          expect(described_class).to receive(:sleep).with(4).and_return(true)
+          expect(described_class).to receive(:sleep).with(8).and_return(true)
 
           # Allow the recursive call to eventually succeed
           call_count = 0
@@ -680,6 +687,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
         it "retries up to max_retries times" do
           allow(described_class).to receive(:client).and_return(mock_client)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           expect(described_class).to receive(:send_message).exactly(4).times.and_call_original
           described_class.send(:send_message, message, channel: channel)
         end
@@ -695,6 +704,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
         it "logs max retries exceeded" do
           allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
 
           expect(Rails.logger).to receive(:error).with("[Slack] Failed to send message after 3 retries")
           described_class.send(:send_message, message, channel: channel)
@@ -705,12 +716,16 @@ RSpec.describe SlackNotificationService, type: :service do
             block.call(double("Scope", set_tag: nil, set_context: nil))
           end
           allow(Sentry).to receive(:capture_exception)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           expect(Sentry).to receive(:capture_message).with("Slack message failed after max retries", level: "error")
           described_class.send(:send_message, message, channel: channel)
         end
 
         it "returns false" do
           allow(described_class).to receive(:client).and_return(mock_client)
+          # Mock sleep to avoid actual delays in tests
+          allow(described_class).to receive(:sleep).and_return(true)
           result = described_class.send(:send_message, message, channel: channel)
           expect(result).to be false
         end
@@ -735,7 +750,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "returns properly formatted message" do
         result = described_class.send(:format_signal_message, signal_data)
 
-        expect(result[:text]).to eq("🎯 New Trading Signal: BTC-USD")
+        expect(result[:text]).to eq("\u{1F3AF} New Trading Signal: BTC-USD")
         expect(result[:attachments]).to be_an(Array)
         expect(result[:attachments].first[:fields]).to include(
           {title: "Symbol", value: "BTC-USD", short: true},
@@ -746,7 +761,7 @@ RSpec.describe SlackNotificationService, type: :service do
 
       it "handles missing data gracefully" do
         result = described_class.send(:format_signal_message, {})
-        expect(result[:text]).to eq("🎯 New Trading Signal: N/A")
+        expect(result[:text]).to eq("\u{1F3AF} New Trading Signal: N/A")
       end
 
       it "formats colors correctly" do
@@ -775,7 +790,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "returns properly formatted message" do
         result = described_class.send(:format_position_message, mock_position, "closed")
 
-        expect(result[:text]).to eq("🔴 Position Closed: BTC-USD")
+        expect(result[:text]).to eq("\u{1F534} Position Closed: BTC-USD")
         expect(result[:attachments]).to be_an(Array)
         expect(result[:attachments].first[:fields]).to include(
           {title: "Symbol", value: "BTC-USD", short: true},
@@ -800,7 +815,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "formats critical alerts correctly" do
         result = described_class.send(:format_alert_message, "critical", "System Down", "Database connection failed")
 
-        expect(result[:text]).to eq("🚨 Alert: System Down")
+        expect(result[:text]).to eq("\u{1F6A8} Alert: System Down")
         expect(result[:attachments].first[:color]).to eq("danger")
         expect(result[:attachments].first[:fields]).to include(
           {title: "Level", value: "CRITICAL", short: true},
@@ -811,7 +826,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "handles alerts without details" do
         result = described_class.send(:format_alert_message, "warning", "High CPU Usage", nil)
 
-        expect(result[:text]).to eq("⚠️ Alert: High CPU Usage")
+        expect(result[:text]).to eq("\u26A0\uFE0F Alert: High CPU Usage")
         expect(result[:attachments].first[:color]).to eq("warning")
       end
     end
@@ -830,11 +845,11 @@ RSpec.describe SlackNotificationService, type: :service do
       it "formats healthy status correctly" do
         result = described_class.send(:format_health_message, health_data)
 
-        expect(result[:text]).to eq("✅ Health Check")
+        expect(result[:text]).to eq("\u2705 Health Check")
         expect(result[:attachments].first[:color]).to eq("good")
         expect(result[:attachments].first[:fields]).to include(
           {title: "Overall Health", value: "Healthy", short: true},
-          {title: "Database", value: "✅", short: true}
+          {title: "Database", value: "\u2705", short: true}
         )
       end
 
@@ -842,9 +857,9 @@ RSpec.describe SlackNotificationService, type: :service do
         unhealthy_data = health_data.merge(overall_health: "unhealthy", database: false)
         result = described_class.send(:format_health_message, unhealthy_data)
 
-        expect(result[:text]).to eq("❌ Health Check")
+        expect(result[:text]).to eq("\u274C Health Check")
         expect(result[:attachments].first[:color]).to eq("danger")
-        expect(result[:attachments].first[:fields].find { |f| f[:title] == "Database" }[:value]).to eq("❌")
+        expect(result[:attachments].first[:fields].find { |f| f[:title] == "Database" }[:value]).to eq("\u274C")
       end
     end
 

@@ -68,9 +68,9 @@ class MarginWindowMonitoringJob < ApplicationJob
 
   def get_current_margin_window
     # Get current margin window from Coinbase API
-    path = "/api/v3/brokerage/cfm/intraday_margin_setting"
-    resp = @positions_service.send(:authenticated_get, path, {})
-    margin_data = JSON.parse(resp.body)
+    # Use the AdvancedTradeClient which has the correct endpoint
+    advanced_trade_client = Coinbase::AdvancedTradeClient.new(logger: @logger)
+    margin_data = advanced_trade_client.get_current_margin_window
 
     @logger.debug("Margin window data: #{margin_data}")
     margin_data
@@ -168,9 +168,9 @@ class MarginWindowMonitoringJob < ApplicationJob
   end
 
   def get_futures_balance_summary
-    path = "/api/v3/brokerage/cfm/balance_summary"
-    resp = @positions_service.send(:authenticated_get, path, {})
-    balance_data = JSON.parse(resp.body)
+    # Use the AdvancedTradeClient which has the correct endpoint
+    advanced_trade_client = Coinbase::AdvancedTradeClient.new(logger: @logger)
+    balance_data = advanced_trade_client.get_futures_balance_summary
 
     {
       futures_buying_power: balance_data.dig("futures_buying_power").to_f,

@@ -84,19 +84,23 @@ class SlackNotificationService
     end
 
     def signals_channel
-      ENV["SLACK_SIGNALS_CHANNEL"] || "#trading-signals"
+      channel = ENV["SLACK_SIGNALS_CHANNEL"]
+      channel.present? ? channel : "#trading-signals"
     end
 
     def positions_channel
-      ENV["SLACK_POSITIONS_CHANNEL"] || "#trading-positions"
+      channel = ENV["SLACK_POSITIONS_CHANNEL"]
+      channel.present? ? channel : "#trading-positions"
     end
 
     def status_channel
-      ENV["SLACK_STATUS_CHANNEL"] || "#bot-status"
+      channel = ENV["SLACK_STATUS_CHANNEL"]
+      channel.present? ? channel : "#bot-status"
     end
 
     def alerts_channel
-      ENV["SLACK_ALERTS_CHANNEL"] || "#trading-alerts"
+      channel = ENV["SLACK_ALERTS_CHANNEL"]
+      channel.present? ? channel : "#trading-alerts"
     end
 
     def client
@@ -118,8 +122,7 @@ class SlackNotificationService
         client.chat_postMessage(
           channel: channel,
           text: message[:text],
-          attachments: message[:attachments],
-          blocks: message[:blocks]
+          attachments: message[:attachments]
         )
         Rails.logger.info("[Slack] Message sent to #{channel}")
         true
@@ -251,13 +254,13 @@ class SlackNotificationService
 
       action_emoji = case action.to_s.downcase
       when "opened"
-        "🟢"
+        "\u{1F7E2}"
       when "closed"
-        "🔴"
+        "\u{1F534}"
       when "updated"
-        "🔄"
+        "\u{1F504}"
       else
-        "📊"
+        "\u{1F4CA}"
       end
 
       color = case action.to_s.downcase
@@ -323,7 +326,7 @@ class SlackNotificationService
       return {} unless status_data.present? && status_data.is_a?(Hash)
 
       {
-        text: "🤖 Bot Status Update",
+        text: "\u{1F916} Bot Status Update",
         attachments: [
           {
             color: status_data[:healthy] ? "good" : "danger",
@@ -335,7 +338,7 @@ class SlackNotificationService
               },
               {
                 title: "Trading Active",
-                value: status_data[:trading_active] ? "✅" : "❌",
+                value: status_data[:trading_active] ? "\u2705" : "\u274C",
                 short: true
               },
               {
@@ -369,15 +372,15 @@ class SlackNotificationService
 
       emoji = case level.to_s.downcase
       when "critical"
-        "🚨"
+        "\u{1F6A8}"
       when "error"
-        "❌"
+        "\u274C"
       when "warning"
-        "⚠️"
+        "\u26A0\uFE0F"
       when "info"
-        "ℹ️"
+        "\u2139\uFE0F"
       else
-        "📢"
+        "\u{1F4E2}"
       end
 
       color = case level.to_s.downcase
@@ -426,7 +429,7 @@ class SlackNotificationService
 
       total_pnl = pnl_data[:total_pnl]
       color = total_pnl&.positive? ? "good" : "danger"
-      emoji = total_pnl&.positive? ? "📈" : "📉"
+      emoji = total_pnl&.positive? ? "\u{1F4C8}" : "\u{1F4C9}"
 
       {
         text: "#{emoji} PnL Update",
@@ -485,11 +488,11 @@ class SlackNotificationService
 
       emoji = case overall_health
       when "healthy"
-        "✅"
+        "\u2705"
       when "warning"
-        "⚠️"
+        "\u26A0\uFE0F"
       else
-        "❌"
+        "\u274C"
       end
 
       {
@@ -505,17 +508,17 @@ class SlackNotificationService
               },
               {
                 title: "Database",
-                value: health_data[:database] ? "✅" : "❌",
+                value: health_data[:database] ? "\u2705" : "\u274C",
                 short: true
               },
               {
                 title: "Coinbase API",
-                value: health_data[:coinbase_api] ? "✅" : "❌",
+                value: health_data[:coinbase_api] ? "\u2705" : "\u274C",
                 short: true
               },
               {
                 title: "Background Jobs",
-                value: health_data[:background_jobs] ? "✅" : "❌",
+                value: health_data[:background_jobs] ? "\u2705" : "\u274C",
                 short: true
               },
               {
@@ -538,7 +541,7 @@ class SlackNotificationService
       return {} unless market_data.present? && market_data.is_a?(Hash)
 
       {
-        text: "📊 Market Alert",
+        text: "\u{1F4CA} Market Alert",
         attachments: [
           {
             color: "warning",
