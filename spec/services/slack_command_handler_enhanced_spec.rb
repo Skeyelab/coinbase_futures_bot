@@ -19,7 +19,16 @@ RSpec.describe SlackCommandHandler do
 
       before do
         allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
-        allow(GoodJob::Job).to receive(:where).and_return(double(order: double(first: nil)))
+
+        # Create comprehensive GoodJob mock
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:order).and_return(double(first: nil))
+        allow(good_job_relation).to receive(:count).and_return(0)
+        allow(good_job_relation).to receive(:exists?).and_return(true)
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
       end
 
       it "includes position type breakdown" do
@@ -161,7 +170,16 @@ RSpec.describe SlackCommandHandler do
 
     before do
       allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
-      allow(GoodJob::Job).to receive(:where).and_return(double(order: double(first: nil)))
+
+      # Create comprehensive GoodJob mock
+      good_job_relation = double("GoodJobRelation")
+      allow(good_job_relation).to receive(:order).and_return(double(first: nil))
+      allow(good_job_relation).to receive(:count).and_return(0)
+      allow(good_job_relation).to receive(:exists?).and_return(true)
+      allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+      allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+      allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
     end
 
     it "includes position type breakdown" do

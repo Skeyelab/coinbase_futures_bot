@@ -129,8 +129,8 @@ RSpec.describe Api::PositionsController, type: :controller do
   end
 
   describe "GET #exposure" do
-    let!(:day_position) { create(:position, day_trading: true, status: "OPEN", size: 1, entry_price: 50000) }
-    let!(:swing_position) { create(:position, day_trading: false, status: "OPEN", size: 0.5, entry_price: 40000) }
+    let!(:day_position) { create(:position, day_trading: true, status: "OPEN", size: 1, entry_price: 50_000) }
+    let!(:swing_position) { create(:position, day_trading: false, status: "OPEN", size: 0.5, entry_price: 40_000) }
 
     before do
       # Mock the configuration
@@ -161,7 +161,7 @@ RSpec.describe Api::PositionsController, type: :controller do
 
     it "identifies when exposure exceeds limits" do
       # Create large positions to exceed limits
-      create(:position, day_trading: true, status: "OPEN", size: 10, entry_price: 50000)
+      create(:position, day_trading: true, status: "OPEN", size: 10, entry_price: 50_000)
 
       get :exposure
 
@@ -174,7 +174,7 @@ RSpec.describe Api::PositionsController, type: :controller do
   end
 
   describe "position serialization" do
-    let!(:position) { create(:position, day_trading: true, pnl: 100.50, take_profit: 55000, stop_loss: 45000) }
+    let!(:position) { create(:position, day_trading: true, pnl: 100.50, take_profit: 55_000, stop_loss: 45_000) }
 
     it "includes all required fields" do
       get :index

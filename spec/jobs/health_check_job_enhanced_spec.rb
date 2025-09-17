@@ -21,9 +21,61 @@ RSpec.describe HealthCheckJob, type: :job do
 
       before do
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
-        allow(GoodJob::Job).to receive(:where).and_return(double(exists?: true))
+        # Create comprehensive GoodJob mock
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:exists?).and_return(true)
+        allow(good_job_relation).to receive(:count).and_return(0)
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:order).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:first).and_return(nil)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
         allow(GoodJob::CronEntry).to receive(:all).and_return([])
-        allow(Coinbase::Client).to receive(:new).and_return(double(test_auth: {advanced_trade: {ok: true}, exchange: {ok: true}}))
+        # Mock Coinbase client with all required methods
+        coinbase_client = double("CoinbaseClient")
+        allow(coinbase_client).to receive(:test_auth).and_return({advanced_trade: {ok: true}, exchange: {ok: true}})
+        allow(coinbase_client).to receive(:futures_balance_summary).and_return({
+          "balance_summary" => {
+            "total_usd_balance" => "100000.00",
+            "total_hold_balance" => "10000.00",
+            "available_margin" => "90000.00",
+            "initial_margin" => "5000.00"
+          }
+        })
+        allow(coinbase_client).to receive(:futures_margin_window).and_return({
+          "margin_window" => {
+            "margin_window_type" => "INTRADAY_MARGIN",
+            "end_time" => (Time.current + 8.hours).iso8601
+          }
+        })
+        allow(coinbase_client).to receive(:margin_window).and_return({
+          "margin_window" => {
+            "margin_window_type" => "INTRADAY_MARGIN",
+            "end_time" => (Time.current + 8.hours).iso8601
+          }
+        })
+
+        allow(Coinbase::Client).to receive(:new).and_return(coinbase_client)
+
+        # Mock SwingPositionManager to avoid API calls
+        swing_manager = double("SwingPositionManager")
+        allow(swing_manager).to receive(:get_swing_position_summary).and_return({
+          total_positions: 1,
+          total_exposure: 50000.0,
+          unrealized_pnl: 100.0,
+          risk_metrics: {}
+        })
+        allow(swing_manager).to receive(:check_swing_risk_limits).and_return({
+          risk_status: "acceptable"
+        })
+        allow(swing_manager).to receive(:positions_approaching_expiry).and_return([])
+        allow(swing_manager).to receive(:positions_exceeding_max_hold).and_return([])
+
+        allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
+
+        # Allow logger debug messages
+        allow(logger).to receive(:debug)
       end
 
       it "counts positions by type correctly" do
@@ -80,7 +132,16 @@ RSpec.describe HealthCheckJob, type: :job do
 
       before do
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
-        allow(GoodJob::Job).to receive(:where).and_return(double(exists?: true))
+        # Create comprehensive GoodJob mock
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:exists?).and_return(true)
+        allow(good_job_relation).to receive(:count).and_return(0)
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:order).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:first).and_return(nil)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
         allow(GoodJob::CronEntry).to receive(:all).and_return([])
         allow(Coinbase::Client).to receive(:new).and_return(mock_client)
         allow(mock_client).to receive(:test_auth).and_return({advanced_trade: {ok: true}, exchange: {ok: true}})
@@ -121,7 +182,16 @@ RSpec.describe HealthCheckJob, type: :job do
     context "when Coinbase API fails" do
       before do
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
-        allow(GoodJob::Job).to receive(:where).and_return(double(exists?: true))
+        # Create comprehensive GoodJob mock
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:exists?).and_return(true)
+        allow(good_job_relation).to receive(:count).and_return(0)
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:order).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:first).and_return(nil)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
         allow(GoodJob::CronEntry).to receive(:all).and_return([])
         allow(Coinbase::Client).to receive(:new).and_raise(StandardError.new("API Error"))
       end

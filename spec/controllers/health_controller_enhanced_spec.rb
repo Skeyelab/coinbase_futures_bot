@@ -9,7 +9,14 @@ RSpec.describe HealthController, type: :controller do
 
     before do
       allow(ActiveRecord::Base.connection).to receive(:execute).with("SELECT 1").and_return(true)
-      allow(GoodJob::Job).to receive(:where).and_return(double(count: 0))
+
+      # Create comprehensive GoodJob mock
+      good_job_relation = double("GoodJobRelation")
+      allow(good_job_relation).to receive(:count).and_return(0)
+      allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+      allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+      allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
     end
 
     it "includes position type breakdown in response" do
@@ -94,9 +101,13 @@ RSpec.describe HealthController, type: :controller do
       end
 
       before do
-        allow(GoodJob::Job).to receive(:where).with(finished_at: nil).and_return(double(count: 5))
-        allow(GoodJob::Job).to receive(:where).and_return(double(where: double(count: 2)))
-        allow(GoodJob::Job).to receive(:where).with(hash_not_including(finished_at: nil)).and_return(double(where: double(count: 1)))
+        # Create a comprehensive mock for GoodJob queries
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:count).and_return(5, 2, 1)
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
       end
 
       it "includes job queue statistics" do
@@ -178,7 +189,14 @@ RSpec.describe HealthController, type: :controller do
   describe "Sentry integration" do
     before do
       allow(ActiveRecord::Base.connection).to receive(:execute).with("SELECT 1").and_return(true)
-      allow(GoodJob::Job).to receive(:where).and_return(double(count: 0))
+
+      # Create comprehensive GoodJob mock
+      good_job_relation = double("GoodJobRelation")
+      allow(good_job_relation).to receive(:count).and_return(0)
+      allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+      allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+      allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
     end
 
     it "adds breadcrumb for health check requests" do
@@ -216,9 +234,13 @@ RSpec.describe HealthController, type: :controller do
 
     context "when GoodJob stats have high failure count" do
       before do
-        allow(GoodJob::Job).to receive(:where).with(finished_at: nil).and_return(double(count: 5))
-        allow(GoodJob::Job).to receive(:where).and_return(double(where: double(count: 2)))
-        allow(GoodJob::Job).to receive(:where).with(hash_not_including(finished_at: nil)).and_return(double(where: double(count: 15))) # High failure count
+        # Create comprehensive GoodJob mock for high failure scenario
+        good_job_relation = double("GoodJobRelation")
+        allow(good_job_relation).to receive(:count).and_return(5, 2, 15) # queued, running, failed
+        allow(good_job_relation).to receive(:where).and_return(good_job_relation)
+        allow(good_job_relation).to receive(:not).and_return(good_job_relation)
+
+        allow(GoodJob::Job).to receive(:where).and_return(good_job_relation)
       end
 
       it "captures high failed job count warnings in Sentry" do

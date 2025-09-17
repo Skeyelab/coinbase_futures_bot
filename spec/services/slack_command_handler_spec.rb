@@ -224,7 +224,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         result = described_class.send(:unauthorized_response)
 
         expect(result).to eq({
-          text: "❌ You are not authorized to use this command.",
+          text: "\u274C You are not authorized to use this command.",
           response_type: "ephemeral"
         })
       end
@@ -246,7 +246,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         result = described_class.send(:error_response, "Something went wrong")
 
         expect(result).to eq({
-          text: "❌ Error executing command: Something went wrong",
+          text: "\u274C Error executing command: Something went wrong",
           response_type: "ephemeral"
         })
       end
@@ -272,13 +272,13 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns status information in channel response" do
       result = described_class.send(:handle_status_command)
 
-      expect(result[:text]).to eq("🤖 Bot Status")
+      expect(result[:text]).to eq("\u{1F916} Bot Status")
       expect(result[:response_type]).to eq("in_channel")
       expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
       expect(fields).to include(
-        {title: "Trading Status", value: "🟢 Active", short: true},
+        {title: "Trading Status", value: "\u{1F7E2} Active", short: true},
         {title: "Day Trading Positions", value: "1", short: true},
         {title: "Swing Trading Positions", value: "1", short: true},
         {title: "Total Positions", value: "2", short: true},
@@ -296,7 +296,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       result = described_class.send(:handle_status_command)
       fields = result[:attachments].first[:fields]
       trading_status_field = fields.find { |f| f[:title] == "Trading Status" }
-      expect(trading_status_field[:value]).to eq("🔴 Paused")
+      expect(trading_status_field[:value]).to eq("\u{1F534} Paused")
     end
   end
 
@@ -323,7 +323,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns pause confirmation message" do
       result = described_class.send(:handle_pause_command)
 
-      expect(result[:text]).to eq("⏸️ Trading has been paused. The bot will stop generating new signals and opening positions.")
+      expect(result[:text]).to eq("\u23F8\uFE0F Trading has been paused. The bot will stop generating new signals and opening positions.")
       expect(result[:response_type]).to eq("in_channel")
     end
   end
@@ -351,7 +351,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns resume confirmation message" do
       result = described_class.send(:handle_resume_command)
 
-      expect(result[:text]).to eq("▶️ Trading has been resumed. The bot will continue normal operations.")
+      expect(result[:text]).to eq("\u25B6\uFE0F Trading has been resumed. The bot will continue normal operations.")
       expect(result[:response_type]).to eq("in_channel")
     end
   end
@@ -384,7 +384,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       it "returns positions in channel response" do
         result = described_class.send(:handle_positions_command)
 
-        expect(result[:text]).to eq("📊 Current Positions (2)")
+        expect(result[:text]).to eq("\u{1F4CA} Current Positions (2)")
         expect(result[:response_type]).to eq("in_channel")
         expect(result[:attachments]).to be_an(Array)
         expect(result[:attachments].size).to eq(2)
@@ -418,7 +418,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       it "returns ephemeral response with no positions message" do
         result = described_class.send(:handle_positions_command)
 
-        expect(result[:text]).to eq("📊 No positions found")
+        expect(result[:text]).to eq("\u{1F4CA} No positions found")
         expect(result[:response_type]).to eq("ephemeral")
       end
     end
@@ -433,7 +433,7 @@ RSpec.describe SlackCommandHandler, type: :service do
         allow(described_class).to receive(:get_positions).and_return([])
         result = described_class.send(:handle_positions_command, "open")
 
-        expect(result[:text]).to eq("📊 No positions found for filter: open")
+        expect(result[:text]).to eq("\u{1F4CA} No positions found for filter: open")
       end
     end
   end
@@ -457,7 +457,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns PnL information in channel response" do
       result = described_class.send(:handle_pnl_command, "today")
 
-      expect(result[:text]).to eq("📈 PnL Report (Today)")
+      expect(result[:text]).to eq("\u{1F4C8} PnL Report (Today)")
       expect(result[:response_type]).to eq("in_channel")
       expect(result[:attachments]).to be_an(Array)
 
@@ -471,7 +471,7 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     it "formats positive PnL with profit emoji" do
       result = described_class.send(:handle_pnl_command, "today")
-      expect(result[:text]).to start_with("📈")
+      expect(result[:text]).to start_with("\u{1F4C8}")
     end
 
     context "with negative PnL" do
@@ -482,7 +482,7 @@ RSpec.describe SlackCommandHandler, type: :service do
 
       it "formats negative PnL with loss emoji" do
         result = described_class.send(:handle_pnl_command, "today")
-        expect(result[:text]).to start_with("📉")
+        expect(result[:text]).to start_with("\u{1F4C9}")
       end
 
       it "formats negative values correctly" do
@@ -518,15 +518,15 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns health information in channel response" do
       result = described_class.send(:handle_health_command)
 
-      expect(result[:text]).to eq("✅ Health Check Report")
+      expect(result[:text]).to eq("\u2705 Health Check Report")
       expect(result[:response_type]).to eq("in_channel")
       expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
       expect(fields).to include(
         {title: "Overall Health", value: "Healthy", short: true},
-        {title: "Database", value: "✅ Connected", short: true},
-        {title: "Coinbase API", value: "✅ Connected", short: true}
+        {title: "Database", value: "\u2705 Connected", short: true},
+        {title: "Coinbase API", value: "\u2705 Connected", short: true}
       )
     end
 
@@ -536,10 +536,10 @@ RSpec.describe SlackCommandHandler, type: :service do
 
       result = described_class.send(:handle_health_command)
 
-      expect(result[:text]).to eq("❌ Health Check Report")
+      expect(result[:text]).to eq("\u274C Health Check Report")
       fields = result[:attachments].first[:fields]
       database_field = fields.find { |f| f[:title] == "Database" }
-      expect(database_field[:value]).to eq("❌ Disconnected")
+      expect(database_field[:value]).to eq("\u274C Disconnected")
     end
   end
 
@@ -575,7 +575,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns emergency stop confirmation" do
       result = described_class.send(:handle_emergency_stop_command)
 
-      expect(result[:text]).to start_with("🚨 EMERGENCY STOP EXECUTED 🚨")
+      expect(result[:text]).to start_with("\u{1F6A8} EMERGENCY STOP EXECUTED \u{1F6A8}")
       expect(result[:response_type]).to eq("in_channel")
       expect(result[:attachments]).to be_an(Array)
 
@@ -583,7 +583,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       expect(fields).to include(
         {title: "Positions Closed", value: "2", short: true},
         {title: "Orders Cancelled", value: "3", short: true},
-        {title: "Trading Status", value: "🔴 DISABLED", short: true}
+        {title: "Trading Status", value: "\u{1F534} DISABLED", short: true}
       )
     end
   end
@@ -592,7 +592,7 @@ RSpec.describe SlackCommandHandler, type: :service do
     it "returns help information in ephemeral response" do
       result = described_class.send(:handle_help_command)
 
-      expect(result[:text]).to eq("🤖 Bot Commands Help")
+      expect(result[:text]).to eq("\u{1F916} Bot Commands Help")
       expect(result[:response_type]).to eq("ephemeral")
       expect(result[:attachments]).to be_an(Array)
 

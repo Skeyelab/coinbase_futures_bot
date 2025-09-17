@@ -26,6 +26,22 @@
 
 ### Session log
 
+#### 2025-09-17 18:05 UTC
+- Context: Fixed enhanced test mocking issues and improved test stability
+- Changes:
+  - **Fixed GoodJob mocking**: Updated enhanced test files to properly mock ActiveRecord query chains (where, not, count, exists?, order)
+  - **Enhanced Coinbase client mocking**: Added comprehensive mocks for futures_balance_summary, margin_window, and other API methods
+  - **Fixed SwingPositionManager mocking**: Prevented actual API calls in HealthCheckJob tests by mocking the service layer
+  - **Improved test isolation**: Enhanced mocks now handle complex query patterns without making real database/API calls
+- Commands run:
+  - `bundle exec rspec spec/jobs/health_check_job_enhanced_spec.rb:29` (verified fixes)
+  - `bundle exec rspec spec/controllers/api/positions_controller_spec.rb:205 spec/controllers/api/positions_controller_spec.rb:179 spec/controllers/api/positions_controller_spec.rb:143 spec/services/slack_command_handler_spec.rb:269 spec/services/slack_command_handler_spec.rb:587` (confirmed original fixes still work)
+  - `bin/standardrb --fix`
+- Files touched:
+  - `spec/controllers/health_controller_enhanced_spec.rb`, `spec/services/slack_command_handler_enhanced_spec.rb`, `spec/jobs/health_check_job_enhanced_spec.rb`
+- Next steps:
+  - Commit enhanced test improvements
+
 #### 2025-09-17 17:45 UTC
 - Context: Fixed failing tests after implementing dual position types monitoring
 - Changes:
