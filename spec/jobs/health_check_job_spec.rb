@@ -154,6 +154,7 @@ RSpec.describe HealthCheckJob, type: :job do
       allow(job).to receive(:check_trading_status).and_return(true)
       allow(job).to receive(:check_recent_signals).and_return(Time.current)
       allow(job).to receive(:count_open_positions).and_return(2)
+      allow(job).to receive(:check_swing_positions_health).and_return({healthy: true, total_positions: 0})
 
       result = job.send(:gather_health_data)
 
@@ -166,6 +167,7 @@ RSpec.describe HealthCheckJob, type: :job do
       expect(result).to have_key(:trading_active)
       expect(result).to have_key(:recent_signals)
       expect(result).to have_key(:open_positions)
+      expect(result).to have_key(:swing_positions)
       expect(result).to have_key(:overall_health)
     end
 
@@ -178,6 +180,7 @@ RSpec.describe HealthCheckJob, type: :job do
       expect(job).to receive(:check_trading_status)
       expect(job).to receive(:check_recent_signals)
       expect(job).to receive(:count_open_positions)
+      expect(job).to receive(:check_swing_positions_health)
       expect(job).to receive(:calculate_overall_health)
 
       job.send(:gather_health_data)
