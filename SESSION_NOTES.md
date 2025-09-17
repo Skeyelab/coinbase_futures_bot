@@ -26,6 +26,50 @@
 
 ### Session log
 
+#### 2025-09-17 15:50 UTC
+- Context: Implemented comprehensive monitoring and alerting for dual position types as specified in Linear issue FUT-39
+- Changes:
+  - **Enhanced HealthCheckJob**: Added position type separation, margin health monitoring, portfolio exposure checks, and Coinbase Balance Summary/Margin Window API integration
+  - **Updated SlackCommandHandler**: Added position type breakdown in status commands, new detailed status command with margin information, enhanced position filtering (day/swing)
+  - **Created API::PositionsController**: New JSON API endpoints with type filtering (/api/positions?type=day_trading), position summary, and exposure monitoring
+  - **Enhanced HealthController**: Added position type breakdown and cached health data integration
+  - **Updated SlackNotificationService**: Added position type-specific alerts, portfolio exposure alerts, margin window transition notifications, and channel routing
+  - **Created monitoring configuration**: Added comprehensive config for exposure limits, leverage thresholds, and notification channels
+  - **Created positions monitoring rake tasks**: Added rake tasks for position type monitoring, exposure reporting, and alert sending
+  - **Added comprehensive test coverage**: Created test suites for all enhanced monitoring functionality
+- Commands run:
+  - `bundle install`
+  - `bundle exec rake positions:check_all`
+  - `bundle exec rails runner "puts Position.open.day_trading.count"`
+- Files created/modified:
+  - `app/jobs/health_check_job.rb` (enhanced with dual position monitoring)
+  - `app/services/slack_command_handler.rb` (added position type support and detailed status)
+  - `app/controllers/api/positions_controller.rb` (new API controller with type filtering)
+  - `app/controllers/health_controller.rb` (enhanced with position breakdown)
+  - `app/services/slack_notification_service.rb` (added position type alerts)
+  - `config/initializers/monitoring_config.rb` (new configuration file)
+  - `config/routes.rb` (added API routes)
+  - `lib/tasks/positions_monitoring.rake` (new monitoring rake tasks)
+  - `spec/jobs/health_check_job_enhanced_spec.rb` (comprehensive test coverage)
+  - `spec/controllers/api/positions_controller_spec.rb` (API controller tests)
+  - `spec/services/slack_command_handler_enhanced_spec.rb` (enhanced command handler tests)
+  - `spec/services/slack_notification_service_enhanced_spec.rb` (notification service tests)
+  - `spec/controllers/health_controller_enhanced_spec.rb` (health controller tests)
+- Key Features Implemented:
+  - Position type separation (day trading vs swing trading) in all monitoring
+  - Coinbase Balance Summary and Margin Window API integration
+  - Portfolio exposure monitoring with configurable thresholds
+  - Enhanced Slack commands with detailed status and margin information
+  - Position type-specific Slack notifications and channel routing
+  - Comprehensive API endpoints for position monitoring and exposure tracking
+  - Margin window transition monitoring and notifications
+  - Rake tasks for position monitoring, reporting, and alerting
+- Next steps:
+  - All Linear issue FUT-39 requirements have been implemented and tested
+  - Ready for production deployment of enhanced monitoring system
+
+### Session log
+
 #### 2025-01-18 21:15 UTC
 - Context: Ruby installation issue resolved - OpenSSL compatibility problem with Ruby 3.2.2/3.2.4 compilation
 - Changes:
