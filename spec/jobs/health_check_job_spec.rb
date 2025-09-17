@@ -410,11 +410,24 @@ RSpec.describe HealthCheckJob, type: :job do
   describe "#count_open_positions" do
     context "when positions can be counted" do
       before do
-        allow(Position).to receive(:open).and_return(double(day_trading: double(count: 3)))
+        allow(Position).to receive(:open).and_return(
+          double(
+            day_trading: double(count: 3),
+            count: 5
+          )
+        )
+        allow(Position).to receive(:swing_trading).and_return(
+          double(open: double(count: 2))
+        )
       end
 
       it "returns the count of open positions" do
-        expect(job.send(:count_open_positions)).to eq(3)
+        result = job.send(:count_open_positions)
+        expect(result).to eq({
+          day_trading: 3,
+          swing_trading: 2,
+          total: 5
+        })
       end
     end
 
@@ -424,7 +437,12 @@ RSpec.describe HealthCheckJob, type: :job do
       end
 
       it "returns 0" do
-        expect(job.send(:count_open_positions)).to eq(0)
+        result = job.send(:count_open_positions)
+        expect(result).to eq({
+          day_trading: 0,
+          swing_trading: 0,
+          total: 0
+        })
       end
     end
   end

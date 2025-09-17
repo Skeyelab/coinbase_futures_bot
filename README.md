@@ -476,3 +476,4 @@ See [Development Guide](docs/development.md) for detailed workflow and standards
 ## License
 
 See LICENSE file for details.
+# Test trigger for CI verification

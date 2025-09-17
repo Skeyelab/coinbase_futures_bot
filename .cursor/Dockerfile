@@ -2,7 +2,7 @@
 # - Rails 8 API app using Ruby 3.2.x and PostgreSQL
 # - Installs developer tooling (git, node/npm, editors, postgres client, build deps)
 
-FROM ruby:3.2.2-slim
+FROM ruby:3.2.4-slim
 
 ARG DEBIAN_FRONTEND=noninteractive
 

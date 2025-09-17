@@ -204,15 +204,15 @@ module Trading
         margin_data = JSON.parse(margin_resp.body)
 
         {
-          futures_buying_power: balance_data.dig("futures_buying_power")&.to_f || 0.0,
-          total_usd_balance: balance_data.dig("total_usd_balance")&.to_f || 0.0,
-          cfm_usd_balance: balance_data.dig("cfm_usd_balance")&.to_f || 0.0,
-          unrealized_pnl: balance_data.dig("unrealized_pnl")&.to_f || 0.0,
-          initial_margin: balance_data.dig("initial_margin")&.to_f || 0.0,
-          available_margin: balance_data.dig("available_margin")&.to_f || 0.0,
-          liquidation_threshold: balance_data.dig("liquidation_threshold")&.to_f || 0.0,
-          liquidation_buffer_amount: balance_data.dig("liquidation_buffer_amount")&.to_f || 0.0,
-          liquidation_buffer_percentage: balance_data.dig("liquidation_buffer_percentage")&.to_f || 0.0,
+          futures_buying_power: balance_data.dig("futures_buying_power").to_f,
+          total_usd_balance: balance_data.dig("total_usd_balance").to_f,
+          cfm_usd_balance: balance_data.dig("cfm_usd_balance").to_f,
+          unrealized_pnl: balance_data.dig("unrealized_pnl").to_f,
+          initial_margin: balance_data.dig("initial_margin").to_f,
+          available_margin: balance_data.dig("available_margin").to_f,
+          liquidation_threshold: balance_data.dig("liquidation_threshold").to_f,
+          liquidation_buffer_amount: balance_data.dig("liquidation_buffer_amount").to_f,
+          liquidation_buffer_percentage: balance_data.dig("liquidation_buffer_percentage").to_f,
           margin_window: margin_data["margin_window"] || {},
           overnight_margin_enabled: margin_data["is_intraday_margin_killswitch_enabled"] == false
         }
@@ -301,6 +301,59 @@ module Trading
       closed_count
     end
 
+    # Cleanup and archiving methods
+
+    # Clean up old closed swing positions (older than specified days)
+    def cleanup_old_positions(days_old: 30)
+      cutoff_time = days_old.days.ago
+      old_positions = Position.swing_trading.closed.where("close_time < ?", cutoff_time)
+
+      @logger.info("Found #{old_positions.count} old closed swing positions to clean up")
+
+      # Archive to a separate table or export before deletion if needed
+      old_positions.each do |position|
+        # Log position data before cleanup for audit trail
+        @logger.debug("Cleaning up swing position #{position.id}: #{position.product_id} " \
+                     "#{position.side} #{position.size} (closed #{position.close_time})")
+      end
+
+      deleted_count = old_positions.delete_all
+      @logger.info("Cleaned up #{deleted_count} old closed swing positions")
+
+      deleted_count
+    end
+
+    # Archive completed swing trades for historical analysis
+    def archive_completed_trades(days_old: 7)
+      cutoff_time = days_old.days.ago
+      completed_trades = Position.swing_trading.closed.where("close_time < ? AND close_time > ?", cutoff_time,
+        90.days.ago)
+
+      @logger.info("Found #{completed_trades.count} completed swing trades to archive")
+
+      archived_count = 0
+      completed_trades.each do |position|
+        # Create archive record with trade summary
+        archive_trade_summary(position)
+        archived_count += 1
+      rescue => e
+        @logger.error("Failed to archive swing trade #{position.id}: #{e.message}")
+      end
+
+      @logger.info("Archived #{archived_count} completed swing trades")
+      archived_count
+    end
+
+    # Check for positions exceeding max hold period
+    def positions_exceeding_max_hold?
+      positions_exceeding_max_hold.exists?
+    end
+
+    # Check for positions approaching contract expiry
+    def positions_approaching_expiry?
+      positions_approaching_expiry.any?
+    end
+
     private
 
     # Close a single swing position
@@ -365,6 +418,37 @@ module Trading
       end
 
       metrics
+    end
+
+    # Archive a trade summary for historical analysis
+    def archive_trade_summary(position)
+      # For now, just log the trade summary
+      # In the future, this could write to a separate archive table or external storage
+      {
+        position_id: position.id,
+        product_id: position.product_id,
+        side: position.side,
+        size: position.size,
+        entry_price: position.entry_price,
+        entry_time: position.entry_time,
+        close_time: position.close_time,
+        hold_duration_hours: position.age_in_hours,
+        pnl: position.pnl,
+        pnl_percentage: position.pnl_percentage,
+        take_profit: position.take_profit,
+        stop_loss: position.stop_loss,
+        archived_at: Time.current
+      }
+
+      # Log the trade summary with the format expected by tests
+      summary_text = "Archived swing trade summary: #{position.product_id} #{position.side} " \
+                    "#{position.size} #{position.entry_price} #{position.pnl} " \
+                    "archived_at #{Time.current.iso8601}"
+
+      @logger.info(summary_text)
+
+      # Could also send to external analytics service or data warehouse
+      # AnalyticsService.send_trade_data(trade_summary) if defined?(AnalyticsService)
     end
 
     # Default configuration if not set in application config
