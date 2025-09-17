@@ -54,7 +54,7 @@ jobs:
   test:
     name: Rails tests with coverage
     runs-on: ubuntu-latest
-    needs: [standardrb,lint, security]
+    needs: [lint, security]
 
     services:
       postgres:
