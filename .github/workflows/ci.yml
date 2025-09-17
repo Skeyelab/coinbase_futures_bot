@@ -21,6 +21,8 @@ jobs:
     steps:
     - name: Standard Ruby
       uses: standardrb/standard-ruby-action@v1
+      with:
+        autofix: true
 
   lint:
     name: Check StandardRB (lint)
