@@ -162,29 +162,27 @@ module Coinbase
         resp = authenticated_get(path)
         JSON.parse(resp.body)
       rescue Faraday::ClientError => e
-        if e.response&.dig(:status) == 403
-          # Fallback to balance summary data which includes margin window info
-          @logger.warn("current_margin_window endpoint not accessible (403), using balance summary data")
-          balance_data = get_futures_balance_summary
+        raise e unless e.response&.dig(:status) == 403
 
-          # Extract margin window information from balance summary
-          intraday_data = balance_data.dig("intraday_margin_window_measure")
-          balance_data.dig("overnight_margin_window_measure")
+        # Fallback to balance summary data which includes margin window info
+        @logger.warn("current_margin_window endpoint not accessible (403), using balance summary data")
+        balance_data = get_futures_balance_summary
 
-          # Determine current margin window type based on available data
-          # This is a simplified approach - in reality you'd need to check time-based logic
-          {
-            "margin_window" => {
-              "margin_window_type" => intraday_data ? "INTRADAY_MARGIN" : "OVERNIGHT_MARGIN",
-              "end_time" => nil
-            },
-            "is_intraday_margin_killswitch_enabled" => true,
-            "is_intraday_margin_enrollment_killswitch_enabled" => true,
-            "_source" => "balance_summary_fallback"
-          }
-        else
-          raise e
-        end
+        # Extract margin window information from balance summary
+        intraday_data = balance_data.dig("intraday_margin_window_measure")
+        balance_data.dig("overnight_margin_window_measure")
+
+        # Determine current margin window type based on available data
+        # This is a simplified approach - in reality you'd need to check time-based logic
+        {
+          "margin_window" => {
+            "margin_window_type" => intraday_data ? "INTRADAY_MARGIN" : "OVERNIGHT_MARGIN",
+            "end_time" => nil
+          },
+          "is_intraday_margin_killswitch_enabled" => true,
+          "is_intraday_margin_enrollment_killswitch_enabled" => true,
+          "_source" => "balance_summary_fallback"
+        }
       end
     end
 

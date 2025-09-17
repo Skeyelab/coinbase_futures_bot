@@ -24,19 +24,19 @@ module Sentiment
           all_events.concat(events)
           successful_sources << client.source_name
           @logger.info("#{client.source_name}: fetched #{events.size} events")
-        rescue StandardError => e
+        rescue => e
           @logger.error("#{client.source_name} failed: #{e.class} #{e.message}")
           failed_sources << client.source_name
 
           # Track individual source failures
           Sentry.with_scope do |scope|
-            scope.set_tag('service', 'multi_source_aggregator')
-            scope.set_tag('failed_source', client.source_name)
-            scope.set_context('aggregation', {
-                                total_sources: @clients.size,
-                                successful_sources: successful_sources,
-                                failed_sources: failed_sources
-                              })
+            scope.set_tag("service", "multi_source_aggregator")
+            scope.set_tag("failed_source", client.source_name)
+            scope.set_context("aggregation", {
+              total_sources: @clients.size,
+              successful_sources: successful_sources,
+              failed_sources: failed_sources
+            })
             Sentry.capture_exception(e)
           end
         end
@@ -46,9 +46,9 @@ module Sentiment
 
       # Track aggregation success
       SentryHelper.add_breadcrumb(
-        message: 'Multi-source news aggregation completed',
-        category: 'sentiment',
-        level: 'info',
+        message: "Multi-source news aggregation completed",
+        category: "sentiment",
+        level: "info",
         data: {
           total_events: all_events.size,
           successful_sources: successful_sources,

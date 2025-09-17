@@ -14,16 +14,16 @@ class FetchNewsJob < ApplicationJob
     # Store all events in database
     events.each do |attrs|
       SentimentEvent.upsert({
-                              source: attrs[:source],
-                              symbol: attrs[:symbol],
-                              url: attrs[:url],
-                              title: attrs[:title],
-                              published_at: attrs[:published_at],
-                              raw_text_hash: attrs[:raw_text_hash],
-                              meta: attrs[:meta],
-                              created_at: Time.now.utc,
-                              updated_at: Time.now.utc
-                            }, unique_by: :index_sentiment_events_on_source_and_raw_text_hash)
+        source: attrs[:source],
+        symbol: attrs[:symbol],
+        url: attrs[:url],
+        title: attrs[:title],
+        published_at: attrs[:published_at],
+        raw_text_hash: attrs[:raw_text_hash],
+        meta: attrs[:meta],
+        created_at: Time.now.utc,
+        updated_at: Time.now.utc
+      }, unique_by: :index_sentiment_events_on_source_and_raw_text_hash)
     end
 
     Rails.logger.info("FetchNewsJob: Stored #{events.size} events from multiple sources")
