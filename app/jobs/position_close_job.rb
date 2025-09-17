@@ -4,9 +4,9 @@ class PositionCloseJob < ApplicationJob
   queue_as :critical
 
   def perform(position_id:, reason:, priority: "normal")
-    @position = Position.find(position_id)
     @reason = reason
     @logger = Rails.logger
+    @position = Position.find(position_id)
 
     @logger.info("[PCJ] Closing position #{position_id} (#{@position.product_id}) - Reason: #{reason}")
 
