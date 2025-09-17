@@ -5,6 +5,7 @@ require "rails_helper"
 RSpec.describe MarginWindowMonitoringJob, type: :job do
   let(:logger) { instance_double(Logger) }
   let(:positions_service) { instance_double(Trading::CoinbasePositions) }
+  let(:advanced_trade_client) { instance_double(Coinbase::AdvancedTradeClient) }
 
   before do
     allow(Rails).to receive(:logger).and_return(logger)
@@ -13,6 +14,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
     allow(logger).to receive(:error)
     allow(logger).to receive(:debug)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+    allow(Coinbase::AdvancedTradeClient).to receive(:new).with(logger: logger).and_return(advanced_trade_client)
     allow(SentryHelper).to receive(:add_breadcrumb)
   end
 
@@ -28,9 +30,14 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
 
       before do
         allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
-        allow(positions_service).to receive(:send).with(:authenticated_get,
-          "/api/v3/brokerage/cfm/intraday_margin_setting", {})
-          .and_return(double(body: margin_window_data.to_json))
+        allow(advanced_trade_client).to receive(:get_current_margin_window).and_return(margin_window_data)
+        allow(advanced_trade_client).to receive(:get_futures_balance_summary).and_return({
+          "futures_buying_power" => "10000.0",
+          "total_usd_balance" => "15000.0",
+          "available_margin" => "5000.0",
+          "initial_margin" => "2000.0",
+          "liquidation_threshold" => "1000.0"
+        })
         allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([])
         allow(Rails.cache).to receive(:read).with("last_margin_window_type").and_return(nil)
         allow(Rails.cache).to receive(:write).with("last_margin_window_type", any_args)
@@ -135,7 +142,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
 
       before do
         allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
-        allow(positions_service).to receive(:send).and_raise(api_error)
+        allow(advanced_trade_client).to receive(:get_current_margin_window).and_raise(api_error)
         sentry_scope = double("sentry_scope")
         allow(sentry_scope).to receive(:set_tag)
         allow(sentry_scope).to receive(:set_context)
@@ -182,15 +189,8 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
 
       before do
         allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
-        allow(positions_service).to receive(:send).with(:authenticated_get,
-          "/api/v3/brokerage/cfm/intraday_margin_setting", {})
-          .and_return(double(body: margin_window_data.to_json))
-        allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/cfm/balance_summary", {})
-          .and_return(double(body: balance_summary.to_json))
-        allow(positions_service).to receive(:send).with(:authenticated_get, "/api/v3/brokerage/market/product_book",
-          {limit: 1, product_id: "BTC-USD-PERP"})
-          .and_return(double(body: {pricebook: {bids: [{price: "50000.0"}],
-                                                asks: [{price: "50001.0"}]}}.to_json))
+        allow(advanced_trade_client).to receive(:get_current_margin_window).and_return(margin_window_data)
+        allow(advanced_trade_client).to receive(:get_futures_balance_summary).and_return(balance_summary)
         allow(Position).to receive_message_chain(:swing_trading, :open, :where, :includes).and_return([position])
         allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([position])
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", "0.2").and_return("0.2")

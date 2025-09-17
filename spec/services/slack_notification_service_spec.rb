@@ -598,8 +598,7 @@ RSpec.describe SlackNotificationService, type: :service do
         expect(client).to receive(:chat_postMessage).with(
           channel: channel,
           text: message[:text],
-          attachments: message[:attachments],
-          blocks: message[:blocks]
+          attachments: message[:attachments]
         )
         described_class.send(:send_message, message, channel: channel)
       end
