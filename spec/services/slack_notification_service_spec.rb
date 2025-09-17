@@ -734,7 +734,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "returns properly formatted message" do
         result = described_class.send(:format_signal_message, signal_data)
 
-        expect(result[:text]).to eq("🎯 New Trading Signal: BTC-USD")
+        expect(result[:text]).to eq("\u{1F3AF} New Trading Signal: BTC-USD")
         expect(result[:attachments]).to be_an(Array)
         expect(result[:attachments].first[:fields]).to include(
           {title: "Symbol", value: "BTC-USD", short: true},
@@ -745,7 +745,7 @@ RSpec.describe SlackNotificationService, type: :service do
 
       it "handles missing data gracefully" do
         result = described_class.send(:format_signal_message, {})
-        expect(result[:text]).to eq("🎯 New Trading Signal: N/A")
+        expect(result[:text]).to eq("\u{1F3AF} New Trading Signal: N/A")
       end
 
       it "formats colors correctly" do
@@ -774,7 +774,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "returns properly formatted message" do
         result = described_class.send(:format_position_message, mock_position, "closed")
 
-        expect(result[:text]).to eq("🔴 Position Closed: BTC-USD")
+        expect(result[:text]).to eq("\u{1F534} Position Closed: BTC-USD")
         expect(result[:attachments]).to be_an(Array)
         expect(result[:attachments].first[:fields]).to include(
           {title: "Symbol", value: "BTC-USD", short: true},
@@ -799,7 +799,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "formats critical alerts correctly" do
         result = described_class.send(:format_alert_message, "critical", "System Down", "Database connection failed")
 
-        expect(result[:text]).to eq("🚨 Alert: System Down")
+        expect(result[:text]).to eq("\u{1F6A8} Alert: System Down")
         expect(result[:attachments].first[:color]).to eq("danger")
         expect(result[:attachments].first[:fields]).to include(
           {title: "Level", value: "CRITICAL", short: true},
@@ -810,7 +810,7 @@ RSpec.describe SlackNotificationService, type: :service do
       it "handles alerts without details" do
         result = described_class.send(:format_alert_message, "warning", "High CPU Usage", nil)
 
-        expect(result[:text]).to eq("⚠️ Alert: High CPU Usage")
+        expect(result[:text]).to eq("\u26A0\uFE0F Alert: High CPU Usage")
         expect(result[:attachments].first[:color]).to eq("warning")
       end
     end
@@ -829,11 +829,11 @@ RSpec.describe SlackNotificationService, type: :service do
       it "formats healthy status correctly" do
         result = described_class.send(:format_health_message, health_data)
 
-        expect(result[:text]).to eq("✅ Health Check")
+        expect(result[:text]).to eq("\u2705 Health Check")
         expect(result[:attachments].first[:color]).to eq("good")
         expect(result[:attachments].first[:fields]).to include(
           {title: "Overall Health", value: "Healthy", short: true},
-          {title: "Database", value: "✅", short: true}
+          {title: "Database", value: "\u2705", short: true}
         )
       end
 
@@ -841,9 +841,9 @@ RSpec.describe SlackNotificationService, type: :service do
         unhealthy_data = health_data.merge(overall_health: "unhealthy", database: false)
         result = described_class.send(:format_health_message, unhealthy_data)
 
-        expect(result[:text]).to eq("❌ Health Check")
+        expect(result[:text]).to eq("\u274C Health Check")
         expect(result[:attachments].first[:color]).to eq("danger")
-        expect(result[:attachments].first[:fields].find { |f| f[:title] == "Database" }[:value]).to eq("❌")
+        expect(result[:attachments].first[:fields].find { |f| f[:title] == "Database" }[:value]).to eq("\u274C")
       end
     end
 
