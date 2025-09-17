@@ -12,8 +12,18 @@ env:
   COVERAGE: true
 
 jobs:
+  standardrb:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: write
+    steps:
+    - name: Standard Ruby
+      uses: standardrb/standard-ruby-action@v1
+
   lint:
     name: StandardRB (lint)
+    needs: [standardrb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -43,7 +53,7 @@ jobs:
   test:
     name: Rails tests with coverage
     runs-on: ubuntu-latest
-    needs: [lint, security]
+    needs: [standardrb,lint, security]
 
     services:
       postgres:
