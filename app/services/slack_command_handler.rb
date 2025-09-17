@@ -15,6 +15,8 @@ class SlackCommandHandler
       case command
       when "/bot-status"
         handle_status_command
+      when "/bot-detailed-status"
+        handle_detailed_status_command
       when "/bot-pause"
         handle_pause_command
       when "/bot-resume"
@@ -71,8 +73,18 @@ class SlackCommandHandler
                 short: true
               },
               {
-                title: "Open Positions",
-                value: status_data[:open_positions].to_s,
+                title: "Day Trading Positions",
+                value: status_data[:day_trading_positions].to_s,
+                short: true
+              },
+              {
+                title: "Swing Trading Positions",
+                value: status_data[:swing_trading_positions].to_s,
+                short: true
+              },
+              {
+                title: "Total Positions",
+                value: status_data[:total_positions].to_s,
                 short: true
               },
               {
@@ -239,6 +251,63 @@ class SlackCommandHandler
       }
     end
 
+    def handle_detailed_status_command
+      # Get detailed status including margin and balance information
+      detailed_status = get_detailed_status
+
+      {
+        text: "📊 Detailed Bot Status",
+        response_type: "in_channel",
+        attachments: [
+          {
+            color: detailed_status[:healthy] ? "good" : "danger",
+            fields: [
+              {
+                title: "Day Trading Positions",
+                value: detailed_status[:positions][:day_trading].to_s,
+                short: true
+              },
+              {
+                title: "Swing Trading Positions",
+                value: detailed_status[:positions][:swing_trading].to_s,
+                short: true
+              },
+              {
+                title: "Total Positions",
+                value: detailed_status[:positions][:total].to_s,
+                short: true
+              },
+              {
+                title: "Margin Window",
+                value: detailed_status[:margin][:current_window] || "Unknown",
+                short: true
+              },
+              {
+                title: "Available Margin",
+                value: detailed_status[:margin][:available_margin] ? "$#{detailed_status[:margin][:available_margin]}" : "N/A",
+                short: true
+              },
+              {
+                title: "Liquidation Buffer",
+                value: detailed_status[:margin][:liquidation_buffer] ? "#{detailed_status[:margin][:liquidation_buffer]}%" : "N/A",
+                short: true
+              },
+              {
+                title: "Unrealized PnL",
+                value: detailed_status[:pnl][:unrealized] ? "$#{detailed_status[:pnl][:unrealized]}" : "N/A",
+                short: true
+              },
+              {
+                title: "Daily Realized PnL",
+                value: detailed_status[:pnl][:daily_realized] ? "$#{detailed_status[:pnl][:daily_realized]}" : "N/A",
+                short: true
+              }
+            ]
+          }
+        ]
+      }
+    end
+
     def handle_health_command
       health_data = get_health_status
 
@@ -361,6 +430,11 @@ class SlackCommandHandler
                 short: false
               },
               {
+                title: "/bot-detailed-status",
+                value: "Show detailed status with margin and balance information",
+                short: false
+              },
+              {
                 title: "/bot-pause",
                 value: "Pause trading (stop new signals and positions)",
                 short: false
@@ -372,7 +446,7 @@ class SlackCommandHandler
               },
               {
                 title: "/bot-positions [filter]",
-                value: "Show current positions. Optional filter: 'open', 'closed', symbol name",
+                value: "Show current positions. Filters: 'open', 'closed', 'day', 'swing', symbol name",
                 short: false
               },
               {
@@ -418,7 +492,10 @@ class SlackCommandHandler
     # Helper methods to interact with the bot's state and services
 
     def get_bot_status
-      positions = Position.open.day_trading.count
+      day_positions = Position.open.day_trading.count
+      swing_positions = Position.open.swing_trading.count
+      total_positions = Position.open.count
+
       daily_pnl = Position.where(entry_time: Date.current.beginning_of_day..Time.current).sum(:pnl)
       last_signal = GoodJob::Job.where(job_class: "GenerateSignalsJob",
         finished_at: Date.current.beginning_of_day..Time.current)
@@ -427,7 +504,10 @@ class SlackCommandHandler
 
       {
         trading_active: trading_active?,
-        open_positions: positions,
+        day_trading_positions: day_positions,
+        swing_trading_positions: swing_positions,
+        total_positions: total_positions,
+        open_positions: total_positions, # Keep for backward compatibility
         daily_pnl: daily_pnl,
         last_signal_time: last_signal&.finished_at&.strftime("%H:%M UTC"),
         health_status: overall_health_status,
@@ -438,6 +518,9 @@ class SlackCommandHandler
       Rails.logger.error("[SlackCommand] Error getting bot status: #{e.message}")
       {
         trading_active: false,
+        day_trading_positions: 0,
+        swing_trading_positions: 0,
+        total_positions: 0,
         open_positions: 0,
         healthy: false,
         health_status: "error"
@@ -452,6 +535,10 @@ class SlackCommandHandler
         positions.open
       when "closed"
         positions.closed
+      when "day", "day_trading", "day-trading"
+        positions.open.day_trading
+      when "swing", "swing_trading", "swing-trading"
+        positions.open.swing_trading
       when ""
         positions.open # Default to open positions
       else
@@ -540,6 +627,52 @@ class SlackCommandHandler
         background_jobs: false,
         websocket_connections: 0,
         memory_usage: "N/A"
+      }
+    end
+
+    def get_detailed_status
+      client = Coinbase::Client.new
+      balance_summary = client.futures_balance_summary
+      margin_window = client.margin_window
+
+      {
+        positions: {
+          day_trading: Position.open.day_trading.count,
+          swing_trading: Position.open.swing_trading.count,
+          total: Position.open.count
+        },
+        margin: {
+          current_window: margin_window["margin_window"]["margin_window_type"],
+          available_margin: balance_summary["balance_summary"]["available_margin"]["value"],
+          total_margin: balance_summary["balance_summary"]["initial_margin"]["value"],
+          liquidation_buffer: balance_summary["balance_summary"]["liquidation_buffer_percentage"]
+        },
+        pnl: {
+          unrealized: balance_summary["balance_summary"]["unrealized_pnl"]["value"],
+          daily_realized: balance_summary["balance_summary"]["daily_realized_pnl"]["value"]
+        },
+        healthy: true
+      }
+    rescue => e
+      Rails.logger.error("[SlackCommand] Error getting detailed status: #{e.message}")
+      {
+        positions: {
+          day_trading: Position.open.day_trading.count,
+          swing_trading: Position.open.swing_trading.count,
+          total: Position.open.count
+        },
+        margin: {
+          current_window: "Error",
+          available_margin: nil,
+          total_margin: nil,
+          liquidation_buffer: nil
+        },
+        pnl: {
+          unrealized: nil,
+          daily_realized: nil
+        },
+        healthy: false,
+        error: e.message
       }
     end
 

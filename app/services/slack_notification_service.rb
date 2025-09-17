@@ -73,6 +73,44 @@ class SlackNotificationService
       send_message(message, channel: alerts_channel)
     end
 
+    # Send position type-specific alerts
+    def position_type_alert(position_type, alert_type, message, details = nil)
+      return unless enabled?
+      return unless Rails.application.config.monitoring_config[:enable_position_type_alerts]
+
+      formatted_message = format_position_type_alert(position_type, alert_type, message, details)
+
+      # Route to appropriate channel based on position type
+      channel = case position_type.to_s.downcase
+      when "day_trading", "day"
+        day_trading_channel
+      when "swing_trading", "swing"
+        swing_trading_channel
+      else
+        positions_channel
+      end
+
+      send_message(formatted_message, channel: channel)
+    end
+
+    # Send portfolio exposure alert
+    def portfolio_exposure_alert(exposure_data)
+      return unless enabled?
+      return unless exposure_data.present? && exposure_data.is_a?(Hash)
+
+      message = format_portfolio_exposure_message(exposure_data)
+      send_message(message, channel: risk_alerts_channel)
+    end
+
+    # Send margin window transition notification
+    def margin_window_transition(window_data)
+      return unless enabled?
+      return unless window_data.present? && window_data.is_a?(Hash)
+
+      message = format_margin_window_message(window_data)
+      send_message(message, channel: margin_alerts_channel)
+    end
+
     private
 
     def enabled?
@@ -101,6 +139,22 @@ class SlackNotificationService
     def alerts_channel
       channel = ENV["SLACK_ALERTS_CHANNEL"]
       channel.present? ? channel : "#trading-alerts"
+    end
+
+    def day_trading_channel
+      Rails.application.config.monitoring_config[:slack_notifications][:day_trading_channel] || "#day-trading"
+    end
+
+    def swing_trading_channel
+      Rails.application.config.monitoring_config[:slack_notifications][:swing_trading_channel] || "#swing-trading"
+    end
+
+    def risk_alerts_channel
+      Rails.application.config.monitoring_config[:slack_notifications][:risk_alerts_channel] || "#risk-alerts"
+    end
+
+    def margin_alerts_channel
+      Rails.application.config.monitoring_config[:slack_notifications][:margin_alerts_channel] || "#margin-alerts"
     end
 
     def client
@@ -570,6 +624,171 @@ class SlackNotificationService
                 title: "Volume",
                 value: market_data[:volume] || "N/A",
                 short: true
+              },
+              {
+                title: "Timestamp",
+                value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                short: true
+              }
+            ]
+          }
+        ]
+      }
+    end
+
+    def format_position_type_alert(position_type, alert_type, message, details)
+      return {} unless position_type.present? && alert_type.present? && message.present?
+
+      emoji = case alert_type.to_s.downcase
+      when "closure", "close"
+        "🔴"
+      when "warning", "warn"
+        "⚠️"
+      when "info"
+        "ℹ️"
+      when "risk"
+        "🚨"
+      else
+        "📢"
+      end
+
+      color = case alert_type.to_s.downcase
+      when "closure", "risk"
+        "danger"
+      when "warning", "warn"
+        "warning"
+      else
+        "good"
+      end
+
+      position_type_display = position_type.to_s.humanize.titleize
+
+      fields = [
+        {
+          title: "Position Type",
+          value: position_type_display,
+          short: true
+        },
+        {
+          title: "Alert Type",
+          value: alert_type.to_s.humanize.titleize,
+          short: true
+        },
+        {
+          title: "Timestamp",
+          value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
+          short: true
+        }
+      ]
+
+      if details.present?
+        fields << {
+          title: "Details",
+          value: details.to_s,
+          short: false
+        }
+      end
+
+      {
+        text: "#{emoji} #{position_type_display} Alert: #{message}",
+        attachments: [
+          {
+            color: color,
+            fields: fields
+          }
+        ]
+      }
+    end
+
+    def format_portfolio_exposure_message(exposure_data)
+      return {} unless exposure_data.present? && exposure_data.is_a?(Hash)
+
+      total_exposure = exposure_data[:total_exposure] || 0
+      warnings = exposure_data[:warnings] || []
+
+      color = warnings.any? ? "warning" : "good"
+      emoji = warnings.any? ? "⚠️" : "📊"
+
+      {
+        text: "#{emoji} Portfolio Exposure Report",
+        attachments: [
+          {
+            color: color,
+            fields: [
+              {
+                title: "Day Trading Exposure",
+                value: "#{exposure_data[:day_trading_exposure]}%",
+                short: true
+              },
+              {
+                title: "Swing Trading Exposure",
+                value: "#{exposure_data[:swing_trading_exposure]}%",
+                short: true
+              },
+              {
+                title: "Total Exposure",
+                value: "#{total_exposure}%",
+                short: true
+              },
+              {
+                title: "Warnings",
+                value: warnings.any? ? warnings.join(", ") : "None",
+                short: false
+              },
+              {
+                title: "Timestamp",
+                value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                short: true
+              }
+            ]
+          }
+        ]
+      }
+    end
+
+    def format_margin_window_message(window_data)
+      return {} unless window_data.is_a?(Hash)
+
+      current_window = window_data[:current_window] || "Unknown"
+
+      emoji = case current_window.to_s.downcase
+      when /intraday/
+        "🟢"
+      when /overnight/
+        "🟡"
+      else
+        "📊"
+      end
+
+      color = case current_window.to_s.downcase
+      when /intraday/
+        "good"
+      when /overnight/
+        "warning"
+      else
+        "good"
+      end
+
+      {
+        text: "#{emoji} Margin Window Transition: #{current_window}",
+        attachments: [
+          {
+            color: color,
+            fields: [
+              {
+                title: "Current Window",
+                value: current_window.humanize,
+                short: true
+              },
+              {
+                title: "Window End Time",
+                value: window_data[:window_end_time] || "N/A",
+                short: true
+              },
+              {
+                title: "Next Transition",
+                value: window_data[:next_transition] || "N/A",
+                short: false
               },
               {
                 title: "Timestamp",

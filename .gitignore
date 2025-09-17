@@ -57,3 +57,6 @@ cdp_api_key.json
 .brakeman/
 .rspec_status
 coverage/
+
+# RSpec example status persistence file
+spec/examples.txt

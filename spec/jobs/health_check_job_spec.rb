@@ -413,15 +413,12 @@ RSpec.describe HealthCheckJob, type: :job do
   describe "#count_open_positions" do
     context "when positions can be counted" do
       before do
-        allow(Position).to receive(:open).and_return(
-          double(
-            day_trading: double(count: 3),
-            count: 5
-          )
-        )
-        allow(Position).to receive(:swing_trading).and_return(
-          double(open: double(count: 2))
-        )
+        # Mock the Position.open scope chain
+        open_scope = double("open_scope")
+        allow(Position).to receive(:open).and_return(open_scope)
+        allow(open_scope).to receive(:count).and_return(5)
+        allow(open_scope).to receive(:day_trading).and_return(double(count: 3))
+        allow(open_scope).to receive(:swing_trading).and_return(double(count: 2))
       end
 
       it "returns the count of open positions" do

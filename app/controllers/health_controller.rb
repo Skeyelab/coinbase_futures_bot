@@ -71,6 +71,21 @@ class HealthController < ApplicationController
       nil
     end
 
+    # Get position breakdown
+    positions_data = begin
+      {
+        day_trading: Position.open.day_trading.count,
+        swing_trading: Position.open.swing_trading.count,
+        total: Position.open.count
+      }
+    rescue => e
+      Rails.logger.warn("Failed to get position counts: #{e.message}")
+      {day_trading: 0, swing_trading: 0, total: 0}
+    end
+
+    # Get cached health check data if available
+    cached_health = Rails.cache.read("last_health_check")
+
     health_data = {
       status: connection_ok ? "healthy" : "unhealthy",
       timestamp: Time.current.utc.iso8601,
@@ -78,9 +93,16 @@ class HealthController < ApplicationController
         connection_ok: connection_ok,
         pool: pool_stats
       },
+      positions: positions_data,
       good_job: good_job_stats,
-      environment: Rails.env
+      environment: Rails.env,
+      last_health_check: cached_health ? cached_health[:timestamp] : nil
     }
+
+    # Include detailed health data if available from cache
+    if cached_health && cached_health[:data]
+      health_data[:detailed_health] = cached_health[:data]
+    end
 
     if connection_ok
       render json: health_data, status: :ok
