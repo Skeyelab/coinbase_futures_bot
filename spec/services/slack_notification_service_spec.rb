@@ -16,6 +16,9 @@ RSpec.describe SlackNotificationService, type: :service do
 
     # Mock all ENV variables that might be accessed
     allow(ENV).to receive(:[]).and_call_original
+
+    # Mock sleep calls globally to avoid actual delays in tests
+    allow(described_class).to receive(:sleep).and_return(true)
   end
 
   after do
@@ -646,6 +649,8 @@ RSpec.describe SlackNotificationService, type: :service do
       end
       it "logs the error" do
         allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+        # Mock sleep to avoid actual delays in tests
+        allow(described_class).to receive(:sleep).and_return(true)
 
         expect(Rails.logger).to receive(:error).with("[Slack] API Error: API Error")
         described_class.send(:send_message, message, channel: channel)
@@ -653,6 +658,8 @@ RSpec.describe SlackNotificationService, type: :service do
 
       it "sends error to Sentry" do
         allow_any_instance_of(Slack::Web::Client).to receive(:chat_postMessage).and_raise(slack_error)
+        # Mock sleep to avoid actual delays in tests
+        allow(described_class).to receive(:sleep).and_return(true)
 
         expect(Sentry).to receive(:with_scope)
         described_class.send(:send_message, message, channel: channel)
