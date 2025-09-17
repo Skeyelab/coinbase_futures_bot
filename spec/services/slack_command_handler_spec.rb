@@ -257,7 +257,10 @@ RSpec.describe SlackCommandHandler, type: :service do
     before do
       allow(described_class).to receive(:get_bot_status).and_return({
         trading_active: true,
-        open_positions: 2,
+        day_trading_positions: 1,
+        swing_trading_positions: 1,
+        total_positions: 2,
+        open_positions: 2, # Keep for backward compatibility
         daily_pnl: 150.0,
         last_signal_time: "14:30 UTC",
         health_status: "healthy",
@@ -276,7 +279,9 @@ RSpec.describe SlackCommandHandler, type: :service do
       fields = result[:attachments].first[:fields]
       expect(fields).to include(
         {title: "Trading Status", value: "🟢 Active", short: true},
-        {title: "Open Positions", value: "2", short: true},
+        {title: "Day Trading Positions", value: "1", short: true},
+        {title: "Swing Trading Positions", value: "1", short: true},
+        {title: "Total Positions", value: "2", short: true},
         {title: "Daily PnL", value: "$150.0", short: true}
       )
     end
@@ -592,7 +597,7 @@ RSpec.describe SlackCommandHandler, type: :service do
       expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
-      expect(fields.size).to eq(8) # 8 commands
+      expect(fields.size).to eq(9) # 9 commands
 
       # Check that key commands are included
       command_titles = fields.map { |f| f[:title] }

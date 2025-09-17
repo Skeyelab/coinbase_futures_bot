@@ -155,7 +155,7 @@ RSpec.describe Api::PositionsController, type: :controller do
           "max_swing_trading" => 20.0
         },
         "warnings" => a_kind_of(Array),
-        "healthy" => a_boolean
+        "healthy" => be_in([true, false])
       )
     end
 
@@ -174,7 +174,7 @@ RSpec.describe Api::PositionsController, type: :controller do
   end
 
   describe "position serialization" do
-    let(:position) { create(:position, day_trading: true, pnl: 100.50, take_profit: 55000, stop_loss: 45000) }
+    let!(:position) { create(:position, day_trading: true, pnl: 100.50, take_profit: 55000, stop_loss: 45000) }
 
     it "includes all required fields" do
       get :index
