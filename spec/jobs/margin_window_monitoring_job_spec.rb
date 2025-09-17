@@ -100,7 +100,10 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
 
         before do
           allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
-          allow(swing_manager).to receive(:check_swing_risk_limits).and_return({risk_status: "acceptable"})
+          allow(swing_manager).to receive(:check_swing_risk_limits).and_return({
+            risk_status: "violations_detected",
+            violations: [{message: "1 swing positions exceed margin requirements"}]
+          })
         end
 
         it "handles overnight margin window correctly" do
@@ -186,6 +189,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
           }
         }
       end
+      let(:swing_manager) { instance_double(Trading::SwingPositionManager) }
 
       before do
         allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
@@ -194,6 +198,11 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
         allow(Position).to receive_message_chain(:swing_trading, :open, :where, :includes).and_return([position])
         allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([position])
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", "0.2").and_return("0.2")
+        allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
+        allow(swing_manager).to receive(:check_swing_risk_limits).and_return({
+          risk_status: "violations_detected",
+          violations: [{message: "1 swing positions exceed margin requirements"}]
+        })
         allow(SlackNotificationService).to receive(:alert)
         sentry_scope = double("sentry_scope")
         allow(sentry_scope).to receive(:set_tag)
@@ -209,8 +218,8 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
         described_class.perform_now
 
         expect(SlackNotificationService).to have_received(:alert).with(
-          "critical",
-          "Swing Position Margin Violations",
+          "warning",
+          "Overnight Margin Compliance Issues",
           match(/1 swing positions exceed margin requirements/)
         )
       end
