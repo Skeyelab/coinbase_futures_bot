@@ -4,6 +4,7 @@ require "rails_helper"
 
 RSpec.describe SwingRiskMonitoringJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
+
   let(:manager) { instance_double(Trading::SwingPositionManager) }
   let(:logger) { instance_double(Logger) }
 

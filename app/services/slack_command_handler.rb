@@ -150,7 +150,7 @@ class SlackCommandHandler
 
       if positions.empty?
         return {
-          text: "📊 No positions found#{filter.present? ? " for filter: #{filter}" : ""}",
+          text: "📊 No positions found#{" for filter: #{filter}" if filter.present?}",
           response_type: "ephemeral"
         }
       end
@@ -717,7 +717,7 @@ class SlackCommandHandler
       # For now, we'll use Rails cache
       Rails.cache.write("trading_active", active)
       Rails.cache.write("emergency_stop", emergency) if emergency
-      Rails.logger.info("[SlackCommand] Trading status set to: #{active ? "active" : "inactive"}#{emergency ? " (EMERGENCY)" : ""}")
+      Rails.logger.info("[SlackCommand] Trading status set to: #{active ? "active" : "inactive"}#{" (EMERGENCY)" if emergency}")
     end
 
     def trading_active?

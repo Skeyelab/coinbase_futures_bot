@@ -2,6 +2,7 @@
 
 class Position < ApplicationRecord
   include SentryTrackable
+
   # Validations
   validates :product_id, presence: true
   validates :side, presence: true, inclusion: {in: %w[LONG SHORT]}

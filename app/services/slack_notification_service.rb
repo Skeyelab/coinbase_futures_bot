@@ -2,6 +2,7 @@
 
 class SlackNotificationService
   include SentryServiceTracking
+
   class << self
     # Send a trading signal notification
     def signal_generated(signal_data)
