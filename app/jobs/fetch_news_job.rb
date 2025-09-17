@@ -1,13 +1,17 @@
 # frozen_string_literal: true
 
-class FetchCryptopanicJob < ApplicationJob
+# New multi-source news fetching job
+class FetchNewsJob < ApplicationJob
   queue_as :default
 
-  def perform(max_pages: 2)
-    client = Sentiment::CryptoPanicClient.new
-    return unless client.enabled?
+  def perform(max_pages: 2, sources: :all)
+    aggregator = Sentiment::MultiSourceAggregator.new
 
-    events = client.fetch_recent(max_pages: max_pages)
+    # For now, always fetch from all sources
+    # Future: could support fetching from specific sources only
+    events = aggregator.fetch_all_sources(max_pages: max_pages)
+
+    # Store all events in database
     events.each do |attrs|
       SentimentEvent.upsert({
         source: attrs[:source],
@@ -21,5 +25,7 @@ class FetchCryptopanicJob < ApplicationJob
         updated_at: Time.now.utc
       }, unique_by: :index_sentiment_events_on_source_and_raw_text_hash)
     end
+
+    Rails.logger.info("FetchNewsJob: Stored #{events.size} events from multiple sources")
   end
 end

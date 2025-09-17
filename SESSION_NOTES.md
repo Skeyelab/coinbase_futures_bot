@@ -69,6 +69,29 @@
   - Ready for production deployment of enhanced monitoring system
 
 ### Session log
+#### 2025-01-18 21:30 UTC
+- Context: **FIXED** - Resolved Slack notification errors and Coinbase API endpoint issues
+- Changes:
+  - **MAJOR**: Fixed SlackNotificationService channel resolution - empty string env vars now properly fallback to defaults
+  - **MAJOR**: Fixed Slack API blocks format error - removed conflicting blocks parameter from chat_postMessage
+  - **MAJOR**: Fixed MarginWindowMonitoringJob endpoint - changed from `/intraday_margin_setting` to `/intraday/current_margin_window`
+  - **RESOLVED**: Sentry issue FUTURES_BOT-3Y (404 error fixed, now shows 403 permissions issue)
+- Commands run:
+  - `rails runner "SlackNotificationService.alert('info', 'Test message', 'This is a test')"`
+  - `rails runner "MarginWindowMonitoringJob.perform_now"`
+  - `bin/standardrb --fix app/services/slack_notification_service.rb app/jobs/margin_window_monitoring_job.rb`
+- Files touched:
+  - `app/services/slack_notification_service.rb` - Fixed channel resolution and blocks format
+  - `app/jobs/margin_window_monitoring_job.rb` - Fixed API endpoint and used AdvancedTradeClient
+- Issues resolved:
+  - ✅ Slack::Web::Api::Errors::ChannelNotFound - channels now resolve correctly
+  - ✅ Slack::Web::Api::Errors::InvalidBlocksFormat - removed conflicting blocks parameter
+  - ✅ Faraday::ResourceNotFound 404 - endpoint URL corrected
+- Remaining issues:
+  - ⚠️ CFM API permissions (403 Forbidden) - API key needs futures trading permissions
+- Next steps:
+  - Address CFM permissions issue or disable margin monitoring until futures access is available
+  - Commit these fixes to resolve the immediate Sentry errors
 
 #### 2025-01-18 21:15 UTC
 - Context: Ruby installation issue resolved - OpenSSL compatibility problem with Ruby 3.2.2/3.2.4 compilation

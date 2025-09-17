@@ -7,14 +7,14 @@ require "digest"
 require "time"
 
 module Sentiment
-  class CryptoPanicClient
+  class CryptoPanicClient < BaseNewsClient
     include SentryServiceTracking
 
     API_BASE = "https://cryptopanic.com/api/developer/v2"
 
     def initialize(token: ENV["CRYPTOPANIC_TOKEN"], base_url: ENV["CRYPTOPANIC_BASE_URL"], logger: Rails.logger)
+      super(logger: logger)
       @token = token
-      @logger = logger
       @base_url = base_url.presence || API_BASE
     end
 
@@ -36,6 +36,7 @@ module Sentiment
       while page <= max_pages
         params = {auth_token: @token, page: page}
         params[:public] = true if public_only
+        # Try to get the most recent posts by removing any filters that might limit results
 
         @logger.debug("CryptoPanic: Requesting page #{page} with params: #{params.except(:auth_token).merge(auth_token: "[REDACTED]")}")
 
@@ -75,13 +76,21 @@ module Sentiment
           results.concat(normalized) if normalized.any?
         end
 
+        # Debug: Show the published dates of articles on this page
+        page_dates = Array(body["results"]).filter_map do |item|
+          Time.parse(item["published_at"])
+        rescue
+          nil
+        end
         @logger.debug("CryptoPanic: Page #{page} returned #{Array(body["results"]).size} items")
+        @logger.debug("CryptoPanic: Page #{page} date range: #{page_dates.min} to #{page_dates.max}") if page_dates.any?
         break unless body["next"]
 
         page += 1
       end
 
-      @logger.info("CryptoPanic: Successfully fetched #{results.size} events from #{page - 1} pages")
+      pages_fetched = page - 1
+      @logger.info("CryptoPanic: Successfully fetched #{results.size} events from #{pages_fetched} pages")
 
       # Track successful sentiment data fetching
       SentryHelper.add_breadcrumb(
@@ -149,6 +158,10 @@ module Sentiment
       end
 
       []
+    end
+
+    def source_name
+      "cryptopanic"
     end
 
     private
