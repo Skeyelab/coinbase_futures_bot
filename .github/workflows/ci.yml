@@ -13,6 +13,7 @@ env:
 
 jobs:
   standardrb:
+    name: Run StandardRB (lint)
     runs-on: ubuntu-latest
     permissions:
       checks: write
@@ -22,7 +23,7 @@ jobs:
       uses: standardrb/standard-ruby-action@v1
 
   lint:
-    name: StandardRB (lint)
+    name: Check StandardRB (lint)
     needs: [standardrb]
     runs-on: ubuntu-latest
     steps:
