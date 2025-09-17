@@ -79,17 +79,17 @@ class SlackNotificationService
       return unless Rails.application.config.monitoring_config[:enable_position_type_alerts]
 
       formatted_message = format_position_type_alert(position_type, alert_type, message, details)
-      
+
       # Route to appropriate channel based on position type
       channel = case position_type.to_s.downcase
-      when 'day_trading', 'day'
+      when "day_trading", "day"
         day_trading_channel
-      when 'swing_trading', 'swing'
+      when "swing_trading", "swing"
         swing_trading_channel
       else
         positions_channel
       end
-      
+
       send_message(formatted_message, channel: channel)
     end
 
@@ -637,22 +637,22 @@ class SlackNotificationService
       return {} unless position_type.present? && alert_type.present? && message.present?
 
       emoji = case alert_type.to_s.downcase
-      when 'closure', 'close'
+      when "closure", "close"
         "🔴"
-      when 'warning', 'warn'
+      when "warning", "warn"
         "⚠️"
-      when 'info'
+      when "info"
         "ℹ️"
-      when 'risk'
+      when "risk"
         "🚨"
       else
         "📢"
       end
 
       color = case alert_type.to_s.downcase
-      when 'closure', 'risk'
+      when "closure", "risk"
         "danger"
-      when 'warning', 'warn'
+      when "warning", "warn"
         "warning"
       else
         "good"
@@ -747,7 +747,7 @@ class SlackNotificationService
       return {} unless window_data.present? && window_data.is_a?(Hash)
 
       current_window = window_data[:current_window] || "Unknown"
-      
+
       emoji = case current_window.to_s.downcase
       when /intraday/
         "🟢"

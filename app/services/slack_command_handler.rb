@@ -495,7 +495,7 @@ class SlackCommandHandler
       day_positions = Position.open.day_trading.count
       swing_positions = Position.open.swing_trading.count
       total_positions = Position.open.count
-      
+
       daily_pnl = Position.where(entry_time: Date.current.beginning_of_day..Time.current).sum(:pnl)
       last_signal = GoodJob::Job.where(job_class: "GenerateSignalsJob",
         finished_at: Date.current.beginning_of_day..Time.current)
@@ -631,51 +631,49 @@ class SlackCommandHandler
     end
 
     def get_detailed_status
-      begin
-        client = Coinbase::Client.new
-        balance_summary = client.futures_balance_summary
-        margin_window = client.margin_window
-        
-        {
-          positions: {
-            day_trading: Position.open.day_trading.count,
-            swing_trading: Position.open.swing_trading.count,
-            total: Position.open.count
-          },
-          margin: {
-            current_window: margin_window['margin_window']['margin_window_type'],
-            available_margin: balance_summary['balance_summary']['available_margin']['value'],
-            total_margin: balance_summary['balance_summary']['initial_margin']['value'],
-            liquidation_buffer: balance_summary['balance_summary']['liquidation_buffer_percentage']
-          },
-          pnl: {
-            unrealized: balance_summary['balance_summary']['unrealized_pnl']['value'],
-            daily_realized: balance_summary['balance_summary']['daily_realized_pnl']['value']
-          },
-          healthy: true
-        }
-      rescue => e
-        Rails.logger.error("[SlackCommand] Error getting detailed status: #{e.message}")
-        {
-          positions: {
-            day_trading: Position.open.day_trading.count,
-            swing_trading: Position.open.swing_trading.count,
-            total: Position.open.count
-          },
-          margin: {
-            current_window: "Error",
-            available_margin: nil,
-            total_margin: nil,
-            liquidation_buffer: nil
-          },
-          pnl: {
-            unrealized: nil,
-            daily_realized: nil
-          },
-          healthy: false,
-          error: e.message
-        }
-      end
+      client = Coinbase::Client.new
+      balance_summary = client.futures_balance_summary
+      margin_window = client.margin_window
+
+      {
+        positions: {
+          day_trading: Position.open.day_trading.count,
+          swing_trading: Position.open.swing_trading.count,
+          total: Position.open.count
+        },
+        margin: {
+          current_window: margin_window["margin_window"]["margin_window_type"],
+          available_margin: balance_summary["balance_summary"]["available_margin"]["value"],
+          total_margin: balance_summary["balance_summary"]["initial_margin"]["value"],
+          liquidation_buffer: balance_summary["balance_summary"]["liquidation_buffer_percentage"]
+        },
+        pnl: {
+          unrealized: balance_summary["balance_summary"]["unrealized_pnl"]["value"],
+          daily_realized: balance_summary["balance_summary"]["daily_realized_pnl"]["value"]
+        },
+        healthy: true
+      }
+    rescue => e
+      Rails.logger.error("[SlackCommand] Error getting detailed status: #{e.message}")
+      {
+        positions: {
+          day_trading: Position.open.day_trading.count,
+          swing_trading: Position.open.swing_trading.count,
+          total: Position.open.count
+        },
+        margin: {
+          current_window: "Error",
+          available_margin: nil,
+          total_margin: nil,
+          liquidation_buffer: nil
+        },
+        pnl: {
+          unrealized: nil,
+          daily_realized: nil
+        },
+        healthy: false,
+        error: e.message
+      }
     end
 
     def execute_emergency_stop

@@ -257,7 +257,7 @@ class HealthCheckJob < ApplicationJob
 
   def check_day_trading_positions_health
     day_positions = Position.open.day_trading
-    
+
     {
       total_positions: day_positions.count,
       positions_approaching_closure: day_positions.where("entry_time < ?", 23.hours.ago).count,
@@ -274,8 +274,8 @@ class HealthCheckJob < ApplicationJob
   def check_margin_health
     client = Coinbase::Client.new
     balance_summary = client.futures_balance_summary
-    balance = balance_summary['balance_summary']
-    
+    balance = balance_summary["balance_summary"]
+
     # Separate margin monitoring for position types
     {
       day_trading: {
@@ -287,13 +287,13 @@ class HealthCheckJob < ApplicationJob
         exposure: calculate_swing_trading_exposure,
         margin_used: calculate_swing_trading_margin(balance),
         leverage: calculate_swing_trading_leverage(balance),
-        overnight_margin: balance['overnight_margin_window_measure']
+        overnight_margin: balance["overnight_margin_window_measure"]
       },
       overall: {
-        total_margin: balance['initial_margin']['value'],
-        available_margin: balance['available_margin']['value'],
-        liquidation_buffer: balance['liquidation_buffer_percentage'],
-        unrealized_pnl: balance['unrealized_pnl']['value']
+        total_margin: balance["initial_margin"]["value"],
+        available_margin: balance["available_margin"]["value"],
+        liquidation_buffer: balance["liquidation_buffer_percentage"],
+        unrealized_pnl: balance["unrealized_pnl"]["value"]
       }
     }
   rescue => e
@@ -304,12 +304,12 @@ class HealthCheckJob < ApplicationJob
   def check_margin_window_status
     client = Coinbase::Client.new
     margin_window = client.margin_window
-    
+
     {
-      current_window: margin_window['margin_window']['margin_window_type'],
-      window_end_time: margin_window['margin_window']['end_time'],
-      intraday_killswitch: margin_window['is_intraday_margin_killswitch_enabled'],
-      enrollment_killswitch: margin_window['is_intraday_margin_enrollment_killswitch_enabled'],
+      current_window: margin_window["margin_window"]["margin_window_type"],
+      window_end_time: margin_window["margin_window"]["end_time"],
+      intraday_killswitch: margin_window["is_intraday_margin_killswitch_enabled"],
+      enrollment_killswitch: margin_window["is_intraday_margin_enrollment_killswitch_enabled"],
       next_transition: calculate_next_margin_transition(margin_window)
     }
   rescue => e
@@ -321,20 +321,20 @@ class HealthCheckJob < ApplicationJob
     day_exposure = calculate_day_trading_exposure
     swing_exposure = calculate_swing_trading_exposure
     total_exposure = day_exposure + swing_exposure
-    
+
     max_day_exposure = Rails.application.config.monitoring_config[:max_day_trading_exposure]
     max_swing_exposure = Rails.application.config.monitoring_config[:max_swing_trading_exposure]
-    
+
     warnings = []
-    
+
     if day_exposure > max_day_exposure
       warnings << "Day trading exposure: #{day_exposure.round(2)}% (max: #{max_day_exposure}%)"
     end
-    
+
     if swing_exposure > max_swing_exposure
       warnings << "Swing trading exposure: #{swing_exposure.round(2)}% (max: #{max_swing_exposure}%)"
     end
-    
+
     {
       day_trading_exposure: day_exposure.round(2),
       swing_trading_exposure: swing_exposure.round(2),
@@ -352,22 +352,22 @@ class HealthCheckJob < ApplicationJob
   def calculate_day_trading_exposure
     day_positions = Position.open.day_trading
     return 0.0 if day_positions.empty?
-    
+
     total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
     # Assume total portfolio value for now - this should be replaced with actual account balance
     total_portfolio_value = 100_000.0 # This should come from Coinbase balance
-    
+
     (total_notional / total_portfolio_value * 100).to_f
   end
 
   def calculate_swing_trading_exposure
     swing_positions = Position.open.swing_trading
     return 0.0 if swing_positions.empty?
-    
+
     total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
     # Assume total portfolio value for now - this should be replaced with actual account balance
     total_portfolio_value = 100_000.0 # This should come from Coinbase balance
-    
+
     (total_notional / total_portfolio_value * 100).to_f
   end
 
@@ -375,7 +375,7 @@ class HealthCheckJob < ApplicationJob
     # Calculate margin used specifically for day trading positions
     day_positions = Position.open.day_trading
     return 0.0 if day_positions.empty?
-    
+
     # This is a simplified calculation - in reality this would need to be calculated
     # based on the specific margin requirements for each position
     total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
@@ -386,7 +386,7 @@ class HealthCheckJob < ApplicationJob
     # Calculate margin used specifically for swing trading positions
     swing_positions = Position.open.swing_trading
     return 0.0 if swing_positions.empty?
-    
+
     # Use overnight margin requirements for swing positions
     total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
     total_notional * 0.2 # Assume 20% margin requirement for swing trading (overnight)
@@ -396,7 +396,7 @@ class HealthCheckJob < ApplicationJob
     day_positions = Position.open.day_trading
     total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
     margin_used = calculate_day_trading_margin(balance)
-    
+
     return 0.0 if margin_used.zero?
     total_notional / margin_used
   end
@@ -405,26 +405,26 @@ class HealthCheckJob < ApplicationJob
     swing_positions = Position.open.swing_trading
     total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
     margin_used = calculate_swing_trading_margin(balance)
-    
+
     return 0.0 if margin_used.zero?
     total_notional / margin_used
   end
 
   def calculate_average_duration(positions)
     return 0.0 if positions.empty?
-    
+
     total_duration = positions.sum { |pos| (Time.current - pos.entry_time) / 1.hour }
     total_duration / positions.count
   end
 
   def calculate_next_margin_transition(margin_window)
-    current_window = margin_window['margin_window']['margin_window_type']
-    end_time = Time.parse(margin_window['margin_window']['end_time'])
-    
-    if current_window == 'INTRADAY_MARGIN'
-      "Switches to overnight margin at #{end_time.strftime('%H:%M UTC')}"
+    current_window = margin_window["margin_window"]["margin_window_type"]
+    end_time = Time.parse(margin_window["margin_window"]["end_time"])
+
+    if current_window == "INTRADAY_MARGIN"
+      "Switches to overnight margin at #{end_time.strftime("%H:%M UTC")}"
     else
-      "Switches to intraday margin at #{end_time.strftime('%H:%M UTC')}"
+      "Switches to intraday margin at #{end_time.strftime("%H:%M UTC")}"
     end
   rescue
     "Unable to calculate next transition"

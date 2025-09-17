@@ -6,22 +6,22 @@ class Api::PositionsController < ApplicationController
   # GET /api/positions?type=swing_trading
   def index
     positions = case params[:type]
-    when 'day_trading'
+    when "day_trading"
       Position.open.day_trading
-    when 'swing_trading'
+    when "swing_trading"
       Position.open.swing_trading
     else
       Position.open
     end
-    
+
     # Apply additional filters
     positions = positions.by_product(params[:product_id]) if params[:product_id].present?
     positions = positions.by_side(params[:side]) if params[:side].present?
-    
+
     # Order and paginate
     positions = positions.order(entry_time: :desc)
     positions = positions.limit(params[:limit].to_i) if params[:limit].present?
-    
+
     # Add Sentry breadcrumb for API access
     SentryHelper.add_breadcrumb(
       message: "API positions request",
@@ -34,7 +34,7 @@ class Api::PositionsController < ApplicationController
         position_count: positions.count
       }
     )
-    
+
     render json: {
       positions: positions.map(&method(:serialize_position)),
       summary: {
@@ -46,7 +46,7 @@ class Api::PositionsController < ApplicationController
     }
   rescue => e
     Rails.logger.error("[API::PositionsController] Error retrieving positions: #{e.message}")
-    
+
     # Track API errors
     Sentry.with_scope do |scope|
       scope.set_tag("controller", "api/positions")
@@ -56,26 +56,26 @@ class Api::PositionsController < ApplicationController
         product_id: params[:product_id],
         side: params[:side]
       })
-      
+
       Sentry.capture_exception(e)
     end
-    
+
     render json: {
       error: "Failed to retrieve positions",
       message: e.message,
       timestamp: Time.current.utc.iso8601
     }, status: :internal_server_error
   end
-  
+
   # GET /api/positions/summary
   def summary
     day_positions = Position.open.day_trading
     swing_positions = Position.open.swing_trading
-    
+
     # Calculate exposures and metrics
     day_exposure = calculate_exposure(day_positions)
     swing_exposure = calculate_exposure(swing_positions)
-    
+
     summary_data = {
       day_trading: {
         count: day_positions.count,
@@ -99,7 +99,7 @@ class Api::PositionsController < ApplicationController
       },
       timestamp: Time.current.utc.iso8601
     }
-    
+
     render json: summary_data
   rescue => e
     Rails.logger.error("[API::PositionsController] Error generating summary: #{e.message}")
@@ -109,21 +109,21 @@ class Api::PositionsController < ApplicationController
       timestamp: Time.current.utc.iso8601
     }, status: :internal_server_error
   end
-  
+
   # GET /api/positions/exposure
   def exposure
     day_exposure = calculate_exposure(Position.open.day_trading)
     swing_exposure = calculate_exposure(Position.open.swing_trading)
     total_exposure = day_exposure + swing_exposure
-    
+
     config = Rails.application.config.monitoring_config
     max_day_exposure = config[:max_day_trading_exposure] * 100 # Convert to percentage
     max_swing_exposure = config[:max_swing_trading_exposure] * 100
-    
+
     warnings = []
     warnings << "Day trading exposure exceeds limit" if day_exposure > max_day_exposure
     warnings << "Swing trading exposure exceeds limit" if swing_exposure > max_swing_exposure
-    
+
     render json: {
       day_trading_exposure: day_exposure.round(2),
       swing_trading_exposure: swing_exposure.round(2),
@@ -144,9 +144,9 @@ class Api::PositionsController < ApplicationController
       timestamp: Time.current.utc.iso8601
     }, status: :internal_server_error
   end
-  
+
   private
-  
+
   def serialize_position(position)
     {
       id: position.id,
@@ -167,20 +167,20 @@ class Api::PositionsController < ApplicationController
       updated_at: position.updated_at.utc.iso8601
     }
   end
-  
+
   def calculate_exposure(positions)
     return 0.0 if positions.empty?
-    
+
     total_notional = positions.sum { |pos| pos.size * pos.entry_price }
     # This should be replaced with actual account balance from Coinbase
     total_portfolio_value = 100_000.0
-    
+
     (total_notional / total_portfolio_value * 100).to_f
   end
-  
+
   def calculate_average_duration(positions)
     return 0.0 if positions.empty?
-    
+
     total_duration = positions.sum { |pos| (Time.current - pos.entry_time) / 1.hour }
     total_duration / positions.count
   end

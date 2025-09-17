@@ -85,7 +85,7 @@ class HealthController < ApplicationController
 
     # Get cached health check data if available
     cached_health = Rails.cache.read("last_health_check")
-    
+
     health_data = {
       status: connection_ok ? "healthy" : "unhealthy",
       timestamp: Time.current.utc.iso8601,
@@ -98,7 +98,7 @@ class HealthController < ApplicationController
       environment: Rails.env,
       last_health_check: cached_health ? cached_health[:timestamp] : nil
     }
-    
+
     # Include detailed health data if available from cache
     if cached_health && cached_health[:data]
       health_data[:detailed_health] = cached_health[:data]

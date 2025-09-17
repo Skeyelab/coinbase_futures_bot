@@ -56,7 +56,7 @@ Rails.application.routes.draw do
   end
 
   get "/sentiment/aggregates", to: "sentiment#aggregates"
-  
+
   # API routes
   namespace :api do
     resources :positions, only: [:index] do
@@ -66,6 +66,6 @@ Rails.application.routes.draw do
       end
     end
   end
-  
+
   root to: "positions#index"
 end

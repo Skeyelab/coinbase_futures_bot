@@ -13,10 +13,10 @@ namespace :positions do
     if day_positions.any?
       puts "  - Approaching closure (>23h): #{day_positions.where("entry_time < ?", 23.hours.ago).count}"
       puts "  - Needing closure (>24h): #{day_positions.where("entry_time < ?", 24.hours.ago).count}"
-      
+
       avg_duration = day_positions.average("EXTRACT(EPOCH FROM (NOW() - entry_time)) / 3600")
       puts "  - Average duration: #{avg_duration&.round(2)} hours"
-      
+
       total_exposure = calculate_exposure(day_positions)
       puts "  - Total exposure: #{total_exposure.round(2)}%"
     end
@@ -28,10 +28,10 @@ namespace :positions do
     if swing_positions.any?
       puts "  - Approaching expiry (>13 days): #{swing_positions.where("entry_time < ?", 13.days.ago).count}"
       puts "  - Exceeding max hold (>14 days): #{swing_positions.where("entry_time < ?", 14.days.ago).count}"
-      
+
       avg_duration = swing_positions.average("EXTRACT(EPOCH FROM (NOW() - entry_time)) / 86400")
       puts "  - Average duration: #{avg_duration&.round(2)} days"
-      
+
       total_exposure = calculate_exposure(swing_positions)
       puts "  - Total exposure: #{total_exposure.round(2)}%"
     end
@@ -40,13 +40,13 @@ namespace :positions do
     # Overall statistics
     total_positions = Position.open.count
     puts "Total Open Positions: #{total_positions}"
-    
+
     daily_pnl = Position.where(entry_time: Date.current.beginning_of_day..Time.current).sum(:pnl)
     puts "Daily PnL: $#{daily_pnl&.round(2)}"
-    
+
     unrealized_pnl = Position.open.sum(:pnl) || 0
     puts "Unrealized PnL: $#{unrealized_pnl.round(2)}"
-    
+
     puts "=== End Report ==="
   end
 
@@ -78,10 +78,10 @@ namespace :positions do
       # Exposure analysis
       total_exposure = calculate_exposure(day_positions)
       max_exposure = Rails.application.config.monitoring_config[:max_day_trading_exposure] * 100
-      
+
       puts "Total exposure: #{total_exposure.round(2)}%"
       puts "Max allowed: #{max_exposure}%"
-      
+
       if total_exposure > max_exposure
         puts "⚠️  WARNING: Day trading exposure exceeds limit!"
       end
@@ -89,7 +89,7 @@ namespace :positions do
       # Performance analysis
       day_pnl = day_positions.sum(:pnl) || 0
       puts "Day trading unrealized PnL: $#{day_pnl.round(2)}"
-      
+
       avg_duration = day_positions.average("EXTRACT(EPOCH FROM (NOW() - entry_time)) / 3600")
       puts "Average position duration: #{avg_duration&.round(2)} hours"
 
@@ -133,10 +133,10 @@ namespace :positions do
       # Exposure analysis
       total_exposure = calculate_exposure(swing_positions)
       max_exposure = Rails.application.config.monitoring_config[:max_swing_trading_exposure] * 100
-      
+
       puts "Total exposure: #{total_exposure.round(2)}%"
       puts "Max allowed: #{max_exposure}%"
-      
+
       if total_exposure > max_exposure
         puts "⚠️  WARNING: Swing trading exposure exceeds limit!"
       end
@@ -144,7 +144,7 @@ namespace :positions do
       # Performance analysis
       swing_pnl = swing_positions.sum(:pnl) || 0
       puts "Swing trading unrealized PnL: $#{swing_pnl.round(2)}"
-      
+
       avg_duration = swing_positions.average("EXTRACT(EPOCH FROM (NOW() - entry_time)) / 86400")
       puts "Average position duration: #{avg_duration&.round(2)} days"
 
@@ -158,7 +158,7 @@ namespace :positions do
       puts "\nRisk Analysis:"
       high_duration = swing_positions.where("entry_time < ?", 10.days.ago).count
       puts "  Positions >10 days old: #{high_duration}"
-      
+
       if swing_positions.joins("LEFT JOIN trading_pairs ON positions.product_id = trading_pairs.product_id").where("trading_pairs.expires_at < ?", 7.days.from_now).exists?
         expiring_contracts = swing_positions.joins("LEFT JOIN trading_pairs ON positions.product_id = trading_pairs.product_id").where("trading_pairs.expires_at < ?", 7.days.from_now).count
         puts "  Positions with contracts expiring <7 days: #{expiring_contracts}"
@@ -208,13 +208,13 @@ namespace :positions do
     begin
       client = Coinbase::Client.new
       balance_summary = client.futures_balance_summary
-      balance = balance_summary['balance_summary']
-      
+      balance = balance_summary["balance_summary"]
+
       puts "Margin Information:"
-      puts "  Available margin: $#{balance['available_margin']['value']}"
-      puts "  Total margin: $#{balance['initial_margin']['value']}"
-      puts "  Liquidation buffer: #{balance['liquidation_buffer_percentage']}%"
-      puts "  Unrealized PnL: $#{balance['unrealized_pnl']['value']}"
+      puts "  Available margin: $#{balance["available_margin"]["value"]}"
+      puts "  Total margin: $#{balance["initial_margin"]["value"]}"
+      puts "  Liquidation buffer: #{balance["liquidation_buffer_percentage"]}%"
+      puts "  Unrealized PnL: $#{balance["unrealized_pnl"]["value"]}"
     rescue => e
       puts "Margin information unavailable: #{e.message}"
     end
@@ -253,7 +253,7 @@ namespace :positions do
     # Check exposure limits
     day_exposure = calculate_exposure(Position.open.day_trading)
     swing_exposure = calculate_exposure(Position.open.swing_trading)
-    
+
     config = Rails.application.config.monitoring_config
     max_day_exposure = config[:max_day_trading_exposure] * 100
     max_swing_exposure = config[:max_swing_trading_exposure] * 100
@@ -279,11 +279,11 @@ namespace :positions do
 
   def calculate_exposure(positions)
     return 0.0 if positions.empty?
-    
+
     total_notional = positions.sum { |pos| pos.size * pos.entry_price }
     # This should be replaced with actual account balance from Coinbase
     total_portfolio_value = 100_000.0
-    
+
     (total_notional / total_portfolio_value * 100).to_f
   end
 end
