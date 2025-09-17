@@ -12,8 +12,19 @@ env:
   COVERAGE: true
 
 jobs:
+  standardrb:
+    name: Run StandardRB (lint)
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: write
+    steps:
+    - name: Standard Ruby
+      uses: standardrb/standard-ruby-action@v1
+
   lint:
-    name: StandardRB (lint)
+    name: Check StandardRB (lint)
+    needs: [standardrb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
