@@ -65,6 +65,11 @@ RSpec.describe AiCommandProcessorService, type: :service do
   end
 
   describe "#healthy?" do
+    before do
+      allow(ENV).to receive(:[]).with("OPENROUTER_API_KEY").and_return("test_key")
+      allow(ENV).to receive(:[]).with("OPENAI_API_KEY").and_return(nil)
+    end
+
     it "returns true when service works" do
       allow(service).to receive(:process_command).and_return({content: "test"})
       expect(service.healthy?).to be true
