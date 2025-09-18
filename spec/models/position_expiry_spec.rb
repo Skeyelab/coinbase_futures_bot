@@ -3,6 +3,7 @@
 require "rails_helper"
 
 RSpec.describe Position, type: :model do
+  include ActiveSupport::Testing::TimeHelpers
   before do
     travel_to Date.new(2025, 8, 25) # Monday, August 25, 2025
   end

@@ -95,13 +95,15 @@ class FuturesContract
   # Check if a contract is expiring within the specified buffer days
   def self.expiring_soon?(product_id, buffer_days = 2)
     days = days_until_expiry(product_id)
-    days && days <= buffer_days
+    return false unless days
+    days <= buffer_days
   end
 
   # Check if a contract has already expired
   def self.expired?(product_id)
     days = days_until_expiry(product_id)
-    days && days < 0
+    return false unless days
+    days < 0
   end
 
   # Get all expiring contracts from positions
