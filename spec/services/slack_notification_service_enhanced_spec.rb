@@ -2,18 +2,15 @@
 
 require "rails_helper"
 
-RSpec.describe SlackNotificationService, :pending do
-  let(:mock_client) { instance_double(Slack::Web::Client) }
+RSpec.describe SlackNotificationService do
+  before(:each) do
+    # Clear any existing mocks/stubs and reset the service's memoized client
+    RSpec::Mocks.space.reset_all
+    described_class.instance_variable_set(:@client, nil)
 
-  before do
     allow(ENV).to receive(:[]).and_call_original
     allow(ENV).to receive(:[]).with("SLACK_ENABLED").and_return("true")
     allow(ENV).to receive(:[]).with("SLACK_BOT_TOKEN").and_return("test-token")
-    
-    # Create a fresh mock client for each test
-    fresh_mock_client = instance_double(Slack::Web::Client)
-    allow(Slack::Web::Client).to receive(:new).and_return(fresh_mock_client)
-    allow(fresh_mock_client).to receive(:chat_postMessage).and_return(true)
 
     # Mock monitoring config
     allow(Rails.application.config).to receive(:monitoring_config).and_return({
@@ -27,9 +24,20 @@ RSpec.describe SlackNotificationService, :pending do
     })
   end
 
+  # Helper method to set up mock client for each test
+  def setup_mock_client
+    # Create a fresh mock client for each test
+    mock_client = instance_double(Slack::Web::Client)
+    allow(Slack::Web::Client).to receive(:new).and_return(mock_client)
+    allow(mock_client).to receive(:chat_postMessage).and_return(true)
+    mock_client
+  end
+
   describe ".position_type_alert" do
     context "when alerts are enabled" do
-      it "sends day trading alerts to correct channel", :pending do
+      it "sends day trading alerts to correct channel" do
+        mock_client = setup_mock_client
+
         expect(mock_client).to receive(:chat_postMessage).with(
           hash_including(channel: "#day-trading-test")
         )
@@ -42,7 +50,9 @@ RSpec.describe SlackNotificationService, :pending do
         )
       end
 
-      it "sends swing trading alerts to correct channel", :pending do
+      it "sends swing trading alerts to correct channel" do
+        mock_client = setup_mock_client
+
         expect(mock_client).to receive(:chat_postMessage).with(
           hash_including(channel: "#swing-trading-test")
         )
@@ -54,7 +64,9 @@ RSpec.describe SlackNotificationService, :pending do
         )
       end
 
-      it "formats closure alerts correctly", :pending do
+      it "formats closure alerts correctly" do
+        mock_client = setup_mock_client
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           expect(args[:text]).to include("🔴")
           expect(args[:text]).to include("Day Trading Alert")
@@ -68,7 +80,9 @@ RSpec.describe SlackNotificationService, :pending do
         )
       end
 
-      it "formats warning alerts correctly", :pending do
+      it "formats warning alerts correctly" do
+        mock_client = setup_mock_client
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           expect(args[:text]).to include("⚠️")
           expect(args[:attachments].first[:color]).to eq("warning")
@@ -81,7 +95,9 @@ RSpec.describe SlackNotificationService, :pending do
         )
       end
 
-      it "includes details when provided", :pending do
+      it "includes details when provided" do
+        mock_client = setup_mock_client
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           fields = args[:attachments].first[:fields]
           details_field = fields.find { |f| f[:title] == "Details" }
@@ -105,7 +121,8 @@ RSpec.describe SlackNotificationService, :pending do
       end
 
       it "does not send alerts when disabled" do
-        expect(mock_client).not_to receive(:chat_postMessage)
+        # Don't set up mock client since we expect no calls to be made
+        expect(Slack::Web::Client).not_to receive(:new)
 
         described_class.position_type_alert(
           "day_trading",
@@ -126,7 +143,9 @@ RSpec.describe SlackNotificationService, :pending do
       }
     end
 
-    it "sends exposure alerts to risk channel", :pending do
+    it "sends exposure alerts to risk channel" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage).with(
         hash_including(channel: "#risk-alerts-test")
       )
@@ -134,7 +153,9 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.portfolio_exposure_alert(exposure_data)
     end
 
-    it "formats exposure data correctly", :pending do
+    it "formats exposure data correctly" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("⚠️")
         expect(args[:text]).to include("Portfolio Exposure Report")
@@ -154,7 +175,9 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.portfolio_exposure_alert(exposure_data)
     end
 
-    it "uses warning color when warnings present", :pending do
+    it "uses warning color when warnings present" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:attachments].first[:color]).to eq("warning")
       end
@@ -162,7 +185,8 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.portfolio_exposure_alert(exposure_data)
     end
 
-    it "uses good color when no warnings", :pending do
+    it "uses good color when no warnings" do
+      mock_client = setup_mock_client
       exposure_data[:warnings] = []
 
       expect(mock_client).to receive(:chat_postMessage) do |args|
@@ -182,7 +206,9 @@ RSpec.describe SlackNotificationService, :pending do
       }
     end
 
-    it "sends margin alerts to margin channel", :pending do
+    it "sends margin alerts to margin channel" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage).with(
         hash_including(channel: "#margin-alerts-test")
       )
@@ -190,7 +216,9 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.margin_window_transition(window_data)
     end
 
-    it "formats intraday margin correctly", :pending do
+    it "formats intraday margin correctly" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("🟢")
         expect(args[:text]).to include("INTRADAY_MARGIN")
@@ -204,7 +232,8 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.margin_window_transition(window_data)
     end
 
-    it "formats overnight margin correctly", :pending do
+    it "formats overnight margin correctly" do
+      mock_client = setup_mock_client
       window_data[:current_window] = "OVERNIGHT_MARGIN"
 
       expect(mock_client).to receive(:chat_postMessage) do |args|
@@ -215,7 +244,9 @@ RSpec.describe SlackNotificationService, :pending do
       described_class.margin_window_transition(window_data)
     end
 
-    it "includes transition information", :pending do
+    it "includes transition information" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         fields = args[:attachments].first[:fields]
         transition_field = fields.find { |f| f[:title] == "Next Transition" }
@@ -256,8 +287,8 @@ RSpec.describe SlackNotificationService, :pending do
   end
 
   describe "message formatting edge cases" do
-    it "handles empty position type gracefully", :pending do
-      result = described_class.send(:format_position_type_alert, "", "warning", "test")
+    it "handles empty position type gracefully" do
+      result = described_class.send(:format_position_type_alert, "", "warning", "test", nil)
       expect(result).to eq({})
     end
 
@@ -271,7 +302,9 @@ RSpec.describe SlackNotificationService, :pending do
       expect(result[:text]).to include("Unknown")
     end
 
-    it "handles unknown alert types", :pending do
+    it "handles unknown alert types" do
+      mock_client = setup_mock_client
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("📢")
         expect(args[:attachments].first[:color]).to eq("good")
