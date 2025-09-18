@@ -2,6 +2,7 @@
 
 class TradingPair < ApplicationRecord
   include SentryTrackable
+
   validates :product_id, presence: true, uniqueness: true
 
   scope :enabled, -> { where(enabled: true) }
