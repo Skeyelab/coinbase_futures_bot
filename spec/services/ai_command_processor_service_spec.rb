@@ -60,7 +60,9 @@ RSpec.describe AiCommandProcessorService, type: :service do
 
     it "raises error without API key" do
       service.instance_variable_set(:@openrouter_key, nil)
-      expect { service.call_openrouter(test_input) }.to raise_error(AiCommandProcessorService::ApiError, /not configured/)
+      expect do
+        service.call_openrouter(test_input)
+      end.to raise_error(AiCommandProcessorService::ApiError, /not configured/)
     end
   end
 

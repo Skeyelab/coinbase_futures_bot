@@ -39,7 +39,7 @@ class ChatBotService
   private
 
   def sanitize_input(input)
-    input.to_s.strip.gsub(/[^\w\s\-.,?!$%]/, "")[0..500]
+    input.to_s.strip.gsub(/[^\w\s\-.,?!]/, "")[0..500]
   end
 
   def build_context
@@ -284,8 +284,10 @@ class ChatBotService
   end
 
   def application_uptime
-    "#{((Time.current - Rails.application.config.started_at) / 1.hour).to_i}h"
-  rescue
-    "N/A"
+    if Rails.application.config.respond_to?(:started_at) && Rails.application.config.started_at
+      "#{((Time.current - Rails.application.config.started_at) / 1.hour).to_i}h"
+    else
+      "N/A"
+    end
   end
 end
