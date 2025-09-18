@@ -24,8 +24,8 @@ class FuturesContract
     return nil unless month
 
     # Convert 2-digit year to 4-digit year
-    # Assume 00-30 means 2000-2030, 31-99 means 1931-1999
-    year = (year_suffix <= 30) ? 2000 + year_suffix : 1900 + year_suffix
+    # Assume 00-69 means 2000-2069, 70-99 means 1970-1999
+    year = (year_suffix <= 69) ? 2000 + year_suffix : 1900 + year_suffix
 
     begin
       Date.new(year, month, day)

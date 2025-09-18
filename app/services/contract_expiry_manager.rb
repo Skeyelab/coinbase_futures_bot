@@ -4,6 +4,10 @@
 class ContractExpiryManager
   include SentryServiceTracking
 
+  # Financial calculation constants
+  ESTIMATED_CONTRACT_VALUE = 50_000.0  # Estimated value per contract in USD
+  ESTIMATED_MARGIN_RATE = 0.1          # Estimated margin requirement (10%)
+
   def initialize(logger: Rails.logger)
     @logger = logger
     @positions_service = Trading::CoinbasePositions.new(logger: logger)
@@ -118,7 +122,7 @@ class ContractExpiryManager
 
     # Estimate margin freed (simplified calculation)
     # In production, this would query actual margin requirements from Coinbase API
-    estimated_margin_freed = total_size * 50000 * 0.1 # Rough estimate: $50k per contract * 10% margin
+    estimated_margin_freed = total_size * ESTIMATED_CONTRACT_VALUE * ESTIMATED_MARGIN_RATE
 
     if closed_count > 0 && estimated_margin_freed > 1000
       @logger.info("Estimated #{estimated_margin_freed.round} margin freed by closing #{closed_count} expiring positions")
