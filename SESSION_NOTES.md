@@ -26,6 +26,47 @@
 
 ### Session log
 
+#### 2025-09-18 23:20 UTC
+- Context: Completed comprehensive contract expiry management implementation (Linear issue FUT-40)
+- Changes:
+  - **Created FuturesContract utility class**: Built complete expiry date parsing for Coinbase futures product IDs (BIT-DDMMMYY-CDE format)
+  - **Enhanced Position model with expiry methods**: Added scopes and instance methods for contract expiry detection and management
+  - **Implemented ContractExpiryManager service**: Comprehensive service for monitoring expiry, closing positions, checking margin requirements, and generating reports
+  - **Created ContractExpiryMonitoringJob**: Background job with regular and emergency monitoring modes, comprehensive error handling and Slack notifications
+  - **Added cron job scheduling**: Configured expiry monitoring every 2 hours and emergency checks every hour during market hours
+  - **Created comprehensive Rake tasks**: Manual expiry management commands for checking, closing, validating, and reporting on contract expiry
+  - **Built extensive test coverage**: 350+ test cases covering all expiry management functionality with proper time travel and mocking
+  - **Integrated with existing services**: Seamless integration with CoinbasePositions, SlackNotificationService, and Position management
+- Commands run:
+  - `bundle install` (installed missing RSpec dependencies)
+  - `bundle exec rspec spec/services/futures_contract_spec.rb --format progress` (validated core functionality)
+  - `bin/standardrb --fix` (applied code formatting)
+- Files touched:
+  - `app/services/futures_contract.rb` (created utility class for expiry date parsing)
+  - `app/models/position.rb` (added expiry-related scopes and methods)
+  - `app/services/contract_expiry_manager.rb` (created comprehensive expiry management service)
+  - `app/jobs/contract_expiry_monitoring_job.rb` (created background monitoring job)
+  - `config/initializers/good_job.rb` (added cron job configuration)
+  - `lib/tasks/contracts.rake` (created manual management tasks)
+  - `spec/services/futures_contract_spec.rb` (created comprehensive test suite)
+  - `spec/services/contract_expiry_manager_spec.rb` (created service test suite)
+  - `spec/jobs/contract_expiry_monitoring_job_spec.rb` (created job test suite)
+  - `spec/models/position_expiry_spec.rb` (created model test suite)
+- Features implemented:
+  - Product ID expiry date parsing (BIT-29AUG25-CDE → August 29, 2025)
+  - Days until expiry calculation with current date awareness
+  - Position expiry detection with configurable buffer days
+  - Automated position closure before contract expiration
+  - Emergency closure of already expired positions
+  - Margin requirement monitoring near expiry (2x, 1.5x, 1.2x multipliers)
+  - Comprehensive expiry reporting and validation
+  - Slack notifications for expiry events and emergencies
+  - Manual management commands for operational control
+- Next steps:
+  - Monitor expiry management in production
+  - Fine-tune buffer days and notification thresholds
+  - Consider integration with margin monitoring service
+
 #### 2025-09-17 21:45 UTC
 - Context: Completed comprehensive test coverage for PositionCloseJob (Linear issue FUT-51)
 - Changes:

@@ -26,6 +26,20 @@ class Position < ApplicationRecord
   scope :older_than, ->(hours) { where("entry_time < ?", hours.hours.ago) }
   scope :open_swing_positions, -> { swing_trading.open }
 
+  # Contract expiry scopes
+  scope :expiring_within_days, ->(days) {
+    open.select { |p| p.days_until_expiry && p.days_until_expiry <= days }
+  }
+  scope :contract_expiring_soon, ->(buffer_days = 2) {
+    open.select { |p| p.expiring_soon?(buffer_days) }
+  }
+  scope :contract_expiring_today, -> {
+    open.select { |p| p.days_until_expiry == 0 }
+  }
+  scope :contract_expired, -> {
+    open.select { |p| p.expired? }
+  }
+
   # Callbacks
   before_validation :set_defaults
   after_create :log_position_opened
@@ -84,6 +98,53 @@ class Position < ApplicationRecord
 
   def needs_closure_soon?
     day_trading? && open? && age_in_hours.to_f > 23.5
+  end
+
+  # Contract expiry methods
+  def days_until_expiry
+    FuturesContract.days_until_expiry(product_id)
+  end
+
+  def expiring_soon?(buffer_days = 2)
+    FuturesContract.expiring_soon?(product_id, buffer_days)
+  end
+
+  def expired?
+    FuturesContract.expired?(product_id)
+  end
+
+  def expiry_date
+    FuturesContract.parse_expiry_date(product_id)
+  end
+
+  def needs_expiry_closure?(buffer_days = 2)
+    open? && expiring_soon?(buffer_days)
+  end
+
+  def margin_impact_near_expiry
+    FuturesContract.margin_impact_near_expiry(product_id)
+  end
+
+  def get_current_market_price
+    # Try to get current price from recent market data
+    # First try recent ticks
+    recent_tick = Tick.where(product_id: product_id)
+      .order(observed_at: :desc)
+      .first
+
+    return recent_tick.price if recent_tick && recent_tick.observed_at > 5.minutes.ago
+
+    # Fall back to most recent 1-minute candle
+    recent_candle = Candle.for_symbol(product_id)
+      .one_minute
+      .order(timestamp: :desc)
+      .first
+
+    return recent_candle.close if recent_candle && recent_candle.timestamp > 5.minutes.ago
+
+    # If no recent data, log warning and return nil
+    Rails.logger.warn("No recent price data for #{product_id}")
+    nil
   end
 
   def calculate_pnl(current_price)
@@ -182,6 +243,59 @@ class Position < ApplicationRecord
     old_positions.destroy_all
     Rails.logger.info("Cleaned up #{count} old closed positions")
     count
+  end
+
+  # Contract expiry class methods
+  def self.positions_approaching_expiry(buffer_days = 2)
+    FuturesContract.find_expiring_positions(buffer_days)
+  end
+
+  def self.positions_expiring_today
+    FuturesContract.find_expiring_positions(0)
+  end
+
+  def self.expired_positions
+    FuturesContract.find_expired_positions
+  end
+
+  def self.close_expiring_positions(buffer_days = 2, close_price = nil, reason = "Contract expiry")
+    positions = positions_approaching_expiry(buffer_days)
+    return 0 if positions.empty?
+
+    closed_count = 0
+    positions.each do |position|
+      current_price = close_price || position.get_current_market_price
+      next unless current_price
+
+      position.force_close!(current_price, reason)
+      closed_count += 1
+    rescue => e
+      Rails.logger.error("Failed to close expiring position #{position.id}: #{e.message}")
+    end
+
+    Rails.logger.info("Closed #{closed_count} positions approaching contract expiry")
+    closed_count
+  end
+
+  def self.emergency_close_expired_positions(close_price = nil)
+    positions = expired_positions
+    return 0 if positions.empty?
+
+    Rails.logger.error("EMERGENCY: Found #{positions.size} expired positions")
+    closed_count = 0
+
+    positions.each do |position|
+      current_price = close_price || position.get_current_market_price
+      next unless current_price
+
+      position.force_close!(current_price, "EMERGENCY: Contract expired")
+      closed_count += 1
+    rescue => e
+      Rails.logger.error("Failed to close expired position #{position.id}: #{e.message}")
+    end
+
+    Rails.logger.error("EMERGENCY: Closed #{closed_count} expired positions")
+    closed_count
   end
 
   private
