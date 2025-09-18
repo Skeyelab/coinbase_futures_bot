@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_28_044757) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_18_035737) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -41,6 +41,35 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_28_044757) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["symbol", "timeframe", "timestamp"], name: "index_candles_on_symbol_and_timeframe_and_timestamp", unique: true
+  end
+
+  create_table "chat_messages", force: :cascade do |t|
+    t.bigint "chat_session_id", null: false
+    t.text "content", null: false
+    t.string "message_type", null: false
+    t.datetime "timestamp", null: false
+    t.string "profit_impact", default: "unknown", null: false
+    t.decimal "relevance_score", precision: 5, scale: 3, default: "1.0"
+    t.json "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_session_id", "timestamp"], name: "index_chat_messages_on_chat_session_id_and_timestamp"
+    t.index ["chat_session_id"], name: "index_chat_messages_on_chat_session_id"
+    t.index ["message_type"], name: "index_chat_messages_on_message_type"
+    t.index ["profit_impact"], name: "index_chat_messages_on_profit_impact"
+    t.index ["relevance_score"], name: "index_chat_messages_on_relevance_score"
+  end
+
+  create_table "chat_sessions", force: :cascade do |t|
+    t.string "session_id", null: false
+    t.string "name"
+    t.boolean "active", default: true, null: false
+    t.json "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_chat_sessions_on_active"
+    t.index ["session_id"], name: "index_chat_sessions_on_session_id", unique: true
+    t.index ["updated_at"], name: "index_chat_sessions_on_updated_at"
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -229,4 +258,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_28_044757) do
     t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
     t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
   end
+
+  add_foreign_key "chat_messages", "chat_sessions"
 end

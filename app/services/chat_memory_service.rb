@@ -5,57 +5,159 @@ class ChatMemoryService
 
   def initialize(session_id)
     @session_id = session_id
-    @cache_key = "chat_session:#{session_id}"
+    @session = ChatSession.find_or_create_by_session_id(session_id)
   end
 
-  def store(input, result)
+  def store(content, type, profit_impact = :unknown)
     track_service_call("store") do
-      memory = load_memory
-      memory[Time.current.to_i] = {
-        input: input.to_s.truncate(200),
-        command_type: result[:type],
-        timestamp: Time.current.utc.iso8601
-      }
+      relevance_score = calculate_relevance_score(content, type, profit_impact)
 
-      # Keep only last 50 interactions
-      trimmed_memory = memory.to_a.last(50).to_h
-      save_memory(trimmed_memory)
+      @session.chat_messages.create!(
+        content: content.to_s.truncate(2000),
+        message_type: type.to_s,
+        profit_impact: profit_impact.to_s,
+        relevance_score: relevance_score,
+        timestamp: Time.current,
+        metadata: {command_type: extract_command_type(content)}
+      )
+
+      # Update session activity
+      @session.touch
+
+      # Prune old messages to keep database lean
+      prune_old_messages if @session.message_count > 200
     end
   end
 
+  def store_user_input(input)
+    profit_impact = determine_profit_impact(input)
+    store(input, :user, profit_impact)
+  end
+
+  def store_bot_response(response, command_result = nil)
+    profit_impact = determine_response_profit_impact(response, command_result)
+    store(response, :bot, profit_impact)
+  end
+
+  def context_for_ai(max_tokens = 4000)
+    # Get recent profitable messages with simple token management
+    messages = @session.chat_messages.profitable.recent.limit(20)
+
+    # Simple token estimation and truncation
+    context_parts = []
+    estimated_tokens = 0
+
+    messages.each do |msg|
+      msg_tokens = (msg.content.length / 4).to_i # ~4 chars per token
+      break if estimated_tokens + msg_tokens > max_tokens
+
+      context_parts << "#{msg.message_type}: #{msg.content}"
+      estimated_tokens += msg_tokens
+    end
+
+    context_parts.reverse.join("\n")
+  end
+
   def recent_interactions(limit = 5)
-    load_memory.values.last(limit)
+    @session.chat_messages.recent.limit(limit).pluck(:content, :message_type, :timestamp)
+      .map { |content, type, time| {input: content, command_type: type, timestamp: time.iso8601} }
   end
 
-  def interaction_count
-    load_memory.size
-  end
-
-  def last_command_type
-    load_memory.values.last&.dig(:command_type)
-  end
-
-  def clear_session
-    Rails.cache.delete(@cache_key)
+  def search_history(query)
+    @session.chat_messages
+      .where("content ILIKE ?", "%#{query}%")
+      .profitable
+      .recent
+      .limit(10)
+      .pluck(:content, :timestamp, :profit_impact)
   end
 
   def session_summary
-    memory = load_memory
     {
       session_id: @session_id,
-      total_interactions: memory.size,
-      last_activity: memory.values.last&.dig(:timestamp),
-      command_types: memory.values.map { |v| v[:command_type] }.uniq
+      total_interactions: @session.message_count,
+      last_activity: @session.last_activity&.iso8601,
+      profitable_messages: @session.profitable_messages.count,
+      active: @session.active?
     }
+  end
+
+  def clear_session
+    @session.chat_messages.destroy_all
+  end
+
+  def deactivate_session
+    @session.deactivate!
   end
 
   private
 
-  def load_memory
-    Rails.cache.fetch(@cache_key, expires_in: 24.hours) { {} }
+  def calculate_relevance_score(content, type, profit_impact)
+    # Simple profit-focused scoring
+    base_score = case profit_impact.to_s
+    when "high" then 5.0
+    when "medium" then 3.0
+    when "low" then 2.0
+    else 1.0
+    end
+
+    # Boost for trading keywords
+    if content.match?(/position|signal|profit|loss|entry|exit|trade|market/i)
+      base_score += 0.5
+    end
+
+    # Boost for successful commands
+    if type.to_s == "bot" && content.match?(/success|completed|executed/i)
+      base_score += 0.5
+    end
+
+    [base_score, 5.0].min
   end
 
-  def save_memory(memory)
-    Rails.cache.write(@cache_key, memory, expires_in: 24.hours)
+  def determine_profit_impact(input)
+    case input.downcase
+    when /position|pnl|profit|loss|trade|signal|entry|exit/
+      :high
+    when /market|price|data|status/
+      :medium
+    when /help|what|how/
+      :low
+    else
+      :unknown
+    end
+  end
+
+  def determine_response_profit_impact(response, command_result)
+    return :high if command_result&.dig(:type) == "position_data"
+    return :medium if command_result&.dig(:type) == "signal_data"
+    return :medium if command_result&.dig(:type) == "market_data"
+
+    # Check response content for trading relevance
+    if response.match?(/position|profit|loss|signal|trade/i)
+      :medium
+    else
+      :low
+    end
+  end
+
+  def extract_command_type(content)
+    case content.downcase
+    when /position/ then "position_query"
+    when /signal/ then "signal_query"
+    when /market/ then "market_data"
+    when /status/ then "system_status"
+    when /help/ then "help"
+    else "general"
+    end
+  end
+
+  def prune_old_messages
+    # Keep only top 100 messages by relevance and recency
+    keeper_ids = @session.chat_messages
+      .order(relevance_score: :desc, timestamp: :desc)
+      .limit(100)
+      .pluck(:id)
+
+    @session.chat_messages.where.not(id: keeper_ids).destroy_all
   end
 end
