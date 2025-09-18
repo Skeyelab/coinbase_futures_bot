@@ -29,6 +29,10 @@ DATABASE_URL=postgresql://username:password@localhost:5432/coinbase_futures_bot_
 COINBASE_API_KEY=your_api_key_here
 COINBASE_API_SECRET=your_api_secret_here
 
+# AI Service Configuration (Chat Bot)
+OPENROUTER_API_KEY=your_openrouter_api_key
+OPENAI_API_KEY=your_openai_api_key
+
 # CryptoPanic API
 CRYPTOPANIC_TOKEN=your_cryptopanic_token
 

@@ -1,0 +1,62 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.openai.com/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"gpt-4","messages":[{"role":"system","content":"You are an
+        AI assistant for a Coinbase futures trading bot. Help users understand their
+        trading system.\n\nFeatures: Real-time data, multi-timeframe analysis (1min-1h),
+        day/swing trading, risk management, paper trading, Slack alerts.\n\nProvide
+        helpful, accurate information emphasizing risk management. Keep responses
+        concise and actionable.\n"},{"role":"user","content":"What is the current
+        BTC trend?"}],"max_tokens":1000,"temperature":0.7}'
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Authorization:
+      - "<AUTHORIZATION>"
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 404
+      message: Not Found
+    headers:
+      Date:
+      - Thu, 18 Sep 2025 02:50:40 GMT
+      Content-Type:
+      - text/html
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Cf-Cache-Status:
+      - DYNAMIC
+      Set-Cookie:
+      - __cf_bm=iEuPKTILGzhUxmFBEh0C_XqAzEsQCGTXOeEXxhV5sA8-1758163840-1.0.1.1-6p_DCgXGvLo.ZJZBKAeVhVodZgNAVMOQ0NOXS1fMy2wH0zsTmcGptaGp8W5nArPKVRk0HVIkt9mwk9vBTbasWFmAXQyKnVzt0nOP3Qftic0;
+        path=/; expires=Thu, 18-Sep-25 03:20:40 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=BbBty4W4pilmCRybcVTGiv0drMXljGuTkjDFI9Qg.yg-1758163840179-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      X-Content-Type-Options:
+      - nosniff
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 980d89809c4af820-PDX
+      Alt-Svc:
+      - h3=":443"; ma=86400
+    body:
+      encoding: ASCII-8BIT
+      string: "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404
+        Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+  recorded_at: Thu, 18 Sep 2025 02:50:40 GMT
+recorded_with: VCR 6.3.1

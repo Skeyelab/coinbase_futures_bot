@@ -1,0 +1,102 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.openai.com/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"gpt-4","messages":[{"role":"system","content":"You are an
+        AI assistant for a Coinbase futures trading bot. You help users understand
+        and interact with their trading system.\n\nThe bot includes:\n- Real-time
+        market data processing\n- Multi-timeframe technical analysis (1min, 5min,
+        15min, 1h)\n- Day trading and swing trading strategies\n- Risk management
+        and position sizing\n- Paper trading simulation\n- Slack notifications and
+        alerts\n\nAlways provide helpful, accurate information about trading operations
+        while emphasizing risk management.\nKeep responses concise and actionable."},{"role":"user","content":"What
+        is the current market trend for BTC?"}],"max_tokens":1000,"temperature":0.7,"top_p":1,"frequency_penalty":0,"presence_penalty":0}'
+    headers:
+      User-Agent:
+      - Faraday v2.11.0
+      Authorization:
+      - "<AUTHORIZATION>"
+      Content-Type:
+      - application/json
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '425'
+    body:
+      encoding: UTF-8
+      string: '{"id":"chatcmpl-fallback123","object":"chat.completion","created":1700000000,"model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"I''m
+        here to help with your trading bot analysis. To assess BTC''s current trend,
+        I''d recommend checking:\n\n- Your bot''s latest multi-timeframe signals\n-
+        Current EMA crossover status\n- Recent volume and momentum indicators\n- Active
+        position status and risk exposure\n\nThis fallback response shows the system
+        is working even when the primary AI service is unavailable. What specific
+        trading data would you like help interpreting?"},"finish_reason":"stop"}],"usage":{"prompt_tokens":125,"completion_tokens":95,"total_tokens":220}}'
+  recorded_at: Mon, 01 Jan 2024 12:00:00 GMT
+- request:
+    method: post
+    uri: https://api.openai.com/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"gpt-4","messages":[{"role":"system","content":"You are an AI
+        assistant for a Coinbase futures trading bot. Help users understand their
+        trading system.\n\nFeatures: Real-time data, multi-timeframe analysis (1min-1h),
+        day/swing trading, risk management, paper trading, Slack alerts.\n\nProvide
+        helpful, accurate information emphasizing risk management. Keep responses
+        concise and actionable.\n"},{"role":"user","content":"What is the current
+        BTC trend?"}],"max_tokens":1000,"temperature":0.7}'
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Authorization:
+      - "<AUTHORIZATION>"
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+      Accept:
+      - "*/*"
+  response:
+    status:
+      code: 404
+      message: Not Found
+    headers:
+      Date:
+      - Thu, 18 Sep 2025 02:50:37 GMT
+      Content-Type:
+      - text/html
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Cf-Cache-Status:
+      - DYNAMIC
+      Set-Cookie:
+      - __cf_bm=OSYKTWEkjsG8aAbQfH7WT6oVgeloNcUSf03ohh04Ziw-1758163837-1.0.1.1-ll7tRXU7poDzVz69_PIoDNL0WfiGsm0kBRXAAvu23.Hiq84Et_1zAHk69Ux5t0VPB2V3tI9HKKCgg7uxf9Dwp0iLcU6tnLPAQIjxAnMnpBA;
+        path=/; expires=Thu, 18-Sep-25 03:20:37 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=t_hwC9Ts4vJ9S4k146LeY0L_NdnJc7Y48t_XxcewsL8-1758163837841-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      X-Content-Type-Options:
+      - nosniff
+      Server:
+      - cloudflare
+      Cf-Ray:
+      - 980d89720c42659c-PDX
+      Alt-Svc:
+      - h3=":443"; ma=86400
+    body:
+      encoding: ASCII-8BIT
+      string: "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404
+        Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+  recorded_at: Thu, 18 Sep 2025 02:50:37 GMT
+recorded_with: VCR 6.3.1

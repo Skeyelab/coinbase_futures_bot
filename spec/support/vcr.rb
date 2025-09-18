@@ -74,6 +74,10 @@ VCR.configure do |config|
   config.filter_sensitive_data("<COINBASE_API_KEY>") { ENV["COINBASE_API_KEY"] }
   config.filter_sensitive_data("<COINBASE_API_SECRET>") { ENV["COINBASE_API_SECRET"] }
 
+  # Filter AI service API keys
+  config.filter_sensitive_data("<OPENROUTER_API_KEY>") { ENV["OPENROUTER_API_KEY"] }
+  config.filter_sensitive_data("<OPENAI_API_KEY>") { ENV["OPENAI_API_KEY"] }
+
   # Setup smart filtering
   VCRHelpers.setup_timestamp_filters(config)
   # NOTE: setup_response_trimming uses before_record which is not supported in VCR 6+
