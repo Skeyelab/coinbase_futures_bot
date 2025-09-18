@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe FuturesContract, type: :service do
-  include ActiveSupport::Testing::TimeHelpers
 
   describe ".parse_expiry_date" do
     context "with valid Coinbase futures product IDs" do

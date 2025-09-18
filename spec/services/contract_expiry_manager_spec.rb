@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe ContractExpiryManager, type: :service do
-  include ActiveSupport::Testing::TimeHelpers
   let(:logger) { double("logger", info: nil, warn: nil, error: nil) }
   let(:positions_service) { double("positions_service") }
   let(:slack_service) { double("slack_service", alert: nil) }
