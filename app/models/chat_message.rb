@@ -9,8 +9,8 @@ class ChatMessage < ApplicationRecord
   validates :profit_impact, inclusion: {in: %w[unknown low medium high]}
   validates :relevance_score, presence: true, numericality: {greater_than: 0, less_than_or_equal_to: 5}
 
-  enum profit_impact: {unknown: "unknown", low: "low", medium: "medium", high: "high"}
-  enum message_type: {user: "user", bot: "bot", system: "system"}
+  enum :profit_impact, {unknown: "unknown", low: "low", medium: "medium", high: "high"}
+  enum :message_type, {user: "user", bot: "bot", system: "system"}
 
   scope :recent, -> { order(timestamp: :desc) }
   scope :profitable, -> { where(profit_impact: [:medium, :high]) }
