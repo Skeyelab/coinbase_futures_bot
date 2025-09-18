@@ -10,7 +10,7 @@ RSpec.describe ChatBotService, type: :service do
 
   before do
     allow(AiCommandProcessorService).to receive(:new).and_return(ai_service)
-    allow(ChatMemoryService).to receive(:new).with(session_id).and_return(memory_service)
+    allow(ChatMemoryService).to receive(:new).and_return(memory_service)
     allow(memory_service).to receive(:store)
     allow(memory_service).to receive(:recent_interactions).and_return([])
     allow(memory_service).to receive(:session_summary).and_return({

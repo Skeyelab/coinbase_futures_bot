@@ -39,7 +39,7 @@ class ChatBotService
   private
 
   def sanitize_input(input)
-    input.to_s.strip.gsub(/[^\w\s\-.,?!]/, "")[0..500]
+    input.to_s.strip.gsub(/[^\w\s\-.,?!]/, "")[0...500]
   end
 
   def build_context
@@ -99,7 +99,7 @@ class ChatBotService
         open_positions: positions.count,
         day_trading: positions.day_trading.count,
         swing_trading: positions.swing_trading.count,
-        total_pnl: total_pnl.round(2),
+        total_pnl: (total_pnl || 0).round(2),
         positions: positions.map { |p| position_summary(p) }
       }
     }
@@ -262,8 +262,9 @@ class ChatBotService
   end
 
   def extract_market_params(content)
-    symbol = content.match(/([A-Z]{3,4}[-_]?PERP?)/i)&.captures&.first
-    {symbol: symbol&.upcase || "BTC-PERP"}
+    # Look for crypto symbols (BTC, ETH, etc.) in the content
+    symbol = content.match(/\b(BTC|ETH|SOL|ADA|DOT|LINK|UNI|AAVE|MATIC|AVAX|ATOM|XRP|LTC|BCH|ETC|DOGE|SHIB)\b/i)&.captures&.first
+    {symbol: symbol ? "#{symbol.upcase}-PERP" : "BTC-PERP"}
   end
 
   def trading_status_context

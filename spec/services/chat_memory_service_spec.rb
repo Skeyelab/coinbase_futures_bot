@@ -97,7 +97,12 @@ RSpec.describe ChatMemoryService, type: :service do
     end
 
     it "returns correct count after storing interactions" do
-      3.times { |i| service.store("input #{i}", {type: "test", data: {}}) }
+      base_time = Time.current
+      3.times do |i|
+        travel_to(base_time + i.seconds) do
+          service.store("input #{i}", {type: "test", data: {}})
+        end
+      end
       expect(service.interaction_count).to eq(3)
     end
   end
