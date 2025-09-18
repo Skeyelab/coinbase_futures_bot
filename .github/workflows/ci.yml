@@ -12,21 +12,8 @@ env:
   COVERAGE: true
 
 jobs:
-  standardrb:
-    name: Run StandardRB (lint)
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      contents: write
-    steps:
-    - name: Standard Ruby
-      uses: standardrb/standard-ruby-action@v1
-      with:
-        autofix: true
-
   lint:
-    name: Check StandardRB (lint)
-    needs: [standardrb]
+    name: StandardRB (lint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -420,7 +407,7 @@ jobs:
     if: always() && needs.lint.result == 'success' && needs.security.result == 'success' && needs.test.result == 'success'
     steps:
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: coverage-reports-${{ github.run_number }}
           path: coverage/
