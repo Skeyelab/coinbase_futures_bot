@@ -15,7 +15,7 @@ RSpec.describe SlackNotificationService do
       enable_position_type_alerts: true,
       slack_notifications: {
         day_trading_channel: "#day-trading-test",
-        swing_trading_channel: "#swing-trading-test", 
+        swing_trading_channel: "#swing-trading-test",
         risk_alerts_channel: "#risk-alerts-test",
         margin_alerts_channel: "#margin-alerts-test"
       }
@@ -32,7 +32,7 @@ RSpec.describe SlackNotificationService do
     context "when alerts are enabled" do
       it "sends day trading alerts to correct channel" do
         setup_mock_client
-        
+
         expect(mock_client).to receive(:chat_postMessage).with(
           hash_including(channel: "#day-trading-test")
         )
@@ -47,7 +47,7 @@ RSpec.describe SlackNotificationService do
 
       it "sends swing trading alerts to correct channel" do
         setup_mock_client
-        
+
         expect(mock_client).to receive(:chat_postMessage).with(
           hash_including(channel: "#swing-trading-test")
         )
@@ -61,7 +61,7 @@ RSpec.describe SlackNotificationService do
 
       it "formats closure alerts correctly" do
         setup_mock_client
-        
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           expect(args[:text]).to include("🔴")
           expect(args[:text]).to include("Day Trading Alert")
@@ -77,7 +77,7 @@ RSpec.describe SlackNotificationService do
 
       it "formats warning alerts correctly" do
         setup_mock_client
-        
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           expect(args[:text]).to include("⚠️")
           expect(args[:attachments].first[:color]).to eq("warning")
@@ -92,7 +92,7 @@ RSpec.describe SlackNotificationService do
 
       it "includes details when provided" do
         setup_mock_client
-        
+
         expect(mock_client).to receive(:chat_postMessage) do |args|
           fields = args[:attachments].first[:fields]
           details_field = fields.find { |f| f[:title] == "Details" }
@@ -139,7 +139,7 @@ RSpec.describe SlackNotificationService do
 
     it "sends exposure alerts to risk channel" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage).with(
         hash_including(channel: "#risk-alerts-test")
       )
@@ -149,7 +149,7 @@ RSpec.describe SlackNotificationService do
 
     it "formats exposure data correctly" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("⚠️")
         expect(args[:text]).to include("Portfolio Exposure Report")
@@ -171,7 +171,7 @@ RSpec.describe SlackNotificationService do
 
     it "uses warning color when warnings present" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:attachments].first[:color]).to eq("warning")
       end
@@ -202,7 +202,7 @@ RSpec.describe SlackNotificationService do
 
     it "sends margin alerts to margin channel" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage).with(
         hash_including(channel: "#margin-alerts-test")
       )
@@ -212,7 +212,7 @@ RSpec.describe SlackNotificationService do
 
     it "formats intraday margin correctly" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("🟢")
         expect(args[:text]).to include("INTRADAY_MARGIN")
@@ -240,7 +240,7 @@ RSpec.describe SlackNotificationService do
 
     it "includes transition information" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         fields = args[:attachments].first[:fields]
         transition_field = fields.find { |f| f[:title] == "Next Transition" }
@@ -298,7 +298,7 @@ RSpec.describe SlackNotificationService do
 
     it "handles unknown alert types" do
       setup_mock_client
-      
+
       expect(mock_client).to receive(:chat_postMessage) do |args|
         expect(args[:text]).to include("📢")
         expect(args[:attachments].first[:color]).to eq("good")
