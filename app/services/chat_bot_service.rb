@@ -12,7 +12,10 @@ class ChatBotService
   def process(input)
     track_service_call("process") do
       sanitized_input = sanitize_input(input)
-      return error_response("Invalid input") if sanitized_input.blank?
+      if sanitized_input.blank?
+        error_result = error_response("Invalid input")
+        return format_response(error_result, nil)
+      end
 
       # Get AI interpretation of the command
       ai_response = @ai.process_command(sanitized_input, context: build_context)
@@ -29,7 +32,8 @@ class ChatBotService
     end
   rescue => e
     Rails.logger.error("[ChatBotService] Error processing input: #{e.message}")
-    error_response("Processing failed: #{e.message}")
+    error_result = error_response("Processing failed: #{e.message}")
+    format_response(error_result, nil)
   end
 
   def session_summary
@@ -91,7 +95,7 @@ class ChatBotService
 
   def execute_position_query(params)
     positions = Position.open.limit(10)
-    total_pnl = positions.sum(&:pnl) || 0
+    total_pnl = positions.sum { |p| p.pnl || 0 }
 
     {
       type: "position_data",
@@ -99,7 +103,7 @@ class ChatBotService
         open_positions: positions.count,
         day_trading: positions.day_trading.count,
         swing_trading: positions.swing_trading.count,
-        total_pnl: (total_pnl || 0).round(2),
+        total_pnl: total_pnl.round(2),
         positions: positions.map { |p| position_summary(p) }
       }
     }

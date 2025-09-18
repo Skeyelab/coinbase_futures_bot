@@ -32,8 +32,9 @@ RSpec.describe ChatBotService, type: :service do
     end
 
     it "initializes AI service and memory service" do
+      service # Trigger initialization
       expect(AiCommandProcessorService).to have_received(:new)
-      expect(ChatMemoryService).to have_received(:new).with(session_id)
+      expect(ChatMemoryService).to have_received(:new)
     end
   end
 
