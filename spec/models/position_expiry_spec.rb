@@ -27,9 +27,9 @@ RSpec.describe Position, type: :model do
         expect(result).not_to include(safe_position, closed_position)
       end
 
-      it "returns empty array when no positions expiring within days" do
+      it "returns positions expiring today and expired positions" do
         result = Position.expiring_within_days(0)
-        expect(result).to contain_exactly(expiring_today)
+        expect(result).to contain_exactly(expiring_today, expired_position)
       end
     end
 
@@ -164,7 +164,7 @@ RSpec.describe Position, type: :model do
 
       context "when recent candle data is available but no recent ticks" do
         let!(:old_tick) { create(:tick, product_id: "BIT-27AUG25-CDE", price: 49000, observed_at: 10.minutes.ago) }
-        let!(:recent_candle) { create(:candle, symbol: "BIT-27AUG25-CDE", granularity: 60, close: 50500, timestamp: 3.minutes.ago) }
+        let!(:recent_candle) { create(:candle, symbol: "BIT-27AUG25-CDE", timeframe: "1m", close: 50500, timestamp: 3.minutes.ago) }
 
         it "returns candle close price" do
           expect(position.get_current_market_price).to eq(50500)
@@ -173,7 +173,7 @@ RSpec.describe Position, type: :model do
 
       context "when no recent data is available" do
         let!(:old_tick) { create(:tick, product_id: "BIT-27AUG25-CDE", price: 49000, observed_at: 10.minutes.ago) }
-        let!(:old_candle) { create(:candle, symbol: "BIT-27AUG25-CDE", granularity: 60, close: 50500, timestamp: 10.minutes.ago) }
+        let!(:old_candle) { create(:candle, symbol: "BIT-27AUG25-CDE", timeframe: "1m", close: 50500, timestamp: 10.minutes.ago) }
 
         it "returns nil and logs warning" do
           expect(Rails.logger).to receive(:warn).with(/No recent price data for BIT-27AUG25-CDE/)
@@ -307,7 +307,9 @@ RSpec.describe Position, type: :model do
 
       it "handles errors gracefully" do
         allow(expired_position).to receive(:force_close!).and_raise(StandardError, "Emergency close error")
+        expect(Rails.logger).to receive(:error).with(/EMERGENCY: Found 1 expired positions/)
         expect(Rails.logger).to receive(:error).with(/Failed to close expired position.*Emergency close error/)
+        expect(Rails.logger).to receive(:error).with(/EMERGENCY: Closed 0 expired positions/)
 
         result = Position.emergency_close_expired_positions
         expect(result).to eq(0)
