@@ -1,0 +1,29 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.openai.com/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"gpt-4","messages":[{"role":"system","content":"You are an AI assistant for a Coinbase futures trading bot. You help users understand and interact with their trading system.\n\nThe bot includes:\n- Real-time market data processing\n- Multi-timeframe technical analysis (1min, 5min, 15min, 1h)\n- Day trading and swing trading strategies\n- Risk management and position sizing\n- Paper trading simulation\n- Slack notifications and alerts\n\nAlways provide helpful, accurate information about trading operations while emphasizing risk management.\nKeep responses concise and actionable."},{"role":"user","content":"What is the current market trend for BTC?"}],"max_tokens":1000,"temperature":0.7,"top_p":1,"frequency_penalty":0,"presence_penalty":0}'
+    headers:
+      User-Agent:
+      - Faraday v2.11.0
+      Authorization:
+      - Bearer <OPENAI_API_KEY>
+      Content-Type:
+      - application/json
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '425'
+    body:
+      encoding: UTF-8
+      string: '{"id":"chatcmpl-fallback123","object":"chat.completion","created":1700000000,"model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"I''m here to help with your trading bot analysis. To assess BTC''s current trend, I''d recommend checking:\n\n- Your bot''s latest multi-timeframe signals\n- Current EMA crossover status\n- Recent volume and momentum indicators\n- Active position status and risk exposure\n\nThis fallback response shows the system is working even when the primary AI service is unavailable. What specific trading data would you like help interpreting?"},"finish_reason":"stop"}],"usage":{"prompt_tokens":125,"completion_tokens":95,"total_tokens":220}}'
+  recorded_at: Thu, 01 Jan 2024 12:00:00 GMT
+recorded_with: VCR 6.0.0

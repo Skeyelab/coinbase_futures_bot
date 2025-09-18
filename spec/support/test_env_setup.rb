@@ -31,6 +31,10 @@ RSpec.configure do |config|
     # CryptoPanic API (prevent real API calls)
     ENV["CRYPTOPANIC_API_KEY"] ||= "test-cryptopanic-key"
 
+    # AI Service API keys (prevent real API calls in tests)
+    ENV["OPENROUTER_API_KEY"] ||= "test-openrouter-key"
+    ENV["OPENAI_API_KEY"] ||= "test-openai-key"
+
     puts "✅ Test environment variables configured for CI/GitHub Actions compatibility"
   end
 end

@@ -1,0 +1,33 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://openrouter.ai/api/v1/chat/completions
+    body:
+      encoding: UTF-8
+      string: '{"model":"anthropic/claude-3.5-sonnet","messages":[{"role":"system","content":"You are an AI assistant for a Coinbase futures trading bot. You help users understand and interact with their trading system.\n\nThe bot includes:\n- Real-time market data processing\n- Multi-timeframe technical analysis (1min, 5min, 15min, 1h)\n- Day trading and swing trading strategies\n- Risk management and position sizing\n- Paper trading simulation\n- Slack notifications and alerts\n\nAlways provide helpful, accurate information about trading operations while emphasizing risk management.\nKeep responses concise and actionable.\n\nCurrent context:\nsymbol: BTC-USD\ntimeframe: 1h"},{"role":"user","content":"What is the current market trend for BTC?"}],"max_tokens":1000,"temperature":0.7,"top_p":1,"frequency_penalty":0,"presence_penalty":0}'
+    headers:
+      User-Agent:
+      - Faraday v2.11.0
+      Authorization:
+      - Bearer <OPENROUTER_API_KEY>
+      Content-Type:
+      - application/json
+      Http-Referer:
+      - http://localhost:3000
+      X-Title:
+      - Coinbase Futures Bot
+  response:
+    status:
+      code: 200
+      message: OK
+    headers:
+      Content-Type:
+      - application/json
+      Content-Length:
+      - '542'
+    body:
+      encoding: UTF-8
+      string: '{"id":"gen-1234567890","object":"chat.completion","created":1700000000,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"message":{"role":"assistant","content":"Based on the BTC-USD 1-hour timeframe context, I can help analyze the current market trend. However, I would need access to the latest price data, technical indicators, and recent candle information from your trading system to provide a specific trend analysis.\n\nFor accurate trend assessment, consider checking:\n- Recent EMA crossovers on 15min/1h timeframes\n- Current price relative to key support/resistance levels\n- Volume patterns and momentum indicators\n- Any active signals from your multi-timeframe strategy\n\nWould you like me to help interpret specific technical data or trading signals you''re seeing?"},"finish_reason":"stop"}],"usage":{"prompt_tokens":145,"completion_tokens":120,"total_tokens":265}}'
+  recorded_at: Thu, 01 Jan 2024 12:00:00 GMT
+recorded_with: VCR 6.0.0
