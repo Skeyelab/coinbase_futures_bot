@@ -82,6 +82,17 @@ Rails.application.configure do
     margin_window_monitoring: {
       cron: ENV.fetch("MARGIN_WINDOW_MONITORING_CRON", "*/30 9-17 * * 1-5"), # every 30 min during market hours
       class: "MarginWindowMonitoringJob"
+    },
+    # Contract expiry monitoring - run every 2 hours
+    contract_expiry_monitoring: {
+      cron: ENV.fetch("CONTRACT_EXPIRY_MONITORING_CRON", "0 */2 * * *"), # every 2 hours
+      class: "ContractExpiryMonitoringJob"
+    },
+    # Emergency expiry check - run every hour during market hours
+    emergency_expiry_check: {
+      cron: ENV.fetch("EMERGENCY_EXPIRY_CHECK_CRON", "0 9-17 * * 1-5"), # every hour during market hours
+      class: "ContractExpiryMonitoringJob",
+      args: {emergency_check: true}
     }
   }
 end
