@@ -1,0 +1,86 @@
+name: Sync Documentation to Wiki
+
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'wiki/**'
+      - '.github/workflows/sync-wiki.yml'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Skeyelab/coinbase_futures_bot'
+    
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone wiki repository
+        run: |
+          # Try to clone the wiki repo, create it if it doesn't exist
+          if git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo; then
+            echo "Wiki repository cloned successfully"
+          else
+            echo "Wiki repository doesn't exist yet - will be created on first push"
+            mkdir wiki-repo
+            cd wiki-repo
+            git init
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
+          fi
+
+      - name: Sync documentation files
+        run: |
+          cd wiki-repo
+          
+          # Clear existing content (except .git)
+          find . -type f -not -path './.git/*' -delete
+          
+          # Copy all markdown files from wiki/ directory
+          cp -r ../wiki/* . 2>/dev/null || echo "No files to copy"
+          
+          # Home.md should already exist in wiki/ directory, but verify
+          if [ ! -f "Home.md" ]; then
+            echo "Warning: Home.md not found in wiki/ directory!"
+            echo "The GitHub wiki requires a Home.md file as the main page."
+          fi
+
+      - name: Commit and push changes
+        run: |
+          cd wiki-repo
+          
+          # Add all files
+          git add .
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Commit changes
+          git commit -m "docs: sync documentation from main repo
+          
+          - Automated sync from main repository wiki/ directory
+          - Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          - Source commit: ${{ github.sha }}"
+          
+          # Push changes
+          git push origin master || git push origin main || {
+            echo "Creating new wiki repository..."
+            git push -u origin master
+          }
+
+      - name: Summary
+        run: |
+          echo "✅ Documentation successfully synced to wiki!"
+          echo "📖 Wiki URL: https://github.com/${{ github.repository }}/wiki"
+          echo "🔄 Triggered by changes in: wiki/"
