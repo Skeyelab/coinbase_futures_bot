@@ -12,6 +12,9 @@ class ChatMemoryService
     track_service_call("store") do
       relevance_score = calculate_relevance_score(content, type, profit_impact)
 
+      # Prune old messages first if we have too many (before adding new message)
+      prune_old_messages if @session.chat_messages.count >= 200
+
       @session.chat_messages.create!(
         content: content.to_s.truncate(2000),
         message_type: type.to_s,
@@ -23,9 +26,6 @@ class ChatMemoryService
 
       # Update session activity
       @session.touch
-
-      # Prune old messages to keep database lean
-      prune_old_messages if @session.chat_messages.count > 200
     end
   end
 
@@ -40,18 +40,21 @@ class ChatMemoryService
   end
 
   def context_for_ai(max_tokens = 4000)
-    # Get recent profitable messages with simple token management
-    messages = @session.chat_messages.profitable.recent.limit(20)
+    # Get recent profitable messages with proper token management
+    messages = @session.chat_messages.profitable.recent
 
-    # Simple token estimation and truncation
+    # Token estimation and truncation with proper limit
     context_parts = []
     estimated_tokens = 0
 
     messages.each do |msg|
-      msg_tokens = (msg.content.length / 4).to_i # ~4 chars per token
+      # More accurate token estimation: ~4 chars per token for content + overhead
+      msg_content = "#{msg.message_type}: #{msg.content}"
+      msg_tokens = (msg_content.length / 4).to_i
+
       break if estimated_tokens + msg_tokens > max_tokens
 
-      context_parts << "#{msg.message_type}: #{msg.content}"
+      context_parts << msg_content
       estimated_tokens += msg_tokens
     end
 
@@ -102,14 +105,10 @@ class ChatMemoryService
     end
 
     # Boost for trading keywords
-    if content.match?(/position|signal|profit|loss|entry|exit|trade|market/i)
-      base_score += 0.5
-    end
+    base_score += 0.5 if content.match?(/position|signal|profit|loss|entry|exit|trade|market/i)
 
     # Boost for successful commands
-    if type.to_s == "bot" && content.match?(/success|completed|executed/i)
-      base_score += 0.5
-    end
+    base_score += 0.5 if type.to_s == "bot" && content.match?(/success|completed|executed/i)
 
     [base_score, 5.0].min
   end
@@ -153,6 +152,7 @@ class ChatMemoryService
 
   def prune_old_messages
     # Keep only top 100 messages by relevance and recency
+    # This will be called when we have 201+ messages, so we keep 100 and add 1 new = 101 total
     keeper_ids = @session.chat_messages
       .order(relevance_score: :desc, timestamp: :desc)
       .limit(100)

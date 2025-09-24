@@ -56,11 +56,11 @@ namespace :chat_bot do
         # Built-in CLI commands (processed locally without AI)
         case input.downcase
         when /^history\s*(\d+)?$/
-          limit = $1&.to_i || 10
+          limit = Regexp.last_match(1)&.to_i || 10
           show_local_history(bot, limit)
           next
         when /^search\s+(.+)$/
-          query = $1.strip
+          query = Regexp.last_match(1).strip
           show_search_results(bot, query)
           next
         when /^sessions$/
@@ -70,7 +70,7 @@ namespace :chat_bot do
           show_context_status(bot)
           next
         when /^new[-_]?session(?:\s+(.+))?$/
-          name = $1&.strip
+          name = Regexp.last_match(1)&.strip
           session_id = start_new_session(name)
           bot = ChatBotService.new(session_id)
           puts "Started new session: #{session_id[0..7]} - #{name || "Unnamed"}"
@@ -180,10 +180,10 @@ namespace :chat_bot do
     sessions = ChatSession.active.recent.limit(10)
     current_id = bot.instance_variable_get(:@session_id)
 
-    puts "💬 Active Chat Sessions:"
+    puts "\u{1F4AC} Active Chat Sessions:"
     if sessions.any?
       sessions.each_with_index do |session, i|
-        marker = (session.session_id == current_id) ? "→" : " "
+        marker = (session.session_id == current_id) ? "\u2192" : " "
         puts "#{marker} #{i + 1}. #{session.session_id[0..7]} - #{session.name || "Unnamed"}"
         puts "    Messages: #{session.message_count} (#{session.profitable_messages.count} profitable)"
         puts "    Last: #{session.last_activity&.strftime("%m/%d %H:%M") || "N/A"}"
@@ -199,7 +199,7 @@ namespace :chat_bot do
     memory_service = ChatMemoryService.new(bot.instance_variable_get(:@session_id))
     context_length = memory_service.context_for_ai(4000).length
 
-    puts "🧠 Context Status:"
+    puts "\u{1F9E0} Context Status:"
     puts "Session: #{summary[:session_id][0..7]}"
     puts "Messages: #{summary[:total_interactions]} (#{summary[:profitable_messages]} profitable)"
     puts "Context Length: #{context_length} chars (~#{(context_length / 4).to_i} tokens)"

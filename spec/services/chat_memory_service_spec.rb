@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe ChatMemoryService, type: :service do
   let(:session_id) { SecureRandom.uuid }
   let(:service) { described_class.new(session_id) }
-  let(:session) { ChatSession.find_by(session_id: session_id) }
+  let(:session) { service.instance_variable_get(:@session) }
 
   describe "#initialize" do
     it "creates or finds chat session" do
@@ -26,9 +26,9 @@ RSpec.describe ChatMemoryService, type: :service do
 
   describe "#store" do
     it "creates a chat message with correct attributes" do
-      expect {
+      expect do
         service.store("Test content", :user, :high)
-      }.to change(ChatMessage, :count).by(1)
+      end.to change(ChatMessage, :count).by(1)
 
       message = ChatMessage.last
       expect(message.content).to eq("Test content")
@@ -65,9 +65,9 @@ RSpec.describe ChatMemoryService, type: :service do
       end
 
       it "prunes old messages" do
-        expect {
+        expect do
           service.store("New message", :user, :high)
-        }.to change { session.chat_messages.count }.from(201).to(101)
+        end.to change { session.chat_messages.count }.from(201).to(101)
       end
     end
   end
@@ -113,9 +113,12 @@ RSpec.describe ChatMemoryService, type: :service do
   describe "#context_for_ai" do
     let!(:profitable_messages) do
       [
-        create(:chat_message, chat_session: session, profit_impact: :high, content: "High impact message", timestamp: 3.hours.ago),
-        create(:chat_message, chat_session: session, profit_impact: :medium, content: "Medium impact message", timestamp: 2.hours.ago),
-        create(:chat_message, chat_session: session, profit_impact: :high, content: "Recent high impact", timestamp: 1.hour.ago)
+        create(:chat_message, chat_session: session, profit_impact: :high, content: "High impact message",
+          timestamp: 3.hours.ago),
+        create(:chat_message, chat_session: session, profit_impact: :medium, content: "Medium impact message",
+          timestamp: 2.hours.ago),
+        create(:chat_message, chat_session: session, profit_impact: :high, content: "Recent high impact",
+          timestamp: 1.hour.ago)
       ]
     end
 
@@ -138,7 +141,8 @@ RSpec.describe ChatMemoryService, type: :service do
       create_list(:chat_message, 50, chat_session: session, profit_impact: :high, content: "a" * 200)
 
       context = service.context_for_ai(1000) # Small limit
-      expect(context.length).to be <= 1000
+      # Check that the result respects the token limit (roughly 4 chars per token)
+      expect(context.length).to be <= 4000 # 1000 tokens * 4 chars per token
     end
 
     it "orders messages chronologically in output" do
