@@ -3,195 +3,306 @@
 require "rails_helper"
 
 RSpec.describe ChatMemoryService, type: :service do
-  let(:session_id) { "test-session-456" }
+  let(:session_id) { SecureRandom.uuid }
   let(:service) { described_class.new(session_id) }
-  let(:cache_key) { "chat_session:#{session_id}" }
-
-  before do
-    Rails.cache.clear
-  end
+  let(:session) { service.instance_variable_get(:@session) }
 
   describe "#initialize" do
-    it "sets session_id and cache_key" do
-      expect(service.instance_variable_get(:@session_id)).to eq(session_id)
-      expect(service.instance_variable_get(:@cache_key)).to eq(cache_key)
+    it "creates or finds chat session" do
+      expect { service }.to change(ChatSession, :count).by(1)
+      expect(session).to be_present
+      expect(session.session_id).to eq(session_id)
+    end
+
+    context "when session already exists" do
+      let!(:existing_session) { create(:chat_session, session_id: session_id) }
+
+      it "uses existing session" do
+        expect { service }.not_to change(ChatSession, :count)
+        expect(service.instance_variable_get(:@session)).to eq(existing_session)
+      end
     end
   end
 
   describe "#store" do
-    let(:input) { "Show me my positions" }
-    let(:result) { {type: "position_data", data: {}} }
+    it "creates a chat message with correct attributes" do
+      expect do
+        service.store("Test content", :user, :high)
+      end.to change(ChatMessage, :count).by(1)
 
-    it "stores interaction in cache" do
-      service.store(input, result)
-
-      memory = Rails.cache.read(cache_key)
-      expect(memory).not_to be_empty
-
-      interaction = memory.values.first
-      expect(interaction[:input]).to eq(input)
-      expect(interaction[:command_type]).to eq("position_data")
-      expect(interaction[:timestamp]).to be_present
+      message = ChatMessage.last
+      expect(message.content).to eq("Test content")
+      expect(message.message_type).to eq("user")
+      expect(message.profit_impact).to eq("high")
+      expect(message.chat_session).to eq(session)
     end
 
-    it "truncates long input" do
-      long_input = "a" * 300
-      service.store(long_input, result)
-
-      memory = Rails.cache.read(cache_key)
-      interaction = memory.values.first
-      expect(interaction[:input].length).to be <= 200
-      expect(interaction[:input]).to end_with("...")
+    it "calculates relevance score based on profit impact" do
+      service.store("Trading position", :user, :high)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(5.0)
     end
 
-    it "keeps only last 50 interactions" do
-      base_time = Time.current
-      # Store 55 interactions with incrementing timestamps
-      55.times do |i|
-        travel_to(base_time + i.seconds) do
-          service.store("input #{i}", {type: "test", data: {}})
-        end
+    it "truncates long content" do
+      long_content = "a" * 3000
+      service.store(long_content, :user, :unknown)
+      message = ChatMessage.last
+      expect(message.content.length).to eq(2000)
+    end
+
+    it "updates session timestamp" do
+      service # Ensure session is created
+      original_time = session.updated_at
+      travel_to(1.hour.from_now) do
+        service.store("Test", :user)
+        expect(session.reload.updated_at).to be > original_time
+      end
+    end
+
+    context "when session has too many messages" do
+      before do
+        create_list(:chat_message, 201, chat_session: session)
       end
 
-      memory = Rails.cache.read(cache_key)
-      expect(memory.size).to eq(50)
+      it "prunes old messages" do
+        expect do
+          service.store("New message", :user, :high)
+        end.to change { session.chat_messages.count }.from(201).to(101)
+      end
+    end
+  end
 
-      # Should keep the most recent ones (5-54)
-      expect(memory.values.first[:input]).to include("input 5")
-      expect(memory.values.last[:input]).to include("input 54")
+  describe "#store_user_input" do
+    it "determines profit impact from input content" do
+      service.store_user_input("Check my position")
+      message = ChatMessage.last
+      expect(message.profit_impact).to eq("high")
+      expect(message.message_type).to eq("user")
+    end
+
+    it "assigns medium impact for market queries" do
+      service.store_user_input("Show market data")
+      message = ChatMessage.last
+      expect(message.profit_impact).to eq("medium")
+    end
+
+    it "assigns low impact for help queries" do
+      service.store_user_input("What can you help me with?")
+      message = ChatMessage.last
+      expect(message.profit_impact).to eq("low")
+    end
+  end
+
+  describe "#store_bot_response" do
+    it "determines profit impact from command result" do
+      command_result = {type: "position_data", data: {}}
+      service.store_bot_response("Position summary", command_result)
+
+      message = ChatMessage.last
+      expect(message.profit_impact).to eq("high")
+      expect(message.message_type).to eq("bot")
+    end
+
+    it "analyzes response content for trading relevance" do
+      service.store_bot_response("Your profit is $1000", nil)
+      message = ChatMessage.last
+      expect(message.profit_impact).to eq("medium")
+    end
+  end
+
+  describe "#context_for_ai" do
+    let!(:profitable_messages) do
+      [
+        create(:chat_message, chat_session: session, profit_impact: :high, content: "High impact message",
+          timestamp: 3.hours.ago),
+        create(:chat_message, chat_session: session, profit_impact: :medium, content: "Medium impact message",
+          timestamp: 2.hours.ago),
+        create(:chat_message, chat_session: session, profit_impact: :high, content: "Recent high impact",
+          timestamp: 1.hour.ago)
+      ]
+    end
+
+    let!(:non_profitable_messages) do
+      create_list(:chat_message, 5, chat_session: session, profit_impact: :unknown, timestamp: 4.hours.ago)
+    end
+
+    it "returns only profitable messages" do
+      context = service.context_for_ai(4000)
+      expect(context).to include("High impact message")
+      expect(context).to include("Medium impact message")
+      expect(context).to include("Recent high impact")
+      non_profitable_messages.each do |msg|
+        expect(context).not_to include(msg.content)
+      end
+    end
+
+    it "respects token limits" do
+      # Create messages that would exceed token limit
+      create_list(:chat_message, 50, chat_session: session, profit_impact: :high, content: "a" * 200)
+
+      context = service.context_for_ai(1000) # Small limit
+      # Check that the result respects the token limit (roughly 4 chars per token)
+      expect(context.length).to be <= 4000 # 1000 tokens * 4 chars per token
+    end
+
+    it "orders messages chronologically in output" do
+      context = service.context_for_ai(4000)
+      lines = context.split("\n")
+
+      # Should be in chronological order (oldest first in final output)
+      expect(lines.first).to include("High impact message")
+      expect(lines.last).to include("Recent high impact")
     end
   end
 
   describe "#recent_interactions" do
-    before do
-      base_time = Time.current
-      5.times do |i|
-        travel_to(base_time + i.seconds) do
-          service.store("input #{i}", {type: "test_#{i}", data: {}})
-        end
-      end
+    let!(:messages) do
+      [
+        create(:chat_message, chat_session: session, content: "First message", timestamp: 3.hours.ago),
+        create(:chat_message, chat_session: session, content: "Second message", timestamp: 2.hours.ago),
+        create(:chat_message, chat_session: session, content: "Third message", timestamp: 1.hour.ago)
+      ]
     end
 
-    it "returns recent interactions in order" do
-      interactions = service.recent_interactions(3)
-      expect(interactions.size).to eq(3)
-      expect(interactions.first[:input]).to include("input 2")
-      expect(interactions.last[:input]).to include("input 4")
+    it "returns recent interactions in correct format" do
+      interactions = service.recent_interactions(2)
+
+      expect(interactions.length).to eq(2)
+      expect(interactions.first[:input]).to eq("Third message")
+      expect(interactions.last[:input]).to eq("Second message")
     end
 
-    it "returns all interactions if limit is higher than stored" do
-      interactions = service.recent_interactions(10)
-      expect(interactions.size).to eq(5)
-    end
-
-    it "returns empty array for new session" do
-      new_service = described_class.new("new-session")
-      interactions = new_service.recent_interactions
-      expect(interactions).to be_empty
+    it "includes timestamp in ISO format" do
+      interactions = service.recent_interactions(1)
+      expect(interactions.first[:timestamp]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
     end
   end
 
-  describe "#interaction_count" do
-    it "returns zero for new session" do
-      expect(service.interaction_count).to eq(0)
+  describe "#search_history" do
+    let!(:matching_messages) do
+      [
+        create(:chat_message, chat_session: session, content: "BTC position update", profit_impact: :high),
+        create(:chat_message, chat_session: session, content: "Bitcoin trading signal", profit_impact: :medium)
+      ]
     end
 
-    it "returns correct count after storing interactions" do
-      base_time = Time.current
-      3.times do |i|
-        travel_to(base_time + i.seconds) do
-          service.store("input #{i}", {type: "test", data: {}})
-        end
-      end
-      expect(service.interaction_count).to eq(3)
-    end
-  end
-
-  describe "#last_command_type" do
-    it "returns nil for new session" do
-      expect(service.last_command_type).to be_nil
+    let!(:non_matching_messages) do
+      create_list(:chat_message, 3, chat_session: session, content: "ETH market data", profit_impact: :low)
     end
 
-    it "returns last command type" do
-      service.store("first", {type: "position_query", data: {}})
-      service.store("second", {type: "signal_query", data: {}})
-
-      expect(service.last_command_type).to eq("signal_query")
-    end
-  end
-
-  describe "#clear_session" do
-    before do
-      service.store("test input", {type: "test", data: {}})
+    it "finds messages matching query" do
+      results = service.search_history("BTC")
+      expect(results.length).to eq(1)
+      expect(results.first[0]).to include("BTC position update")
     end
 
-    it "clears session data from cache" do
-      expect(Rails.cache.read(cache_key)).not_to be_nil
+    it "searches case-insensitively" do
+      results = service.search_history("bitcoin")
+      expect(results.length).to eq(1)
+      expect(results.first[0]).to include("Bitcoin trading signal")
+    end
 
-      service.clear_session
+    it "returns only profitable messages" do
+      results = service.search_history("market")
+      expect(results).to be_empty # ETH messages are low profit impact
+    end
 
-      expect(Rails.cache.read(cache_key)).to be_nil
+    it "limits results to 10" do
+      create_list(:chat_message, 15, chat_session: session, content: "BTC test", profit_impact: :high)
+      results = service.search_history("BTC")
+      expect(results.length).to eq(10)
     end
   end
 
   describe "#session_summary" do
-    before do
-      base_time = Time.current
-      travel_to(base_time) do
-        service.store("first input", {type: "position_query", data: {}})
-      end
-      travel_to(base_time + 1.second) do
-        service.store("second input", {type: "signal_query", data: {}})
-      end
-      travel_to(base_time + 2.seconds) do
-        service.store("third input", {type: "position_query", data: {}})
-      end
+    let!(:messages) do
+      [
+        create(:chat_message, chat_session: session, profit_impact: :high),
+        create(:chat_message, chat_session: session, profit_impact: :medium),
+        create(:chat_message, chat_session: session, profit_impact: :low)
+      ]
     end
 
-    it "returns comprehensive session summary" do
+    it "returns comprehensive session information" do
       summary = service.session_summary
 
       expect(summary[:session_id]).to eq(session_id)
       expect(summary[:total_interactions]).to eq(3)
+      expect(summary[:profitable_messages]).to eq(2)
+      expect(summary[:active]).to be true
       expect(summary[:last_activity]).to be_present
-      expect(summary[:command_types]).to contain_exactly("position_query", "signal_query")
-    end
-
-    it "returns empty summary for new session" do
-      new_service = described_class.new("empty-session")
-      summary = new_service.session_summary
-
-      expect(summary[:session_id]).to eq("empty-session")
-      expect(summary[:total_interactions]).to eq(0)
-      expect(summary[:last_activity]).to be_nil
-      expect(summary[:command_types]).to be_empty
     end
   end
 
-  describe "cache expiration" do
-    it "sets 24 hour expiration on memory" do
-      service.store("test", {type: "test", data: {}})
+  describe "#clear_session" do
+    let!(:messages) { create_list(:chat_message, 5, chat_session: session) }
 
-      # Check that cache key exists
-      expect(Rails.cache.exist?(cache_key)).to be true
-
-      # Simulate time passage (we can't actually test 24 hours easily)
-      # But we can verify the cache was written with expiration
-      expect(Rails.cache.read(cache_key)).not_to be_nil
+    it "destroys all messages in session" do
+      expect { service.clear_session }.to change { session.chat_messages.count }.from(5).to(0)
     end
   end
 
-  describe "memory persistence" do
-    it "persists memory across service instances" do
-      # Store with first instance
-      service.store("persistent test", {type: "test", data: {}})
+  describe "#deactivate_session" do
+    it "sets session as inactive" do
+      expect { service.deactivate_session }.to change { session.reload.active }.from(true).to(false)
+    end
+  end
 
-      # Create new instance with same session_id
-      new_service = described_class.new(session_id)
+  describe "relevance scoring behavior" do
+    it "assigns high score for high profit impact" do
+      service.store("Test", :user, :high)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(5.0)
+    end
 
-      # Should have same memory
-      expect(new_service.interaction_count).to eq(1)
-      expect(new_service.last_command_type).to eq("test")
+    it "boosts score for trading keywords" do
+      service.store("position update", :user, :low)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(2.5) # 2.0 base + 0.5 boost
+    end
+
+    it "boosts score for successful bot responses" do
+      service.store("success: order executed", :bot, :unknown)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(1.5) # 1.0 base + 0.5 boost
+    end
+
+    it "caps score at 5.0" do
+      service.store("successful position trade completed", :bot, :high)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(5.0) # Would be 6.0 but capped
+    end
+  end
+
+  describe "message pruning behavior" do
+    it "automatically prunes when session exceeds 200 messages" do
+      # Create 201 messages to trigger pruning
+      create_list(:chat_message, 50, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
+      create_list(:chat_message, 50, chat_session: session, relevance_score: 3.0, timestamp: 3.hours.ago)
+      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+
+      # This should trigger pruning automatically
+      service.store("New message", :user, :high)
+
+      # Should be pruned down to 101 messages (100 kept + 1 new)
+      expect(session.chat_messages.count).to eq(101)
+    end
+
+    it "prioritizes high relevance messages during pruning" do
+      # Create mix of low and high relevance messages beyond threshold
+      create_list(:chat_message, 100, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
+      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+
+      # Trigger pruning
+      service.store("New message", :user, :high)
+
+      remaining_scores = session.chat_messages.pluck(:relevance_score)
+      # Should keep all high relevance messages and few/no low relevance
+      high_count = remaining_scores.count(5.0)
+      low_count = remaining_scores.count(1.0)
+
+      expect(high_count).to be > low_count
+      expect(remaining_scores.max).to eq(5.0) # High scores are preserved
     end
   end
 end
