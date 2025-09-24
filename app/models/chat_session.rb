@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 class ChatSession < ApplicationRecord
-  has_many :chat_messages, dependent: :destroy, counter_cache: true
+  has_many :chat_messages, dependent: :destroy
 
   validates :session_id, presence: true, uniqueness: true
   validates :active, inclusion: {in: [true, false]}
 
   scope :recent, -> { order(updated_at: :desc) }
   scope :active, -> { where(active: true) }
-  scope :profitable, -> { joins(:chat_messages).where(chat_messages: {profit_impact: %w[medium high]}).distinct }
+  scope :profitable, -> { where(id: ChatMessage.where(profit_impact: %w[medium high]).select(:chat_session_id)) }
 
   def self.find_or_create_by_session_id(session_id)
     find_or_create_by(session_id: session_id)
