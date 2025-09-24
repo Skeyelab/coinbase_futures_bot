@@ -8,15 +8,18 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 
 ## Features
 
+- **🤖 AI-Powered Chat Interface**: Natural language command processing with OpenRouter (Claude 3.5) and ChatGPT fallback
 - **Multi-timeframe Trading Strategies**: 1h trend analysis, 15m confirmation, 5m entry signals, 1m micro-timing
 - **Real-time Market Data**: WebSocket integration with Coinbase spot and futures APIs
 - **🔔 Real-Time Signal Generation**: Live trading signals based on real-time market data with WebSocket broadcasting
+- **Trading Control**: Start/stop trading, emergency stop, position sizing through chat interface
 - **Sentiment Analysis**: News sentiment integration with CryptoPanic API and lexicon-based scoring
 - **Risk Management**: Position sizing, stop losses, take profits, and futures contract management
 - **Paper Trading**: Comprehensive simulation and backtesting framework
 - **Background Processing**: Reliable job processing with GoodJob and PostgreSQL
 - **REST & WebSocket APIs**: Full API access to signals, statistics, and real-time updates
 - **Comprehensive Testing**: Full test suite with VCR for API interactions
+- **Security & Audit**: Comprehensive logging and compliance tracking for trading operations
 
 ## Technology Stack
 
@@ -24,6 +27,7 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 - **Language**: Ruby 3.2.2
 - **Database**: PostgreSQL with time-series optimizations
 - **Jobs**: GoodJob with cron scheduling
+- **AI Services**: OpenRouter (Claude 3.5 Sonnet), OpenAI (GPT-4)
 - **Testing**: RSpec with comprehensive coverage
 - **APIs**: Coinbase Advanced Trade, Exchange API, CryptoPanic
 
@@ -174,6 +178,33 @@ bin/rake day_trading:manage            # Run full management cycle
 # View sentiment data
 curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 ```
+
+### AI-Powered Chat Interface 🤖
+
+The bot includes a comprehensive AI-powered chat interface for natural language interaction:
+
+```bash
+# Start the interactive chat interface
+bin/rails chat_bot:start
+
+# Resume your last session
+bin/rails chat_bot:start --resume
+
+# Example natural language commands:
+FuturesBot> show my positions
+FuturesBot> what signals are active?
+FuturesBot> start trading
+FuturesBot> emergency stop
+FuturesBot> BTC price
+FuturesBot> help
+```
+
+**Key Features:**
+- **Natural Language Processing**: Uses OpenRouter (Claude 3.5) with ChatGPT fallback
+- **Trading Control**: Start/stop operations, emergency stop, position management
+- **Persistent Memory**: Cross-session conversation history with profit-focused scoring
+- **Comprehensive Audit**: Security logging for compliance and operational tracking
+- **Multi-Session Support**: Resume conversations across different sessions
 
 ### Real-Time Signal System 🔔
 
