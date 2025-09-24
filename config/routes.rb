@@ -57,12 +57,22 @@ Rails.application.routes.draw do
 
   get "/sentiment/aggregates", to: "sentiment#aggregates"
 
+  # Chat interface routes
+  get "/chat", to: "chat#index"
+
   # API routes
   namespace :api do
     resources :positions, only: [:index] do
       collection do
         get :summary
         get :exposure
+      end
+    end
+
+    resources :chat_messages, only: [:create, :index] do
+      collection do
+        post :send_message
+        get :conversation_history
       end
     end
   end
