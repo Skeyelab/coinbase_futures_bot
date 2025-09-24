@@ -85,8 +85,6 @@ class RealTimeSignalJob < ApplicationJob
 
   # Class methods for job management
   class << self
-    private
-
     def start_realtime_evaluation(interval_seconds: 30)
       Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
 
