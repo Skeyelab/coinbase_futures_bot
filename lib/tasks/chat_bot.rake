@@ -107,9 +107,7 @@ namespace :chat_bot do
     end
   end
 
-  private
-
-  def parse_cli_options(args)
+  def self.parse_cli_options(args)
     options = {}
 
     args.each_with_index do |arg, i|
@@ -124,7 +122,7 @@ namespace :chat_bot do
     options
   end
 
-  def resume_last_session
+  def self.resume_last_session
     last_session = ChatSession.active.recent.first
     if last_session
       last_session.session_id
@@ -134,7 +132,7 @@ namespace :chat_bot do
     end
   end
 
-  def start_new_session(name = nil)
+  def self.start_new_session(name = nil)
     session_id = SecureRandom.uuid
     ChatSession.create!(
       session_id: session_id,
@@ -144,7 +142,7 @@ namespace :chat_bot do
     session_id
   end
 
-  def show_local_history(bot, limit)
+  def self.show_local_history(bot, limit)
     bot.session_summary
     memory_service = ChatMemoryService.new(bot.instance_variable_get(:@session_id))
     history = memory_service.recent_interactions(limit)
@@ -161,7 +159,7 @@ namespace :chat_bot do
     puts
   end
 
-  def show_search_results(bot, query)
+  def self.show_search_results(bot, query)
     memory_service = ChatMemoryService.new(bot.instance_variable_get(:@session_id))
     results = memory_service.search_history(query)
 
@@ -178,7 +176,7 @@ namespace :chat_bot do
     puts
   end
 
-  def show_sessions_list(bot)
+  def self.show_sessions_list(bot)
     sessions = ChatSession.active.recent.limit(10)
     current_id = bot.instance_variable_get(:@session_id)
 
@@ -196,7 +194,7 @@ namespace :chat_bot do
     puts
   end
 
-  def show_context_status(bot)
+  def self.show_context_status(bot)
     summary = bot.session_summary
     memory_service = ChatMemoryService.new(bot.instance_variable_get(:@session_id))
     context_length = memory_service.context_for_ai(4000).length

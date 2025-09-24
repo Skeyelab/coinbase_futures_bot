@@ -25,7 +25,7 @@ class ChatMemoryService
       @session.touch
 
       # Prune old messages to keep database lean
-      prune_old_messages if @session.message_count > 200
+      prune_old_messages if @session.chat_messages.count > 200
     end
   end
 

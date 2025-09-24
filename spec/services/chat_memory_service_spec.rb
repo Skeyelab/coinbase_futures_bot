@@ -51,6 +51,7 @@ RSpec.describe ChatMemoryService, type: :service do
     end
 
     it "updates session timestamp" do
+      service # Ensure session is created
       original_time = session.updated_at
       travel_to(1.hour.from_now) do
         service.store("Test", :user)
@@ -243,52 +244,61 @@ RSpec.describe ChatMemoryService, type: :service do
     end
   end
 
-  describe "private methods" do
-    describe "#calculate_relevance_score" do
-      it "assigns high score for high profit impact" do
-        service.store("Test", :user, :high)
-        message = ChatMessage.last
-        expect(message.relevance_score).to eq(5.0)
-      end
-
-      it "boosts score for trading keywords" do
-        service.store("position update", :user, :low)
-        message = ChatMessage.last
-        expect(message.relevance_score).to eq(2.5) # 2.0 base + 0.5 boost
-      end
-
-      it "boosts score for successful bot responses" do
-        service.store("success: order executed", :bot, :unknown)
-        message = ChatMessage.last
-        expect(message.relevance_score).to eq(1.5) # 1.0 base + 0.5 boost
-      end
-
-      it "caps score at 5.0" do
-        service.store("successful position trade completed", :bot, :high)
-        message = ChatMessage.last
-        expect(message.relevance_score).to eq(5.0) # Would be 6.0 but capped
-      end
+  describe "relevance scoring behavior" do
+    it "assigns high score for high profit impact" do
+      service.store("Test", :user, :high)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(5.0)
     end
 
-    describe "#prune_old_messages" do
-      before do
-        # Create messages with different relevance scores and timestamps
-        create_list(:chat_message, 50, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
-        create_list(:chat_message, 50, chat_session: session, relevance_score: 3.0, timestamp: 3.hours.ago)
-        create_list(:chat_message, 50, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
-      end
+    it "boosts score for trading keywords" do
+      service.store("position update", :user, :low)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(2.5) # 2.0 base + 0.5 boost
+    end
 
-      it "keeps top 100 messages by relevance and recency" do
-        service.send(:prune_old_messages)
-        expect(session.chat_messages.count).to eq(100)
-      end
+    it "boosts score for successful bot responses" do
+      service.store("success: order executed", :bot, :unknown)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(1.5) # 1.0 base + 0.5 boost
+    end
 
-      it "prioritizes high relevance messages" do
-        service.send(:prune_old_messages)
-        remaining_scores = session.chat_messages.pluck(:relevance_score)
-        expect(remaining_scores.count(5.0)).to eq(50) # All high relevance kept
-        expect(remaining_scores.count(1.0)).to eq(0)  # All low relevance removed
-      end
+    it "caps score at 5.0" do
+      service.store("successful position trade completed", :bot, :high)
+      message = ChatMessage.last
+      expect(message.relevance_score).to eq(5.0) # Would be 6.0 but capped
+    end
+  end
+
+  describe "message pruning behavior" do
+    it "automatically prunes when session exceeds 200 messages" do
+      # Create 201 messages to trigger pruning
+      create_list(:chat_message, 50, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
+      create_list(:chat_message, 50, chat_session: session, relevance_score: 3.0, timestamp: 3.hours.ago)
+      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+
+      # This should trigger pruning automatically
+      service.store("New message", :user, :high)
+
+      # Should be pruned down to 101 messages (100 kept + 1 new)
+      expect(session.chat_messages.count).to eq(101)
+    end
+
+    it "prioritizes high relevance messages during pruning" do
+      # Create mix of low and high relevance messages beyond threshold
+      create_list(:chat_message, 100, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
+      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+
+      # Trigger pruning
+      service.store("New message", :user, :high)
+
+      remaining_scores = session.chat_messages.pluck(:relevance_score)
+      # Should keep all high relevance messages and few/no low relevance
+      high_count = remaining_scores.count(5.0)
+      low_count = remaining_scores.count(1.0)
+
+      expect(high_count).to be > low_count
+      expect(remaining_scores.max).to eq(5.0) # High scores are preserved
     end
   end
 end

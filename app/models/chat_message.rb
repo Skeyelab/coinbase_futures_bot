@@ -3,6 +3,11 @@
 class ChatMessage < ApplicationRecord
   belongs_to :chat_session
 
+  # Token estimation constant for AI context management
+  # Conservative estimate: ~50 tokens per message (includes content + metadata)
+  # Based on typical message length and GPT tokenization patterns
+  ESTIMATED_TOKENS_PER_MESSAGE = 50
+
   validates :content, presence: true
   validates :message_type, presence: true, inclusion: {in: %w[user bot system]}
   validates :timestamp, presence: true
@@ -21,8 +26,8 @@ class ChatMessage < ApplicationRecord
   before_validation :set_timestamp, if: -> { timestamp.blank? }
 
   def self.for_ai_context(max_tokens = 4000)
-    # Simple token estimation: ~4 characters per token
-    max_messages = [max_tokens / 50, 50].min # Conservative estimate
+    # Calculate maximum messages based on token estimation
+    max_messages = [max_tokens / ESTIMATED_TOKENS_PER_MESSAGE, 50].min
 
     profitable.recent.limit(max_messages)
   end
