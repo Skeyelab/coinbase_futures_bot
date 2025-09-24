@@ -39,6 +39,14 @@ Rails.application.routes.draw do
     end
   end
 
+  # Position import routes
+  namespace :position_import do
+    get :index
+    post :import
+    post :replace
+    get :test_connection
+  end
+
   # Real-time signal API endpoints
   resources :signals, only: %i[index show], controller: "signal" do
     collection do
