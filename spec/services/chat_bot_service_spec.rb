@@ -100,7 +100,9 @@ RSpec.describe ChatBotService, type: :service do
     end
 
     describe "position queries" do
-      let(:position) { create(:position, product_id: "BTC-PERP", side: "LONG", size: 1.0, entry_price: 50000, status: "OPEN") }
+      let(:position) do
+        create(:position, product_id: "BTC-PERP", side: "LONG", size: 1.0, entry_price: 50_000, status: "OPEN")
+      end
 
       before do
         position
@@ -130,7 +132,7 @@ RSpec.describe ChatBotService, type: :service do
     end
 
     describe "market data queries" do
-      let(:candle) { create(:candle, symbol: "BTC-PERP", close: 51000.50, timestamp: 1.minute.ago) }
+      let(:candle) { create(:candle, symbol: "BTC-PERP", close: 51_000.50, timestamp: 1.minute.ago) }
 
       before do
         candle
@@ -176,7 +178,7 @@ RSpec.describe ChatBotService, type: :service do
         session_id: session_id,
         total_interactions: 5,
         last_activity: "2025-01-01T12:00:00Z",
-        command_types: ["position_query", "signal_query"]
+        command_types: %w[position_query signal_query]
       }
 
       allow(memory_service).to receive(:session_summary).and_return(expected_summary)
@@ -196,7 +198,7 @@ RSpec.describe ChatBotService, type: :service do
           swing_trading: 1,
           total_pnl: 150.50,
           positions: [
-            {symbol: "BTC-PERP", side: "LONG", size: 1.0, entry_price: 50000.0, pnl: "$75.25"}
+            {symbol: "BTC-PERP", side: "LONG", size: 1.0, entry_price: 50_000.0, pnl: "$75.25"}
           ]
         }
       }
@@ -204,7 +206,7 @@ RSpec.describe ChatBotService, type: :service do
 
     it "formats position responses correctly" do
       formatted = service.send(:format_response, position_data, {type: "position_query"})
-      expect(formatted).to include("📊 Positions Summary")
+      expect(formatted).to include("\u{1F4CA} Positions Summary")
       expect(formatted).to include("Open: 2")
       expect(formatted).to include("Total PnL: $150.5")
       expect(formatted).to include("LONG 1.0 BTC-PERP")
@@ -213,7 +215,7 @@ RSpec.describe ChatBotService, type: :service do
     it "formats error responses correctly" do
       error_data = {type: "error", message: "Something went wrong"}
       formatted = service.send(:format_response, error_data, {})
-      expect(formatted).to eq("❌ Something went wrong")
+      expect(formatted).to eq("\u274C Something went wrong")
     end
   end
 

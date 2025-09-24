@@ -29,6 +29,11 @@ This guide will help you set up and run the Coinbase Futures Bot locally for dev
    - Slack workspace for notifications
    - Bot token for posting messages
 
+4. **AI Services** (For Chat Bot Interface)
+   - OpenRouter API key (primary AI provider - Claude 3.5 Sonnet)
+   - OpenAI API key (fallback AI provider - GPT-4)
+   - Both optional - fallback to pattern matching if unavailable
+
 ## Installation
 
 ### 1. Clone the Repository
@@ -157,6 +162,11 @@ GENERATE_SIGNALS_CRON="*/15 * * * *" # Generate signals every 15 minutes
 SLACK_BOT_TOKEN=xoxb-your-bot-token
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
 SLACK_AUTHORIZED_USERS=U1234567,U7890123  # Comma-separated user IDs
+
+# AI Chat Bot Configuration (Optional)
+OPENROUTER_API_KEY=your_openrouter_api_key  # Primary AI provider (Claude 3.5 Sonnet)
+OPENAI_API_KEY=your_openai_api_key          # Fallback AI provider (GPT-4)
+SECURITY_MONITORING_ENABLED=true           # Enable audit logging
 
 # API Security (Optional)
 SIGNALS_API_KEY=your_secure_api_key  # For API access
@@ -429,6 +439,35 @@ Position.open.each { |p| puts "#{p.product_id}: #{p.side} #{p.size} @ #{p.entry_
 bin/rails runner "EndOfDayPositionClosureJob.perform_now"
 ```
 
+### Chat Bot Interface
+
+```bash
+# Start the AI-powered chat interface
+bin/rails chat_bot:start
+
+# Resume your last chat session
+bin/rails chat_bot:start --resume
+
+# Resume a specific session
+bin/rails chat_bot:start --session <session-id>
+
+# Example commands in the chat interface:
+FuturesBot> show my positions
+FuturesBot> what signals are active?
+FuturesBot> start trading
+FuturesBot> emergency stop
+FuturesBot> help
+FuturesBot> quit
+```
+
+**Chat Bot Features**:
+- **Natural Language Commands**: Use plain English to interact with the bot
+- **Trading Control**: Start/stop trading, emergency stop, position sizing
+- **Position Monitoring**: Check positions, P&L, and trading status
+- **Signal Analysis**: View active signals and market conditions
+- **Session Management**: Persistent conversation history and context
+- **AI-Powered**: OpenRouter (Claude 3.5) with ChatGPT fallback
+
 ## Troubleshooting
 
 ### Common Issues
@@ -485,6 +524,43 @@ GoodJob::Job.where(finished_at: nil).where("created_at < ?", 1.hour.ago).destroy
 # Kill existing good_job process and restart
 pkill -f good_job
 bundle exec good_job start
+```
+
+#### Chat Bot Issues
+```bash
+# Test AI service connectivity
+bin/rails console
+ai_service = AiCommandProcessorService.new
+ai_service.healthy?  # Should return true
+
+# Check chat bot without AI (pattern matching fallback)
+bot = ChatBotService.new
+bot.process("help")  # Should work even without API keys
+
+# View chat sessions and messages
+ChatSession.count
+ChatMessage.count
+
+# Clear old chat sessions if needed
+ChatSession.where('updated_at < ?', 7.days.ago).destroy_all
+```
+
+**Chat Bot API Key Setup**:
+```bash
+# Get OpenRouter API key
+# 1. Sign up at https://openrouter.ai
+# 2. Get API key from dashboard
+# 3. Add to .env: OPENROUTER_API_KEY=your_key
+
+# Get OpenAI API key (fallback)
+# 1. Sign up at https://platform.openai.com
+# 2. Get API key from API keys section
+# 3. Add to .env: OPENAI_API_KEY=your_key
+
+# Test configuration
+bin/rails console
+ENV['OPENROUTER_API_KEY']  # Should show your key
+ENV['OPENAI_API_KEY']      # Should show your key
 ```
 
 ### Getting Help

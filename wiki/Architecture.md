@@ -15,12 +15,18 @@ The coinbase_futures_bot is a Rails 8.0 API-only application designed for automa
 │  • SignalController - Real-time trading signals API            │
 │  • SentimentController - Sentiment analysis API                 │
 │  • SlackController - Slack bot integration                     │
+│  • ChatBotCLI - AI-powered command line interface             │
 │  • Health checks (/up, /health)                                │
 └─────────────────────────────────────────────────────────────────┘
                                     │
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Service Layer                            │
 ├─────────────────────────────────────────────────────────────────┤
+│  AI Chat Interface Services (3 services)                       │
+│  • ChatBotService - Main chat orchestrator                     │
+│  • AiCommandProcessorService - AI provider integration         │
+│  • ChatAuditLogger - Security & compliance logging            │
+│                                                                 │
 │  Market Data Services (6 services)                             │
 │  • CoinbaseSpotSubscriber - WebSocket spot data                │
 │  • CoinbaseFuturesSubscriber - WebSocket futures data          │
@@ -103,6 +109,10 @@ The coinbase_futures_bot is a Rails 8.0 API-only application designed for automa
 │  • SentimentEvent - Raw sentiment events from news sources     │
 │  • SentimentAggregate - Processed sentiment metrics            │
 │                                                                 │
+│  Chat Interface Models                                          │
+│  • ChatSession - Persistent conversation sessions              │
+│  • ChatMessage - Individual messages with profit scoring       │
+│                                                                 │
 │  Job Management (GoodJob)                                       │
 │  • good_jobs - Job queue and execution tracking                │
 │  • good_job_* - Job metadata and batch processing              │
@@ -119,6 +129,10 @@ The coinbase_futures_bot is a Rails 8.0 API-only application designed for automa
 │  • CryptoPanic API - Cryptocurrency news aggregation           │
 │  • CoinDesk RSS - Financial news                               │
 │  • CoinTelegraph RSS - Crypto news                             │
+│                                                                 │
+│  AI Services                                                    │
+│  • OpenRouter API - Primary AI provider (Claude 3.5 Sonnet)   │
+│  • OpenAI API - Fallback AI provider (GPT-4)                   │
 │                                                                 │
 │  Infrastructure                                                 │
 │  • PostgreSQL - Primary database                               │
@@ -302,6 +316,52 @@ Cron Schedules → GoodJob Queue → Background Jobs → Service Layer → Datab
 - **Job Retry Logic**: Automatic retry for failed background jobs
 - **Circuit Breakers**: API failure protection
 - **Graceful Degradation**: System continues operating with reduced functionality
+
+## AI Chat Interface Architecture
+
+### Chat Interface Data Flow
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  User Input     │───▶│  ChatBotService │───▶│  AI Processing  │
+│  • Natural lang │    │  • Sanitization │    │  • OpenRouter   │
+│  • Commands     │    │  • Session mgmt │    │  • ChatGPT      │
+│  • CLI/Terminal │    │  • Audit log    │    │  • Fallback     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                      │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Response       │◀───│  Command        │◀───│  Context        │
+│  • Formatted    │    │  Execution      │    │  Building       │
+│  • Typed output │    │  • Trading ops  │    │  • Session hist │
+│  • Error handle │    │  • Queries      │    │  • Market data  │
+└─────────────────┘    │  • System ctrl  │    │  • Trade status │
+                       └─────────────────┘    └─────────────────┘
+                                │
+                       ┌─────────────────┐
+                       │  Memory &       │
+                       │  Audit          │
+                       │  • ChatSession  │
+                       │  • ChatMessage  │
+                       │  • Audit logs   │
+                       └─────────────────┘
+```
+
+### Chat Interface Components
+
+1. **Input Processing**: Natural language sanitization and validation
+2. **AI Interpretation**: Dual-provider AI with automatic fallback (OpenRouter → ChatGPT → Pattern Matching)
+3. **Command Routing**: Intelligent routing to trading services based on intent
+4. **Context Management**: Profit-focused conversation history with 4K token optimization
+5. **Security Logging**: Comprehensive audit trail for compliance and security
+6. **Response Formatting**: User-friendly output with structured data and error handling
+
+### Performance Characteristics
+
+- **AI Response Time**: ~1-2 seconds average
+- **Local Fallback**: <100ms for pattern matching
+- **Session Memory**: Automatic pruning at 200 messages  
+- **Context Optimization**: Smart token management for AI APIs
+- **Concurrent Sessions**: Support for multiple simultaneous users
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The services layer contains the core business logic of the coinbase_futures_bot. This comprehensive guide documents all **38 services** organized into logical modules that handle specific aspects of the trading system.
+The services layer contains the core business logic of the coinbase_futures_bot. This comprehensive guide documents all **41 services** organized into logical modules that handle specific aspects of the trading system.
 
 ## Service Architecture
 
@@ -16,6 +16,7 @@ app/services/
 ├── strategy/               # Trading strategy services (3 services)
 ├── trading/                # Position management services (3 services)
 ├── backtest/               # Backtesting services (1 service)
+├── chat/                   # AI-powered chat interface services (3 services)
 ├── concerns/               # Shared service concerns (1 service)
 └── standalone/             # Standalone utility services (13 services)
 ```
@@ -454,29 +455,174 @@ order_result = simulator.place_order({
 - Time-series data processing
 - Performance metrics calculation
 
-### 9. Support Services (13 services)
+### 9. Chat Interface Services (3 services)
 
 #### ChatBotService
 **Location**: `app/services/chat_bot_service.rb`
 
-**Purpose**: AI-powered chat bot for system interaction and commands.
+**Purpose**: Main orchestrator for AI-powered trading bot chat interface with comprehensive natural language command processing.
 
 **Key Features**:
-- Natural language command processing
-- Session memory management
-- Context-aware responses
-- Integration with AI services
+- **Natural Language Processing**: Advanced command interpretation using AI services
+- **Trading Control Integration**: Start/stop trading, emergency stop, position sizing
+- **Session Management**: Persistent conversation history with context retention
+- **Comprehensive Audit Logging**: Security-compliant tracking of all operations
+- **Multi-layered Error Handling**: AI service fallbacks with graceful degradation
+- **Memory-Aware Context**: Profit-focused conversation scoring and relevance ranking
+
+**Command Categories**:
+- Position & PnL queries ("show my positions", "current profit/loss")
+- Signal analysis ("active signals", "recent alerts")
+- Market data ("BTC price", "ETH volume")
+- Trading control ("start trading", "emergency stop", "position sizing")
+- System status ("health check", "bot status")
+- Session management ("history", "search", "sessions")
+
+**Usage**:
+```ruby
+bot = ChatBotService.new("session-123")
+response = bot.process("show my positions")
+puts response  # Formatted position summary
+
+# Trading control (security-sensitive)
+bot.process("start trading")  # Activates trading operations
+bot.process("emergency stop") # Immediate position closure
+```
+
+**Security Features**:
+- Input sanitization and validation
+- Session isolation and secure ID generation
+- Comprehensive audit logging for compliance
+- Trading control action verification
 
 #### AiCommandProcessorService
 **Location**: `app/services/ai_command_processor_service.rb`
 
-**Purpose**: AI service integration for command interpretation.
+**Purpose**: AI service integration layer providing dual-provider support with automatic fallback mechanisms.
 
 **Key Features**:
-- OpenRouter and OpenAI integration
-- Fallback API handling
-- Command parsing and interpretation
-- Context-aware processing
+- **Dual AI Provider Support**: OpenRouter (Claude 3.5 Sonnet) with ChatGPT (GPT-4) fallback
+- **Automatic Failover**: Seamless switching between providers on service failure
+- **Context-Aware Processing**: Conversation history and trading context integration
+- **Intelligent Retry Logic**: Service-specific error handling and recovery
+- **Token Management**: Efficient context window management for AI APIs
+- **Performance Monitoring**: Response time tracking and service health checks
+
+**Usage**:
+```ruby
+processor = AiCommandProcessorService.new
+response = processor.process_command(
+  "show my trading positions",
+  context: {
+    session_id: "abc123",
+    trading_status: "active",
+    recent_interactions: [...]
+  }
+)
+puts response[:content]  # AI-interpreted command intent
+puts response[:provider] # "openrouter" or "openai"
+```
+
+**Configuration**:
+```bash
+OPENROUTER_API_KEY=your_openrouter_key  # Primary AI service
+OPENAI_API_KEY=your_openai_key          # Fallback AI service
+```
+
+#### ChatAuditLogger
+**Location**: `app/services/chat_audit_logger.rb`
+
+**Purpose**: Comprehensive audit logging service for security compliance and operational tracking.
+
+**Key Features**:
+- **Security-Sensitive Action Tracking**: Special logging for trading control commands
+- **Comprehensive Command Logging**: Full context capture for all chat interactions
+- **Error and Fallback Tracking**: AI service failure monitoring and recovery logging
+- **Session-Based Audit Trails**: Complete conversation tracking with security metadata
+- **Compliance Reporting**: Structured audit reports for regulatory requirements
+- **External Security Integration**: Support for external monitoring systems
+
+**Audit Categories**:
+- **Standard Commands**: Position queries, market data, system status
+- **Trading Control**: Start/stop operations, emergency stops, position sizing
+- **Security Events**: Failed authentication, suspicious patterns, error recovery
+- **AI Service Events**: Provider failures, fallback usage, response times
+
+**Usage**:
+```ruby
+# Standard command logging
+ChatAuditLogger.log_command(
+  session_id: "session-123",
+  user_input: "show my positions",
+  command_type: "position_query",
+  ai_response: ai_response,
+  result: result,
+  execution_time: 1250
+)
+
+# Security-sensitive trading control
+ChatAuditLogger.log_trading_control(
+  session_id: "session-123",
+  action: "emergency_stop",
+  user_input: "emergency stop",
+  result: stop_result,
+  user_context: context
+)
+
+# AI service error tracking
+ChatAuditLogger.log_ai_service_error(
+  session_id: "session-123",
+  user_input: "start trading",
+  error: service_error,
+  fallback_used: true
+)
+```
+
+**Security Features**:
+- Input sanitization in audit logs
+- Risk-level categorization (LOW/MEDIUM/HIGH/CRITICAL)
+- Trading status change tracking
+- External security system integration
+
+#### ChatMemoryService
+**Location**: `app/services/chat_memory_service.rb`
+
+**Purpose**: Intelligent conversation memory management with profit-focused scoring and context optimization.
+
+**Key Features**:
+- **Database-Backed Persistence**: Permanent conversation storage with ChatSession/ChatMessage models
+- **Profit-Focused Scoring**: Intelligent relevance ranking based on trading outcomes
+- **Context Window Management**: Smart truncation for AI API token limits (4K tokens)
+- **Cross-Session Continuity**: Context retention and conversation resumption
+- **Automatic Memory Pruning**: Efficient storage management keeping top 100-200 messages
+- **Search and Retrieval**: Full-text search across conversation history
+
+**Memory Intelligence**:
+- **High Impact**: Trading control, emergency stops, position changes
+- **Medium Impact**: Signal analysis, market data queries, profitable conversations
+- **Low Impact**: General queries, help requests, system information
+
+**Usage**:
+```ruby
+memory = ChatMemoryService.new("session-123")
+
+# Store user interaction
+memory.store_user_input("show my positions")
+
+# Store bot response with context
+memory.store_bot_response(formatted_response, result)
+
+# Get AI-optimized context
+context = memory.context_for_ai(4000)  # 4K token limit
+
+# Search conversation history
+results = memory.search_history("emergency stop")
+
+# Get session summary
+summary = memory.session_summary
+```
+
+### 10. Support Services (10 services)
 
 #### SlackNotificationService
 **Location**: `app/services/slack_notification_service.rb`

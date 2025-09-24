@@ -86,9 +86,9 @@ RSpec.describe ChatSession, type: :model do
 
     context "when session doesn't exist" do
       it "creates new session" do
-        expect {
+        expect do
           ChatSession.find_or_create_by_session_id(session_id)
-        }.to change(ChatSession, :count).by(1)
+        end.to change(ChatSession, :count).by(1)
       end
 
       it "returns new session with correct session_id" do
