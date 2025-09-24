@@ -3,15 +3,16 @@
     <div class="flex justify-between items-center mb-8">
       <h1 class="text-3xl font-bold text-gray-900">Position Import</h1>
       <div class="space-x-4">
-        <%= link_to "Test Connection", position_import_test_connection_path, 
+        <%= link_to "Test Connection", position_import_test_connection_path,
             class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
-        <%= link_to "Import Positions", position_import_import_path, 
-            method: :post,
-            class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
-        <%= link_to "Replace All", position_import_replace_path, 
-            method: :post,
-            class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded",
-            data: { confirm: "This will delete all existing positions and import from Coinbase. Continue?" } %>
+        <%= form_with url: position_import_import_path, method: :post, local: true, class: "inline" do %>
+          <%= submit_tag "Import Positions", class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded cursor-pointer" %>
+        <% end %>
+        <%= form_with url: position_import_replace_path, method: :post, local: true, class: "inline" do %>
+          <%= submit_tag "Replace All", 
+              class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded cursor-pointer",
+              data: { confirm: "This will delete all existing positions and import from Coinbase. Continue?" } %>
+        <% end %>
       </div>
     </div>
 
@@ -31,7 +32,7 @@
       <!-- Current Positions -->
       <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4">Current Positions in Database</h2>
-        
+
         <% if @positions.any? %>
           <div class="space-y-3">
             <% @positions.each do |position| %>
@@ -62,18 +63,18 @@
       <!-- Import Instructions -->
       <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4">Import Instructions</h2>
-        
+
         <div class="space-y-4 text-sm text-gray-700">
           <div>
             <h3 class="font-medium text-gray-900">🔄 Import Positions</h3>
             <p>Syncs positions from Coinbase without deleting existing ones. Updates existing positions if they match by product_id and side.</p>
           </div>
-          
+
           <div>
             <h3 class="font-medium text-gray-900">🔄 Replace All</h3>
             <p>Deletes all existing positions and imports fresh data from Coinbase. Use this for a complete refresh.</p>
           </div>
-          
+
           <div>
             <h3 class="font-medium text-gray-900">🔌 Test Connection</h3>
             <p>Tests the connection to Coinbase and shows what positions are available there.</p>
