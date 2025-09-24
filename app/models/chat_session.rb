@@ -8,7 +8,7 @@ class ChatSession < ApplicationRecord
 
   scope :recent, -> { order(updated_at: :desc) }
   scope :active, -> { where(active: true) }
-  scope :profitable, -> { joins(:chat_messages).where(chat_messages: {profit_impact: ["medium", "high"]}).distinct }
+  scope :profitable, -> { joins(:chat_messages).where(chat_messages: {profit_impact: %w[medium high]}).distinct }
 
   def self.find_or_create_by_session_id(session_id)
     find_or_create_by(session_id: session_id)
