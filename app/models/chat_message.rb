@@ -3,10 +3,11 @@
 class ChatMessage < ApplicationRecord
   belongs_to :chat_session
 
-  # Token estimation constant for AI context management
-  # Conservative estimate: ~50 tokens per message (includes content + metadata)
-  # Based on typical message length and GPT tokenization patterns
-  ESTIMATED_TOKENS_PER_MESSAGE = 50
+  # Token estimation constants for AI context management
+  # More sophisticated estimation based on content analysis
+  BASE_TOKENS_PER_MESSAGE = 10  # Base overhead for message structure
+  TOKENS_PER_CHAR = 0.25        # ~4 chars per token average
+  MAX_TOKENS_PER_MESSAGE = 200  # Cap for very long messages
 
   validates :content, presence: true
   validates :message_type, presence: true, inclusion: {in: %w[user bot system]}
@@ -27,14 +28,21 @@ class ChatMessage < ApplicationRecord
 
   def self.for_ai_context(max_tokens = 4000)
     # Calculate maximum messages based on token estimation
-    max_messages = [max_tokens / ESTIMATED_TOKENS_PER_MESSAGE, 50].min
+    max_messages = [max_tokens / 50, 50].min # Conservative estimate
 
     profitable.recent.limit(max_messages)
   end
 
+  # More accurate token estimation for individual messages
+  def estimated_tokens
+    content_tokens = (content.length * TOKENS_PER_CHAR).to_i
+    total_tokens = BASE_TOKENS_PER_MESSAGE + content_tokens
+    [total_tokens, MAX_TOKENS_PER_MESSAGE].min
+  end
+
   def trading_related?
     profit_impact.in?(%w[medium high]) ||
-      content.match?(/position|signal|trade|profit|loss|entry|exit|market/i)
+      content.match?(ChatMemoryService::TRADING_KEYWORDS_REGEX)
   end
 
   private

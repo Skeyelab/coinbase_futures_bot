@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class ChatSession < ApplicationRecord
-  has_many :chat_messages, dependent: :destroy
+  has_many :chat_messages, dependent: :destroy, counter_cache: true
 
   validates :session_id, presence: true, uniqueness: true
   validates :active, inclusion: {in: [true, false]}

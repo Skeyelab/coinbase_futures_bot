@@ -3,6 +3,9 @@
 class ChatMemoryService
   include SentryServiceTracking
 
+  # Trading-related keywords for relevance scoring
+  TRADING_KEYWORDS_REGEX = /position|signal|profit|loss|entry|exit|trade|market/i
+
   def initialize(session_id)
     @session_id = session_id
     @session = ChatSession.find_or_create_by_session_id(session_id)
@@ -48,9 +51,9 @@ class ChatMemoryService
     estimated_tokens = 0
 
     messages.each do |msg|
-      # More accurate token estimation: ~4 chars per token for content + overhead
+      # Use more sophisticated token estimation
       msg_content = "#{msg.message_type}: #{msg.content}"
-      msg_tokens = (msg_content.length / 4).to_i
+      msg_tokens = msg.estimated_tokens
 
       break if estimated_tokens + msg_tokens > max_tokens
 
@@ -105,7 +108,7 @@ class ChatMemoryService
     end
 
     # Boost for trading keywords
-    base_score += 0.5 if content.match?(/position|signal|profit|loss|entry|exit|trade|market/i)
+    base_score += 0.5 if content.match?(TRADING_KEYWORDS_REGEX)
 
     # Boost for successful commands
     base_score += 0.5 if type.to_s == "bot" && content.match?(/success|completed|executed/i)
@@ -132,7 +135,7 @@ class ChatMemoryService
     return :medium if command_result&.dig(:type) == "market_data"
 
     # Check response content for trading relevance
-    if response.match?(/position|profit|loss|signal|trade/i)
+    if response.match?(TRADING_KEYWORDS_REGEX)
       :medium
     else
       :low

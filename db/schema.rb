@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_18_035737) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_24_174916) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"

@@ -115,7 +115,14 @@ namespace :chat_bot do
       when "--resume"
         options[:resume] = true
       when "--session"
-        options[:session_id] = args[i + 1] if args[i + 1]
+        # Validate that next argument exists and is not another flag
+        next_arg = args[i + 1]
+        if next_arg && !next_arg.start_with?("--")
+          options[:session_id] = next_arg
+        else
+          puts "Error: --session requires a session ID argument"
+          exit 1
+        end
       end
     end
 
