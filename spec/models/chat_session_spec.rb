@@ -43,7 +43,9 @@ RSpec.describe ChatSession, type: :model do
 
     describe ".recent" do
       it "orders by updated_at desc" do
-        expect(ChatSession.recent).to eq([recent_session, old_session])
+        # Test with the specific records we created for this test
+        recent_sessions = ChatSession.where(id: [recent_session.id, old_session.id]).recent
+        expect(recent_sessions).to eq([recent_session, old_session])
       end
     end
 

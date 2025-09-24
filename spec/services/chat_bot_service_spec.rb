@@ -12,6 +12,9 @@ RSpec.describe ChatBotService, type: :service do
     allow(AiCommandProcessorService).to receive(:new).and_return(ai_service)
     allow(ChatMemoryService).to receive(:new).and_return(memory_service)
     allow(memory_service).to receive(:store)
+    allow(memory_service).to receive(:store_user_input)
+    allow(memory_service).to receive(:store_bot_response)
+    allow(memory_service).to receive(:context_for_ai).and_return("test context")
     allow(memory_service).to receive(:recent_interactions).and_return([])
     allow(memory_service).to receive(:session_summary).and_return({
       session_id: session_id,
@@ -56,7 +59,7 @@ RSpec.describe ChatBotService, type: :service do
 
       it "stores interaction in memory" do
         service.process(input)
-        expect(memory_service).to have_received(:store).with(input, anything)
+        expect(memory_service).to have_received(:store_user_input).with(input)
       end
 
       it "calls AI service with context" do

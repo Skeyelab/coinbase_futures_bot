@@ -19,7 +19,7 @@ class ChatMessage < ApplicationRecord
   enum :message_type, {user: "user", bot: "bot", system: "system"}
 
   scope :recent, -> { order(timestamp: :desc) }
-  scope :profitable, -> { where(profit_impact: [:medium, :high]) }
+  scope :profitable, -> { where(profit_impact: %w[medium high]) }
   scope :user_messages, -> { where(message_type: "user") }
   scope :bot_responses, -> { where(message_type: "bot") }
   scope :by_relevance, -> { order(relevance_score: :desc) }

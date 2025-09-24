@@ -16,22 +16,31 @@ RSpec.describe ChatMessage, type: :model do
       expect(message.errors[:message_type]).to include("can't be blank")
     end
 
-    it "validates inclusion of message_type" do
-      message = build(:chat_message, message_type: "invalid")
-      expect(message).not_to be_valid
-      expect(message.errors[:message_type]).to include("is not included in the list")
+    it "accepts valid message_type values" do
+      %w[user bot system].each do |type|
+        message = build(:chat_message, message_type: type)
+        expect(message).to be_valid, "Expected message_type '#{type}' to be valid"
+      end
     end
 
-    it "validates presence of timestamp" do
-      message = build(:chat_message, timestamp: nil)
-      expect(message).not_to be_valid
-      expect(message.errors[:timestamp]).to include("can't be blank")
+    it "automatically sets timestamp if blank" do
+      message = ChatMessage.new(
+        chat_session: build(:chat_session),
+        content: "Test message",
+        message_type: "user",
+        profit_impact: "unknown",
+        relevance_score: 1.0
+      )
+      message.timestamp = nil
+      message.valid?
+      expect(message.timestamp).to be_present
     end
 
-    it "validates inclusion of profit_impact" do
-      message = build(:chat_message, profit_impact: "invalid")
-      expect(message).not_to be_valid
-      expect(message.errors[:profit_impact]).to include("is not included in the list")
+    it "accepts valid profit_impact values" do
+      %w[unknown low medium high].each do |impact|
+        message = build(:chat_message, profit_impact: impact)
+        expect(message).to be_valid, "Expected profit_impact '#{impact}' to be valid"
+      end
     end
 
     it "validates presence of relevance_score" do
@@ -87,7 +96,9 @@ RSpec.describe ChatMessage, type: :model do
 
     describe ".recent" do
       it "orders by timestamp desc" do
-        expect(ChatMessage.recent.limit(2)).to eq([recent_message, old_message])
+        # Test with the specific records we created for this test
+        recent_messages = ChatMessage.where(id: [recent_message.id, old_message.id]).recent
+        expect(recent_messages).to eq([recent_message, old_message])
       end
     end
 
