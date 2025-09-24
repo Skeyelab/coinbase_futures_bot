@@ -85,6 +85,8 @@ class ChatBotService
     content = ai_response[:content].to_s.downcase
 
     case content
+    when /size|siz.*position|position.*siz/
+      {type: "trading_control", params: {action: "position_sizing", content: content}}
     when /position|pnl|profit|loss|open|close/
       {type: "position_query", params: extract_position_params(content)}
     when /signal|alert|entry|exit/
@@ -103,8 +105,6 @@ class ChatBotService
       {type: "trading_control", params: {action: "stop"}}
     when /emergency.*stop|kill.*switch|stop.*emergency/
       {type: "trading_control", params: {action: "emergency_stop"}}
-    when /size|siz.*position|position.*siz/
-      {type: "trading_control", params: {action: "position_sizing", content: content}}
     else
       {type: "general", params: {content: ai_response[:content]}}
     end
