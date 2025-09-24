@@ -8,8 +8,8 @@ class PositionImportService
   end
 
   def import_positions_from_coinbase
-    track_service_call('import_positions_from_coinbase') do
-      Rails.logger.info('[PIS] Starting position import from Coinbase...')
+    track_service_call("import_positions_from_coinbase") do
+      Rails.logger.info("[PIS] Starting position import from Coinbase...")
 
       # Test authentication first
       auth_result = @coinbase_client.test_auth
@@ -35,10 +35,10 @@ class PositionImportService
           updated_count += 1
           Rails.logger.info("[PIS] Updated existing position: #{result[:position].product_id}")
         when :skipped
-          Rails.logger.debug("[PIS] Skipped position: #{cb_position['product_id']} - #{result[:reason]}")
+          Rails.logger.debug("[PIS] Skipped position: #{cb_position["product_id"]} - #{result[:reason]}")
         end
-      rescue StandardError => e
-        error_msg = "Failed to sync position #{cb_position['product_id']}: #{e.message}"
+      rescue => e
+        error_msg = "Failed to sync position #{cb_position["product_id"]}: #{e.message}"
         Rails.logger.error("[PIS] #{error_msg}")
         errors << error_msg
       end
@@ -53,38 +53,38 @@ class PositionImportService
         total_coinbase: coinbase_positions.size
       }
     end
-  rescue StandardError => e
+  rescue => e
     Rails.logger.error("[PIS] Position import failed: #{e.message}")
     Sentry.capture_exception(e)
     raise
   end
 
   def sync_position(coinbase_position)
-    product_id = coinbase_position['product_id']
-    size = coinbase_position['number_of_contracts'].to_f
-    side = coinbase_position['side']&.upcase
-    entry_price = coinbase_position['avg_entry_price']&.to_f
-    unrealized_pnl = coinbase_position['unrealized_pnl']&.to_f
+    product_id = coinbase_position["product_id"]
+    size = coinbase_position["number_of_contracts"].to_f
+    side = coinbase_position["side"]&.upcase
+    entry_price = coinbase_position["avg_entry_price"]&.to_f
+    unrealized_pnl = coinbase_position["unrealized_pnl"]&.to_f
 
     # Skip if no size (closed position)
-    return { action: :skipped, reason: 'No size' } if size.zero?
+    return {action: :skipped, reason: "No size"} if size.zero?
 
     # Skip if missing required data
-    return { action: :skipped, reason: 'Missing required data' } unless product_id && side && entry_price
+    return {action: :skipped, reason: "Missing required data"} unless product_id && side && entry_price
 
     # Convert Coinbase side to our format
     position_side = case side.downcase
-                    when 'long', 'buy' then 'LONG'
-                    when 'short', 'sell' then 'SHORT'
-                    else
-                      return { action: :skipped, reason: "Unknown side: #{side}" }
-                    end
+    when "long", "buy" then "LONG"
+    when "short", "sell" then "SHORT"
+    else
+      return {action: :skipped, reason: "Unknown side: #{side}"}
+    end
 
     # Try to find existing position by product_id and side
     existing_position = Position.open
-                                .where(product_id: product_id, side: position_side)
-                                .order(:entry_time)
-                                .last
+      .where(product_id: product_id, side: position_side)
+      .order(:entry_time)
+      .last
 
     if existing_position
       # Update existing position
@@ -95,7 +95,7 @@ class PositionImportService
         updated_at: Time.current
       )
 
-      { action: :updated, position: existing_position }
+      {action: :updated, position: existing_position}
     else
       # Create new position
       new_position = Position.create!(
@@ -104,19 +104,19 @@ class PositionImportService
         size: size,
         entry_price: entry_price,
         entry_time: Time.current, # Use current time since we don't have entry time from Coinbase
-        status: 'OPEN',
+        status: "OPEN",
         pnl: unrealized_pnl,
         day_trading: determine_day_trading_status(product_id),
         take_profit: nil, # Will be set by strategy if needed
         stop_loss: nil    # Will be set by strategy if needed
       )
 
-      { action: :created, position: new_position }
+      {action: :created, position: new_position}
     end
   end
 
   def clear_all_positions
-    track_service_call('clear_all_positions') do
+    track_service_call("clear_all_positions") do
       count = Position.count
       Position.delete_all
       Rails.logger.info("[PIS] Cleared #{count} positions from database")
@@ -125,8 +125,8 @@ class PositionImportService
   end
 
   def import_and_replace
-    track_service_call('import_and_replace') do
-      Rails.logger.info('[PIS] Starting full position replacement...')
+    track_service_call("import_and_replace") do
+      Rails.logger.info("[PIS] Starting full position replacement...")
 
       # Clear existing positions
       cleared_count = clear_all_positions

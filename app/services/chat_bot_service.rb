@@ -83,11 +83,13 @@ class ChatBotService
   end
 
   def parse_ai_response(ai_response, original_input = nil)
-    content = ai_response[:content].to_s.downcase
+    content = ai_response&.dig(:content)&.to_s&.downcase || ""
     input = original_input&.downcase || ""
 
     case content
-    when /size|siz.*position|position.*siz/
+    when /what.*should.*do|advice|recommendation|analysis|analyze/
+      {type: "market_analysis", params: extract_analysis_params(content)}
+    when /size.*position|position.*size|sizing/
       {type: "trading_control", params: {action: "position_sizing", content: content}}
     when /position|pnl|profit|loss|open|close/
       {type: "position_query", params: extract_position_params(content)}
@@ -95,8 +97,6 @@ class ChatBotService
       {type: "signal_query", params: extract_signal_params(content)}
     when /market|price|data|candle/
       {type: "market_data", params: extract_market_params(content)}
-    when /what.*should.*do|advice|recommendation|analysis|analyze/
-      {type: "market_analysis", params: extract_market_analysis_params(content)}
     when /status|health|system/
       {type: "system_status", params: {}}
     when /history|search|sessions|context/
@@ -111,7 +111,7 @@ class ChatBotService
       {type: "trading_control", params: {action: "emergency_stop"}}
     else
       # Check original input for market analysis keywords if AI response doesn't match
-      if input.match?(/analyze|analysis|recommend|what.*should.*do|advice|suggestion|market.*analysis/)
+      if input&.match?(/analyze|analysis|recommend|what.*should.*do|advice|suggestion|market.*analysis/)
         {type: "market_analysis", params: extract_analysis_params(input)}
       else
         {type: "general", params: {content: ai_response[:content]}}
@@ -189,20 +189,25 @@ class ChatBotService
   end
 
   def execute_market_analysis_query(params)
-    symbol = params[:symbol] || "BTC-USD"
-    timeframe = params[:timeframe] || "1h"
-
-    analysis_service = MarketAnalysisService.new(symbol: symbol, timeframe: timeframe)
-    advice = analysis_service.generate_advice
-
-    {
-      type: "market_analysis",
-      data: {
-        symbol: symbol,
-        timeframe: timeframe,
-        advice: advice
-      }
-    }
+    if params[:symbol]
+      # Analyze specific symbol
+      @market_analysis.analyze_position_recommendation(symbol: params[:symbol])
+    elsif params[:position_id]
+      # Analyze specific position
+      position = Position.find(params[:position_id])
+      @market_analysis.analyze_position_recommendation(position: position)
+    else
+      # Analyze current positions or general market
+      open_positions = Position.open.limit(1)
+      if open_positions.any?
+        @market_analysis.analyze_position_recommendation(position: open_positions.first)
+      else
+        @market_analysis.analyze_market_conditions
+      end
+    end
+  rescue => e
+    Rails.logger.error("[ChatBot] Market analysis error: #{e.message}")
+    error_response("Market analysis failed: #{e.message}")
   end
 
   def extract_market_analysis_params(content)
@@ -613,6 +618,8 @@ class ChatBotService
   end
 
   def extract_analysis_params(content)
+    return {symbol: nil, position_id: nil} if content.nil?
+
     # Look for specific symbols or position references
     symbol = content.match(/\b(BTC|ETH|SOL|ADA|DOT|LINK|UNI|AAVE|MATIC|AVAX|ATOM|XRP|LTC|BCH|ETC|DOGE|SHIB)\b/i)&.captures&.first
     position_id = content.match(/position\s*(\d+)/i)&.captures&.first

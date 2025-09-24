@@ -31,6 +31,88 @@ class MarketAnalysisService
     build_advice_text(analysis)
   end
 
+  def analyze_position_recommendation(symbol: nil, position: nil)
+    track_service_call("analyze_position_recommendation") do
+      # Get current position if not provided
+      position ||= Position.open.find_by(product_id: symbol) if symbol
+
+      # Get market data for the symbol
+      market_data = get_market_data(symbol || position&.product_id)
+      return error_response("No market data available") unless market_data
+
+      # Get technical indicators
+      technical_analysis = analyze_technical_indicators
+
+      # Get market sentiment
+      sentiment_analysis = analyze_market_sentiment(symbol || position&.product_id)
+
+      # Get recent signals
+      recent_signals = get_recent_signals(symbol || position&.product_id)
+
+      # Generate recommendation
+      recommendation = generate_recommendation(
+        position: position,
+        market_data: market_data,
+        technical_analysis: technical_analysis,
+        sentiment_analysis: sentiment_analysis,
+        recent_signals: recent_signals
+      )
+
+      {
+        type: "market_analysis",
+        data: {
+          symbol: symbol || position&.product_id,
+          current_price: market_data[:price],
+          recommendation: recommendation[:action],
+          confidence: recommendation[:confidence],
+          reasoning: recommendation[:reasoning],
+          technical_indicators: technical_analysis,
+          sentiment: sentiment_analysis,
+          recent_signals: recent_signals,
+          risk_assessment: recommendation[:risk_level],
+          suggested_actions: recommendation[:suggested_actions]
+        }
+      }
+    rescue => e
+      Rails.logger.error("[MarketAnalysis] Error analyzing position: #{e.message}")
+      error_response("Analysis failed: #{e.message}")
+    end
+  end
+
+  def analyze_market_conditions(symbols: ["BTC-PERP", "ETH-PERP"])
+    track_service_call("analyze_market_conditions") do
+      analysis_results = {}
+
+      symbols.each do |symbol|
+        market_data = get_market_data(symbol)
+        next unless market_data
+
+        technical_analysis = analyze_technical_indicators
+        sentiment_analysis = analyze_market_sentiment(symbol)
+
+        analysis_results[symbol] = {
+          price: market_data[:price],
+          technical: technical_analysis,
+          sentiment: sentiment_analysis,
+          recommendation: generate_market_recommendation(technical_analysis, sentiment_analysis)
+        }
+      end
+
+      {
+        type: "market_conditions",
+        data: {
+          timestamp: Time.current.utc.iso8601,
+          markets: analysis_results,
+          overall_sentiment: calculate_overall_sentiment(analysis_results.values),
+          best_opportunities: identify_best_opportunities(analysis_results)
+        }
+      }
+    rescue => e
+      Rails.logger.error("[MarketAnalysis] Error analyzing market conditions: #{e.message}")
+      error_response("Market analysis failed: #{e.message}")
+    end
+  end
+
   private
 
   def analyze_price_data
@@ -148,38 +230,6 @@ class MarketAnalysisService
       volatility_risk: assess_volatility_risk,
       sentiment_risk: assess_sentiment_risk,
       overall_risk_level: calculate_overall_risk
-    }
-  end
-
-  def generate_recommendation
-    price_data = analyze_price_data
-    return {action: "wait", confidence: 0, reason: "Insufficient data"} if price_data[:error]
-
-    technical = analyze_technical_indicators
-    sentiment = analyze_sentiment
-    positions = analyze_positions
-    signals = analyze_signals
-    risk = assess_risk
-
-    analysis = {
-      price_data: price_data,
-      technical_indicators: technical,
-      sentiment_data: sentiment,
-      position_data: positions,
-      signal_data: signals,
-      risk_assessment: risk
-    }
-
-    recommendation = build_recommendation(analysis)
-    {
-      action: recommendation[:action],
-      confidence: recommendation[:confidence],
-      reasoning: recommendation[:reasoning],
-      entry_price: recommendation[:entry_price],
-      stop_loss: recommendation[:stop_loss],
-      take_profit: recommendation[:take_profit],
-      position_size: recommendation[:position_size],
-      timeframe: recommendation[:timeframe]
     }
   end
 
@@ -813,5 +863,343 @@ class MarketAnalysisService
     else
       "Unknown"
     end
+  end
+
+  def get_market_data(symbol)
+    return nil unless symbol
+
+    # Get recent candles for analysis
+    recent_candles = Candle.for_symbol(symbol)
+      .one_minute
+      .order(timestamp: :desc)
+      .limit(100)
+
+    return nil if recent_candles.empty?
+
+    latest_candle = recent_candles.first
+    price_history = recent_candles.map(&:close).reverse
+
+    {
+      symbol: symbol,
+      price: latest_candle.close,
+      timestamp: latest_candle.timestamp,
+      volume: latest_candle.volume,
+      price_history: price_history,
+      candles: recent_candles
+    }
+  end
+
+  def analyze_market_sentiment(symbol)
+    # Get recent sentiment events
+    recent_sentiment = SentimentEvent.where(symbol: symbol)
+      .where("created_at >= ?", 24.hours.ago)
+      .order(created_at: :desc)
+      .limit(10)
+
+    return {score: 0, trend: "neutral", confidence: 0} if recent_sentiment.empty?
+
+    scores = recent_sentiment.map(&:sentiment_score).compact
+    avg_score = scores.sum / scores.length.to_f
+
+    {
+      score: avg_score.round(2),
+      trend: if avg_score > 0.1
+               "bullish"
+             else
+               (avg_score < -0.1) ? "bearish" : "neutral"
+             end,
+      confidence: [scores.length * 10, 100].min,
+      recent_events: recent_sentiment.count
+    }
+  end
+
+  def get_recent_signals(symbol)
+    SignalAlert.for_symbol(symbol)
+      .recent(6)
+      .order(alert_timestamp: :desc)
+      .limit(5)
+      .map do |signal|
+      {
+        side: signal.side,
+        confidence: signal.confidence,
+        strategy: signal.strategy_name,
+        timestamp: signal.alert_timestamp,
+        type: signal.signal_type
+      }
+    end
+  end
+
+  def generate_recommendation(position:, market_data:, technical_analysis:, sentiment_analysis:, recent_signals:)
+    current_price = market_data[:price]
+    position_side = position&.side
+    entry_price = position&.entry_price
+    position&.pnl
+
+    # Calculate position performance
+    position_performance = if position && entry_price
+      ((current_price - entry_price) / entry_price * 100) * ((position_side == "LONG") ? 1 : -1)
+    else
+      0
+    end
+
+    # Analyze technical signals
+    technical_signals = analyze_technical_signals(technical_analysis, current_price)
+
+    # Analyze sentiment signals
+    sentiment_signals = analyze_sentiment_signals(sentiment_analysis)
+
+    # Analyze recent signal patterns
+    signal_patterns = analyze_signal_patterns(recent_signals)
+
+    # Generate recommendation based on all factors
+    if position
+      generate_position_recommendation(
+        position: position,
+        position_performance: position_performance,
+        technical_signals: technical_signals,
+        sentiment_signals: sentiment_signals,
+        signal_patterns: signal_patterns
+      )
+    else
+      generate_entry_recommendation(
+        symbol: market_data[:symbol],
+        technical_signals: technical_signals,
+        sentiment_signals: sentiment_signals,
+        signal_patterns: signal_patterns
+      )
+    end
+  end
+
+  def analyze_technical_signals(technical_analysis, current_price)
+    sma_20 = technical_analysis[:sma_20]
+    sma_50 = technical_analysis[:sma_50]
+    rsi = technical_analysis[:rsi]
+    technical_analysis[:trend]
+    bollinger = technical_analysis[:bollinger_bands]
+
+    signals = {
+      trend_continuation: false,
+      trend_reversal: false,
+      strong_buy: false,
+      strong_sell: false,
+      weak_buy: false,
+      weak_sell: false,
+      stop_loss_triggered: false
+    }
+
+    # RSI analysis
+    if rsi && rsi > 70
+      signals[:strong_sell] = true
+      signals[:trend_reversal] = true
+    elsif rsi && rsi < 30
+      signals[:strong_buy] = true
+      signals[:trend_reversal] = true
+    elsif rsi && rsi > 60
+      signals[:weak_sell] = true
+    elsif rsi && rsi < 40
+      signals[:weak_buy] = true
+    end
+
+    # Moving average analysis
+    if sma_20 && sma_50
+      if current_price > sma_20 && sma_20 > sma_50
+        signals[:trend_continuation] = true
+        signals[:weak_buy] = true unless signals[:strong_sell]
+      elsif current_price < sma_20 && sma_20 < sma_50
+        signals[:trend_continuation] = true
+        signals[:weak_sell] = true unless signals[:strong_buy]
+      end
+    elsif sma_20
+      # Only use SMA 20 if SMA 50 is not available
+      if current_price > sma_20
+        signals[:weak_buy] = true unless signals[:strong_sell]
+      elsif current_price < sma_20
+        signals[:weak_sell] = true unless signals[:strong_buy]
+      end
+    end
+
+    # Bollinger Bands analysis
+    if bollinger && current_price > bollinger[:upper]
+      signals[:strong_sell] = true
+    elsif bollinger && current_price < bollinger[:lower]
+      signals[:strong_buy] = true
+    end
+
+    signals
+  end
+
+  def analyze_sentiment_signals(sentiment_analysis)
+    score = sentiment_analysis[:score]
+    trend = sentiment_analysis[:trend]
+
+    {
+      bullish: trend == "bullish",
+      bearish: trend == "bearish",
+      neutral: trend == "neutral",
+      aligned: score.abs > 0.3,
+      contrarian: score.abs < 0.1,
+      slightly_bullish: trend == "bullish" && score < 0.3,
+      slightly_bearish: trend == "bearish" && score > -0.3
+    }
+  end
+
+  def analyze_signal_patterns(recent_signals)
+    return {pattern: "none", strength: 0} if recent_signals.empty?
+
+    long_signals = recent_signals.count { |s| s[:side] == "long" }
+    short_signals = recent_signals.count { |s| s[:side] == "short" }
+    total_signals = recent_signals.length
+
+    {
+      pattern: if long_signals > short_signals
+                 "long_bias"
+               else
+                 (short_signals > long_signals) ? "short_bias" : "mixed"
+               end,
+      strength: [long_signals, short_signals].max.to_f / total_signals,
+      total_signals: total_signals
+    }
+  end
+
+  def generate_position_recommendation(position:, position_performance:, technical_signals:, sentiment_signals:, signal_patterns:)
+    position.side
+    current_pnl = position.pnl || 0
+
+    # Determine action based on multiple factors
+    if technical_signals[:trend_reversal] && position_performance > 2
+      # Strong reversal signal with good profit
+      action = "take_profit"
+      confidence = 85
+      reasoning = "Technical indicators suggest trend reversal with #{position_performance.round(1)}% profit. Consider taking profits."
+    elsif technical_signals[:trend_continuation] && sentiment_signals[:aligned]
+      # Trend continuing with sentiment support
+      action = "hold"
+      confidence = 75
+      reasoning = "Trend continuation supported by technical indicators and sentiment. Hold position."
+    elsif current_pnl < -5 || technical_signals[:stop_loss_triggered]
+      # Stop loss conditions
+      action = "stop_loss"
+      confidence = 90
+      reasoning = "Stop loss conditions met. Current PnL: $#{current_pnl.round(2)}. Consider closing position."
+    elsif sentiment_signals[:contrarian] && position_performance > 1
+      # Contrarian sentiment with profit
+      action = "reduce_position"
+      confidence = 70
+      reasoning = "Contrarian sentiment detected with #{position_performance.round(1)}% profit. Consider reducing position size."
+    else
+      # Default hold with monitoring
+      action = "monitor"
+      confidence = 60
+      reasoning = "Mixed signals. Monitor position closely. Current PnL: $#{current_pnl.round(2)}"
+    end
+
+    {
+      action: action,
+      confidence: confidence,
+      reasoning: reasoning,
+      risk_level: calculate_risk_level(technical_signals, sentiment_signals),
+      suggested_actions: generate_suggested_actions(action, position, technical_signals)
+    }
+  end
+
+  def generate_entry_recommendation(symbol:, technical_signals:, sentiment_signals:, signal_patterns:)
+    # Determine if we should enter a position
+    if technical_signals[:strong_buy] && sentiment_signals[:bullish]
+      action = "enter_long"
+      confidence = 80
+      reasoning = "Strong technical buy signals with bullish sentiment. Consider entering long position."
+    elsif technical_signals[:strong_sell] && sentiment_signals[:bearish]
+      action = "enter_short"
+      confidence = 80
+      reasoning = "Strong technical sell signals with bearish sentiment. Consider entering short position."
+    elsif technical_signals[:weak_buy] && sentiment_signals[:slightly_bullish]
+      action = "small_long"
+      confidence = 60
+      reasoning = "Weak buy signals with slightly bullish sentiment. Consider small long position."
+    elsif technical_signals[:weak_sell] && sentiment_signals[:slightly_bearish]
+      action = "small_short"
+      confidence = 60
+      reasoning = "Weak sell signals with slightly bearish sentiment. Consider small short position."
+    else
+      action = "wait"
+      confidence = 70
+      reasoning = "No clear signals. Wait for better entry opportunity."
+    end
+
+    {
+      action: action,
+      confidence: confidence,
+      reasoning: reasoning,
+      risk_level: calculate_risk_level(technical_signals, sentiment_signals),
+      suggested_actions: generate_entry_actions(action, technical_signals)
+    }
+  end
+
+  def calculate_risk_level(technical_signals, sentiment_signals)
+    risk_factors = 0
+
+    risk_factors += 1 if technical_signals[:trend_reversal]
+    risk_factors += 1 if sentiment_signals[:contrarian]
+    risk_factors += 1 if technical_signals[:strong_sell] || technical_signals[:strong_buy]
+
+    case risk_factors
+    when 0..1 then "low"
+    when 2 then "medium"
+    else "high"
+    end
+  end
+
+  def generate_suggested_actions(action, position, technical_signals)
+    actions = []
+
+    case action
+    when "take_profit"
+      actions << "Close 50-75% of position to lock in profits"
+      actions << "Set trailing stop at recent high/low"
+      actions << "Monitor for re-entry opportunity"
+    when "hold"
+      actions << "Continue monitoring position"
+      actions << "Update stop loss if trend continues"
+      actions << "Consider adding to position if trend strengthens"
+    when "stop_loss"
+      actions << "Close entire position immediately"
+      actions << "Review entry strategy for future trades"
+      actions << "Wait for better setup before re-entering"
+    when "reduce_position"
+      actions << "Close 25-50% of position"
+      actions << "Tighten stop loss on remaining position"
+      actions << "Monitor for complete exit signal"
+    when "monitor"
+      actions << "Set price alerts for key levels"
+      actions << "Review position if PnL drops below -3%"
+      actions << "Consider partial profit taking if gains exceed 5%"
+    end
+
+    actions
+  end
+
+  def generate_entry_actions(action, technical_signals)
+    actions = []
+
+    case action
+    when "enter_long", "enter_short"
+      actions << "Enter position with 2% risk per trade"
+      actions << "Set stop loss at recent swing low/high"
+      actions << "Set take profit at 2:1 risk/reward ratio"
+    when "small_long", "small_short"
+      actions << "Enter small position with 1% risk"
+      actions << "Use tighter stop loss due to weak signals"
+      actions << "Monitor closely for exit signals"
+    when "wait"
+      actions << "Wait for stronger technical confirmation"
+      actions << "Monitor key support/resistance levels"
+      actions << "Look for confluence of multiple indicators"
+    end
+
+    actions
+  end
+
+  def error_response(message)
+    {type: "error", message: message}
   end
 end
