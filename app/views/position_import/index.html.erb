@@ -9,7 +9,7 @@
           <%= submit_tag "Import Positions", class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded cursor-pointer" %>
         <% end %>
         <%= form_with url: position_import_replace_path, method: :post, local: true, class: "inline" do %>
-          <%= submit_tag "Replace All", 
+          <%= submit_tag "Replace All",
               class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded cursor-pointer",
               data: { confirm: "This will delete all existing positions and import from Coinbase. Continue?" } %>
         <% end %>
