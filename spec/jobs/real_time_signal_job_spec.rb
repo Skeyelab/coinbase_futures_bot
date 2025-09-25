@@ -264,9 +264,9 @@ RSpec.describe RealTimeSignalJob, type: :job do
       end.not_to raise_error
     end
 
-    it "defines private job scheduling methods" do
-      expect(described_class.private_methods).to include(:schedule_realtime_evaluation)
-      expect(described_class.private_methods).to include(:start_realtime_evaluation)
+    it "defines class job scheduling methods" do
+      expect(described_class.methods).to include(:schedule_realtime_evaluation)
+      expect(described_class.methods).to include(:start_realtime_evaluation)
     end
   end
 end
