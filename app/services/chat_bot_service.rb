@@ -14,9 +14,9 @@ class ChatBotService
     start_time = Time.current
     sanitized_input = sanitize_input(input)
 
-    track_service_call('process') do
+    track_service_call("process") do
       if sanitized_input.blank?
-        error_result = error_response('Invalid input')
+        error_result = error_response("Invalid input")
         return format_response(error_result, nil)
       end
 
@@ -42,7 +42,7 @@ class ChatBotService
 
       formatted_response
     end
-  rescue StandardError => e
+  rescue => e
     ((Time.current - start_time) * 1000).round(2)
     Rails.logger.error("[ChatBotService] Error processing input: #{e.message}")
 
@@ -69,7 +69,7 @@ class ChatBotService
   private
 
   def sanitize_input(input)
-    input.to_s.strip.gsub(/[^\w\s\-.,?!]/, '')[0...500]
+    input.to_s.strip.gsub(/[^\w\s\-.,?!]/, "")[0...500]
   end
 
   def build_context
@@ -83,64 +83,64 @@ class ChatBotService
   end
 
   def parse_ai_response(ai_response, original_input = nil)
-    content = ai_response&.dig(:content)&.to_s&.downcase || ''
-    input = original_input&.downcase || ''
+    content = ai_response&.dig(:content)&.to_s&.downcase || ""
+    input = original_input&.downcase || ""
 
     case content
     when /what.*should.*do|advice|recommendation|analysis|analyze/
-      { type: 'market_analysis', params: extract_analysis_params(content) }
+      {type: "market_analysis", params: extract_analysis_params(content)}
     when /size.*position|position.*size|sizing/
-      { type: 'trading_control', params: { action: 'position_sizing', content: content } }
+      {type: "trading_control", params: {action: "position_sizing", content: content}}
     when /position|pnl|profit|loss|open|close/
-      { type: 'position_query', params: extract_position_params(content) }
+      {type: "position_query", params: extract_position_params(content)}
     when /signal|alert|entry|exit/
-      { type: 'signal_query', params: extract_signal_params(content) }
+      {type: "signal_query", params: extract_signal_params(content)}
     when /market|price|data|candle/
-      { type: 'market_data', params: extract_market_params(content) }
+      {type: "market_data", params: extract_market_params(content)}
     when /status|health|system/
-      { type: 'system_status', params: {} }
+      {type: "system_status", params: {}}
     when /history|search|sessions|context/
-      { type: 'memory_command', params: extract_memory_params(content) }
+      {type: "memory_command", params: extract_memory_params(content)}
     when /help|command|what/
-      { type: 'help', params: {} }
+      {type: "help", params: {}}
     when /(start|resume|enable).*trad|trad.*(start|resume|enable)/
-      { type: 'trading_control', params: { action: 'start' } }
+      {type: "trading_control", params: {action: "start"}}
     when /(stop|pause|disable).*trad|trad.*(stop|pause|disable)/
-      { type: 'trading_control', params: { action: 'stop' } }
+      {type: "trading_control", params: {action: "stop"}}
     when /emergency.*stop|kill.*switch|stop.*emergency/
-      { type: 'trading_control', params: { action: 'emergency_stop' } }
+      {type: "trading_control", params: {action: "emergency_stop"}}
     else
       # Check original input for market analysis keywords if AI response doesn't match
       if input&.match?(/analyze|analysis|recommend|what.*should.*do|advice|suggestion|market.*analysis/)
-        { type: 'market_analysis', params: extract_analysis_params(input) }
+        {type: "market_analysis", params: extract_analysis_params(input)}
       else
-        { type: 'general', params: { content: ai_response[:content] } }
+        {type: "general", params: {content: ai_response[:content]}}
       end
     end
   end
 
   def execute_command(command, original_input)
     case command[:type]
-    when 'position_query'
+    when "position_query"
       execute_position_query(command[:params])
-    when 'signal_query'
+    when "signal_query"
       execute_signal_query(command[:params])
-    when 'market_data'
+    when "market_data"
       execute_market_data_query(command[:params])
-    when 'market_analysis'
+    when "market_analysis"
       execute_market_analysis_query(command[:params])
-    when 'system_status'
+    when "system_status"
       execute_status_query
-    when 'memory_command'
+    when "memory_command"
       execute_memory_command(command[:params], original_input)
-    when 'trading_control'
+    when "trading_control"
       execute_trading_control_command(command[:params], original_input)
-    when 'help'
+    when "help"
       execute_help_command
-    when 'general'
-      { type: 'ai_response', content: command[:params][:content] }
+    when "general"
+      {type: "ai_response", content: command[:params][:content]}
     else
-      error_response('Command not recognized')
+      error_response("Command not recognized")
     end
   end
 
@@ -149,7 +149,7 @@ class ChatBotService
     total_pnl = positions.sum { |p| p.pnl || 0 }
 
     {
-      type: 'position_data',
+      type: "position_data",
       data: {
         open_positions: positions.count,
         day_trading: positions.day_trading.count,
@@ -164,25 +164,25 @@ class ChatBotService
     signals = SignalAlert.active.recent.limit(5)
 
     {
-      type: 'signal_data',
+      type: "signal_data",
       data: {
         active_signals: signals.count,
         recent_signals: signals.map { |s| signal_summary(s) },
-        last_signal_time: signals.first&.alert_timestamp&.strftime('%H:%M UTC')
+        last_signal_time: signals.first&.alert_timestamp&.strftime("%H:%M UTC")
       }
     }
   end
 
   def execute_market_data_query(params)
-    symbol = params[:symbol] || 'BTC-PERP'
+    symbol = params[:symbol] || "BTC-PERP"
     recent_candle = Candle.for_symbol(symbol).one_minute.order(timestamp: :desc).first
 
     {
-      type: 'market_data',
+      type: "market_data",
       data: {
         symbol: symbol,
         price: recent_candle&.close&.round(2),
-        timestamp: recent_candle&.timestamp&.strftime('%H:%M UTC'),
+        timestamp: recent_candle&.timestamp&.strftime("%H:%M UTC"),
         volume: recent_candle&.volume&.round(2)
       }
     }
@@ -205,7 +205,7 @@ class ChatBotService
         @market_analysis.analyze_market_conditions
       end
     end
-  rescue StandardError => e
+  rescue => e
     Rails.logger.error("[ChatBot] Market analysis error: #{e.message}")
     error_response("Market analysis failed: #{e.message}")
   end
@@ -216,7 +216,7 @@ class ChatBotService
 
     {
       symbol: symbol ? "#{symbol.upcase}-USD" : nil,
-      timeframe: timeframe || '1h'
+      timeframe: timeframe || "1h"
     }
   end
 
@@ -225,12 +225,12 @@ class ChatBotService
     swing_positions = Position.open.swing_trading.count
 
     {
-      type: 'system_status',
+      type: "system_status",
       data: {
         trading_active: trading_active?,
         day_trading_positions: day_positions,
         swing_trading_positions: swing_positions,
-        health_status: 'operational',
+        health_status: "operational",
         uptime: application_uptime
       }
     }
@@ -238,13 +238,13 @@ class ChatBotService
 
   def execute_memory_command(params, original_input)
     case params[:action]
-    when 'history'
+    when "history"
       execute_history_command(params[:limit])
-    when 'search'
+    when "search"
       execute_search_command(params[:query])
-    when 'sessions'
+    when "sessions"
       execute_sessions_command
-    when 'context'
+    when "context"
       execute_context_status_command
     else
       # Default to history for ambiguous commands
@@ -256,7 +256,7 @@ class ChatBotService
     interactions = @memory.recent_interactions(limit)
 
     {
-      type: 'history_data',
+      type: "history_data",
       data: {
         interactions: interactions,
         total_count: @memory.session_summary[:total_interactions]
@@ -265,12 +265,12 @@ class ChatBotService
   end
 
   def execute_search_command(query)
-    return error_response('Search query required') if query.blank?
+    return error_response("Search query required") if query.blank?
 
     results = @memory.search_history(query)
 
     {
-      type: 'search_results',
+      type: "search_results",
       data: {
         query: query,
         results: results,
@@ -283,15 +283,15 @@ class ChatBotService
     sessions = ChatSession.active.recent.limit(10).map do |session|
       {
         id: session.session_id[0..7],
-        name: session.name || 'Unnamed',
+        name: session.name || "Unnamed",
         message_count: session.message_count,
-        last_activity: session.last_activity&.strftime('%m/%d %H:%M'),
+        last_activity: session.last_activity&.strftime("%m/%d %H:%M"),
         profitable_messages: session.profitable_messages.count
       }
     end
 
     {
-      type: 'sessions_data',
+      type: "sessions_data",
       data: {
         sessions: sessions,
         current_session: @session_id[0..7]
@@ -304,7 +304,7 @@ class ChatBotService
     context_length = @memory.context_for_ai(4000).length
 
     {
-      type: 'context_status',
+      type: "context_status",
       data: {
         session_id: summary[:session_id][0..7],
         total_messages: summary[:total_interactions],
@@ -318,13 +318,13 @@ class ChatBotService
 
   def execute_trading_control_command(params, original_input)
     case params[:action]
-    when 'start'
+    when "start"
       execute_start_trading_command
-    when 'stop'
+    when "stop"
       execute_stop_trading_command
-    when 'emergency_stop'
+    when "emergency_stop"
       execute_emergency_stop_command
-    when 'position_sizing'
+    when "position_sizing"
       execute_position_sizing_command(params[:content], original_input)
     else
       error_response("Unknown trading control action: #{params[:action]}")
@@ -334,11 +334,11 @@ class ChatBotService
   def execute_start_trading_command
     if trading_active?
       return {
-        type: 'trading_control_response',
+        type: "trading_control_response",
         data: {
-          action: 'start',
-          status: 'already_active',
-          message: 'Trading is already active. No action needed.'
+          action: "start",
+          status: "already_active",
+          message: "Trading is already active. No action needed."
         }
       }
     end
@@ -346,10 +346,10 @@ class ChatBotService
     set_trading_status(true)
 
     {
-      type: 'trading_control_response',
+      type: "trading_control_response",
       data: {
-        action: 'start',
-        status: 'success',
+        action: "start",
+        status: "success",
         message: "\u2705 Trading has been activated. The bot will now generate signals and manage positions."
       }
     }
@@ -358,11 +358,11 @@ class ChatBotService
   def execute_stop_trading_command
     unless trading_active?
       return {
-        type: 'trading_control_response',
+        type: "trading_control_response",
         data: {
-          action: 'stop',
-          status: 'already_inactive',
-          message: 'Trading is already inactive. No action needed.'
+          action: "stop",
+          status: "already_inactive",
+          message: "Trading is already inactive. No action needed."
         }
       }
     end
@@ -370,10 +370,10 @@ class ChatBotService
     set_trading_status(false)
 
     {
-      type: 'trading_control_response',
+      type: "trading_control_response",
       data: {
-        action: 'stop',
-        status: 'success',
+        action: "stop",
+        status: "success",
         message: "\u23F8\uFE0F Trading has been paused. The bot will stop generating new signals and opening positions."
       }
     }
@@ -384,10 +384,10 @@ class ChatBotService
     result = execute_emergency_stop_internal
 
     {
-      type: 'trading_control_response',
+      type: "trading_control_response",
       data: {
-        action: 'emergency_stop',
-        status: result[:success] ? 'success' : 'partial',
+        action: "emergency_stop",
+        status: result[:success] ? "success" : "partial",
         message: "🚨 EMERGENCY STOP EXECUTED 🚨\n\n#{result[:message]}\n\nPositions closed: #{result[:positions_closed]}\nOrders cancelled: #{result[:orders_cancelled]}"
       }
     }
@@ -395,14 +395,14 @@ class ChatBotService
 
   def execute_position_sizing_command(content, original_input)
     # Extract sizing information from content
-    current_equity = ENV.fetch('SIGNAL_EQUITY_USD', '10000').to_f
-    risk_per_trade = ENV.fetch('RISK_PER_TRADE_PERCENT', '2').to_f
+    current_equity = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    risk_per_trade = ENV.fetch("RISK_PER_TRADE_PERCENT", "2").to_f
 
     {
-      type: 'trading_control_response',
+      type: "trading_control_response",
       data: {
-        action: 'position_sizing',
-        status: 'info',
+        action: "position_sizing",
+        status: "info",
         message: "📊 Position Sizing Configuration:\n\nEquity: $#{current_equity.round(2)}\nRisk per trade: #{risk_per_trade}%\nMax risk per trade: $#{(current_equity * risk_per_trade / 100).round(2)}\n\nTo adjust sizing, update environment variables:\n- SIGNAL_EQUITY_USD\n- RISK_PER_TRADE_PERCENT"
       }
     }
@@ -410,25 +410,25 @@ class ChatBotService
 
   def execute_help_command
     {
-      type: 'help',
+      type: "help",
       data: {
         commands: [
-          'Check positions and PnL',
-          'View active signals',
-          'Get market data for symbols',
-          'Analyze market conditions and get trading recommendations',
+          "Check positions and PnL",
+          "View active signals",
+          "Get market data for symbols",
+          "Analyze market conditions and get trading recommendations",
           'Ask "what should I do with this position based on the market?"',
-          'Get advice on specific symbols or positions',
-          'System status and health',
-          'Start/resume trading operations',
-          'Stop/pause trading operations',
-          'Emergency stop (close all positions)',
-          'Check position sizing configuration',
-          'View conversation history',
-          'Search past conversations',
-          'List chat sessions',
-          'Show context status',
-          'General trading questions'
+          "Get advice on specific symbols or positions",
+          "System status and health",
+          "Start/resume trading operations",
+          "Stop/pause trading operations",
+          "Emergency stop (close all positions)",
+          "Check position sizing configuration",
+          "View conversation history",
+          "Search past conversations",
+          "List chat sessions",
+          "Show context status",
+          "General trading questions"
         ]
       }
     }
@@ -436,31 +436,31 @@ class ChatBotService
 
   def format_response(result, command)
     case result[:type]
-    when 'position_data'
+    when "position_data"
       format_position_response(result[:data])
-    when 'signal_data'
+    when "signal_data"
       format_signal_response(result[:data])
-    when 'market_data'
+    when "market_data"
       format_market_response(result[:data])
-    when 'market_analysis'
+    when "market_analysis"
       format_market_analysis_response(result[:data])
-    when 'system_status'
+    when "system_status"
       format_status_response(result[:data])
-    when 'trading_control_response'
+    when "trading_control_response"
       format_trading_control_response(result[:data])
-    when 'history_data'
+    when "history_data"
       format_history_response(result[:data])
-    when 'search_results'
+    when "search_results"
       format_search_response(result[:data])
-    when 'sessions_data'
+    when "sessions_data"
       format_sessions_response(result[:data])
-    when 'context_status'
+    when "context_status"
       format_context_status_response(result[:data])
-    when 'help'
+    when "help"
       format_help_response(result[:data])
-    when 'ai_response'
+    when "ai_response"
       result[:content]
-    when 'error'
+    when "error"
       "❌ #{result[:message]}"
     else
       "Response received: #{result[:type]}"
@@ -485,7 +485,7 @@ class ChatBotService
   def format_signal_response(data)
     output = "🚨 Signal Summary\n"
     output += "Active Signals: #{data[:active_signals]}\n"
-    output += "Last Signal: #{data[:last_signal_time] || 'N/A'}\n"
+    output += "Last Signal: #{data[:last_signal_time] || "N/A"}\n"
 
     if data[:recent_signals].any?
       output += "\nRecent Signals:\n"
@@ -515,11 +515,11 @@ class ChatBotService
 
     if data[:interactions].any?
       data[:interactions].each_with_index do |interaction, i|
-        timestamp = Time.parse(interaction[:timestamp]).strftime('%H:%M')
+        timestamp = Time.parse(interaction[:timestamp]).strftime("%H:%M")
         output += "#{i + 1}. [#{timestamp}] #{interaction[:command_type]}: #{interaction[:input].truncate(80)}\n"
       end
     else
-      output += 'No conversation history found.'
+      output += "No conversation history found."
     end
 
     output
@@ -530,13 +530,13 @@ class ChatBotService
 
     if data[:results].any?
       data[:results].each_with_index do |result, i|
-        timestamp = result[1].strftime('%m/%d %H:%M')
+        timestamp = result[1].strftime("%m/%d %H:%M")
         impact = result[2].upcase
         content = result[0].truncate(100)
         output += "#{i + 1}. [#{timestamp}] [#{impact}] #{content}\n"
       end
     else
-      output += 'No results found for your search.'
+      output += "No results found for your search."
     end
 
     output
@@ -547,13 +547,13 @@ class ChatBotService
 
     if data[:sessions].any?
       data[:sessions].each_with_index do |session, i|
-        marker = session[:id] == data[:current_session] ? "\u2192" : ' '
+        marker = (session[:id] == data[:current_session]) ? "\u2192" : " "
         output += "#{marker} #{i + 1}. #{session[:id]} - #{session[:name]}\n"
         output += "    Messages: #{session[:message_count]} (#{session[:profitable_messages]} profitable)\n"
-        output += "    Last: #{session[:last_activity] || 'N/A'}\n"
+        output += "    Last: #{session[:last_activity] || "N/A"}\n"
       end
     else
-      output += 'No active sessions found.'
+      output += "No active sessions found."
     end
 
     output
@@ -564,7 +564,7 @@ class ChatBotService
     output += "Session: #{data[:session_id]}\n"
     output += "Messages: #{data[:total_messages]} (#{data[:profitable_messages]} profitable)\n"
     output += "Context Length: #{data[:context_length]} chars (~#{data[:estimated_tokens]} tokens)\n"
-    output += "Last Activity: #{data[:last_activity] || 'N/A'}\n"
+    output += "Last Activity: #{data[:last_activity] || "N/A"}\n"
     output
   end
 
@@ -579,7 +579,7 @@ class ChatBotService
   end
 
   def error_response(message)
-    { type: 'error', message: message }
+    {type: "error", message: message}
   end
 
   def position_summary(position)
@@ -588,7 +588,7 @@ class ChatBotService
       side: position.side,
       size: position.size,
       entry_price: position.entry_price&.round(2),
-      pnl: position.pnl ? "$#{position.pnl.round(2)}" : 'N/A'
+      pnl: position.pnl ? "$#{position.pnl.round(2)}" : "N/A"
     }
   end
 
@@ -603,22 +603,22 @@ class ChatBotService
 
   def extract_position_params(content)
     symbol = content.match(/([A-Z]{3,4}[-_]?PERP?)/i)&.captures&.first
-    { symbol: symbol&.upcase }
+    {symbol: symbol&.upcase}
   end
 
   def extract_signal_params(content)
     symbol = content.match(/([A-Z]{3,4}[-_]?PERP?)/i)&.captures&.first
-    { symbol: symbol&.upcase }
+    {symbol: symbol&.upcase}
   end
 
   def extract_market_params(content)
     # Look for crypto symbols (BTC, ETH, etc.) in the content
     symbol = content.match(/\b(BTC|ETH|SOL|ADA|DOT|LINK|UNI|AAVE|MATIC|AVAX|ATOM|XRP|LTC|BCH|ETC|DOGE|SHIB)\b/i)&.captures&.first
-    { symbol: symbol ? "#{symbol.upcase}-PERP" : 'BTC-PERP' }
+    {symbol: symbol ? "#{symbol.upcase}-PERP" : "BTC-PERP"}
   end
 
   def extract_analysis_params(content)
-    return { symbol: nil, position_id: nil } if content.nil?
+    return {symbol: nil, position_id: nil} if content.nil?
 
     # Look for specific symbols or position references
     symbol = content.match(/\b(BTC|ETH|SOL|ADA|DOT|LINK|UNI|AAVE|MATIC|AVAX|ATOM|XRP|LTC|BCH|ETC|DOGE|SHIB)\b/i)&.captures&.first
@@ -634,16 +634,16 @@ class ChatBotService
     case content
     when /history/
       limit = content.match(/\d+/)&.to_s&.to_i || 10
-      { action: 'history', limit: limit }
+      {action: "history", limit: limit}
     when /search/
       query = content.match(/search\s+(.+)/i)&.captures&.first&.strip
-      { action: 'search', query: query }
+      {action: "search", query: query}
     when /sessions/
-      { action: 'sessions' }
+      {action: "sessions"}
     when /context/
-      { action: 'context' }
+      {action: "context"}
     else
-      { action: 'history', limit: 5 }
+      {action: "history", limit: 5}
     end
   end
 
@@ -657,19 +657,19 @@ class ChatBotService
 
   def market_context
     recent_signals = SignalAlert.active.recent(6).count
-    { recent_signals: recent_signals }
+    {recent_signals: recent_signals}
   end
 
   def set_trading_status(active, emergency: false)
-    Rails.cache.write('trading_active', active)
-    Rails.cache.write('emergency_stop', emergency) if emergency
-    Rails.logger.info("[ChatBot] Trading status set to: #{active ? 'active' : 'inactive'}#{if emergency
-                                                                                             ' (EMERGENCY)'
+    Rails.cache.write("trading_active", active)
+    Rails.cache.write("emergency_stop", emergency) if emergency
+    Rails.logger.info("[ChatBot] Trading status set to: #{active ? "active" : "inactive"}#{if emergency
+                                                                                             " (EMERGENCY)"
                                                                                            end}")
   end
 
   def trading_active?
-    Rails.cache.fetch('trading_active', expires_in: 1.hour) { true }
+    Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
   end
 
   def execute_emergency_stop_internal
@@ -693,11 +693,11 @@ class ChatBotService
 
       {
         success: true,
-        message: 'Emergency stop completed successfully.',
+        message: "Emergency stop completed successfully.",
         positions_closed: positions_closed,
         orders_cancelled: orders_cancelled
       }
-    rescue StandardError => e
+    rescue => e
       Rails.logger.error("[ChatBot] Error during emergency stop: #{e.message}")
       {
         success: false,
@@ -739,21 +739,21 @@ class ChatBotService
 
     case content
     when /position|pnl|profit|loss/
-      { content: 'User wants to check trading positions', provider: 'fallback' }
+      {content: "User wants to check trading positions", provider: "fallback"}
     when /signal|alert/
-      { content: 'User wants to view active signals', provider: 'fallback' }
+      {content: "User wants to view active signals", provider: "fallback"}
     when /market|price|data/
-      { content: 'User wants market data information', provider: 'fallback' }
+      {content: "User wants market data information", provider: "fallback"}
     when /start.*trad|resume.*trad/
-      { content: 'User wants to start trading operations', provider: 'fallback' }
+      {content: "User wants to start trading operations", provider: "fallback"}
     when /stop.*trad|pause.*trad/
-      { content: 'User wants to stop trading operations', provider: 'fallback' }
+      {content: "User wants to stop trading operations", provider: "fallback"}
     when /emergency.*stop/
-      { content: 'User wants emergency stop', provider: 'fallback' }
+      {content: "User wants emergency stop", provider: "fallback"}
     when /help/
-      { content: 'User wants help information', provider: 'fallback' }
+      {content: "User wants help information", provider: "fallback"}
     else
-      { content: 'General query about trading system', provider: 'fallback' }
+      {content: "General query about trading system", provider: "fallback"}
     end
   end
 
@@ -770,7 +770,7 @@ class ChatBotService
     )
 
     # Special logging for trading control commands
-    return unless command[:type] == 'trading_control'
+    return unless command[:type] == "trading_control"
 
     ChatAuditLogger.log_trading_control(
       session_id: @session_id,
@@ -783,23 +783,23 @@ class ChatBotService
 
   def determine_trading_impact(command, result)
     case command[:type]
-    when 'trading_control'
+    when "trading_control"
       case command.dig(:params, :action)
-      when 'emergency_stop'
-        'critical'
-      when 'start', 'stop'
-        'high'
-      when 'position_sizing'
-        'medium'
+      when "emergency_stop"
+        "critical"
+      when "start", "stop"
+        "high"
+      when "position_sizing"
+        "medium"
       else
-        'low'
+        "low"
       end
-    when 'position_query'
-      'medium'
-    when 'signal_query'
-      'medium'
+    when "position_query"
+      "medium"
+    when "signal_query"
+      "medium"
     else
-      'low'
+      "low"
     end
   end
 
@@ -816,7 +816,7 @@ class ChatBotService
     if Rails.application.config.respond_to?(:started_at) && Rails.application.config.started_at
       "#{((Time.current - Rails.application.config.started_at) / 1.hour).to_i}h"
     else
-      'N/A'
+      "N/A"
     end
   end
 end
