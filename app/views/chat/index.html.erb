@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Coinbase Futures Trading Bot - Chat Interface</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: #0a0a0a;
+        color: #ffffff;
+        height: 100vh;
+        overflow: hidden;
+      }
+      
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        max-width: 1200px;
+        margin: 0 auto;
+        border-left: 1px solid #333;
+        border-right: 1px solid #333;
+      }
+      
+      .chat-header {
+        background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+        padding: 20px;
+        border-bottom: 1px solid #333;
+        text-align: center;
+      }
+      
+      .chat-header h1 {
+        color: #00d4ff;
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      
+      .chat-header p {
+        color: #888;
+        font-size: 14px;
+      }
+      
+      .session-info {
+        background: #1a1a1a;
+        padding: 10px 20px;
+        border-bottom: 1px solid #333;
+        font-size: 12px;
+        color: #666;
+      }
+      
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #0f0f0f;
+      }
+      
+      .message {
+        margin-bottom: 20px;
+        max-width: 80%;
+        animation: fadeIn 0.3s ease-in;
+      }
+      
+      .message.user {
+        margin-left: auto;
+        background: #0066cc;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 18px 18px 4px 18px;
+      }
+      
+      .message.bot {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        color: #ffffff;
+        padding: 12px 16px;
+        border-radius: 18px 18px 18px 4px;
+      }
+      
+      .message.error {
+        background: #cc0000;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+      }
+      
+      .message .timestamp {
+        font-size: 11px;
+        color: #666;
+        margin-top: 4px;
+      }
+      
+      .chat-input-container {
+        background: #1a1a1a;
+        border-top: 1px solid #333;
+        padding: 20px;
+      }
+      
+      .chat-input-form {
+        display: flex;
+        gap: 12px;
+      }
+      
+      .chat-input {
+        flex: 1;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 16px;
+        outline: none;
+      }
+      
+      .chat-input:focus {
+        border-color: #00d4ff;
+        box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+      }
+      
+      .chat-send-btn {
+        background: #00d4ff;
+        color: #000;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      
+      .chat-send-btn:hover {
+        background: #0099cc;
+      }
+      
+      .chat-send-btn:disabled {
+        background: #333;
+        color: #666;
+        cursor: not-allowed;
+      }
+      
+      .loading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #666;
+        font-style: italic;
+      }
+      
+      .loading-dots {
+        display: inline-block;
+      }
+      
+      .loading-dots::after {
+        content: '...';
+        animation: dots 1.5s infinite;
+      }
+      
+      @keyframes dots {
+        0%, 20% { content: '.'; }
+        40% { content: '..'; }
+        60%, 100% { content: '...'; }
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      .status-indicators {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        font-size: 12px;
+      }
+      
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #00ff00;
+      }
+      
+      .status-dot.disconnected {
+        background: #ff0000;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="chat-container">
+      <div class="chat-header">
+        <h1>🤖 Trading Bot Assistant</h1>
+        <p>Interactive chat interface for Coinbase futures trading operations</p>
+      </div>
+      
+      <div class="session-info">
+        <div class="status-indicators">
+          <div class="status-indicator">
+            <div class="status-dot" id="connection-status"></div>
+            <span>Connected</span>
+          </div>
+          <div class="status-indicator">
+            Session ID: <code><%= @session_id %></code>
+          </div>
+        </div>
+      </div>
+      
+      <div class="chat-messages" id="chat-messages">
+        <div class="message bot">
+          <div>👋 Welcome to the Coinbase Futures Trading Bot chat interface!</div>
+          <div>You can ask me about:</div>
+          <div style="margin-top: 8px; padding-left: 16px;">
+            • Position status and P&L<br>
+            • Active trading signals<br>
+            • Market data and prices<br>
+            • System status and controls<br>
+            • Trading operations (start/stop/emergency stop)
+          </div>
+          <div class="timestamp">System</div>
+        </div>
+      </div>
+      
+      <div class="chat-input-container">
+        <form class="chat-input-form" id="chat-form">
+          <%= hidden_field_tag :authenticity_token, @csrf_token %>
+          <input 
+            type="text" 
+            class="chat-input" 
+            id="message-input" 
+            placeholder="Ask about positions, signals, market data, or trading controls..." 
+            autocomplete="off"
+            maxlength="500"
+          >
+          <button type="submit" class="chat-send-btn" id="send-btn">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      class TradingBotChat {
+        constructor() {
+          this.sessionId = '<%= @session_id %>';
+          this.csrfToken = '<%= @csrf_token %>';
+          this.messagesContainer = document.getElementById('chat-messages');
+          this.messageInput = document.getElementById('message-input');
+          this.sendBtn = document.getElementById('send-btn');
+          this.chatForm = document.getElementById('chat-form');
+          this.connectionStatus = document.getElementById('connection-status');
+          
+          this.init();
+        }
+        
+        init() {
+          this.chatForm.addEventListener('submit', (e) => this.handleSubmit(e));
+          this.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              this.handleSubmit(e);
+            }
+          });
+          
+          // Load conversation history
+          this.loadConversationHistory();
+          
+          // Focus input
+          this.messageInput.focus();
+        }
+        
+        async handleSubmit(e) {
+          e.preventDefault();
+          
+          const message = this.messageInput.value.trim();
+          if (!message) return;
+          
+          // Clear input and disable send button
+          this.messageInput.value = '';
+          this.sendBtn.disabled = true;
+          this.sendBtn.textContent = 'Sending...';
+          
+          // Add user message to chat
+          this.addMessage(message, 'user');
+          
+          // Show loading indicator
+          const loadingId = this.addLoadingMessage();
+          
+          try {
+            const response = await this.sendMessage(message);
+            
+            // Remove loading indicator
+            this.removeMessage(loadingId);
+            
+            if (response.success) {
+              this.addMessage(response.data.bot_response, 'bot');
+            } else {
+              this.addMessage(`Error: ${response.error}`, 'error');
+            }
+          } catch (error) {
+            this.removeMessage(loadingId);
+            this.addMessage(`Network error: ${error.message}`, 'error');
+            this.updateConnectionStatus(false);
+          } finally {
+            this.sendBtn.disabled = false;
+            this.sendBtn.textContent = 'Send';
+            this.messageInput.focus();
+          }
+        }
+        
+        async sendMessage(message) {
+          const response = await fetch('/api/chat_messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': this.csrfToken,
+              'X-Chat-Session-ID': this.sessionId
+            },
+            body: JSON.stringify({ message })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          return await response.json();
+        }
+        
+        async loadConversationHistory() {
+          try {
+            const response = await fetch('/api/chat_messages/conversation_history', {
+              headers: {
+                'X-Chat-Session-ID': this.sessionId
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              // History loading could be implemented here if needed
+              this.updateConnectionStatus(true);
+            }
+          } catch (error) {
+            console.warn('Failed to load conversation history:', error);
+            this.updateConnectionStatus(false);
+          }
+        }
+        
+        addMessage(content, type) {
+          const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const messageEl = document.createElement('div');
+          messageEl.className = `message ${type}`;
+          messageEl.id = messageId;
+          
+          const timestamp = new Date().toLocaleTimeString();
+          messageEl.innerHTML = `
+            <div>${this.escapeHtml(content)}</div>
+            <div class="timestamp">${timestamp}</div>
+          `;
+          
+          this.messagesContainer.appendChild(messageEl);
+          this.scrollToBottom();
+          
+          return messageId;
+        }
+        
+        addLoadingMessage() {
+          const messageId = `loading-${Date.now()}`;
+          const messageEl = document.createElement('div');
+          messageEl.className = 'message bot loading';
+          messageEl.id = messageId;
+          messageEl.innerHTML = `
+            <div>Processing your request<span class="loading-dots"></span></div>
+          `;
+          
+          this.messagesContainer.appendChild(messageEl);
+          this.scrollToBottom();
+          
+          return messageId;
+        }
+        
+        removeMessage(messageId) {
+          const messageEl = document.getElementById(messageId);
+          if (messageEl) {
+            messageEl.remove();
+          }
+        }
+        
+        updateConnectionStatus(connected) {
+          this.connectionStatus.className = connected ? 'status-dot' : 'status-dot disconnected';
+        }
+        
+        scrollToBottom() {
+          this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+        }
+        
+        escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+      }
+      
+      // Initialize chat when DOM is loaded
+      document.addEventListener('DOMContentLoaded', () => {
+        new TradingBotChat();
+      });
+    </script>
+  </body>
+</html>

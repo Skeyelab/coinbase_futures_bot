@@ -39,6 +39,14 @@ Rails.application.routes.draw do
     end
   end
 
+  # Position import routes
+  namespace :position_import do
+    get :index
+    post :import
+    post :replace
+    get :test_connection
+  end
+
   # Real-time signal API endpoints
   resources :signals, only: %i[index show], controller: "signal" do
     collection do
@@ -57,12 +65,22 @@ Rails.application.routes.draw do
 
   get "/sentiment/aggregates", to: "sentiment#aggregates"
 
+  # Chat interface routes
+  get "/chat", to: "chat#index"
+
   # API routes
   namespace :api do
     resources :positions, only: [:index] do
       collection do
         get :summary
         get :exposure
+      end
+    end
+
+    resources :chat_messages, only: %i[create index] do
+      collection do
+        post :send_message
+        get :conversation_history
       end
     end
   end
