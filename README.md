@@ -24,7 +24,7 @@ An automated cryptocurrency futures trading bot built with Rails 8.0, featuring 
 ## Technology Stack
 
 - **Framework**: Rails 8.0 (API-only)
-- **Language**: Ruby 3.2.2
+- **Language**: Ruby 3.2.4
 - **Database**: PostgreSQL with time-series optimizations
 - **Jobs**: GoodJob with cron scheduling
 - **AI Services**: OpenRouter (Claude 3.5 Sonnet), OpenAI (GPT-4)
@@ -89,48 +89,6 @@ Coverage data is automatically generated during CI runs and available as downloa
 2. Generates coverage reports and HTML output
 3. Uploads coverage artifacts for download
 4. Displays coverage percentage in the workflow logs
-
-## Prerequisites
-- Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
-- PostgreSQL (DATABASE_URL)
-- Bundler
-
-## Quick Start
-
-### 1. Setup Environment
-```bash
-# Clone and setup Ruby environment
-git clone git@github.com:Skeyelab/coinbase_futures_bot.git
-cd coinbase_futures_bot
-rvm use ruby-3.2.2@coinbase_futures_bot --create
-
-# Install dependencies and setup database
-bundle install
-bin/rails db:prepare
-```
-
-### 2. Configure Environment Variables
-```bash
-# Copy example and edit configuration
-cp .env.example .env
-# Edit .env with your API credentials
-```
-
-Required variables:
-- `DATABASE_URL` - PostgreSQL connection string
-- `COINBASE_API_KEY` - Coinbase API credentials
-- `CRYPTOPANIC_TOKEN` - News sentiment API token
-
-### 3. Start Development Server
-```bash
-bin/rails server
-# Access GoodJob dashboard: http://localhost:3000/good_job
-```
-
-### 4. Run Tests
-```bash
-bundle exec rspec
-```
 
 ## 📚 Documentation
 
@@ -482,8 +440,8 @@ This project follows GitHub Flow with pull requests:
 
 1. **Create Feature Branch**: `git checkout -b feature/description`
 2. **Make Changes**: Follow coding standards and write tests
-3. **Run Tests**: `bundle exec rspec && bundle exec rubocop`
-4. **Submit PR**: All CI checks must pass (RuboCop, Brakeman, RSpec)
+3. **Run Tests**: `bundle exec rspec && bin/standardrb --fix`
+4. **Submit PR**: All CI checks must pass (StandardRB, Brakeman, RSpec)
 5. **Code Review**: Maintain documentation and session notes
 
 See [Development Guide](docs/development.md) for detailed workflow and standards.
