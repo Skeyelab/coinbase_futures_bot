@@ -2,7 +2,7 @@
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
 
-**Status**: ✅ Production-Ready | **Framework**: Rails 8.0 | **Language**: Ruby 3.2.2
+**Status**: ✅ Production-Ready | **Framework**: Rails 8.0.2 | **Language**: Ruby 3.2.4
 
 A fully-featured automated cryptocurrency futures trading bot with AI-powered chat interface, real-time market data, multi-timeframe signal generation, sentiment analysis, and comprehensive risk management.
 
@@ -94,7 +94,7 @@ Coverage data is automatically generated during CI runs and available as downloa
 
 ## Prerequisites
 
-- Ruby 3.2.2 (managed via `.ruby-version`)
+- Ruby 3.2.4 (managed via `.ruby-version`)
 - PostgreSQL database
 - Bundler gem manager
 - Coinbase API credentials (API key + secret)
