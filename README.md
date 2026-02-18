@@ -502,7 +502,7 @@ This project is **feature-complete and production-ready**. For a comprehensive l
 - ✅ **80+ test files** with 1000+ test examples
 - ✅ **25 background jobs** for automated trading operations
 - ✅ **40+ services** implementing business logic
-- ✅ **11 models** for data persistence
+- ✅ **10 models** for data persistence
 - ✅ **Comprehensive documentation** in docs/ directory
 
 ## Contributing
