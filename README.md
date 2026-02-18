@@ -511,8 +511,8 @@ This project follows GitHub Flow:
 
 1. **Create Feature Branch**: `git checkout -b feature/description`
 2. **Make Changes**: Follow coding standards and write tests
-3. **Run Tests**: `bundle exec rspec && bundle exec rubocop`
-4. **Submit PR**: All CI checks must pass (RuboCop, Brakeman, RSpec)
+3. **Run Tests**: `bundle exec rspec && bin/standardrb`
+4. **Submit PR**: All CI checks must pass (StandardRB, Brakeman, RSpec)
 
 See [Development Guide](docs/development.md) for detailed workflow.
 
