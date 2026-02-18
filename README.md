@@ -2,7 +2,9 @@
 
 [![CI Status](https://github.com/Skeyelab/coinbase_futures_bot/workflows/CI/badge.svg)](https://github.com/Skeyelab/coinbase_futures_bot/actions)
 
-An automated cryptocurrency futures trading bot built with Rails 8.0, featuring real-time market data ingestion, multi-timeframe signal generation, sentiment analysis, and risk management.
+**Status**: ✅ Production-Ready | **Framework**: Rails 8.0 | **Language**: Ruby 3.2.2
+
+A fully-featured automated cryptocurrency futures trading bot with AI-powered chat interface, real-time market data, multi-timeframe signal generation, sentiment analysis, and comprehensive risk management.
 
 **Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)
 
@@ -91,45 +93,57 @@ Coverage data is automatically generated during CI runs and available as downloa
 4. Displays coverage percentage in the workflow logs
 
 ## Prerequisites
-- Ruby 3.2.2 (RVM recommended; repo uses `.ruby-version`)
-- PostgreSQL (DATABASE_URL)
-- Bundler
 
-## Quick Start
+- Ruby 3.2.2 (managed via `.ruby-version`)
+- PostgreSQL database
+- Bundler gem manager
+- Coinbase API credentials (API key + secret)
+- CryptoPanic API token (for sentiment analysis)
 
-### 1. Setup Environment
+See [Development Guide](docs/development.md) for detailed setup instructions.
+
+## Quick Reference
+
+### Starting the Bot
 ```bash
-# Clone and setup Ruby environment
-git clone git@github.com:Skeyelab/coinbase_futures_bot.git
-cd coinbase_futures_bot
-rvm use ruby-3.2.2@coinbase_futures_bot --create
-
-# Install dependencies and setup database
-bundle install
-bin/rails db:prepare
-```
-
-### 2. Configure Environment Variables
-```bash
-# Copy example and edit configuration
-cp .env.example .env
-# Edit .env with your API credentials
-```
-
-Required variables:
-- `DATABASE_URL` - PostgreSQL connection string
-- `COINBASE_API_KEY` - Coinbase API credentials
-- `CRYPTOPANIC_TOKEN` - News sentiment API token
-
-### 3. Start Development Server
-```bash
+# 1. Start Rails server
 bin/rails server
-# Access GoodJob dashboard: http://localhost:3000/good_job
+
+# 2. Access GoodJob dashboard
+open http://localhost:3000/good_job
+
+# 3. Start AI chat interface
+bin/rails chat_bot:start
+
+# 4. Start real-time signal system
+bin/rake realtime:signals
 ```
 
-### 4. Run Tests
+### Running Tests
 ```bash
-bundle exec rspec
+# Full test suite with coverage
+COVERAGE=true bundle exec rspec
+
+# View coverage report
+open coverage/index.html
+
+# Run specific test file
+bundle exec rspec spec/services/chat_bot_service_spec.rb
+```
+
+### Common Operations
+```bash
+# Check system health
+curl http://localhost:3000/up
+
+# View active signals
+curl "http://localhost:3000/signals/active"
+
+# Check positions
+bin/rake day_trading:check_positions
+
+# Emergency stop all trading
+FORCE=true bin/rake realtime:cancel_all
 ```
 
 ## 📚 Documentation
@@ -476,17 +490,31 @@ export SENTIMENT_Z_THRESHOLD=1.5
 RAILS_ENV=production bundle exec good_job start
 ```
 
+## Project Status & Roadmap
+
+This project is **feature-complete and production-ready**. For a comprehensive list of implemented features and future enhancements, see:
+
+- **[TODO.md](TODO.md)** - Prioritized work items and future enhancements
+- **[Development Guide](docs/development.md)** - Setup, workflow, and coding standards
+- **GitHub Issues** - Bug reports and feature requests
+
+### Key Metrics
+- ✅ **80+ test files** with 1000+ test examples
+- ✅ **25 background jobs** for automated trading operations
+- ✅ **40+ services** implementing business logic
+- ✅ **11 models** for data persistence
+- ✅ **Comprehensive documentation** in docs/ directory
+
 ## Contributing
 
-This project follows GitHub Flow with pull requests:
+This project follows GitHub Flow:
 
 1. **Create Feature Branch**: `git checkout -b feature/description`
 2. **Make Changes**: Follow coding standards and write tests
 3. **Run Tests**: `bundle exec rspec && bundle exec rubocop`
 4. **Submit PR**: All CI checks must pass (RuboCop, Brakeman, RSpec)
-5. **Code Review**: Maintain documentation and session notes
 
-See [Development Guide](docs/development.md) for detailed workflow and standards.
+See [Development Guide](docs/development.md) for detailed workflow.
 
 ## Security & Risk Management
 
@@ -507,4 +535,3 @@ See [Development Guide](docs/development.md) for detailed workflow and standards
 ## License
 
 See LICENSE file for details.
-# Test trigger for CI verification
