@@ -534,4 +534,4 @@ See [Development Guide](docs/development.md) for detailed workflow.
 
 ## License
 
-See LICENSE file for details.
+This project is private. All rights reserved.
