@@ -10,6 +10,10 @@ module Trading
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
+      @trailing_stop_runner = Trading::TrailingStop::Runner.new(
+        logger: logger,
+        positions_service: @positions_service
+      )
     end
 
     # Check if any day trading positions need immediate closure
@@ -141,7 +145,7 @@ module Trading
     alias_method :get_summary, :get_position_summary
 
     # Check if any positions have hit take profit or stop loss
-    def check_tp_sl_triggers
+    def check_tp_sl_triggers(exclude_position_ids: [])
       positions = Position.open_day_trading_positions
       return [] if positions.empty?
 
@@ -149,6 +153,7 @@ module Trading
       current_prices = get_current_prices
 
       positions.each do |position|
+        next if exclude_position_ids.include?(position.id)
         current_price = current_prices[position.id]
         next unless current_price
 
@@ -174,11 +179,17 @@ module Trading
 
     # Close positions that have hit take profit or stop loss
     def close_tp_sl_positions
-      triggered_positions = check_tp_sl_triggers
-      return 0 if triggered_positions.empty?
+      closed_count = 0
+      trailing_result = @trailing_stop_runner.close_triggered_positions(positions: Position.open_day_trading_positions)
+      closed_count += trailing_result[:closed_count]
+
+      triggered_positions = check_tp_sl_triggers(exclude_position_ids: trailing_result[:processed_ids])
+      triggered_positions = triggered_positions.reject do |trigger_info|
+        trigger_info[:trigger] == "stop_loss" && trigger_info[:position].trailing_stop_enabled
+      end
+      return closed_count if triggered_positions.empty?
 
       @logger.info("Closing #{triggered_positions.size} positions that hit TP/SL")
-      closed_count = 0
 
       triggered_positions.each do |trigger_info|
         position = trigger_info[:position]
