@@ -68,7 +68,7 @@ group :test do
   gem "simplecov-json", "~> 0.2", require: false
 end
 
-gem "good_job", "~> 4.12"
+gem "good_job", "~> 4.18"
 gem "sentry-rails"
 gem "sentry-ruby"
 
