@@ -18,6 +18,41 @@ RSpec.describe OperationsController, type: :controller do
     )
   end
 
+  before do
+    @orig_username = ENV["OPERATIONS_UI_USERNAME"]
+    @orig_password = ENV["OPERATIONS_UI_PASSWORD"]
+    ENV["OPERATIONS_UI_USERNAME"] = "ops_admin"
+    ENV["OPERATIONS_UI_PASSWORD"] = "ops_secret"
+    request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("ops_admin:ops_secret")
+  end
+
+  after do
+    ENV["OPERATIONS_UI_USERNAME"] = @orig_username
+    ENV["OPERATIONS_UI_PASSWORD"] = @orig_password
+  end
+
+  describe "authentication" do
+    it "requires basic authentication for all actions" do
+      request.env.delete("HTTP_AUTHORIZATION")
+      get :index
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it "rejects invalid credentials" do
+      request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("ops_admin:wrong")
+      get :index
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it "returns forbidden when credentials are not configured" do
+      ENV["OPERATIONS_UI_USERNAME"] = ""
+      ENV["OPERATIONS_UI_PASSWORD"] = ""
+      request.env.delete("HTTP_AUTHORIZATION")
+      get :index
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
+
   describe "GET #index" do
     it "renders successfully" do
       get :index

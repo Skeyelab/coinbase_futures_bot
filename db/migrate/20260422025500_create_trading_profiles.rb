@@ -18,6 +18,6 @@ class CreateTradingProfiles < ActiveRecord::Migration[8.0]
     end
 
     add_index :trading_profiles, :slug, unique: true
-    add_index :trading_profiles, :active
+    add_index :trading_profiles, :active, unique: true, where: "active = true"
   end
 end

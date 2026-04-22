@@ -3,47 +3,73 @@
 class TradingConfiguration
   class << self
     def current_profile
-      TradingProfile.active.order(updated_at: :desc).first
+      @current_profile ||= TradingProfile.active.order(updated_at: :desc).first
+    end
+
+    def reset_profile_cache!
+      @current_profile = nil
     end
 
     def signal_equity_usd
-      current_profile&.signal_equity_usd&.to_f || env_float("SIGNAL_EQUITY_USD", 10_000.0)
+      profile_float(:signal_equity_usd) || env_float("SIGNAL_EQUITY_USD", 10_000.0)
     end
 
     def min_confidence
-      current_profile&.min_confidence&.to_f || env_float("REALTIME_SIGNAL_MIN_CONFIDENCE", 60.0)
+      profile_float(:min_confidence) || env_float("REALTIME_SIGNAL_MIN_CONFIDENCE", 60.0)
     end
 
     def max_signals_per_hour
-      current_profile&.max_signals_per_hour&.to_i || env_int("REALTIME_SIGNAL_MAX_PER_HOUR", 10)
+      profile_int(:max_signals_per_hour) || env_int("REALTIME_SIGNAL_MAX_PER_HOUR", 10)
     end
 
     def evaluation_interval_seconds
-      current_profile&.evaluation_interval_seconds&.to_i || env_int("REALTIME_SIGNAL_EVALUATION_INTERVAL", 30)
+      profile_int(:evaluation_interval_seconds) || env_int("REALTIME_SIGNAL_EVALUATION_INTERVAL", 30)
     end
 
     def strategy_risk_fraction
-      current_profile&.strategy_risk_fraction&.to_f || env_float("STRATEGY_RISK_FRACTION", 0.01)
+      profile_float(:strategy_risk_fraction) || env_float("STRATEGY_RISK_FRACTION", 0.01)
     end
 
     def strategy_tp_target
-      current_profile&.strategy_tp_target&.to_f || env_float("STRATEGY_TP_TARGET", 0.006)
+      profile_float(:strategy_tp_target) || env_float("STRATEGY_TP_TARGET", 0.006)
     end
 
     def strategy_sl_target
-      current_profile&.strategy_sl_target&.to_f || env_float("STRATEGY_SL_TARGET", 0.004)
+      profile_float(:strategy_sl_target) || env_float("STRATEGY_SL_TARGET", 0.004)
     end
 
     private
 
+    def profile_float(attribute)
+      value = current_profile&.public_send(attribute)
+      return if value.nil?
+
+      coerce_float(value, nil)
+    end
+
+    def profile_int(attribute)
+      value = current_profile&.public_send(attribute)
+      return if value.nil?
+
+      coerce_int(value, nil)
+    end
+
     def env_float(key, fallback)
-      Float(ENV.fetch(key, fallback.to_s))
+      coerce_float(ENV.fetch(key, fallback.to_s), fallback)
+    end
+
+    def env_int(key, fallback)
+      coerce_int(ENV.fetch(key, fallback.to_s), fallback)
+    end
+
+    def coerce_float(value, fallback)
+      Float(value)
     rescue ArgumentError, TypeError
       fallback
     end
 
-    def env_int(key, fallback)
-      Integer(ENV.fetch(key, fallback.to_s))
+    def coerce_int(value, fallback)
+      Integer(value)
     rescue ArgumentError, TypeError
       fallback
     end

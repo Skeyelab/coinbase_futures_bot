@@ -4,11 +4,13 @@ class OperationsController < ActionController::Base
   layout "application"
   protect_from_forgery with: :exception
 
+  before_action :require_operations_basic_auth
+
   def index
     @profiles = TradingProfile.order(:name)
     @active_profile = TradingConfiguration.current_profile
     @trading_active = trading_active?
-    @emergency_stop = Rails.cache.fetch("emergency_stop", expires_in: 1.hour) { false }
+    @emergency_stop = Rails.cache.read("emergency_stop") || false
   end
 
   def activate_profile
@@ -37,6 +39,22 @@ class OperationsController < ActionController::Base
   private
 
   def trading_active?
-    Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+    result = Rails.cache.read("trading_active")
+    result.nil? ? true : result
+  end
+
+  def require_operations_basic_auth
+    username = ENV["OPERATIONS_UI_USERNAME"].to_s
+    password = ENV["OPERATIONS_UI_PASSWORD"].to_s
+
+    unless username.present? && password.present?
+      render plain: "Operations UI credentials not configured. Set OPERATIONS_UI_USERNAME and OPERATIONS_UI_PASSWORD.",
+        status: :forbidden and return
+    end
+
+    authenticate_or_request_with_http_basic("Operations UI") do |u, p|
+      ActiveSupport::SecurityUtils.secure_compare(u.to_s, username) &&
+        ActiveSupport::SecurityUtils.secure_compare(p.to_s, password)
+    end
   end
 end

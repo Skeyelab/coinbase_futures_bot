@@ -17,9 +17,11 @@ class TradingProfile < ApplicationRecord
 
   def activate!
     self.class.transaction do
+      self.class.lock(true).load
       self.class.update_all(active: false)
       update!(active: true)
     end
+    TradingConfiguration.reset_profile_cache!
   end
 
   private
