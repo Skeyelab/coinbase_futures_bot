@@ -395,15 +395,15 @@ class ChatBotService
 
   def execute_position_sizing_command(content, original_input)
     # Extract sizing information from content
-    current_equity = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
-    risk_per_trade = ENV.fetch("RISK_PER_TRADE_PERCENT", "2").to_f
+    current_equity = TradingConfiguration.signal_equity_usd
+    risk_per_trade = (TradingConfiguration.strategy_risk_fraction * 100).round(2)
 
     {
       type: "trading_control_response",
       data: {
         action: "position_sizing",
         status: "info",
-        message: "📊 Position Sizing Configuration:\n\nEquity: $#{current_equity.round(2)}\nRisk per trade: #{risk_per_trade}%\nMax risk per trade: $#{(current_equity * risk_per_trade / 100).round(2)}\n\nTo adjust sizing, update environment variables:\n- SIGNAL_EQUITY_USD\n- RISK_PER_TRADE_PERCENT"
+        message: "📊 Position Sizing Configuration:\n\nEquity: $#{current_equity.round(2)}\nRisk per trade: #{risk_per_trade}%\nMax risk per trade: $#{(current_equity * risk_per_trade / 100).round(2)}\n\nTo adjust sizing, use the /operations page profile selector or update env vars."
       }
     }
   end

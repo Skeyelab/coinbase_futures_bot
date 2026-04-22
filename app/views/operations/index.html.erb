@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Trading Operations</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 24px; background: #101418; color: #f3f4f6; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+      .card { border: 1px solid #2a323b; border-radius: 8px; padding: 16px; margin: 16px 0; background: #161c22; }
+      .muted { color: #9ca3af; }
+      .active { color: #34d399; font-weight: 600; }
+      .paused { color: #f59e0b; font-weight: 600; }
+      button { border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+      .primary { background: #2563eb; color: #fff; }
+      .danger { background: #dc2626; color: #fff; }
+      .ghost { background: #374151; color: #fff; }
+      code { background: #0b0f13; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Trading Operations</h1>
+    <p class="muted">Profile-based runtime controls for signal generation and risk sizing.</p>
+
+    <% if flash[:notice].present? %>
+      <p class="active"><%= flash[:notice] %></p>
+    <% end %>
+    <% if flash[:alert].present? %>
+      <p class="paused"><%= flash[:alert] %></p>
+    <% end %>
+
+    <div class="card">
+      <h2>Runtime Status</h2>
+      <p>
+        Trading:
+        <span class="<%= @trading_active ? "active" : "paused" %>"><%= @trading_active ? "ACTIVE" : "PAUSED" %></span>
+      </p>
+      <p>Emergency stop: <code><%= @emergency_stop %></code></p>
+
+      <div class="row">
+        <%= button_to "Start Trading", operations_set_trading_state_path(state: "start"), method: :post, class: "primary" %>
+        <%= button_to "Pause Trading", operations_set_trading_state_path(state: "stop"), method: :post, class: "ghost" %>
+        <%= button_to "Emergency Stop", operations_emergency_stop_path, method: :post, class: "danger", data: { turbo_confirm: "Enable emergency stop?" } %>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Active Profile</h2>
+      <% if @active_profile %>
+        <p class="active"><%= @active_profile.name %> (<code><%= @active_profile.slug %></code>)</p>
+        <div class="muted">
+          Equity $<%= @active_profile.signal_equity_usd %>,
+          Min Confidence <%= @active_profile.min_confidence %>%,
+          Max/Hour <%= @active_profile.max_signals_per_hour %>,
+          Eval Interval <%= @active_profile.evaluation_interval_seconds %>s,
+          Risk <%= (@active_profile.strategy_risk_fraction * 100).round(2) %>%
+        </div>
+      <% else %>
+        <p class="paused">No active profile. Env vars are currently used as fallback.</p>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <h2>Profiles</h2>
+      <% @profiles.each do |profile| %>
+        <div class="row">
+          <strong><%= profile.name %></strong>
+          <span class="muted">(<%= profile.slug %>)</span>
+          <% unless profile.active? %>
+            <%= button_to "Activate", operations_activate_profile_path(profile), method: :post, class: "primary" %>
+          <% else %>
+            <span class="active">Active</span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </body>
+</html>

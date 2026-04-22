@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_22_025600) do
   create_schema "auth"
   create_schema "extensions"
   create_schema "graphql"
@@ -260,6 +260,23 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
     t.date "expiration_date"
     t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
     t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
+  end
+
+  create_table "trading_profiles", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.decimal "signal_equity_usd", precision: 15, scale: 2, null: false
+    t.decimal "min_confidence", precision: 5, scale: 2, null: false
+    t.integer "max_signals_per_hour", null: false
+    t.integer "evaluation_interval_seconds", null: false
+    t.decimal "strategy_risk_fraction", precision: 8, scale: 6, null: false
+    t.decimal "strategy_tp_target", precision: 8, scale: 6, null: false
+    t.decimal "strategy_sl_target", precision: 8, scale: 6, null: false
+    t.boolean "active", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_trading_profiles_on_active", unique: true, where: "active = true"
+    t.index ["slug"], name: "index_trading_profiles_on_slug", unique: true
   end
 
   add_foreign_key "chat_messages", "chat_sessions"

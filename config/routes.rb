@@ -67,6 +67,10 @@ Rails.application.routes.draw do
 
   # Chat interface routes
   get "/chat", to: "chat#index"
+  get "/operations", to: "operations#index"
+  post "/operations/profiles/:id/activate", to: "operations#activate_profile", as: :operations_activate_profile
+  post "/operations/trading_state", to: "operations#set_trading_state", as: :operations_set_trading_state
+  post "/operations/emergency_stop", to: "operations#emergency_stop", as: :operations_emergency_stop
 
   # API routes
   namespace :api do

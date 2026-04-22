@@ -46,7 +46,7 @@ class RapidSignalEvaluationJob < ApplicationJob
 
     # Generate signal using spot price as reference
     begin
-      equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "50000").to_f # Increased for ~20 ETH capacity
+      equity_usd = TradingConfiguration.signal_equity_usd
       signal = strategy.signal(symbol: @product_id, equity_usd: equity_usd)
     rescue => e
       @logger.error("[RSE] Error generating signal: #{e.message}")
