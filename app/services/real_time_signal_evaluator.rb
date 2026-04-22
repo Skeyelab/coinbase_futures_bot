@@ -11,10 +11,10 @@ class RealTimeSignalEvaluator
     @last_evaluation = {}
 
     config = Rails.application.config.real_time_signals
-    @evaluation_interval = config[:evaluation_interval].seconds
-    @min_confidence_threshold = config[:min_confidence_threshold]
+    @evaluation_interval = TradingConfiguration.evaluation_interval_seconds.seconds
+    @min_confidence_threshold = TradingConfiguration.min_confidence
     @deduplication_window = config[:deduplication_window]
-    @max_signals_per_hour = config[:max_signals_per_hour]
+    @max_signals_per_hour = TradingConfiguration.max_signals_per_hour
   end
 
   # Evaluate all enabled trading pairs for signals
@@ -41,7 +41,7 @@ class RealTimeSignalEvaluator
   # Evaluate a specific trading pair for signals
   def evaluate_pair(trading_pair)
     symbol = resolve_symbol(trading_pair.product_id)
-    equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    equity_usd = TradingConfiguration.signal_equity_usd
 
     @strategies.each do |strategy_name, strategy|
       evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)

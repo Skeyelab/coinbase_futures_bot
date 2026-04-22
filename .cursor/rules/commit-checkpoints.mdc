@@ -17,7 +17,7 @@ Create frequent, safe checkpoints using the MCP commit/push tooling whenever rel
 
 ## Preconditions
 - Build/tests are green when available.
-- Update [SESSION_NOTES.md](mdc:SESSION_NOTES.md): add a new entry to `### Session log` describing what changed and commands run.
+- Keep commit messages high-signal and scoped to the actual change set.
 
 ## How to commit (MCP-first)
 1. Stage changes via MCP Git tool.

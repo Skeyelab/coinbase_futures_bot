@@ -492,9 +492,8 @@ RAILS_ENV=production bundle exec good_job start
 
 ## Project Status & Roadmap
 
-This project is **feature-complete and production-ready**. For a comprehensive list of implemented features and future enhancements, see:
+This project is **feature-complete and production-ready**. For implemented features and ongoing priorities, see:
 
-- **[TODO.md](TODO.md)** - Prioritized work items and future enhancements
 - **[Development Guide](docs/development.md)** - Setup, workflow, and coding standards
 - **GitHub Issues** - Bug reports and feature requests
 
