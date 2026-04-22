@@ -56,7 +56,7 @@ module Trading
       end
 
       def stop_loss_triggered?(price, current_stop_price)
-        long? ? current_stop_price.to_f > price.to_f : current_stop_price.to_f < price.to_f
+        long? ? current_stop_price.to_f >= price.to_f : current_stop_price.to_f <= price.to_f
       end
 
       private

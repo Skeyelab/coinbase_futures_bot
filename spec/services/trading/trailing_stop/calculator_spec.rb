@@ -27,7 +27,7 @@ RSpec.describe Trading::TrailingStop::Calculator do
     it "uses long trigger semantics" do
       expect(calculator.profit_goal_reached?(10_100.0)).to be(true)
       expect(calculator.stop_loss_triggered?(9790.0, 9800.0)).to be(true)
-      expect(calculator.stop_loss_triggered?(9800.0, 9800.0)).to be(false)
+      expect(calculator.stop_loss_triggered?(9800.0, 9800.0)).to be(true)
     end
   end
 
@@ -55,7 +55,7 @@ RSpec.describe Trading::TrailingStop::Calculator do
     it "uses short trigger semantics" do
       expect(calculator.profit_goal_reached?(9890.0)).to be(true)
       expect(calculator.stop_loss_triggered?(10_250.0, 10_200.0)).to be(true)
-      expect(calculator.stop_loss_triggered?(10_200.0, 10_200.0)).to be(false)
+      expect(calculator.stop_loss_triggered?(10_200.0, 10_200.0)).to be(true)
     end
   end
 end

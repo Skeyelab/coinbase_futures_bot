@@ -184,6 +184,9 @@ module Trading
       closed_count += trailing_result[:closed_count]
 
       triggered_positions = check_tp_sl_triggers(exclude_position_ids: trailing_result[:processed_ids])
+      triggered_positions = triggered_positions.reject do |trigger_info|
+        trigger_info[:trigger] == "stop_loss" && trigger_info[:position].trailing_stop_enabled
+      end
       return closed_count if triggered_positions.empty?
 
       @logger.info("Closing #{triggered_positions.size} positions that hit TP/SL")

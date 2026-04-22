@@ -120,7 +120,8 @@ module Trading
 
       triggered_positions = check_swing_tp_sl_triggers
       triggered_positions = triggered_positions.reject do |trigger_data|
-        trailing_result[:processed_ids].include?(trigger_data[:position].id)
+        trailing_result[:processed_ids].include?(trigger_data[:position].id) ||
+          (trigger_data[:trigger] == "stop_loss" && trigger_data[:position].trailing_stop_enabled)
       end
       return closed_count if triggered_positions.empty?
 

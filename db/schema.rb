@@ -178,7 +178,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
     t.jsonb "trailing_stop_state", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["trailing_stop_enabled"], name: "index_positions_on_trailing_stop_enabled"
+    t.index ["status", "trailing_stop_enabled"], name: "index_positions_on_status_and_trailing_stop_enabled"
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|
