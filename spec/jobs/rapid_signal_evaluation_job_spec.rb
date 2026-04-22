@@ -23,7 +23,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
     # Mock configuration
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
-    allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "50000").and_return("50000")
+    allow(TradingConfiguration).to receive(:signal_equity_usd).and_return(50_000.0)
 
     # Mock strategy creation
     allow(Strategy::MultiTimeframeSignal).to receive(:new).and_return(mock_strategy)
@@ -88,7 +88,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       end
 
       it "respects custom equity from environment" do
-        allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "50000").and_return("75000")
+        allow(TradingConfiguration).to receive(:signal_equity_usd).and_return(75_000.0)
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
