@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.0.2"
+gem "rails", "~> 8.1"
 # Use postgresql as the database for Active Record
 gem "pg", "~> 1.6"
 # Use the Puma web server [https://github.com/puma/puma]
@@ -76,7 +76,7 @@ gem "sentry-ruby"
 gem "jwt", "~> 3.1"
 
 # Slack integration for notifications and bot control
-gem "slack-ruby-client", "~> 2.4"
+gem "slack-ruby-client", "~> 3.1"
 
 # Pagination for API endpoints
 gem "kaminari", "~> 1.2"
