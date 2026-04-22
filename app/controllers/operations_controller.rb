@@ -48,8 +48,8 @@ class OperationsController < ActionController::Base
     password = ENV["OPERATIONS_UI_PASSWORD"].to_s
 
     unless username.present? && password.present?
-      render plain: "Operations UI credentials not configured. Set OPERATIONS_UI_USERNAME and OPERATIONS_UI_PASSWORD.",
-        status: :forbidden and return
+      return render plain: "Operations UI credentials not configured. Set OPERATIONS_UI_USERNAME and OPERATIONS_UI_PASSWORD.",
+        status: :forbidden
     end
 
     authenticate_or_request_with_http_basic("Operations UI") do |u, p|
