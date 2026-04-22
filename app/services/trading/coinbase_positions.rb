@@ -460,7 +460,9 @@ module Trading
         status: "OPEN",
         day_trading: day_trading,
         take_profit: take_profit,
-        stop_loss: stop_loss
+        stop_loss: stop_loss,
+        trailing_stop_enabled: ActiveModel::Type::Boolean.new.cast(ENV.fetch("TRAILING_STOP_ENABLED", "false")),
+        trailing_stop_state: {}
       )
 
       @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")

@@ -11,6 +11,7 @@ class Position < ApplicationRecord
   validates :entry_time, presence: true
   validates :status, presence: true, inclusion: {in: %w[OPEN CLOSED]}
   validates :day_trading, inclusion: {in: [true, false]}
+  validates :trailing_stop_enabled, inclusion: {in: [true, false]}
 
   # Scopes
   scope :open, -> { where(status: "OPEN") }
@@ -25,6 +26,7 @@ class Position < ApplicationRecord
   scope :expiring_soon, -> { day_trading.opened_yesterday.open }
   scope :older_than, ->(hours) { where("entry_time < ?", hours.hours.ago) }
   scope :open_swing_positions, -> { swing_trading.open }
+  scope :trailing_stop_managed, -> { open.where(trailing_stop_enabled: true) }
 
   # Contract expiry scopes
   scope :expiring_within_days, ->(days) {
@@ -190,6 +192,10 @@ class Position < ApplicationRecord
     else
       current_price >= stop_loss
     end
+  end
+
+  def trailing_stop_active?
+    trailing_stop_enabled? && open?
   end
 
   def close_position!(close_price, close_time = Time.current)
