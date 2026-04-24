@@ -257,15 +257,11 @@ Set these environment variables before starting:
 # Your account equity (used for position sizing)
 export SIGNAL_EQUITY_USD=5000
 
-# Risk per trade as a percentage of equity (default: 1%)
+# Risk per trade as a percentage of equity (default: 2%)
 export RISK_PER_TRADE_PERCENT=2
 
-# Minimum signal confidence to act on (0–100)
+# Minimum signal confidence to act on (0–100, default: 60)
 export REALTIME_SIGNAL_MIN_CONFIDENCE=65
-
-# Take profit and stop loss widths (in basis points)
-export STRATEGY_TP_TARGET=0.004   # 40 bps take profit
-export STRATEGY_SL_TARGET=0.003   # 30 bps stop loss
 ```
 
 ### Starting the Real-Time Trading System
@@ -288,7 +284,7 @@ For scheduled or one-off signal generation:
 
 ```bash
 # Generate signals for all enabled pairs
-bin/rake signals:generate
+bin/rake signals:run
 
 # Or using a runner
 bin/rails runner "GenerateSignalsJob.perform_now(equity_usd: 10000)"
@@ -522,11 +518,7 @@ bin/rake day_trading:force_close_all
 ### Cancel All Active Signals
 
 ```bash
-# Cancel all signals via API
-curl -X POST -H "X-API-Key: $SIGNALS_API_KEY" \
-  http://localhost:3000/signals/cancel_all
-
-# Or via rake
+# Cancel all active signals via rake task
 FORCE=true bin/rake realtime:cancel_all
 ```
 

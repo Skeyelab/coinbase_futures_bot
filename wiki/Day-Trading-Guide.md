@@ -130,9 +130,9 @@ http://localhost:3000/good_job
 |------|-------|-------|
 | Max position duration | 24 hours | Automatically enforced |
 | Typical hold time | 1–4 hours | Strategy optimised for this range |
-| Take profit target | 40 bps (default) | Set via `STRATEGY_TP_TARGET=0.004` |
-| Stop loss target | 30 bps (default) | Set via `STRATEGY_SL_TARGET=0.003` |
-| Max signals per hour | 8 (default) | Set via `REALTIME_SIGNAL_MAX_PER_HOUR` |
+| Take profit target | 40 bps | Hardcoded in `MultiTimeframeSignal` strategy |
+| Stop loss target | 30 bps | Hardcoded in `MultiTimeframeSignal` strategy |
+| Max signals per hour | 10 (default) | Set via `REALTIME_SIGNAL_MAX_PER_HOUR` |
 | Daily loss limit | Manual | Stop trading if equity drops 5% in a day |
 
 ## Configuration
@@ -148,16 +148,12 @@ SIGNAL_EQUITY_USD=5000
 RISK_PER_TRADE_PERCENT=2
 
 # Signal quality
-REALTIME_SIGNAL_MIN_CONFIDENCE=65     # 0–100; higher = fewer but better signals
-REALTIME_SIGNAL_MAX_PER_HOUR=8        # Rate limit
-REALTIME_SIGNAL_EVALUATION_INTERVAL=45 # Seconds between strategy evaluations
-
-# Position sizing (take profit / stop loss)
-STRATEGY_TP_TARGET=0.004              # 40 bps take profit
-STRATEGY_SL_TARGET=0.003              # 30 bps stop loss
+REALTIME_SIGNAL_MIN_CONFIDENCE=65     # 0–100; higher = fewer but better signals (default: 60)
+REALTIME_SIGNAL_MAX_PER_HOUR=8        # Rate limit (default: 10)
+REALTIME_SIGNAL_EVALUATION_INTERVAL=45 # Seconds between strategy evaluations (default: 30)
 
 # Duplicate prevention
-REALTIME_SIGNAL_DEDUPE_WINDOW=300     # Seconds (5 min)
+REALTIME_SIGNAL_DEDUPE_WINDOW=300     # Seconds (default: 300)
 ```
 
 ## Monitoring Positions with the Chat Bot
