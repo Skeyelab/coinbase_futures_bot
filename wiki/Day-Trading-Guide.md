@@ -159,7 +159,7 @@ REALTIME_SIGNAL_DEDUPE_WINDOW=300     # Seconds (default: 300)
 ## Monitoring Positions with the Chat Bot
 
 ```bash
-bin/rails chat_bot:start
+bin/futuresbot chat
 ```
 
 ```
@@ -224,6 +224,7 @@ bin/rake day_trading:force_close_all
 
 **See also:**
 - [User Guide](User-Guide) — Full feature walkthrough
+- [CLI Reference](CLI-Reference) — Full `bin/futuresbot` command reference
 - [Trading Strategies](Trading-Strategies) — How signals are generated
 - [Risk Management](Risk-Management) — Position sizing and stop controls
 - [API Reference](API-Reference) — REST API for position data

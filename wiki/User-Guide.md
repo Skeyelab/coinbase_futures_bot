@@ -20,7 +20,8 @@ The bot exposes three primary interfaces. Choose the one that fits your workflow
 
 | Interface | Best For | How to Start |
 |-----------|----------|--------------|
-| **AI Chat Bot** (CLI) | Interactive natural-language control | `bin/rails chat_bot:start` |
+| **`bin/futuresbot` CLI** | TUI dashboard, chat, quick status/position/signal views | `bin/futuresbot` |
+| **AI Chat Bot** | Interactive natural-language control | `bin/futuresbot chat` |
 | **REST API** | Programmatic or scripted access | `curl http://localhost:3000/…` |
 | **Rake Tasks** | One-off operations from the terminal | `bin/rake <task>` |
 | **Web UI** | Viewing and editing positions visually | `http://localhost:3000/positions` |
@@ -56,7 +57,7 @@ curl http://localhost:3000/up
 The easiest way to get a market snapshot is through the conversational chat bot:
 
 ```bash
-bin/rails chat_bot:start
+bin/futuresbot chat
 ```
 
 Example queries:
@@ -218,7 +219,7 @@ PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
 The chat bot supports natural-language trading control commands:
 
 ```bash
-bin/rails chat_bot:start
+bin/futuresbot chat
 ```
 
 **Start / Resume Trading**
@@ -323,7 +324,7 @@ curl -X POST -H "X-API-Key: $SIGNALS_API_KEY" \
 ### Using the AI Chat Bot
 
 ```bash
-bin/rails chat_bot:start
+bin/futuresbot chat
 ```
 
 Position queries:
@@ -538,8 +539,9 @@ SIGNAL_EQUITY_USD=5000 bin/rake realtime:signals
 
 **Check status during the day:**
 ```bash
-bin/rails chat_bot:start
+bin/futuresbot chat
 # Then: "show my positions" or "what signals are active?"
+# Or use the TUI dashboard: bin/futuresbot dashboard
 ```
 
 **End of day:**
@@ -552,6 +554,7 @@ bin/rake day_trading:pnl       # Review PnL
 
 **See also:**
 - [Getting Started](Getting-Started) — Installation and initial setup
+- [CLI Reference](CLI-Reference) — Full `bin/futuresbot` command reference
 - [Configuration](Configuration) — Full list of environment variables
 - [Trading Strategies](Trading-Strategies) — How signals are generated
 - [Day Trading Guide](Day-Trading-Guide) — Day trading rules and automation
