@@ -72,11 +72,11 @@ RSpec.describe TuiDashboard do
       expect { dashboard.handle_keypress("s") }.to change(dashboard, :show_signals).from(true).to(false)
     end
 
-    it "decreases interval on '-'" do
+    it "refreshes slower (increases interval value) on '-'" do
       expect { dashboard.handle_keypress("-") }.to change(dashboard, :refresh_interval).from(5).to(6)
     end
 
-    it "increases interval on '+'" do
+    it "refreshes faster (decreases interval value) on '+'" do
       expect { dashboard.handle_keypress("+") }.to change(dashboard, :refresh_interval).from(5).to(4)
     end
 

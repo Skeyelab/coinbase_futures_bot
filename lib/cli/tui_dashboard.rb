@@ -11,8 +11,8 @@ require "io/console"
 #   r / R                    – force immediate refresh
 #   p / P                    – toggle positions section
 #   s / S                    – toggle signals section
-#   +                        – increase refresh interval by 1 s
-#   -                        – decrease refresh interval by 1 s (min 1 s)
+#   +                        – refresh faster (decrease interval by 1 s, min 1 s)
+#   -                        – refresh slower (increase interval by 1 s)
 class TuiDashboard
   DEFAULT_REFRESH = 5 # seconds
 
