@@ -348,7 +348,7 @@ GEM
       json
       simplecov
     simplecov_json_formatter (0.1.4)
-    slack-ruby-client (2.7.0)
+    slack-ruby-client (3.1.0)
       faraday (>= 2.0.1)
       faraday-mashify
       faraday-multipart
@@ -431,7 +431,7 @@ DEPENDENCIES
   simplecov (~> 0.22)
   simplecov-cobertura (~> 3.1)
   simplecov-json (~> 0.2)
-  slack-ruby-client (~> 2.4)
+  slack-ruby-client (~> 3.1)
   standard (>= 1.35.1)
   test-prof (~> 1.2)
   tzinfo-data
