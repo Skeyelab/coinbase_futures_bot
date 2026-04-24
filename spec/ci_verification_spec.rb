@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rails_helper"
+
 RSpec.describe "CI Environment Verification", :ci_only do
   before(:all) do
     puts "=== CI VERIFICATION TEST STARTING ==="

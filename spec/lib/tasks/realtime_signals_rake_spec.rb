@@ -314,16 +314,18 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           expect(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
           expect(trading_pairs_relation).to receive(:pluck).with(:product_id).and_return(["BTC-USD"])
 
-          expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(
+          expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(hash_including(
             product_ids: ["BTC-USD"],
             enable_candle_aggregation: true,
-            logger: Rails.logger
-          )
-          expect(MarketData::CoinbaseFuturesSubscriber).to receive(:new).with(
+            logger: Rails.logger,
+            on_ticker: kind_of(Proc)
+          ))
+          expect(MarketData::CoinbaseFuturesSubscriber).to receive(:new).with(hash_including(
             product_ids: ["BTC-USD"],
             enable_candle_aggregation: true,
-            logger: Rails.logger
-          )
+            logger: Rails.logger,
+            on_ticker: kind_of(Proc)
+          ))
 
           # Test the core subscription logic
           product_ids = TradingPair.enabled.pluck(:product_id)
@@ -335,16 +337,20 @@ RSpec.describe "Realtime Signals Rake Tasks" do
 
           Rails.logger.info("[RTS] Starting market data subscriptions for #{product_ids.count} products: #{product_ids.join(", ")}")
 
+          tick_persister = ->(_tick) {}
+
           MarketData::CoinbaseSpotSubscriber.new(
             product_ids: product_ids,
             enable_candle_aggregation: true,
-            logger: Rails.logger
+            logger: Rails.logger,
+            on_ticker: tick_persister
           )
 
           MarketData::CoinbaseFuturesSubscriber.new(
             product_ids: product_ids,
             enable_candle_aggregation: true,
-            logger: Rails.logger
+            logger: Rails.logger,
+            on_ticker: tick_persister
           )
         end
 

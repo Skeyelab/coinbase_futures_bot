@@ -47,11 +47,10 @@ module MarketData
         # The WebSocket will run in its own thread
         @logger.info("[MD-Spot] WebSocket connection established, monitoring for messages...")
 
-        # Simple keep-alive loop that doesn't block
-        loop do
-          break unless @ws&.open?
-          sleep 1
-        end
+        # Keep the subscriber alive for the full websocket lifecycle.
+        # We intentionally gate on @ws presence (not open?) to avoid a race
+        # where open? can still be false before the :open callback fires.
+        sleep 1 while @ws
       rescue => e
         @logger.error("[MD-Spot] Failed to establish WebSocket connection: #{e.message}")
         @ws = nil
@@ -91,7 +90,7 @@ module MarketData
       if data["channel"] == "ticker" && data["events"].is_a?(Array)
         data["events"].each do |event|
           Array(event["tickers"]).each do |t|
-            tick_time = t["time"] || t["ts"] || t["timestamp"]
+            tick_time = t["time"] || t["ts"] || t["timestamp"] || data["timestamp"] || Time.now.utc.iso8601
             normalized = {
               "product_id" => t["product_id"],
               "price" => t["price"],
@@ -114,7 +113,7 @@ module MarketData
       normalized = {
         "product_id" => data["product_id"],
         "price" => data["price"],
-        "time" => data["time"] || data["ts"] || data["timestamp"]
+        "time" => data["time"] || data["ts"] || data["timestamp"] || Time.now.utc.iso8601
       }
       @logger.debug("[MD-Spot] ticker: #{normalized.slice("product_id", "price", "time")}")
 
