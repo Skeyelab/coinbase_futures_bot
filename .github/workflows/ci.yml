@@ -233,9 +233,6 @@ jobs:
 
             # Run tests for changed files only (without coverage for speed)
             bundle exec rspec ${{ steps.changed-files.outputs.test-files }} \
-              --format documentation \
-              --format progress \
-              --backtrace \
               --order random \
               --seed $(date +%s)
 
@@ -260,9 +257,6 @@ jobs:
 
           # Run RSpec with coverage - SimpleCov will be loaded via spec_helper.rb
           bundle exec rspec \
-            --format documentation \
-            --format progress \
-            --backtrace \
             --order random \
             --seed $(date +%s)
 

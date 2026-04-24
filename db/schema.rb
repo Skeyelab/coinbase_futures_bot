@@ -275,7 +275,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_025600) do
     t.boolean "active", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["active"], name: "index_trading_profiles_on_active", unique: true, where: "active = true"
+    t.index ["active"], name: "index_trading_profiles_on_active", unique: true, where: "(active = true)"
     t.index ["slug"], name: "index_trading_profiles_on_slug", unique: true
   end
 

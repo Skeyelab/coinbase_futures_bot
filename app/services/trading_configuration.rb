@@ -73,6 +73,5 @@ class TradingConfiguration
     rescue ArgumentError, TypeError
       fallback
     end
-
   end
 end

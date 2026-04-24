@@ -35,6 +35,8 @@ RSpec.configure do |config|
     ENV["OPENROUTER_API_KEY"] ||= "test-openrouter-key"
     ENV["OPENAI_API_KEY"] ||= "test-openai-key"
 
-    puts "✅ Test environment variables configured for CI/GitHub Actions compatibility"
+    if ENV["VERBOSE_TESTS"] == "true" || ENV["RSPEC_DEBUG"] == "1"
+      puts "✅ Test environment variables configured for CI/GitHub Actions compatibility"
+    end
   end
 end

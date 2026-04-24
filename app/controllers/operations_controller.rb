@@ -40,7 +40,7 @@ class OperationsController < ActionController::Base
 
   def trading_active?
     result = Rails.cache.read("trading_active")
-    result.nil? ? true : result
+    result.nil? || result
   end
 
   def require_operations_basic_auth

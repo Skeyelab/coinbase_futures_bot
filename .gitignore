@@ -7,6 +7,9 @@
 # Ignore bundler config.
 /.bundle
 
+# Local gem path (e.g. bundle config set --local path vendor/bundle)
+/vendor/bundle
+
 # Ignore all environment files (except templates).
 /.env*
 !/.env*.erb

@@ -1,6 +1,5 @@
 --require spec_helper
---backtrace
 --color
 --tty
 --order random
---format documentation
+--format progress

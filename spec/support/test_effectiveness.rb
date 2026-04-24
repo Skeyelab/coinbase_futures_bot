@@ -23,6 +23,7 @@ module TestEffectiveness
     ]
 
     return unless critical_methods.include?(method_name.to_sym)
+    return unless ENV["VERBOSE_TESTS"] == "true"
 
     puts "🚨 CRITICAL: Test '#{example.full_description}' is mocking critical business method '#{method_name}'"
     puts "   Consider using integration testing instead of mocking core business logic"
@@ -37,6 +38,7 @@ module TestEffectiveness
 
     # Flag tests that mock too many methods
     return unless mock_count > 5
+    return unless ENV["VERBOSE_TESTS"] == "true"
 
     puts "🔴 HIGH RISK: Test '#{example.full_description}' uses #{mock_count} mocks"
     puts "   Mocked methods: #{mocked_methods.join(", ")}"
@@ -50,6 +52,8 @@ module TestEffectiveness
 
   # CI-specific logging and verification methods
   def self.log_execution_environment
+    return unless ENV["RSPEC_DEBUG"] == "1"
+
     puts "=== TEST EXECUTION ENVIRONMENT ==="
     puts "Rails env: #{Rails.env}"
     puts "Database: #{ActiveRecord::Base.connection.current_database}"
@@ -65,17 +69,17 @@ module TestEffectiveness
     # Force some real operations to verify environment
     if defined?(Position)
       count = Position.count
-      puts "Current Position count: #{count}"
+      puts "Current Position count: #{count}" if ENV["RSPEC_DEBUG"] == "1"
     end
 
     if defined?(TradingPair)
       count = TradingPair.count
-      puts "Current TradingPair count: #{count}"
+      puts "Current TradingPair count: #{count}" if ENV["RSPEC_DEBUG"] == "1"
     end
 
     # Verify database tables exist
     tables = ActiveRecord::Base.connection.tables
-    puts "Database tables: #{tables.join(", ")}"
+    puts "Database tables: #{tables.join(", ")}" if ENV["RSPEC_DEBUG"] == "1"
 
     # Verify we can perform real operations
     begin
@@ -89,18 +93,21 @@ module TestEffectiveness
           status: "OPEN",
           day_trading: true
         )
-        puts "✅ Real Position creation verified (ID: #{test_pos.id})"
+        if ENV["RSPEC_DEBUG"] == "1"
+          puts "✅ Real Position creation verified (ID: #{test_pos.id})"
+        end
         test_pos.destroy
-        puts "✅ Real Position deletion verified"
+        puts "✅ Real Position deletion verified" if ENV["RSPEC_DEBUG"] == "1"
       end
     rescue => e
-      puts "❌ Real database operations failed: #{e.message}"
+      warn "❌ Real database operations failed: #{e.message}"
       raise e
     end
   end
 
   def self.ci_verification_summary
     return unless ENV["CI"]
+    return unless ENV["RSPEC_DEBUG"] == "1"
 
     puts "=== CI VERIFICATION SUMMARY ==="
     puts "Environment: #{Rails.env}"
@@ -121,17 +128,13 @@ RSpec.configure do |config|
     TestEffectiveness.validate_real_code_execution(example)
   end
 
-  # CI-specific configuration
+  # CI-specific configuration (quiet by default; set RSPEC_DEBUG=1 for diagnostics)
   if ENV["CI"]
     config.before(:suite) do
-      puts "=== CI TEST SUITE STARTING ==="
       TestEffectiveness.verify_real_execution
     end
 
     config.after(:suite) do
-      puts "=== CI TEST SUITE COMPLETED ==="
-      puts "Total tests run: #{RSpec.world.example_count}"
-      puts "Total failures: #{RSpec.world.all_examples.count(&:exception)}"
       TestEffectiveness.ci_verification_summary
     end
   end
