@@ -7,16 +7,21 @@ class RealTimeSignalJob < ApplicationJob
   queue_as :realtime_signals
 
   def perform(*)
+    job_started_at = Time.current.utc
+    Rails.logger.info("[RTSJ] Tick start")
     evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
 
     # Evaluate all enabled trading pairs
-    evaluator.evaluate_all_pairs
+    cycle_stats = evaluator.evaluate_all_pairs
 
     # Clean up expired signal alerts
     cleanup_expired_signals
 
     # Log signal statistics
     log_signal_stats
+
+    elapsed = (Time.current.utc - job_started_at).round(2)
+    Rails.logger.info("[RTSJ] Tick done: cycle_stats=#{cycle_stats.inspect} elapsed=#{elapsed}s")
   end
 
   private

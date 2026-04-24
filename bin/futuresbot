@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bin/futuresbot – Thor-based CLI entry point for the Coinbase Futures Bot.
+#
+# Usage:
+#   bin/futuresbot help
+#   bin/futuresbot chat
+#   bin/futuresbot chat --resume
+#   bin/futuresbot status
+#   bin/futuresbot positions
+#   bin/futuresbot signals
+
+APP_PATH = File.expand_path("../config/application", __dir__)
+require_relative "../config/boot"
+require_relative "../config/environment"
+require_relative "../lib/cli/futures_bot_cli"
+
+FuturesBotCli.start(ARGV)
