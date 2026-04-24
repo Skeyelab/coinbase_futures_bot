@@ -125,9 +125,31 @@ RSpec.describe TuiDashboard do
         expect(dashboard.instance_variable_get(:@data)[:signals]).not_to be_empty
       end
 
+      it "populates live prices from recent ticks" do
+        create(:tick, product_id: "NOL-18MAY26-CDE", price: 93.62, observed_at: 5.seconds.ago)
+        dashboard.refresh_data
+        live_prices = dashboard.instance_variable_get(:@data)[:live_prices]
+        expect(live_prices.map(&:product_id)).to include("NOL-18MAY26-CDE")
+      end
+
+      it "splits live prices into futures and spot buckets" do
+        create(:tick, product_id: "NOL-18MAY26-CDE", price: 93.62, observed_at: 5.seconds.ago)
+        create(:tick, product_id: "BTC-USD", price: 68_000, observed_at: 4.seconds.ago)
+        dashboard.refresh_data
+        data = dashboard.instance_variable_get(:@data)
+        expect(data[:futures_live_prices].map(&:product_id)).to include("NOL-18MAY26-CDE")
+        expect(data[:spot_live_prices].map(&:product_id)).to include("BTC-USD")
+      end
+
       it "sets refreshed_at timestamp" do
         dashboard.refresh_data
         expect(dashboard.instance_variable_get(:@data)[:refreshed_at]).to be_within(2.seconds).of(Time.now)
+      end
+
+      it "captures latest tick timestamp for connectivity display" do
+        tick = create(:tick, observed_at: 1.second.ago)
+        dashboard.refresh_data
+        expect(dashboard.instance_variable_get(:@data)[:latest_tick_at]).to eq(tick.observed_at)
       end
 
       it "clears any previous error" do
@@ -170,9 +192,22 @@ RSpec.describe TuiDashboard do
       expect(output.string).to include("Status")
     end
 
+    it "outputs Coinbase connectivity status" do
+      dashboard.render
+      expect(output.string).to include("Coinbase:")
+    end
+
     it "outputs the Open Positions section when show_positions=true" do
       dashboard.render
       expect(output.string).to include("Open Positions")
+    end
+
+    it "outputs unrealized PnL column when positions exist" do
+      create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG")
+      create(:tick, product_id: "BIT-29AUG25-CDE", price: 51000, observed_at: 2.seconds.ago)
+      dashboard.refresh_data
+      dashboard.render
+      expect(output.string).to include("U.PnL")
     end
 
     it "omits the Open Positions section when show_positions=false" do
@@ -184,6 +219,12 @@ RSpec.describe TuiDashboard do
     it "outputs the Active Signals section when show_signals=true" do
       dashboard.render
       expect(output.string).to include("Active Signals")
+    end
+
+    it "outputs separate futures and spot price sections" do
+      dashboard.render
+      expect(output.string).to include("Futures Live Prices")
+      expect(output.string).to include("Spot Prices")
     end
 
     it "omits the Active Signals section when show_signals=false" do
@@ -211,6 +252,8 @@ RSpec.describe TuiDashboard do
       before do
         create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG")
         create(:signal_alert, symbol: "BTC-USD", confidence: 90)
+        create(:tick, product_id: "BIT-29AUG25-CDE", price: 51000, observed_at: 2.seconds.ago)
+        create(:tick, product_id: "NOL-18MAY26-CDE", price: 93.62, observed_at: 3.seconds.ago)
         dashboard.refresh_data
         dashboard.render
       end
@@ -221,6 +264,21 @@ RSpec.describe TuiDashboard do
 
       it "renders signal symbols" do
         expect(output.string).to include("BTC-USD")
+      end
+
+      it "renders live price product IDs" do
+        expect(output.string).to include("NOL-18MAY26-CDE")
+      end
+
+      it "renders spot prices in the spot section" do
+        create(:tick, product_id: "BTC-USD", price: 68_000, observed_at: 2.seconds.ago)
+        dashboard.refresh_data
+        dashboard.render
+        expect(output.string).to include("BTC-USD")
+      end
+
+      it "renders unrealized PnL values when price data exists" do
+        expect(output.string).to match(/[+-]\d+\.\d{1,2}/)
       end
     end
   end
@@ -233,6 +291,52 @@ RSpec.describe TuiDashboard do
       allow(dashboard).to receive(:terminal_cols).and_return(80)
       expect { dashboard.start }.not_to raise_error
       expect(output.string).to include("FuturesBot")
+    end
+  end
+
+  describe "terminal buffer behavior" do
+    it "enters alternate screen mode during setup" do
+      allow(output).to receive(:print)
+      allow(Signal).to receive(:trap)
+
+      dashboard.send(:setup_terminal)
+
+      expect(output).to have_received(:print).with(include("\e[?1049h"))
+    end
+
+    it "exits alternate screen mode during restore" do
+      allow(output).to receive(:print)
+
+      dashboard.send(:restore_terminal)
+
+      expect(output).to have_received(:print).with(include("\e[?1049l"))
+    end
+
+    it "uses CRLF line endings in interactive tty renders" do
+      allow(output).to receive(:tty?).and_return(true)
+      allow(dashboard).to receive(:terminal_cols).and_return(80)
+
+      dashboard.refresh_data
+      dashboard.render
+
+      expect(output.string).to include("\r\n")
+    end
+  end
+
+  describe "coinbase status helper" do
+    it "returns no data when no ticks are available" do
+      status = dashboard.send(:coinbase_connection_status, nil)
+      expect(status).to include("NO DATA")
+    end
+
+    it "returns live for fresh tick data" do
+      status = dashboard.send(:coinbase_connection_status, 3.seconds.ago)
+      expect(status).to include("LIVE")
+    end
+
+    it "returns stale for old tick data" do
+      status = dashboard.send(:coinbase_connection_status, 2.minutes.ago)
+      expect(status).to include("STALE")
     end
   end
 end

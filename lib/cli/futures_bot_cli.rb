@@ -330,7 +330,7 @@ class FuturesBotCli < Thor
   # ── Formatting helpers ───────────────────────────────────────────────────────
 
   def colorize_count(count)
-    count > 0 ? "#{GREEN}#{BOLD}#{count}#{RESET}" : "#{WHITE}#{count}#{RESET}"
+    (count > 0) ? "#{GREEN}#{BOLD}#{count}#{RESET}" : "#{WHITE}#{count}#{RESET}"
   end
 
   def format_positions_header
@@ -357,7 +357,11 @@ class FuturesBotCli < Thor
 
   def format_signal_row(sig)
     side_color = sig.long? ? GREEN : RED
-    conf_color = sig.confidence >= 80 ? GREEN : (sig.confidence >= 60 ? YELLOW : RED)
+    conf_color = if sig.confidence >= 80
+      GREEN
+    else
+      ((sig.confidence >= 60) ? YELLOW : RED)
+    end
     "  %-6s  %-20s  #{side_color}%-6s#{RESET}  %-8s  %-12s  #{conf_color}%-6s#{RESET}" % [
       sig.id,
       sig.symbol.to_s.truncate(20),

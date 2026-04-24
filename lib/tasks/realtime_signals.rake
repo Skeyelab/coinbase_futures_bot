@@ -3,7 +3,9 @@
 namespace :realtime do
   desc "Start real-time signal evaluation system"
   task signals: :environment do
-    Rails.logger.info("[RTS] Starting real-time signal evaluation system...")
+    @shutdown_requested = false
+    puts "[RTS] Starting real-time signal evaluation system..."
+    puts "[RTS] Rails env: #{Rails.env}"
 
     # Start market data subscriptions with real-time candle aggregation
     start_market_data_subscriptions
@@ -12,28 +14,50 @@ namespace :realtime do
     start_signal_evaluation
 
     # Keep the process alive
-    Rails.logger.info("[RTS] Real-time signal system started. Press Ctrl+C to stop.")
+    puts "[RTS] Real-time signal system started. Press Ctrl+C to stop."
     trap_signals
 
+    last_heartbeat_at = Time.current.utc
     loop do
       sleep 1
+      break if @shutdown_requested
+
+      if Time.current.utc - last_heartbeat_at >= 15
+        print_runtime_heartbeat
+        last_heartbeat_at = Time.current.utc
+      end
     end
+
+    shutdown
+    exit 0
   end
 
   desc "Start real-time signal evaluation job only (for use with existing market data)"
   task signal_job: :environment do
-    Rails.logger.info("[RTS] Starting real-time signal evaluation job...")
+    @shutdown_requested = false
+    puts "[RTS] Starting real-time signal evaluation job..."
+    puts "[RTS] Rails env: #{Rails.env}"
 
     # Start real-time signal evaluation
     start_signal_evaluation
 
     # Keep the process alive
-    Rails.logger.info("[RTS] Real-time signal job started. Press Ctrl+C to stop.")
+    puts "[RTS] Real-time signal job started. Press Ctrl+C to stop."
     trap_signals
 
+    last_heartbeat_at = Time.current.utc
     loop do
       sleep 1
+      break if @shutdown_requested
+
+      if Time.current.utc - last_heartbeat_at >= 15
+        print_runtime_heartbeat
+        last_heartbeat_at = Time.current.utc
+      end
     end
+
+    shutdown
+    exit 0
   end
 
   desc "Evaluate signals once for all pairs"
@@ -136,23 +160,27 @@ namespace :realtime do
 
     if product_ids.empty?
       Rails.logger.warn("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
+      puts "[RTS] No enabled trading pairs found. Skipping market data subscriptions."
       return
     end
 
     Rails.logger.info("[RTS] Starting market data subscriptions for #{product_ids.count} products: #{product_ids.join(", ")}")
+    on_ticker = build_tick_persister
 
     # Start spot market data subscription with real-time candle aggregation
     spot_subscriber = MarketData::CoinbaseSpotSubscriber.new(
       product_ids: product_ids,
       enable_candle_aggregation: true,
-      logger: Rails.logger
+      logger: Rails.logger,
+      on_ticker: on_ticker
     )
 
     # Start futures market data subscription with real-time candle aggregation
     futures_subscriber = MarketData::CoinbaseFuturesSubscriber.new(
       product_ids: product_ids,
       enable_candle_aggregation: true,
-      logger: Rails.logger
+      logger: Rails.logger,
+      on_ticker: on_ticker
     )
 
     # Start subscribers in background threads
@@ -171,25 +199,63 @@ namespace :realtime do
   end
 
   def start_signal_evaluation
-    Rails.logger.info("[RTS] Starting real-time signal evaluation...")
+    interval_seconds = ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i
+    puts "[RTS] Starting real-time signal evaluation (interval=#{interval_seconds}s)..."
 
     # Start the real-time signal evaluation
-    RealTimeSignalJob.start_realtime_evaluation(interval_seconds: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL",
-      "30").to_i)
+    RealTimeSignalJob.start_realtime_evaluation(interval_seconds: interval_seconds)
+  end
+
+  def build_tick_persister
+    lambda do |tick|
+      product_id = tick["product_id"].presence
+      price = tick["price"]&.to_d
+      observed_at = begin
+        Time.parse(tick["time"].to_s).utc
+      rescue
+        Time.current.utc
+      end
+
+      next if product_id.blank? || price.nil?
+
+      Tick.create!(product_id: product_id, price: price, observed_at: observed_at)
+    rescue => e
+      Rails.logger.error("[RTS] Failed to persist tick #{tick.inspect}: #{e.class}: #{e.message}")
+    end
+  end
+
+  def print_runtime_heartbeat
+    active = SignalAlert.active.count
+    last_signal_at = SignalAlert.maximum(:alert_timestamp)
+    last_tick_at = Tick.maximum(:observed_at)
+    last_signal_age = last_signal_at ? (Time.current.utc - last_signal_at).to_i : nil
+    last_tick_age = last_tick_at ? (Time.current.utc - last_tick_at).to_i : nil
+
+    puts(
+      "[RTS] heartbeat active_signals=#{active} " \
+      "last_signal=#{format_age(last_signal_age)} " \
+      "last_tick=#{format_age(last_tick_age)}"
+    )
+  rescue => e
+    puts "[RTS] heartbeat error: #{e.class}: #{e.message}"
+  end
+
+  def format_age(age_seconds)
+    return "none" if age_seconds.nil?
+
+    "#{age_seconds}s ago"
   end
 
   def trap_signals
     # Handle graceful shutdown
     Signal.trap("INT") do
-      Rails.logger.info("[RTS] Received INT signal, shutting down...")
-      shutdown
-      exit 0
+      @shutdown_requested = true
+      puts "[RTS] Received INT signal, shutting down..."
     end
 
     Signal.trap("TERM") do
-      Rails.logger.info("[RTS] Received TERM signal, shutting down...")
-      shutdown
-      exit 0
+      @shutdown_requested = true
+      puts "[RTS] Received TERM signal, shutting down..."
     end
   end
 

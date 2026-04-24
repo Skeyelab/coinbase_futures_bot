@@ -29,25 +29,49 @@ class RealTimeSignalEvaluator
       return
     end
 
-    @logger.info("[RTSE] Evaluating #{enabled_pairs.count} enabled trading pairs")
+    cycle_started_at = Time.current.utc
+    @logger.info("[RTSE] Evaluating #{enabled_pairs.count} enabled trading pairs (cycle start)")
+
+    cycle_stats = {
+      pairs_total: enabled_pairs.count,
+      pairs_evaluated: 0,
+      pairs_skipped_insufficient_data: 0,
+      signals_created: 0
+    }
 
     enabled_pairs.find_each do |pair|
-      evaluate_pair(pair)
+      pair_stats = evaluate_pair(pair) || {signals_created: 0, insufficient_data: 0}
+      cycle_stats[:pairs_evaluated] += 1
+      cycle_stats[:pairs_skipped_insufficient_data] += pair_stats[:insufficient_data]
+      cycle_stats[:signals_created] += pair_stats[:signals_created]
     end
 
     @last_evaluation[:all] = Time.current.utc
+
+    elapsed = (Time.current.utc - cycle_started_at).round(2)
+    @logger.info(
+      "[RTSE] Cycle done: pairs=#{cycle_stats[:pairs_evaluated]}/#{cycle_stats[:pairs_total]} " \
+      "signals_created=#{cycle_stats[:signals_created]} " \
+      "skipped_no_data=#{cycle_stats[:pairs_skipped_insufficient_data]} " \
+      "elapsed=#{elapsed}s"
+    )
+    cycle_stats
   end
 
   # Evaluate a specific trading pair for signals
   def evaluate_pair(trading_pair)
     symbol = resolve_symbol(trading_pair.product_id)
     equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    pair_stats = {signals_created: 0, insufficient_data: 0}
 
     @strategies.each do |strategy_name, strategy|
-      evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
+      strategy_result = evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
+      pair_stats[:signals_created] += strategy_result[:signals_created]
+      pair_stats[:insufficient_data] += strategy_result[:insufficient_data]
     end
 
     @last_evaluation[symbol] = Time.current.utc
+    pair_stats
   end
 
   # Check if we should run evaluation based on timing constraints
@@ -86,14 +110,21 @@ class RealTimeSignalEvaluator
   end
 
   def evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
-    return unless has_sufficient_data?(symbol)
+    unless has_sufficient_data?(symbol)
+      @logger.debug("[RTSE] Skip #{strategy_name} #{symbol}: insufficient recent candles")
+      return {signals_created: 0, insufficient_data: 1}
+    end
 
     signal = strategy.signal(symbol: symbol, equity_usd: equity_usd)
+    return {signals_created: 0, insufficient_data: 0} unless signal
+    return {signals_created: 0, insufficient_data: 0} unless valid_signal?(signal)
 
-    create_signal_alert(strategy_name, symbol, signal) if signal && valid_signal?(signal)
+    created = create_signal_alert(strategy_name, symbol, signal)
+    {signals_created: created ? 1 : 0, insufficient_data: 0}
   rescue => e
     @logger.error("[RTSE] Error evaluating #{strategy_name} for #{symbol}: #{e.message}")
     @logger.error(e.backtrace.join("\n"))
+    {signals_created: 0, insufficient_data: 0}
   end
 
   def valid_signal?(signal)
@@ -114,7 +145,10 @@ class RealTimeSignalEvaluator
   end
 
   def create_signal_alert(strategy_name, symbol, signal)
-    return unless should_create_signal?(strategy_name, symbol, signal)
+    unless should_create_signal?(strategy_name, symbol, signal)
+      @logger.debug("[RTSE] Suppressed signal #{strategy_name} #{symbol}: rate-limit/duplicate guard")
+      return false
+    end
 
     SignalAlert.create_entry_signal!(
       symbol: symbol,
@@ -134,8 +168,10 @@ class RealTimeSignalEvaluator
 
     # Broadcast the signal if broadcaster is available
     broadcast_signal(signal) if defined?(SignalBroadcaster)
+    true
   rescue => e
     @logger.error("[RTSE] Failed to create signal alert: #{e.message}")
+    false
   end
 
   def should_create_signal?(strategy_name, symbol, signal)
