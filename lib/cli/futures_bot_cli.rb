@@ -21,7 +21,7 @@ class FuturesBotCli < Thor
   CYAN = "\e[36m"
   WHITE = "\e[37m"
 
-  # Tell Thor not to exit on --help so we control output flow ourselves.
+  # Tell Thor to exit with a non-zero status code when a command fails.
   def self.exit_on_failure?
     true
   end
@@ -275,12 +275,19 @@ class FuturesBotCli < Thor
   def show_sessions_list(bot, current_id)
     sessions = ChatSession.active.recent.limit(10)
 
+    # Fetch profitable-message counts in one query to avoid N+1.
+    profitable_counts = ChatMessage.profitable
+      .where(chat_session_id: sessions.map(&:id))
+      .group(:chat_session_id)
+      .count
+
     puts "#{BOLD}💬  Active Chat Sessions#{RESET}:"
     if sessions.any?
       sessions.each_with_index do |session, i|
         marker = (session.session_id == current_id) ? "#{GREEN}→#{RESET}" : " "
+        profitable = profitable_counts[session.id] || 0
         puts "  #{marker} #{i + 1}. #{session.session_id[0..7]} – #{session.name || "Unnamed"}"
-        puts "       Messages: #{session.message_count} (#{session.profitable_messages.count} profitable)"
+        puts "       Messages: #{session.message_count} (#{profitable} profitable)"
         puts "       Last: #{session.last_activity&.strftime("%m/%d %H:%M") || "N/A"}"
       end
     else
