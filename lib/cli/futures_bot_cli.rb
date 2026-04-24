@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require "thor"
+require_relative "tui_dashboard"
 
 # FuturesBotCli provides a Thor-based command-line interface for interacting
 # with the Coinbase Futures Bot from the shell.
 #
 # Usage:
+#   bin/futuresbot dashboard         # Real-time full-screen TUI dashboard
 #   bin/futuresbot chat              # Start interactive chat
 #   bin/futuresbot status            # Show system status
 #   bin/futuresbot positions         # List open positions
@@ -24,6 +26,17 @@ class FuturesBotCli < Thor
   # Tell Thor to exit with a non-zero status code when a command fails.
   def self.exit_on_failure?
     true
+  end
+
+  # Run the TUI dashboard when no subcommand is given.
+  default_command :dashboard
+
+  # ─── dashboard ──────────────────────────────────────────────────────────────
+  desc "dashboard", "Launch the real-time full-screen TUI dashboard"
+  method_option :refresh, aliases: "-i", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
+    desc: "Auto-refresh interval in seconds"
+  def dashboard
+    TuiDashboard.new(refresh_interval: options[:refresh]).start
   end
 
   # ─── chat ───────────────────────────────────────────────────────────────────

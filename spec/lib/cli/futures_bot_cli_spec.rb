@@ -13,6 +13,24 @@ RSpec.describe FuturesBotCli, type: :model do
     described_class.start(args)
   end
 
+  # ── dashboard ────────────────────────────────────────────────────────────────
+
+  describe "#dashboard" do
+    it "delegates to TuiDashboard#start" do
+      mock_tui = instance_double(TuiDashboard)
+      expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
+      expect(mock_tui).to receive(:start)
+      run_cli("dashboard")
+    end
+
+    it "passes a custom --refresh interval through" do
+      mock_tui = instance_double(TuiDashboard)
+      expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
+      expect(mock_tui).to receive(:start)
+      run_cli("dashboard", "--refresh", "10")
+    end
+  end
+
   # ── status ───────────────────────────────────────────────────────────────────
 
   describe "#status" do
