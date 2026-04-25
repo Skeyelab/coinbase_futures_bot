@@ -26,6 +26,20 @@
 
 ### Session log
 
+#### 2026-04-24 12:00 UTC
+- Context: CLI (`bin/futuresbot`) should align local `Position` rows with Coinbase when the interactive bot starts.
+- Changes:
+  - `dashboard` (default) and `chat` call `PositionImportService#import_positions_from_coinbase` before the TUI or chat loop; failures are logged and shown as a warning without aborting.
+  - Opt-out: `FUTURESBOT_SKIP_POSITION_SYNC=1` (documented in `bin/futuresbot`).
+  - Specs stub import in dashboard/chat; added ordered sync test and skip-env test.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/futures_bot_cli_spec.rb`
+  - `bin/standardrb --fix lib/cli/futures_bot_cli.rb spec/lib/cli/futures_bot_cli_spec.rb`
+- Files touched:
+  - `lib/cli/futures_bot_cli.rb`, `spec/lib/cli/futures_bot_cli_spec.rb`, `bin/futuresbot`, `SESSION_NOTES.md`
+- Next steps:
+  - Open PR from feature branch; full `parallel_rspec` if desired before merge.
+
 #### 2024-12-19 21:15 UTC
 - Context: Added comprehensive market analysis functionality to chat bot
 - Changes:

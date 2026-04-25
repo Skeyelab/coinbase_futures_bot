@@ -2,6 +2,7 @@
 
 require "rails_helper"
 require "thor"
+require "climate_control"
 require_relative "../../../lib/cli/futures_bot_cli"
 
 RSpec.describe FuturesBotCli, type: :model do
@@ -16,18 +17,49 @@ RSpec.describe FuturesBotCli, type: :model do
   # ── dashboard ────────────────────────────────────────────────────────────────
 
   describe "#dashboard" do
-    it "delegates to TuiDashboard#start" do
-      mock_tui = instance_double(TuiDashboard)
-      expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
-      expect(mock_tui).to receive(:start)
-      run_cli("dashboard")
+    context "with startup position sync" do
+      let(:import_service) { instance_double(PositionImportService) }
+      let(:import_result) { {imported: 0, updated: 1, errors: [], total_coinbase: 1} }
+
+      before do
+        allow(PositionImportService).to receive(:new).and_return(import_service)
+        allow(import_service).to receive(:import_positions_from_coinbase).and_return(import_result)
+      end
+
+      it "delegates to TuiDashboard#start" do
+        mock_tui = instance_double(TuiDashboard)
+        expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
+        expect(mock_tui).to receive(:start)
+        run_cli("dashboard")
+      end
+
+      it "syncs positions from Coinbase before starting the dashboard" do
+        mock_tui = instance_double(TuiDashboard)
+        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
+        allow(mock_tui).to receive(:start)
+        expect(import_service).to receive(:import_positions_from_coinbase).ordered
+        expect(mock_tui).to receive(:start).ordered
+        run_cli("dashboard")
+      end
+
+      it "passes a custom --refresh interval through" do
+        mock_tui = instance_double(TuiDashboard)
+        expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
+        expect(mock_tui).to receive(:start)
+        run_cli("dashboard", "--refresh", "10")
+      end
     end
 
-    it "passes a custom --refresh interval through" do
-      mock_tui = instance_double(TuiDashboard)
-      expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
-      expect(mock_tui).to receive(:start)
-      run_cli("dashboard", "--refresh", "10")
+    context "when FUTURESBOT_SKIP_POSITION_SYNC is set" do
+      it "does not call PositionImportService" do
+        mock_tui = instance_double(TuiDashboard)
+        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
+        allow(mock_tui).to receive(:start)
+        ClimateControl.modify(FUTURESBOT_SKIP_POSITION_SYNC: "1") do
+          expect(PositionImportService).not_to receive(:new)
+          run_cli("dashboard")
+        end
+      end
     end
   end
 
@@ -247,8 +279,12 @@ RSpec.describe FuturesBotCli, type: :model do
   describe "#chat" do
     let(:session_id) { "test-session-abc" }
     let(:bot) { instance_double(ChatBotService) }
+    let(:import_service) { instance_double(PositionImportService) }
+    let(:import_result) { {imported: 0, updated: 0, errors: [], total_coinbase: 0} }
 
     before do
+      allow(PositionImportService).to receive(:new).and_return(import_service)
+      allow(import_service).to receive(:import_positions_from_coinbase).and_return(import_result)
       allow(SecureRandom).to receive(:uuid).and_return(session_id)
       allow(ChatBotService).to receive(:new).with(session_id).and_return(bot)
       allow(bot).to receive(:process).and_return("✅ Command processed")
@@ -261,6 +297,12 @@ RSpec.describe FuturesBotCli, type: :model do
       allow(Signal).to receive(:trap)
       allow($stdout).to receive(:puts)
       allow($stdout).to receive(:print)
+    end
+
+    it "syncs positions from Coinbase after the banner" do
+      allow($stdin).to receive(:gets).and_return("quit\n")
+      expect(import_service).to receive(:import_positions_from_coinbase)
+      run_cli("chat")
     end
 
     it "exits cleanly on 'quit'" do

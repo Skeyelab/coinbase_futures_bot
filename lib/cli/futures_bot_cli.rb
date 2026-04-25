@@ -37,6 +37,7 @@ module Cli
     method_option :refresh, aliases: "-i", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
       desc: "Auto-refresh interval in seconds"
     def dashboard
+      sync_positions_on_startup
       TuiDashboard.new(refresh_interval: options[:refresh]).start
     end
 
@@ -48,6 +49,7 @@ module Cli
       desc: "Resume a specific session by ID"
     def chat
       print_banner
+      sync_positions_on_startup
 
       session_id = resolve_session_id(options)
       bot = ChatBotService.new(session_id)
@@ -165,6 +167,26 @@ module Cli
     end
 
     private
+
+    # Pulls open futures positions from Coinbase into the local DB so the bot
+    # matches exchange state after restarts. Non-fatal if the API is unavailable.
+    def sync_positions_on_startup
+      return if skip_position_sync?
+
+      result = PositionImportService.new.import_positions_from_coinbase
+      return unless $stdout.tty?
+
+      puts "#{GREEN}✓#{RESET} Positions synced from Coinbase " \
+           "(#{result[:imported]} new, #{result[:updated]} updated, " \
+           "#{result[:total_coinbase]} on exchange)\n"
+    rescue => e
+      Rails.logger.warn("[FuturesBotCli] Position sync on startup failed: #{e.message}")
+      puts "#{YELLOW}⚠#{RESET} Position sync skipped: #{e.message}\n" if $stdout.tty?
+    end
+
+    def skip_position_sync?
+      ENV["FUTURESBOT_SKIP_POSITION_SYNC"].present?
+    end
 
     # ── Session helpers ─────────────────────────────────────────────────────────
 
