@@ -2,6 +2,8 @@
 
 The FuturesBot includes a comprehensive AI-powered CLI Chat Bot Interface that allows operators to interact with the trading bot through natural language commands. This interface provides full control over trading operations, position monitoring, and system management.
 
+The chat interface is integrated into the primary TUI CLI (`bin/futuresbot`).  You can launch it directly or use it after opening the TUI dashboard.
+
 ## Overview
 
 The Chat Bot Interface consists of several integrated components:
@@ -18,14 +20,17 @@ The Chat Bot Interface consists of several integrated components:
 ### Launch the Chat Bot
 
 ```bash
-# Start a new chat session
-rails chat_bot:start
+# Start a new chat session (preferred – uses the primary TUI CLI)
+bin/futuresbot chat
 
 # Resume the last active session
-rails chat_bot:start --resume
+bin/futuresbot chat --resume
 
 # Resume a specific session
-rails chat_bot:start --session <session-id>
+bin/futuresbot chat --session_id <session-id>
+
+# Legacy Rake task (still works, but bin/futuresbot chat is preferred)
+# rails chat_bot:start
 ```
 
 ### Basic Commands
