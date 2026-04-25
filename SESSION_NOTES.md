@@ -26,6 +26,31 @@
 
 ### Session log
 
+#### 2026-04-25 22:00 UTC
+- Context: TUI arrow-key shortcuts and hint line for refresh/section toggles.
+- Changes:
+  - `KEY_ACTIONS`: `\e[A`/`\e[B` faster/slower refresh; `\e[D`/`\e[C` toggle positions/signals.
+  - Header hint includes `[↑/↓ speed]` and `[←/→ toggle]`; specs assert mappings and hint text.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb --format progress`
+  - `bin/standardrb --fix lib/cli/tui_dashboard.rb spec/lib/cli/tui_dashboard_spec.rb`
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `SESSION_NOTES.md`
+
+#### 2026-04-25 17:30 UTC
+- Context: TUI exited on mouse wheel/arrow escape sequences because `Esc` was interpreted as immediate quit.
+- Changes:
+  - `Cli::TuiDashboard#run_interactive` now reads key input through `read_keypress`.
+  - Added `read_keypress` to consume multi-byte escape sequences; only lone `Esc` maps to quit.
+  - Added specs for lone `Esc` and buffered escape sequences (scroll/arrow style input).
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb --format documentation`
+  - `bin/standardrb --fix lib/cli/tui_dashboard.rb spec/lib/cli/tui_dashboard_spec.rb`
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - (Done in 2026-04-25 22:00 UTC entry) Arrow keys mapped; extend if more terminals need alternate sequences.
+
 #### 2026-04-24 18:30 UTC
 - Context: TUI dashboard position management (plan: import, close, reconcile).
 - Changes:

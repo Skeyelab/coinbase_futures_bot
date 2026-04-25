@@ -14,6 +14,8 @@ require "io/console"
 #   i / I                    – import/sync positions from Coinbase
 #   c / C                    – close an OPEN position (prompt; market order on exchange)
 #   o / O                    – reconcile local OPEN rows missing from exchange (prompt: type yes)
+#   ↑ / ↓                    – faster / slower refresh
+#   ← / →                    – toggle positions / signals
 #   +                        – refresh faster (decrease interval by 1 s, min 1 s)
 #   -                        – refresh slower (increase interval by 1 s)
 module Cli
@@ -48,6 +50,10 @@ module Cli
       "i" => :import_positions, "I" => :import_positions,
       "c" => :close_position, "C" => :close_position,
       "o" => :reconcile_positions, "O" => :reconcile_positions,
+      "\e[A" => :faster,      # Up arrow
+      "\e[B" => :slower,      # Down arrow
+      "\e[D" => :toggle_positions, # Left arrow
+      "\e[C" => :toggle_signals,   # Right arrow
       "+" => :faster, "=" => :faster,
       "-" => :slower
     }.freeze
@@ -151,7 +157,7 @@ module Cli
       buf << divider_heavy << "\n"
       buf << "  #{BOLD}#{CYAN}🤖  FuturesBot#{RESET}  " \
              "#{DIM}#{ts}  ·  #{RESET}" \
-             "[q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [+/-]" \
+             "[q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [↑/↓ speed] [←/→ toggle]" \
              "#{CLEAR_EOL}\n"
       buf << divider_heavy << "\n"
 
@@ -398,11 +404,7 @@ module Cli
       loop do
         # Non-blocking keypress poll (50 ms timeout)
         if IO.select([$stdin], nil, nil, 0.05)
-          key = begin
-            $stdin.read_nonblock(1)
-          rescue
-            nil
-          end
+          key = read_keypress
           handle_keypress(key)
         end
 
@@ -417,6 +419,34 @@ module Cli
     ensure
       restore_terminal
       @output.puts "\nFuturesBot Dashboard closed."
+    end
+
+    # Reads one keypress from stdin. For escape sequences (mouse wheel, arrows),
+    # this consumes trailing bytes so only a lone ESC is treated as quit.
+    def read_keypress
+      first = begin
+        $stdin.read_nonblock(1)
+      rescue
+        nil
+      end
+      return nil unless first
+      return first unless first == "\e"
+
+      suffix = +""
+      loop do
+        break unless IO.select([$stdin], nil, nil, 0.001)
+
+        chunk = begin
+          $stdin.read_nonblock(1)
+        rescue
+          nil
+        end
+        break unless chunk
+
+        suffix << chunk
+      end
+
+      suffix.empty? ? first : "#{first}#{suffix}"
     end
 
     # ── Terminal setup / teardown ─────────────────────────────────────────────────

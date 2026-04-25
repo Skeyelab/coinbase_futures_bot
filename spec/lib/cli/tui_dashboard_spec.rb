@@ -80,6 +80,22 @@ RSpec.describe TuiDashboard do
       expect { dashboard.handle_keypress("+") }.to change(dashboard, :refresh_interval).from(5).to(4)
     end
 
+    it "refreshes faster (decreases interval) on Up arrow" do
+      expect { dashboard.handle_keypress("\e[A") }.to change(dashboard, :refresh_interval).from(5).to(4)
+    end
+
+    it "refreshes slower (increases interval) on Down arrow" do
+      expect { dashboard.handle_keypress("\e[B") }.to change(dashboard, :refresh_interval).from(5).to(6)
+    end
+
+    it "toggles positions on Left arrow" do
+      expect { dashboard.handle_keypress("\e[D") }.to change(dashboard, :show_positions).from(true).to(false)
+    end
+
+    it "toggles signals on Right arrow" do
+      expect { dashboard.handle_keypress("\e[C") }.to change(dashboard, :show_signals).from(true).to(false)
+    end
+
     it "does not decrease interval below 1 second" do
       9.times { dashboard.handle_keypress("+") }
       expect(dashboard.refresh_interval).to eq(1)
@@ -256,6 +272,8 @@ RSpec.describe TuiDashboard do
       expect(output.string).to include("[i]mport")
       expect(output.string).to include("[c]lose")
       expect(output.string).to include("[o]reconcile")
+      expect(output.string).to include("[↑/↓ speed]")
+      expect(output.string).to include("[←/→ toggle]")
     end
 
     it "outputs the Status row" do
@@ -391,6 +409,20 @@ RSpec.describe TuiDashboard do
       dashboard.render
 
       expect(output.string).to include("\r\n")
+    end
+
+    it "treats a lone ESC as escape" do
+      allow($stdin).to receive(:read_nonblock).and_return("\e")
+      allow(IO).to receive(:select).and_return(nil)
+
+      expect(dashboard.send(:read_keypress)).to eq("\e")
+    end
+
+    it "consumes full escape sequences (e.g. scroll/arrow)" do
+      allow($stdin).to receive(:read_nonblock).and_return("\e", "[", "A")
+      allow(IO).to receive(:select).and_return(true, true, nil)
+
+      expect(dashboard.send(:read_keypress)).to eq("\e[A")
     end
   end
 
