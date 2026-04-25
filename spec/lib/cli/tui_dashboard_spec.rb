@@ -88,6 +88,74 @@ RSpec.describe TuiDashboard do
     it "ignores unknown keys" do
       expect { dashboard.handle_keypress("x") }.not_to change(dashboard, :running)
     end
+
+    it "runs position import on 'i'" do
+      pis = instance_double(PositionImportService)
+      allow(PositionImportService).to receive(:new).and_return(pis)
+      allow(pis).to receive(:import_positions_from_coinbase).and_return(
+        imported: 0, updated: 1, errors: [], total_coinbase: 2
+      )
+      expect(pis).to receive(:import_positions_from_coinbase)
+      dashboard.handle_keypress("i")
+    end
+
+    it "runs position import on 'I'" do
+      pis = instance_double(PositionImportService)
+      allow(PositionImportService).to receive(:new).and_return(pis)
+      allow(pis).to receive(:import_positions_from_coinbase).and_return(
+        imported: 0, updated: 0, errors: [], total_coinbase: 0
+      )
+      dashboard.handle_keypress("I")
+    end
+
+    it "sets error flash when import raises" do
+      pis = instance_double(PositionImportService)
+      allow(PositionImportService).to receive(:new).and_return(pis)
+      allow(pis).to receive(:import_positions_from_coinbase).and_raise(StandardError, "network down")
+      dashboard.handle_keypress("i")
+      expect(dashboard.instance_variable_get(:@flash_level)).to eq(:error)
+      expect(dashboard.instance_variable_get(:@flash_text)).to include("network down")
+    end
+
+    it "closes a position when prompted with a valid id" do
+      position = create(:position, status: "OPEN")
+      mock_cb = instance_double(Trading::CoinbasePositions)
+      allow(mock_cb).to receive(:close_position).and_return({"success" => true})
+      dash = described_class.new(
+        refresh_interval: 5,
+        output: output,
+        positions_service: mock_cb
+      )
+      allow(output).to receive(:tty?).and_return(true)
+      allow(dash).to receive(:with_cooked_stdin).and_yield
+      allow($stdin).to receive(:gets).and_return("#{position.id}\n")
+
+      dash.handle_keypress("c")
+
+      expect(mock_cb).to have_received(:close_position).with(
+        product_id: position.product_id,
+        size: position.size
+      )
+      expect(dash.instance_variable_get(:@flash_level)).to eq(:ok)
+    end
+
+    it "reconciles when user types yes" do
+      mock_rec = instance_double(PositionReconcileService)
+      allow(mock_rec).to receive(:reconcile!).and_return({closed_count: 0, closed_ids: [], errors: []})
+      dash = described_class.new(
+        refresh_interval: 5,
+        output: output,
+        reconcile_service: mock_rec
+      )
+      allow(output).to receive(:tty?).and_return(true)
+      allow(dash).to receive(:with_cooked_stdin).and_yield
+      allow($stdin).to receive(:gets).and_return("yes\n")
+
+      dash.handle_keypress("o")
+
+      expect(mock_rec).to have_received(:reconcile!)
+      expect(dash.instance_variable_get(:@flash_level)).to eq(:ok)
+    end
   end
 
   # ── refresh_data ──────────────────────────────────────────────────────────────
@@ -185,6 +253,9 @@ RSpec.describe TuiDashboard do
       dashboard.render
       expect(output.string).to include("[q]uit")
       expect(output.string).to include("[r]efresh")
+      expect(output.string).to include("[i]mport")
+      expect(output.string).to include("[c]lose")
+      expect(output.string).to include("[o]reconcile")
     end
 
     it "outputs the Status row" do

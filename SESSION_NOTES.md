@@ -26,6 +26,21 @@
 
 ### Session log
 
+#### 2026-04-24 18:30 UTC
+- Context: TUI dashboard position management (plan: import, close, reconcile).
+- Changes:
+  - `Cli::TuiDashboard`: keys `[i]` sync via `PositionImportService`, `[c]` market-close prompt (cooked stdin) via `Trading::CoinbasePositions#close_position`, `[o]` reconcile after typing `yes` via new `PositionReconcileService`.
+  - Transient flash line in render; optional DI `position_import_service`, `positions_service`, `reconcile_service` for tests.
+  - `PositionReconcileService`: marks local `OPEN` absent from Coinbase futures snapshot as `CLOSED` (`force_close!`); specs for TUI + service.
+  - `FuturesBotCli` dashboard desc notes TUI keys.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb spec/services/position_reconcile_service_spec.rb`
+  - `bin/standardrb --fix` on touched Ruby files
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `app/services/position_reconcile_service.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `spec/services/position_reconcile_service_spec.rb`, `lib/cli/futures_bot_cli.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - PR / `parallel_rspec` before merge if required.
+
 #### 2026-04-24 12:00 UTC
 - Context: CLI (`bin/futuresbot`) should align local `Position` rows with Coinbase when the interactive bot starts.
 - Changes:

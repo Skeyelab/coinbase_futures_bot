@@ -11,12 +11,16 @@ require "io/console"
 #   r / R                    – force immediate refresh
 #   p / P                    – toggle positions section
 #   s / S                    – toggle signals section
+#   i / I                    – import/sync positions from Coinbase
+#   c / C                    – close an OPEN position (prompt; market order on exchange)
+#   o / O                    – reconcile local OPEN rows missing from exchange (prompt: type yes)
 #   +                        – refresh faster (decrease interval by 1 s, min 1 s)
 #   -                        – refresh slower (increase interval by 1 s)
 module Cli
   class TuiDashboard
     DEFAULT_REFRESH = 5 # seconds
     LIVE_TICK_THRESHOLD_SECONDS = 15
+    FLASH_SECONDS = 8
 
     # ANSI escape helpers
     RESET = "\e[0m"
@@ -41,20 +45,30 @@ module Cli
       "r" => :force_refresh, "R" => :force_refresh,
       "p" => :toggle_positions, "P" => :toggle_positions,
       "s" => :toggle_signals, "S" => :toggle_signals,
+      "i" => :import_positions, "I" => :import_positions,
+      "c" => :close_position, "C" => :close_position,
+      "o" => :reconcile_positions, "O" => :reconcile_positions,
       "+" => :faster, "=" => :faster,
       "-" => :slower
     }.freeze
 
     attr_reader :running, :show_positions, :show_signals, :refresh_interval
 
-    def initialize(refresh_interval: DEFAULT_REFRESH, output: $stdout)
+    def initialize(refresh_interval: DEFAULT_REFRESH, output: $stdout,
+      position_import_service: nil, positions_service: nil, reconcile_service: nil)
       @refresh_interval = refresh_interval
       @output = output
+      @position_import_service = position_import_service
+      @positions_service = positions_service
+      @reconcile_service = reconcile_service
       @running = true
       @show_positions = true
       @show_signals = true
       @data = {}
       @error = nil
+      @flash_text = nil
+      @flash_level = nil
+      @flash_until = nil
       # Trigger an immediate render on first loop iteration
       @last_refresh = Time.now - refresh_interval
     end
@@ -91,6 +105,12 @@ module Cli
         @last_refresh = Time.now - @refresh_interval
       when :slower
         @refresh_interval += 1
+      when :import_positions
+        run_import_sync
+      when :close_position
+        run_close_position_flow
+      when :reconcile_positions
+        run_reconcile_flow
       end
     end
 
@@ -131,7 +151,7 @@ module Cli
       buf << divider_heavy << "\n"
       buf << "  #{BOLD}#{CYAN}🤖  FuturesBot#{RESET}  " \
              "#{DIM}#{ts}  ·  #{RESET}" \
-             "[q]uit  [r]efresh  [p]ositions  [s]ignals  [+/-] speed" \
+             "[q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [+/-]" \
              "#{CLEAR_EOL}\n"
       buf << divider_heavy << "\n"
 
@@ -144,6 +164,18 @@ module Cli
              "  #{DIM}·#{RESET}  Sessions: #{d[:session_count] || 0}" \
              "  #{DIM}·#{RESET}  Coinbase: #{coinbase_connection_status(d[:latest_tick_at])}" \
              "#{CLEAR_EOL}\n"
+
+      # ── Flash (transient messages) ─────────────────────────────────────────────
+      clear_stale_flash!
+      if @flash_text.present? && @flash_until && Time.now < @flash_until
+        color = case @flash_level
+        when :ok then GREEN
+        when :warn then YELLOW
+        else RED
+        end
+        label = @flash_level.to_s.upcase
+        buf << "  #{color}#{BOLD}#{label}#{RESET}  #{color}#{@flash_text.to_s[0, cols - 16]}#{RESET}#{CLEAR_EOL}\n"
+      end
 
       # ── Positions section ─────────────────────────────────────────────────────
       if @show_positions
@@ -242,6 +274,121 @@ module Cli
     end
 
     private
+
+    # ── Position actions ────────────────────────────────────────────────────────
+
+    def run_import_sync
+      svc = @position_import_service || PositionImportService.new
+      result = svc.import_positions_from_coinbase
+      assign_flash(:ok, "Synced: #{result[:imported]} new, #{result[:updated]} updated " \
+                        "(#{result[:total_coinbase]} on exchange)")
+    rescue => e
+      assign_flash(:error, "Sync failed: #{e.message}")
+    ensure
+      bump_dashboard
+    end
+
+    def run_close_position_flow
+      if @output.tty?
+        with_cooked_stdin do
+          @output.print("\r\n\r\nEnter OPEN position id to market-close on Coinbase (blank=cancel): ")
+          @output.flush
+          line = ($stdin.gets || "").strip
+          if line.empty?
+            assign_flash(:warn, "Close cancelled")
+          elsif !line.match?(/\A\d+\z/)
+            assign_flash(:error, "Invalid position id")
+          else
+            position = Position.find_by(id: line.to_i, status: "OPEN")
+            if position.nil?
+              assign_flash(:error, "No OPEN position ##{line}")
+            else
+              svc = @positions_service || Trading::CoinbasePositions.new(logger: Rails.logger)
+              result = svc.close_position(product_id: position.product_id, size: position.size)
+              if result["success"] || result["order_id"]
+                assign_flash(:ok, "Close submitted for ##{position.id} #{position.product_id}")
+              else
+                assign_flash(:error, "Close failed: #{result.inspect}")
+              end
+            end
+          end
+        end
+      else
+        assign_flash(:warn, "Close prompt needs a TTY")
+      end
+    rescue => e
+      assign_flash(:error, "Close error: #{e.message}")
+    ensure
+      bump_dashboard
+    end
+
+    def run_reconcile_flow
+      if @output.tty?
+        with_cooked_stdin do
+          @output.print("\r\n\r\nType yes to close local OPEN rows missing from Coinbase (else=cancel): ")
+          @output.flush
+          line = ($stdin.gets || "").strip
+          if line != "yes"
+            assign_flash(:warn, "Reconcile cancelled")
+          else
+            svc = @reconcile_service || PositionReconcileService.new
+            result = svc.reconcile!
+            msg = "Reconciled #{result[:closed_count]} local row(s)"
+            msg += " — #{result[:errors].join("; ")}" if result[:errors].any?
+            assign_flash(result[:errors].any? ? :warn : :ok, msg)
+          end
+        end
+      else
+        assign_flash(:warn, "Reconcile prompt needs a TTY")
+      end
+    rescue => e
+      assign_flash(:error, "Reconcile failed: #{e.message}")
+    ensure
+      bump_dashboard
+    end
+
+    def assign_flash(level, text)
+      @flash_level = level
+      @flash_text = text
+      @flash_until = Time.now + FLASH_SECONDS
+    end
+
+    def clear_stale_flash!
+      return unless @flash_until && Time.now >= @flash_until
+
+      @flash_text = nil
+      @flash_level = nil
+      @flash_until = nil
+    end
+
+    def bump_dashboard
+      @last_refresh = Time.now - @refresh_interval
+      refresh_data
+      render
+    end
+
+    def with_cooked_stdin
+      had_saved = @saved_tty.present? && !@saved_tty.empty?
+      if had_saved
+        system("stty", @saved_tty)
+      end
+      begin
+        $stdin.cooked!
+        $stdin.echo = true
+      rescue
+        # Non-TTY or unsupported
+      end
+      @output.print(SHOW_CURSOR)
+      yield
+    ensure
+      @output.print(HIDE_CURSOR)
+      begin
+        $stdin.raw!
+        $stdin.echo = false
+      rescue
+        # ignore
+      end
+    end
 
     # ── Interactive loop ─────────────────────────────────────────────────────────
 
