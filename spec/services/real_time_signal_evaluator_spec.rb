@@ -27,6 +27,101 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
       evaluator = described_class.new
       expect(evaluator.logger).to eq(Rails.logger)
     end
+
+    context "when an active TradingProfile exists" do
+      let!(:profile) { create(:trading_profile, :active, min_confidence_threshold: 75, max_signals_per_hour: 3, deduplication_window: 600) }
+
+      it "reads min_confidence_threshold from the active profile" do
+        ev = described_class.new(logger: logger)
+        expect(ev.instance_variable_get(:@min_confidence_threshold)).to eq(75.0)
+      end
+
+      it "reads max_signals_per_hour from the active profile" do
+        ev = described_class.new(logger: logger)
+        expect(ev.instance_variable_get(:@max_signals_per_hour)).to eq(3)
+      end
+
+      it "reads deduplication_window from the active profile" do
+        ev = described_class.new(logger: logger)
+        expect(ev.instance_variable_get(:@deduplication_window)).to eq(600)
+      end
+    end
+
+    context "when no TradingProfile is active" do
+      before { TradingProfile.update_all(active: false) }
+
+      it "falls back to env-var defaults for min_confidence_threshold" do
+        ev = described_class.new(logger: logger)
+        expected = ENV.fetch("REALTIME_SIGNAL_MIN_CONFIDENCE", "60").to_f
+        expect(ev.instance_variable_get(:@min_confidence_threshold)).to eq(expected)
+      end
+
+      it "falls back to env-var defaults for max_signals_per_hour" do
+        ev = described_class.new(logger: logger)
+        expected = ENV.fetch("REALTIME_SIGNAL_MAX_PER_HOUR", "10").to_i
+        expect(ev.instance_variable_get(:@max_signals_per_hour)).to eq(expected)
+      end
+
+      it "falls back to env-var defaults for deduplication_window" do
+        ev = described_class.new(logger: logger)
+        expected = ENV.fetch("REALTIME_SIGNAL_DEDUPE_WINDOW", "300").to_i
+        expect(ev.instance_variable_get(:@deduplication_window)).to eq(expected)
+      end
+    end
+  end
+
+  describe "#load_strategies (via initialize)" do
+    context "when an active TradingProfile exists" do
+      let!(:profile) { create(:trading_profile, :active, tp_target: 0.009, sl_target: 0.005, risk_fraction: 0.03, max_position_size: 20, min_position_size: 2) }
+
+      it "passes tp_target from the active profile to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expect(strategy.instance_variable_get(:@config)[:tp_target]).to eq(0.009)
+      end
+
+      it "passes sl_target from the active profile to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expect(strategy.instance_variable_get(:@config)[:sl_target]).to eq(0.005)
+      end
+
+      it "passes risk_fraction from the active profile to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expect(strategy.instance_variable_get(:@config)[:risk_fraction]).to eq(0.03)
+      end
+
+      it "passes max_position_size from the active profile to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expect(strategy.instance_variable_get(:@config)[:max_position_size]).to eq(20)
+      end
+
+      it "passes min_position_size from the active profile to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expect(strategy.instance_variable_get(:@config)[:min_position_size]).to eq(2)
+      end
+    end
+
+    context "when no TradingProfile is active" do
+      before { TradingProfile.update_all(active: false) }
+
+      it "passes default tp_target to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expected = ENV.fetch("STRATEGY_TP_TARGET", "0.006").to_f
+        expect(strategy.instance_variable_get(:@config)[:tp_target]).to eq(expected)
+      end
+
+      it "passes default sl_target to the strategy" do
+        ev = described_class.new(logger: logger)
+        strategy = ev.strategies["MultiTimeframeSignal"]
+        expected = ENV.fetch("STRATEGY_SL_TARGET", "0.004").to_f
+        expect(strategy.instance_variable_get(:@config)[:sl_target]).to eq(expected)
+      end
+    end
   end
 
   describe "#valid_signal?" do
