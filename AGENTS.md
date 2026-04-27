@@ -34,6 +34,13 @@
 - One-shot realtime evaluation: `bin/rake realtime:evaluate`
 - Day trading summary: `bin/rake day_trading:check_positions`
 - Day trading close workflow: `bin/rake day_trading:manage`
+- Kill switch: `bin/futuresbot halt [--reason "..."]` / `bin/futuresbot resume`
+
+### Beads issue tracker
+- List issues: `bd list` / `bd ready`
+- Sync with GitHub: `GITHUB_TOKEN="$(gh auth token)" bd github sync`
+  - Note: `bd config set github.token` is written to config.yaml but not read by `bd github sync` (bd bug); use the env var workaround above.
+- Push to Dolt remote: `bd dolt push` (no remote configured yet)
 
 ## High-value gotchas
 - `bin/setup` is not a harmless bootstrap script. It also runs `git config core.hooksPath .githooks`. Do not run it casually in automation if you want to avoid mutating local git config.
