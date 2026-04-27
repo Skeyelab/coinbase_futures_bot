@@ -50,6 +50,7 @@ module Cli
       "i" => :import_positions, "I" => :import_positions,
       "c" => :close_position, "C" => :close_position,
       "o" => :reconcile_positions, "O" => :reconcile_positions,
+      "h" => :toggle_halt, "H" => :toggle_halt,
       "\e[A" => :faster,      # Up arrow
       "\e[B" => :slower,      # Down arrow
       "\e[D" => :toggle_positions, # Left arrow
@@ -117,6 +118,8 @@ module Cli
         run_close_position_flow
       when :reconcile_positions
         run_reconcile_flow
+      when :toggle_halt
+        run_halt_toggle_flow
       end
     end
 
@@ -125,6 +128,7 @@ module Cli
       latest_tick_at = Tick.maximum(:observed_at)
       live_prices = latest_prices_by_product
       futures_live_prices, spot_live_prices = split_live_prices(live_prices)
+      last_signal_eval_at = SignalAlert.maximum(:created_at)
 
       @data = {
         day_pos_count: Position.open.day_trading.count,
@@ -134,6 +138,7 @@ module Cli
         positions: Position.open.order(entry_time: :desc).limit(15).to_a,
         signals: SignalAlert.active.recent.order(alert_timestamp: :desc).limit(10).to_a,
         latest_tick_at: latest_tick_at,
+        last_signal_eval_at: last_signal_eval_at,
         live_prices: live_prices,
         futures_live_prices: futures_live_prices,
         spot_live_prices: spot_live_prices,
@@ -157,7 +162,7 @@ module Cli
       buf << divider_heavy << "\n"
       buf << "  #{BOLD}#{CYAN}🤖  FuturesBot#{RESET}  " \
              "#{DIM}#{ts}  ·  #{RESET}" \
-             "[q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [↑/↓ speed] [←/→ toggle]" \
+             "[q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [h]alt [↑/↓ speed] [←/→ toggle]" \
              "#{CLEAR_EOL}\n"
       buf << divider_heavy << "\n"
 
@@ -169,6 +174,8 @@ module Cli
              "  #{DIM}·#{RESET}  Signals: #{colorize(d[:signal_count] || 0)}" \
              "  #{DIM}·#{RESET}  Sessions: #{d[:session_count] || 0}" \
              "  #{DIM}·#{RESET}  Coinbase: #{coinbase_connection_status(d[:latest_tick_at])}" \
+             "  #{DIM}·#{RESET}  Trading: #{trading_halt_status_label}" \
+             "  #{DIM}·#{RESET}  Eval: #{signal_eval_status_label(d[:last_signal_eval_at])}" \
              "#{CLEAR_EOL}\n"
 
       # ── Flash (transient messages) ─────────────────────────────────────────────
@@ -353,6 +360,37 @@ module Cli
       bump_dashboard
     end
 
+    def run_halt_toggle_flow
+      if @output.tty?
+        currently_halted = TradingHalt.halted?
+        action = currently_halted ? "RESUME trading" : "HALT trading"
+        with_cooked_stdin do
+          @output.print("\r\n\r\nType yes to #{action} (else=cancel): ")
+          @output.flush
+          line = ($stdin.gets || "").strip
+          if line != "yes"
+            assign_flash(:warn, "#{action} cancelled")
+          elsif currently_halted
+            TradingHalt.resume!
+            assign_flash(:ok, "Trading RESUMED")
+          else
+            @output.print("Reason (optional, Enter to skip): ")
+            @output.flush
+            reason = ($stdin.gets || "").strip.presence
+            TradingHalt.halt!(reason: reason)
+            msg = reason ? "Trading HALTED — #{reason}" : "Trading HALTED"
+            assign_flash(:error, msg)
+          end
+        end
+      else
+        assign_flash(:warn, "Halt prompt needs a TTY")
+      end
+    rescue => e
+      assign_flash(:error, "Halt error: #{e.message}")
+    ensure
+      bump_dashboard
+    end
+
     def assign_flash(level, text)
       @flash_level = level
       @flash_text = text
@@ -504,6 +542,25 @@ module Cli
         "#{GREEN}#{BOLD}LIVE#{RESET} #{DIM}(#{age_seconds}s ago)#{RESET}"
       else
         "#{YELLOW}#{BOLD}STALE#{RESET} #{DIM}(#{age_seconds}s ago)#{RESET}"
+      end
+    end
+
+    def trading_halt_status_label
+      if TradingHalt.halted?
+        "#{RED}#{BOLD}HALTED#{RESET}"
+      else
+        "#{GREEN}#{BOLD}ACTIVE#{RESET}"
+      end
+    end
+
+    def signal_eval_status_label(last_eval_at)
+      return "#{DIM}never#{RESET}" unless last_eval_at
+
+      age_seconds = (Time.now - last_eval_at).to_i
+      if age_seconds < 120
+        "#{GREEN}#{DIM}#{age_seconds}s ago#{RESET}"
+      else
+        "#{YELLOW}#{DIM}#{(age_seconds / 60).round}m ago#{RESET}"
       end
     end
 
