@@ -36,7 +36,7 @@ class SignalAlert < ApplicationRecord
     metadata: {}, strategy_data: {})
     create!(
       symbol: symbol,
-      side: side,
+      side: normalized_entry_side(side),
       signal_type: "entry",
       strategy_name: strategy_name,
       confidence: confidence,
@@ -150,13 +150,12 @@ class SignalAlert < ApplicationRecord
     end
   end
 
-  def self.determine_exit_side(signal_type)
-    case signal_type
-    when "stop_loss", "take_profit"
-      # For exit signals, side depends on original position
-      # This would need to be determined from position context
-    end
+  def self.determine_exit_side(_signal_type)
     "unknown"
+  end
+
+  def self.normalized_entry_side(side)
+    SideNormalizer.signal(side) || side
   end
 
   private

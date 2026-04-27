@@ -421,6 +421,34 @@ RSpec.describe SignalAlert, type: :model do
         expect(signal.expires_at).to be_within(1.second).of(5.minutes.from_now.utc)
       end
 
+      it "normalizes buy and sell entry sides" do
+        buy_signal = described_class.create_entry_signal!(
+          symbol: "BTC-USD",
+          side: "buy",
+          strategy_name: "MultiTimeframeSignal",
+          confidence: 85.0,
+          entry_price: 50_000.0,
+          stop_loss: 49_000.0,
+          take_profit: 52_000.0,
+          quantity: 10,
+          timeframe: "5m"
+        )
+        sell_signal = described_class.create_entry_signal!(
+          symbol: "BTC-USD",
+          side: "sell",
+          strategy_name: "MultiTimeframeSignal",
+          confidence: 85.0,
+          entry_price: 50_000.0,
+          stop_loss: 49_000.0,
+          take_profit: 52_000.0,
+          quantity: 10,
+          timeframe: "5m"
+        )
+
+        expect(buy_signal.side).to eq("long")
+        expect(sell_signal.side).to eq("short")
+      end
+
       it "raises error on invalid attributes" do
         attrs = entry_signal_attrs.except(:symbol)
         expect do

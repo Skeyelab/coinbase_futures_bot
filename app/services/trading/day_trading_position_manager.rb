@@ -241,27 +241,10 @@ module Trading
     end
 
     def get_current_price_for_position(position)
-      # Try to get current price from the most recent tick or candle
-      # This is a simplified approach - in production you might want to use real-time market data
-
-      # Try to get from recent ticks first
-      recent_tick = Tick.where(product_id: position.product_id)
-        .order(observed_at: :desc)
-        .first
-
-      return recent_tick.price if recent_tick && recent_tick.observed_at > 5.minutes.ago
-
-      # Fall back to most recent 1-minute candle
-      recent_candle = Candle.for_symbol(position.product_id)
-        .one_minute
-        .order(timestamp: :desc)
-        .first
-
-      return recent_candle.close if recent_candle && recent_candle.timestamp > 5.minutes.ago
-
-      # If no recent data, use entry price as fallback
-      @logger.warn("No recent price data for #{position.product_id}, using entry price")
-      position.entry_price
+      RecentMarketPrice.for_product(position.product_id) || begin
+        @logger.warn("No recent price data for #{position.product_id}, using entry price")
+        position.entry_price
+      end
     end
   end
 end

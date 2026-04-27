@@ -58,11 +58,6 @@ class PositionReconcileService
   end
 
   def normalized_side(side)
-    return nil unless side
-
-    case side.downcase
-    when "long", "buy" then "LONG"
-    when "short", "sell" then "SHORT"
-    end
+    SideNormalizer.position(side)
   end
 end

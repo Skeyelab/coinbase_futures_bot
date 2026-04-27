@@ -20,6 +20,7 @@ RSpec.describe HealthCheckJob, type: :job do
       let!(:old_day_position) { create(:position, day_trading: true, status: "OPEN", entry_time: 25.hours.ago) }
 
       before do
+        allow(logger).to receive(:debug)
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
         # Create comprehensive GoodJob mock
         good_job_relation = double("GoodJobRelation")
@@ -131,6 +132,7 @@ RSpec.describe HealthCheckJob, type: :job do
       end
 
       before do
+        allow(logger).to receive(:debug)
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
         # Create comprehensive GoodJob mock
         good_job_relation = double("GoodJobRelation")
@@ -181,6 +183,7 @@ RSpec.describe HealthCheckJob, type: :job do
 
     context "when Coinbase API fails" do
       before do
+        allow(logger).to receive(:debug)
         allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
         # Create comprehensive GoodJob mock
         good_job_relation = double("GoodJobRelation")

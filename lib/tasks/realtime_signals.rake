@@ -10,17 +10,19 @@ namespace :realtime do
     # Start market data subscriptions with real-time candle aggregation
     start_market_data_subscriptions
 
-    # Start real-time signal evaluation
-    start_signal_evaluation
+    runner = build_signal_runner
 
     # Keep the process alive
     puts "[RTS] Real-time signal system started. Press Ctrl+C to stop."
     trap_signals
+    runner.start!
 
     last_heartbeat_at = Time.current.utc
     loop do
       sleep 1
       break if @shutdown_requested
+
+      runner.tick(now: Time.current.utc)
 
       if Time.current.utc - last_heartbeat_at >= 15
         print_runtime_heartbeat
@@ -38,17 +40,19 @@ namespace :realtime do
     puts "[RTS] Starting real-time signal evaluation job..."
     puts "[RTS] Rails env: #{Rails.env}"
 
-    # Start real-time signal evaluation
-    start_signal_evaluation
+    runner = build_signal_runner
 
     # Keep the process alive
     puts "[RTS] Real-time signal job started. Press Ctrl+C to stop."
     trap_signals
+    runner.start!
 
     last_heartbeat_at = Time.current.utc
     loop do
       sleep 1
       break if @shutdown_requested
+
+      runner.tick(now: Time.current.utc)
 
       if Time.current.utc - last_heartbeat_at >= 15
         print_runtime_heartbeat
@@ -198,12 +202,12 @@ namespace :realtime do
     sleep 2
   end
 
-  def start_signal_evaluation
-    interval_seconds = ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i
-    puts "[RTS] Starting real-time signal evaluation (interval=#{interval_seconds}s)..."
-
-    # Start the real-time signal evaluation
-    RealTimeSignalJob.start_realtime_evaluation(interval_seconds: interval_seconds)
+  def build_signal_runner
+    RealtimeSignalRunner.new(
+      job_class: RealTimeSignalJob,
+      logger: Rails.logger,
+      interval_seconds: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i
+    )
   end
 
   def build_tick_persister

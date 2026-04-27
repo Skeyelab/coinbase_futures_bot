@@ -12,21 +12,8 @@ require "factory_bot_rails"
 require "rails-controller-testing"
 
 # Test profiling (only load when needed to avoid overhead)
-puts "=== TestProf DEBUG ==="
-puts "TAG_PROF env var: '#{ENV["TAG_PROF"]}'"
-puts "SAMPLE env var: '#{ENV["SAMPLE"]}'"
-puts "RPROF env var: '#{ENV["RPROF"]}'"
-puts "STACKPROF env var: '#{ENV["STACKPROF"]}'"
-
-will_load_test_prof = (ENV["SAMPLE"] && ENV["SAMPLE"] != "") || (ENV["RPROF"] && ENV["RPROF"] != "") || (ENV["STACKPROF"] && ENV["STACKPROF"] != "") || (ENV["TAG_PROF"] && ENV["TAG_PROF"] != "")
-puts "Will load TestProf: #{will_load_test_prof}"
-
-if will_load_test_prof
-  require "test_prof"
-  puts "TestProf loaded successfully"
-else
-  puts "TestProf NOT loaded (environment variables empty)"
-end
+will_load_test_prof = [ENV["SAMPLE"], ENV["RPROF"], ENV["STACKPROF"], ENV["TAG_PROF"]].any?(&:present?)
+require "test_prof" if will_load_test_prof
 
 # CI-specific configuration and verification
 if ENV["CI"]
@@ -206,6 +193,3 @@ RSpec.configure do |config|
 
   # Host authorization is disabled in test environment via config.hosts = nil
 end
-
-# Load test support files
-Dir[Rails.root.join("spec", "support", "**", "*.rb")].each { |f| require f }

@@ -18,12 +18,17 @@ RSpec.describe FuturesBotCli, type: :model do
 
   describe "#dashboard" do
     context "with startup position sync" do
-      let(:import_service) { instance_double(PositionImportService) }
-      let(:import_result) { {imported: 0, updated: 1, errors: [], total_coinbase: 1} }
+      let(:startup_sync) { instance_double(StartupPositionSync) }
+      let(:sync_result) do
+        StartupPositionSync::Result.new(
+          status: :ok,
+          message: "Positions synced from Coinbase (0 new, 1 updated, 1 on exchange)"
+        )
+      end
 
       before do
-        allow(PositionImportService).to receive(:new).and_return(import_service)
-        allow(import_service).to receive(:import_positions_from_coinbase).and_return(import_result)
+        allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+        allow(startup_sync).to receive(:call).and_return(sync_result)
       end
 
       it "delegates to TuiDashboard#start" do
@@ -37,7 +42,7 @@ RSpec.describe FuturesBotCli, type: :model do
         mock_tui = instance_double(TuiDashboard)
         allow(TuiDashboard).to receive(:new).and_return(mock_tui)
         allow(mock_tui).to receive(:start)
-        expect(import_service).to receive(:import_positions_from_coinbase).ordered
+        expect(startup_sync).to receive(:call).ordered
         expect(mock_tui).to receive(:start).ordered
         run_cli("dashboard")
       end
@@ -51,12 +56,16 @@ RSpec.describe FuturesBotCli, type: :model do
     end
 
     context "when FUTURESBOT_SKIP_POSITION_SYNC is set" do
-      it "does not call PositionImportService" do
+      it "still delegates sync skipping to StartupPositionSync" do
         mock_tui = instance_double(TuiDashboard)
+        startup_sync = instance_double(StartupPositionSync)
         allow(TuiDashboard).to receive(:new).and_return(mock_tui)
         allow(mock_tui).to receive(:start)
+        allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+        allow(startup_sync).to receive(:call).and_return(StartupPositionSync::Result.new(status: :skipped))
+
         ClimateControl.modify(FUTURESBOT_SKIP_POSITION_SYNC: "1") do
-          expect(PositionImportService).not_to receive(:new)
+          expect(startup_sync).to receive(:call)
           run_cli("dashboard")
         end
       end
@@ -279,12 +288,12 @@ RSpec.describe FuturesBotCli, type: :model do
   describe "#chat" do
     let(:session_id) { "test-session-abc" }
     let(:bot) { instance_double(ChatBotService) }
-    let(:import_service) { instance_double(PositionImportService) }
-    let(:import_result) { {imported: 0, updated: 0, errors: [], total_coinbase: 0} }
+    let(:startup_sync) { instance_double(StartupPositionSync) }
+    let(:sync_result) { StartupPositionSync::Result.new(status: :ok, message: "Positions synced from Coinbase (0 new, 0 updated, 0 on exchange)") }
 
     before do
-      allow(PositionImportService).to receive(:new).and_return(import_service)
-      allow(import_service).to receive(:import_positions_from_coinbase).and_return(import_result)
+      allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+      allow(startup_sync).to receive(:call).and_return(sync_result)
       allow(SecureRandom).to receive(:uuid).and_return(session_id)
       allow(ChatBotService).to receive(:new).with(session_id).and_return(bot)
       allow(bot).to receive(:process).and_return("✅ Command processed")
@@ -301,7 +310,7 @@ RSpec.describe FuturesBotCli, type: :model do
 
     it "syncs positions from Coinbase after the banner" do
       allow($stdin).to receive(:gets).and_return("quit\n")
-      expect(import_service).to receive(:import_positions_from_coinbase)
+      expect(startup_sync).to receive(:call)
       run_cli("chat")
     end
 
