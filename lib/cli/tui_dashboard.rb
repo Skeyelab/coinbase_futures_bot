@@ -128,7 +128,7 @@ module Cli
       latest_tick_at = Tick.maximum(:observed_at)
       live_prices = latest_prices_by_product
       futures_live_prices, spot_live_prices = split_live_prices(live_prices)
-      last_signal_eval_at = SignalAlert.maximum(:created_at)
+      last_signal_eval_at = SignalAlert.maximum(:alert_timestamp)
 
       @data = {
         day_pos_count: Position.open.day_trading.count,
@@ -560,7 +560,7 @@ module Cli
       if age_seconds < 120
         "#{GREEN}#{DIM}#{age_seconds}s ago#{RESET}"
       else
-        "#{YELLOW}#{DIM}#{(age_seconds / 60).round}m ago#{RESET}"
+        "#{YELLOW}#{DIM}#{age_seconds / 60}m ago#{RESET}"
       end
     end
 

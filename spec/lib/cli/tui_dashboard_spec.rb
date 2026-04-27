@@ -297,7 +297,7 @@ RSpec.describe TuiDashboard do
       it "populates last_signal_eval_at from most recent signal alert" do
         alert = create(:signal_alert)
         dashboard.refresh_data
-        expect(dashboard.instance_variable_get(:@data)[:last_signal_eval_at]).to be_within(1.second).of(alert.created_at)
+        expect(dashboard.instance_variable_get(:@data)[:last_signal_eval_at]).to be_within(1.second).of(alert.alert_timestamp)
       end
     end
 
