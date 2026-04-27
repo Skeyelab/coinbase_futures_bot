@@ -99,6 +99,7 @@ module Trading
     # Returns order result hash
     def open_position(product_id:, side:, size:, type: :market, price: nil, day_trading: nil, take_profit: nil,
       stop_loss: nil)
+      TradingHalt.assert_active!(context: "CoinbasePositions#open_position")
       # Use configuration default if not specified
       day_trading = Rails.application.config.default_day_trading if day_trading.nil?
       raise "Authentication required" unless @authenticated
@@ -128,6 +129,7 @@ module Trading
     # If size is nil, attempts to infer the open size from list_open_positions for the product.
     # Returns order result hash
     def close_position(product_id:, size: nil)
+      TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
       raise "Authentication required" unless @authenticated
 
       # If explicit size provided, still infer side from current position when possible,
@@ -178,6 +180,7 @@ module Trading
     # Increase an existing position by adding more contracts in the same direction.
     # Returns order result hash
     def increase_position(product_id:, size:)
+      TradingHalt.assert_active!(context: "CoinbasePositions#increase_position")
       raise "Authentication required" unless @authenticated
 
       # Get the current position to determine the side

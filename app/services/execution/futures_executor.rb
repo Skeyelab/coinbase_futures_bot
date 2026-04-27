@@ -14,6 +14,8 @@ module Execution
     # futures_product_id: String
     # at: ISO8601 String
     def consider_entry(spot_price:, futures_product_id:, at: Time.now.utc.iso8601)
+      TradingHalt.assert_active!(context: "FuturesExecutor#consider_entry")
+
       # Check if rollover is needed before considering entry
       check_and_perform_rollover
 
