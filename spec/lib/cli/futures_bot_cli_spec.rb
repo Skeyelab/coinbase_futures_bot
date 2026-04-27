@@ -72,6 +72,37 @@ RSpec.describe FuturesBotCli, type: :model do
     end
   end
 
+  # ── start ─────────────────────────────────────────────────────────────────────
+
+  describe "#start" do
+    let(:startup_sync) { instance_double(StartupPositionSync) }
+    let(:mock_launcher) { instance_double(FuturesBotLauncher) }
+
+    before do
+      allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+      allow(startup_sync).to receive(:call).and_return(StartupPositionSync::Result.new(status: :skipped))
+      allow(FuturesBotLauncher).to receive(:new).and_return(mock_launcher)
+      allow(mock_launcher).to receive(:start)
+    end
+
+    it "creates a FuturesBotLauncher and calls start" do
+      expect(FuturesBotLauncher).to receive(:new).with(hash_including(tui_refresh: TuiDashboard::DEFAULT_REFRESH)).and_return(mock_launcher)
+      expect(mock_launcher).to receive(:start)
+      run_cli("start")
+    end
+
+    it "syncs positions before launching" do
+      expect(startup_sync).to receive(:call).ordered
+      expect(mock_launcher).to receive(:start).ordered
+      run_cli("start")
+    end
+
+    it "passes a custom --refresh interval through" do
+      expect(FuturesBotLauncher).to receive(:new).with(hash_including(tui_refresh: 10)).and_return(mock_launcher)
+      run_cli("start", "--refresh", "10")
+    end
+  end
+
   # ── status ───────────────────────────────────────────────────────────────────
 
   describe "#status" do
