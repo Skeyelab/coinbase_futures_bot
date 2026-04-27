@@ -22,8 +22,7 @@ trading_profiles = [
     min_position_size: 1,
     min_confidence_threshold: 75.0,
     max_signals_per_hour: 5,
-    deduplication_window: 600,
-    active: false
+    deduplication_window: 600
   },
   {
     name: "10-Contract",
@@ -35,8 +34,7 @@ trading_profiles = [
     min_position_size: 10,
     min_confidence_threshold: 60.0,
     max_signals_per_hour: 10,
-    deduplication_window: 300,
-    active: true
+    deduplication_window: 300
   }
 ]
 
@@ -47,7 +45,9 @@ trading_profiles.each do |attrs|
   puts "TradingProfile: #{profile.name} (#{profile.active? ? "active" : "inactive"})"
 end
 
-# Ensure exactly one active profile when seeds set multiple active
-if TradingProfile.where(active: true).count > 1
-  TradingProfile.where(active: true).order(:id).first.activate!
+# Activate the default preset only when no operator-selected profile is already active.
+# Using activate! ensures uniqueness rules and the DB constraint are always respected.
+if TradingProfile.where(active: true).none?
+  TradingProfile.find_by(name: "10-Contract")&.activate!
+  puts "TradingProfile: activated 10-Contract as default"
 end

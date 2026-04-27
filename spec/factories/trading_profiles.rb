@@ -19,7 +19,7 @@ FactoryBot.define do
     end
 
     trait :conservative do
-      name { "Conservative" }
+      sequence(:name) { |n| "Conservative-#{n}" }
       tp_target { 0.004 }
       sl_target { 0.003 }
       risk_fraction { 0.01 }
@@ -29,8 +29,8 @@ FactoryBot.define do
       max_signals_per_hour { 5 }
     end
 
-    trait :aggressive do
-      name { "10-Contract" }
+    trait :ten_contract do
+      sequence(:name) { |n| "10-Contract-#{n}" }
       tp_target { 0.008 }
       sl_target { 0.005 }
       risk_fraction { 0.03 }

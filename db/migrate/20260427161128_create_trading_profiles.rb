@@ -2,12 +2,6 @@
 
 class CreateTradingProfiles < ActiveRecord::Migration[8.1]
   def up
-    # Drop the old table if it exists with the legacy column schema
-    # (created by a branch that was never merged to main).
-    if table_exists?(:trading_profiles)
-      drop_table :trading_profiles
-    end
-
     create_table :trading_profiles do |t|
       t.string :name, null: false
       t.text :description
@@ -30,8 +24,11 @@ class CreateTradingProfiles < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :trading_profiles, :name, unique: true
-    add_index :trading_profiles, :active
+    # Case-insensitive unique index on name to match model validation semantics
+    add_index :trading_profiles, "lower(name)", unique: true, name: "index_trading_profiles_on_lower_name"
+
+    # Partial unique index — enforces at most one active profile at the DB level
+    add_index :trading_profiles, :active, unique: true, where: "active IS TRUE", name: "index_trading_profiles_one_active"
   end
 
   def down

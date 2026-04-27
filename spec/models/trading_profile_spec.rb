@@ -107,6 +107,20 @@ RSpec.describe TradingProfile do
       expect(result.name).to eq("default (env)")
     end
 
+    it "default profile is read-only to prevent accidental persistence" do
+      result = described_class.effective
+      expect { result.save! }.to raise_error(ActiveRecord::ReadOnlyRecord)
+    end
+
+    it "default profile reads STRATEGY_TP_TARGET / STRATEGY_SL_TARGET / STRATEGY_RISK_FRACTION env vars" do
+      ClimateControl.modify(STRATEGY_TP_TARGET: "0.009", STRATEGY_SL_TARGET: "0.005", STRATEGY_RISK_FRACTION: "0.03") do
+        result = described_class.default_profile
+        expect(result.tp_target).to eq(0.009)
+        expect(result.sl_target).to eq(0.005)
+        expect(result.risk_fraction).to eq(0.03)
+      end
+    end
+
     it "default profile has sensible values" do
       result = described_class.effective
       expect(result.tp_target).to be > 0
@@ -176,8 +190,8 @@ RSpec.describe TradingProfile do
       expect(profile.min_confidence_threshold).to be >= 70
     end
 
-    it "aggressive trait has higher sizing" do
-      profile = build(:trading_profile, :aggressive)
+    it "ten_contract trait has higher sizing" do
+      profile = build(:trading_profile, :ten_contract)
       expect(profile.min_position_size).to be >= 10
     end
   end

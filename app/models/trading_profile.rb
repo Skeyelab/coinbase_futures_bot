@@ -35,7 +35,7 @@ class TradingProfile < ApplicationRecord
 
   # ── Scopes ────────────────────────────────────────────────────────────────────
 
-  scope :active_profile, -> { find_by(active: true) }
+  scope :active_profiles, -> { where(active: true) }
 
   # ── Class methods ─────────────────────────────────────────────────────────────
 
@@ -50,20 +50,20 @@ class TradingProfile < ApplicationRecord
     active_profile || default_profile
   end
 
-  # Build an unsaved record with env-var / hard-coded defaults.
-  # Useful as a fallback without touching the DB.
+  # Build an unsaved, read-only record with env-var / hard-coded defaults.
+  # Marked readonly! so callers cannot accidentally persist the fallback config.
   def self.default_profile
     new(
       name: "default (env)",
-      tp_target: ENV.fetch("TP_TARGET", "0.006").to_f,
-      sl_target: ENV.fetch("SL_TARGET", "0.004").to_f,
-      risk_fraction: ENV.fetch("RISK_FRACTION", "0.02").to_f,
+      tp_target: ENV.fetch("STRATEGY_TP_TARGET", "0.006").to_f,
+      sl_target: ENV.fetch("STRATEGY_SL_TARGET", "0.004").to_f,
+      risk_fraction: ENV.fetch("STRATEGY_RISK_FRACTION", "0.02").to_f,
       max_position_size: ENV.fetch("MAX_POSITION_SIZE", "15").to_i,
       min_position_size: ENV.fetch("MIN_POSITION_SIZE", "5").to_i,
       min_confidence_threshold: ENV.fetch("REALTIME_SIGNAL_MIN_CONFIDENCE", "60").to_f,
       max_signals_per_hour: ENV.fetch("REALTIME_SIGNAL_MAX_PER_HOUR", "10").to_i,
       deduplication_window: ENV.fetch("REALTIME_SIGNAL_DEDUPE_WINDOW", "300").to_i
-    )
+    ).tap(&:readonly!)
   end
 
   # ── Instance methods ──────────────────────────────────────────────────────────
