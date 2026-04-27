@@ -17,8 +17,9 @@ class RealTimeSignalEvaluator
 
   # Evaluate all enabled trading pairs for signals
   def evaluate_all_pairs
-    refresh_profile_settings
     return unless should_evaluate?
+
+    refresh_profile_settings
 
     enabled_pairs = TradingPair.enabled
 
@@ -88,7 +89,12 @@ class RealTimeSignalEvaluator
     @min_confidence_threshold = profile.min_confidence_threshold.to_f
     @deduplication_window = profile.deduplication_window
     @max_signals_per_hour = profile.max_signals_per_hour
-    @strategies = load_strategies(profile)
+
+    profile_key = [profile.id, profile.updated_at]
+    if profile_key != @cached_profile_key
+      @strategies = load_strategies(profile)
+      @cached_profile_key = profile_key
+    end
   end
 
   def load_strategies(profile = TradingProfile.effective)

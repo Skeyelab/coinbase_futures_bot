@@ -298,6 +298,57 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
         expect(evaluator).not_to have_received(:evaluate_pair)
       end
+
+      it "skips profile refresh when evaluation is skipped" do
+        allow(evaluator).to receive(:refresh_profile_settings)
+
+        evaluator.evaluate_all_pairs
+
+        expect(evaluator).not_to have_received(:refresh_profile_settings)
+      end
+    end
+  end
+
+  describe "#refresh_profile_settings (profile caching)" do
+    context "when the active profile has not changed between calls" do
+      let!(:profile) { create(:trading_profile, :active) }
+
+      it "does not rebuild strategies on consecutive calls" do
+        evaluator.send(:refresh_profile_settings)
+        original_strategies = evaluator.strategies
+
+        evaluator.send(:refresh_profile_settings)
+
+        expect(evaluator.strategies).to equal(original_strategies)
+      end
+    end
+
+    context "when the active profile is updated" do
+      let!(:profile) { create(:trading_profile, :active, tp_target: 0.006) }
+
+      it "rebuilds strategies after the profile changes" do
+        evaluator.send(:refresh_profile_settings)
+        original_strategies = evaluator.strategies
+
+        profile.update!(tp_target: 0.009)
+        evaluator.send(:refresh_profile_settings)
+
+        expect(evaluator.strategies).not_to equal(original_strategies)
+      end
+    end
+
+    context "when switching from no active profile to an active one" do
+      before { TradingProfile.update_all(active: false) }
+
+      it "rebuilds strategies when a new profile is activated" do
+        evaluator.send(:refresh_profile_settings)
+        original_strategies = evaluator.strategies
+
+        create(:trading_profile, :active)
+        evaluator.send(:refresh_profile_settings)
+
+        expect(evaluator.strategies).not_to equal(original_strategies)
+      end
     end
   end
 
