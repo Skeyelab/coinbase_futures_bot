@@ -10,48 +10,33 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
-  create_schema "auth"
-  create_schema "extensions"
-  create_schema "graphql"
-  create_schema "graphql_public"
-  create_schema "net"
-  create_schema "pgbouncer"
-  create_schema "pgsodium"
-  create_schema "pgsodium_masks"
-  create_schema "realtime"
-  create_schema "storage"
-  create_schema "supabase_functions"
-  create_schema "undefined"
-  create_schema "unstract"
-  create_schema "vault"
-
+ActiveRecord::Schema[8.1].define(version: 2026_04_27_161128) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "candles", force: :cascade do |t|
+    t.decimal "close", precision: 20, scale: 10, null: false
+    t.datetime "created_at", null: false
+    t.decimal "high", precision: 20, scale: 10, null: false
+    t.decimal "low", precision: 20, scale: 10, null: false
+    t.decimal "open", precision: 20, scale: 10, null: false
     t.string "symbol", null: false
     t.string "timeframe", default: "1h", null: false
     t.datetime "timestamp", null: false
-    t.decimal "open", precision: 20, scale: 10, null: false
-    t.decimal "high", precision: 20, scale: 10, null: false
-    t.decimal "low", precision: 20, scale: 10, null: false
-    t.decimal "close", precision: 20, scale: 10, null: false
-    t.decimal "volume", precision: 30, scale: 10, default: "0.0", null: false
-    t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "volume", precision: 30, scale: 10, default: "0.0", null: false
     t.index ["symbol", "timeframe", "timestamp"], name: "index_candles_on_symbol_and_timeframe_and_timestamp", unique: true
   end
 
   create_table "chat_messages", force: :cascade do |t|
     t.bigint "chat_session_id", null: false
     t.text "content", null: false
+    t.datetime "created_at", null: false
     t.string "message_type", null: false
-    t.datetime "timestamp", null: false
+    t.json "metadata", default: {}
     t.string "profit_impact", default: "unknown", null: false
     t.decimal "relevance_score", precision: 5, scale: 3, default: "1.0"
-    t.json "metadata", default: {}
-    t.datetime "created_at", null: false
+    t.datetime "timestamp", null: false
     t.datetime "updated_at", null: false
     t.index ["chat_session_id", "timestamp"], name: "index_chat_messages_on_chat_session_id_and_timestamp"
     t.index ["chat_session_id"], name: "index_chat_messages_on_chat_session_id"
@@ -61,11 +46,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
   end
 
   create_table "chat_sessions", force: :cascade do |t|
-    t.string "session_id", null: false
-    t.string "name"
     t.boolean "active", default: true, null: false
-    t.json "metadata", default: {}
     t.datetime "created_at", null: false
+    t.json "metadata", default: {}
+    t.string "name"
+    t.string "session_id", null: false
     t.datetime "updated_at", null: false
     t.index ["active"], name: "index_chat_sessions_on_active"
     t.index ["session_id"], name: "index_chat_sessions_on_session_id", unique: true
@@ -73,78 +58,78 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.text "description"
-    t.jsonb "serialized_properties"
-    t.text "on_finish"
-    t.text "on_success"
-    t.text "on_discard"
-    t.text "callback_queue_name"
     t.integer "callback_priority"
-    t.datetime "enqueued_at"
+    t.text "callback_queue_name"
+    t.datetime "created_at", null: false
+    t.text "description"
     t.datetime "discarded_at"
+    t.datetime "enqueued_at"
     t.datetime "finished_at"
     t.datetime "jobs_finished_at"
+    t.text "on_discard"
+    t.text "on_finish"
+    t.text "on_success"
+    t.jsonb "serialized_properties"
+    t.datetime "updated_at", null: false
   end
 
   create_table "good_job_executions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.uuid "active_job_id", null: false
-    t.text "job_class"
-    t.text "queue_name"
-    t.jsonb "serialized_params"
-    t.datetime "scheduled_at"
-    t.datetime "finished_at"
-    t.text "error"
-    t.integer "error_event", limit: 2
-    t.text "error_backtrace", array: true
-    t.uuid "process_id"
+    t.datetime "created_at", null: false
     t.interval "duration"
+    t.text "error"
+    t.text "error_backtrace", array: true
+    t.integer "error_event", limit: 2
+    t.datetime "finished_at"
+    t.text "job_class"
+    t.uuid "process_id"
+    t.text "queue_name"
+    t.datetime "scheduled_at"
+    t.jsonb "serialized_params"
+    t.datetime "updated_at", null: false
     t.index ["active_job_id", "created_at"], name: "index_good_job_executions_on_active_job_id_and_created_at"
     t.index ["process_id", "created_at"], name: "index_good_job_executions_on_process_id_and_created_at"
   end
 
   create_table "good_job_processes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "state"
     t.integer "lock_type", limit: 2
+    t.jsonb "state"
+    t.datetime "updated_at", null: false
   end
 
   create_table "good_job_settings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.text "key"
+    t.datetime "updated_at", null: false
     t.jsonb "value"
     t.index ["key"], name: "index_good_job_settings_on_key", unique: true
   end
 
   create_table "good_jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.text "queue_name"
-    t.integer "priority"
-    t.jsonb "serialized_params"
-    t.datetime "scheduled_at"
-    t.datetime "performed_at"
-    t.datetime "finished_at"
-    t.text "error"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.uuid "active_job_id"
-    t.text "concurrency_key"
-    t.text "cron_key"
-    t.uuid "retried_good_job_id"
-    t.datetime "cron_at"
-    t.uuid "batch_id"
     t.uuid "batch_callback_id"
-    t.boolean "is_discrete"
-    t.integer "executions_count"
-    t.text "job_class"
+    t.uuid "batch_id"
+    t.text "concurrency_key"
+    t.datetime "created_at", null: false
+    t.datetime "cron_at"
+    t.text "cron_key"
+    t.text "error"
     t.integer "error_event", limit: 2
+    t.integer "executions_count"
+    t.datetime "finished_at"
+    t.boolean "is_discrete"
+    t.text "job_class"
     t.text "labels", array: true
-    t.uuid "locked_by_id"
     t.datetime "locked_at"
+    t.uuid "locked_by_id"
+    t.datetime "performed_at"
+    t.integer "priority"
+    t.text "queue_name"
+    t.uuid "retried_good_job_id"
+    t.datetime "scheduled_at"
+    t.jsonb "serialized_params"
+    t.datetime "updated_at", null: false
     t.index ["active_job_id", "created_at"], name: "index_good_jobs_on_active_job_id_and_created_at"
     t.index ["batch_callback_id"], name: "index_good_jobs_on_batch_callback_id", where: "(batch_callback_id IS NOT NULL)"
     t.index ["batch_id"], name: "index_good_jobs_on_batch_id", where: "(batch_id IS NOT NULL)"
@@ -163,52 +148,52 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
   end
 
   create_table "positions", force: :cascade do |t|
+    t.datetime "close_time"
+    t.datetime "created_at", null: false
+    t.boolean "day_trading"
+    t.decimal "entry_price"
+    t.datetime "entry_time"
+    t.decimal "pnl"
     t.string "product_id"
     t.string "side"
     t.decimal "size"
-    t.decimal "entry_price"
-    t.datetime "entry_time"
-    t.datetime "close_time"
     t.string "status"
-    t.decimal "pnl"
-    t.decimal "take_profit"
     t.decimal "stop_loss"
-    t.boolean "day_trading"
+    t.decimal "take_profit"
     t.boolean "trailing_stop_enabled", default: false, null: false
     t.jsonb "trailing_stop_state", default: {}, null: false
-    t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["status", "trailing_stop_enabled"], name: "index_positions_on_status_and_trailing_stop_enabled"
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|
+    t.decimal "avg_score", precision: 8, scale: 4, default: "0.0", null: false
+    t.integer "count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.jsonb "meta", default: {}, null: false
     t.string "symbol", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "weighted_score", precision: 8, scale: 4, default: "0.0", null: false
     t.string "window", null: false
     t.datetime "window_end_at", null: false
-    t.integer "count", default: 0, null: false
-    t.decimal "avg_score", precision: 8, scale: 4, default: "0.0", null: false
-    t.decimal "weighted_score", precision: 8, scale: 4, default: "0.0", null: false
     t.decimal "z_score", precision: 8, scale: 4, default: "0.0", null: false
-    t.jsonb "meta", default: {}, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.index ["symbol", "window", "window_end_at"], name: "index_sentiment_aggregates_on_sym_win_end", unique: true
     t.index ["symbol"], name: "index_sentiment_aggregates_on_symbol"
     t.index ["window_end_at"], name: "index_sentiment_aggregates_on_window_end_at"
   end
 
   create_table "sentiment_events", force: :cascade do |t|
-    t.string "source", null: false
-    t.string "symbol"
-    t.string "url"
-    t.string "title"
-    t.decimal "score", precision: 6, scale: 3
     t.decimal "confidence", precision: 6, scale: 3
+    t.datetime "created_at", null: false
+    t.jsonb "meta", default: {}, null: false
     t.datetime "published_at", null: false
     t.string "raw_text_hash", null: false
-    t.jsonb "meta", default: {}, null: false
-    t.datetime "created_at", null: false
+    t.decimal "score", precision: 6, scale: 3
+    t.string "source", null: false
+    t.string "symbol"
+    t.string "title"
     t.datetime "updated_at", null: false
+    t.string "url"
     t.index ["published_at"], name: "index_sentiment_events_on_published_at"
     t.index ["source", "raw_text_hash"], name: "index_sentiment_events_on_source_and_raw_text_hash", unique: true
     t.index ["symbol"], name: "index_sentiment_events_on_symbol"
@@ -216,50 +201,68 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_22_000001) do
   end
 
   create_table "signal_alerts", force: :cascade do |t|
-    t.string "symbol"
-    t.string "side"
-    t.string "signal_type"
-    t.string "strategy_name"
-    t.decimal "confidence"
-    t.decimal "entry_price"
-    t.decimal "stop_loss"
-    t.decimal "take_profit"
-    t.integer "quantity"
-    t.string "timeframe"
     t.string "alert_status"
     t.datetime "alert_timestamp"
+    t.decimal "confidence"
+    t.datetime "created_at", null: false
+    t.decimal "entry_price"
     t.datetime "expires_at"
     t.jsonb "metadata"
+    t.integer "quantity"
+    t.string "side"
+    t.string "signal_type"
+    t.decimal "stop_loss"
     t.jsonb "strategy_data"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.string "strategy_name"
+    t.string "symbol"
+    t.decimal "take_profit"
+    t.string "timeframe"
     t.datetime "triggered_at"
+    t.datetime "updated_at", null: false
   end
 
   create_table "ticks", force: :cascade do |t|
-    t.string "product_id", null: false
-    t.decimal "price", precision: 15, scale: 5, null: false
-    t.datetime "observed_at", null: false
     t.datetime "created_at", null: false
+    t.datetime "observed_at", null: false
+    t.decimal "price", precision: 15, scale: 5, null: false
+    t.string "product_id", null: false
     t.datetime "updated_at", null: false
     t.index ["product_id", "observed_at"], name: "index_ticks_on_product_id_and_observed_at"
   end
 
   create_table "trading_pairs", force: :cascade do |t|
-    t.string "product_id", null: false
     t.string "base_currency"
-    t.string "quote_currency"
-    t.string "status"
+    t.string "contract_type"
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.date "expiration_date"
     t.decimal "min_size", precision: 20, scale: 10
     t.decimal "price_increment", precision: 20, scale: 10
+    t.string "product_id", null: false
+    t.string "quote_currency"
     t.decimal "size_increment", precision: 20, scale: 10
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
+    t.string "status"
     t.datetime "updated_at", null: false
-    t.string "contract_type"
-    t.date "expiration_date"
     t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
     t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
+  end
+
+  create_table "trading_profiles", force: :cascade do |t|
+    t.boolean "active", default: false, null: false
+    t.datetime "created_at", null: false
+    t.integer "deduplication_window", default: 300, null: false
+    t.text "description"
+    t.integer "max_position_size", default: 15, null: false
+    t.integer "max_signals_per_hour", default: 10, null: false
+    t.decimal "min_confidence_threshold", precision: 6, scale: 2, default: "60.0", null: false
+    t.integer "min_position_size", default: 5, null: false
+    t.string "name", null: false
+    t.decimal "risk_fraction", precision: 10, scale: 6, default: "0.02", null: false
+    t.decimal "sl_target", precision: 10, scale: 6, default: "0.004", null: false
+    t.decimal "tp_target", precision: 10, scale: 6, default: "0.006", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower(name)", name: "index_trading_profiles_on_lower_name", unique: true
+    t.index ["active"], name: "index_trading_profiles_one_active", unique: true, where: "active IS TRUE"
   end
 
   add_foreign_key "chat_messages", "chat_sessions"
