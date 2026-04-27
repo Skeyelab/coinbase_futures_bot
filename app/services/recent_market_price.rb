@@ -8,23 +8,17 @@ class RecentMarketPrice
   end
 
   def self.recent_tick_price(product_id)
-    recent_tick = Tick.where(product_id: product_id)
+    Tick.where(product_id: product_id)
+      .where("observed_at > ?", STALE_AFTER.ago)
       .order(observed_at: :desc)
-      .first
-
-    return unless recent_tick && recent_tick.observed_at > STALE_AFTER.ago
-
-    recent_tick.price
+      .pick(:price)
   end
 
   def self.recent_one_minute_candle_price(product_id)
-    recent_candle = Candle.for_symbol(product_id)
+    Candle.for_symbol(product_id)
       .one_minute
+      .where("timestamp > ?", STALE_AFTER.ago)
       .order(timestamp: :desc)
-      .first
-
-    return unless recent_candle && recent_candle.timestamp > STALE_AFTER.ago
-
-    recent_candle.close
+      .pick(:close)
   end
 end
