@@ -172,6 +172,58 @@ RSpec.describe TuiDashboard do
       expect(mock_rec).to have_received(:reconcile!)
       expect(dash.instance_variable_get(:@flash_level)).to eq(:ok)
     end
+
+    context "halt toggle (h key)" do
+      let(:halt_dash) do
+        described_class.new(refresh_interval: 5, output: output)
+      end
+
+      before do
+        allow(halt_dash).to receive(:bump_dashboard)
+        allow(output).to receive(:tty?).and_return(true)
+        allow(halt_dash).to receive(:with_cooked_stdin).and_yield
+      end
+
+      it "halts trading when active and user confirms" do
+        allow(TradingHalt).to receive(:halted?).and_return(false)
+        allow($stdin).to receive(:gets).and_return("yes\n", "\n")
+        expect(TradingHalt).to receive(:halt!)
+        halt_dash.handle_keypress("h")
+        expect(halt_dash.instance_variable_get(:@flash_level)).to eq(:error)
+        expect(halt_dash.instance_variable_get(:@flash_text)).to include("HALTED")
+      end
+
+      it "resumes trading when halted and user confirms" do
+        allow(TradingHalt).to receive(:halted?).and_return(true)
+        allow($stdin).to receive(:gets).and_return("yes\n")
+        expect(TradingHalt).to receive(:resume!)
+        halt_dash.handle_keypress("h")
+        expect(halt_dash.instance_variable_get(:@flash_level)).to eq(:ok)
+        expect(halt_dash.instance_variable_get(:@flash_text)).to include("RESUMED")
+      end
+
+      it "cancels when user does not type yes" do
+        allow(TradingHalt).to receive(:halted?).and_return(false)
+        allow($stdin).to receive(:gets).and_return("no\n")
+        expect(TradingHalt).not_to receive(:halt!)
+        halt_dash.handle_keypress("h")
+        expect(halt_dash.instance_variable_get(:@flash_level)).to eq(:warn)
+      end
+
+      it "responds to H as well" do
+        allow(TradingHalt).to receive(:halted?).and_return(true)
+        allow($stdin).to receive(:gets).and_return("yes\n")
+        allow(TradingHalt).to receive(:resume!)
+        halt_dash.handle_keypress("H")
+        expect(halt_dash.instance_variable_get(:@flash_level)).to eq(:ok)
+      end
+
+      it "sets warn flash when not a TTY" do
+        allow(output).to receive(:tty?).and_return(false)
+        halt_dash.handle_keypress("h")
+        expect(halt_dash.instance_variable_get(:@flash_level)).to eq(:warn)
+      end
+    end
   end
 
   # ── refresh_data ──────────────────────────────────────────────────────────────
@@ -241,6 +293,12 @@ RSpec.describe TuiDashboard do
         dashboard.refresh_data
         expect(dashboard.instance_variable_get(:@error)).to be_nil
       end
+
+      it "populates last_signal_eval_at from most recent signal alert" do
+        alert = create(:signal_alert)
+        dashboard.refresh_data
+        expect(dashboard.instance_variable_get(:@data)[:last_signal_eval_at]).to be_within(1.second).of(alert.alert_timestamp)
+      end
     end
 
     context "when the database raises" do
@@ -272,6 +330,7 @@ RSpec.describe TuiDashboard do
       expect(output.string).to include("[i]mport")
       expect(output.string).to include("[c]lose")
       expect(output.string).to include("[o]reconcile")
+      expect(output.string).to include("[h]alt")
       expect(output.string).to include("[↑/↓ speed]")
       expect(output.string).to include("[←/→ toggle]")
     end
@@ -284,6 +343,24 @@ RSpec.describe TuiDashboard do
     it "outputs Coinbase connectivity status" do
       dashboard.render
       expect(output.string).to include("Coinbase:")
+    end
+
+    it "outputs Trading halt status in status row" do
+      allow(TradingHalt).to receive(:halted?).and_return(false)
+      dashboard.render
+      expect(output.string).to include("Trading:")
+      expect(output.string).to include("ACTIVE")
+    end
+
+    it "shows HALTED in status row when trading is halted" do
+      allow(TradingHalt).to receive(:halted?).and_return(true)
+      dashboard.render
+      expect(output.string).to include("HALTED")
+    end
+
+    it "outputs signal eval status in status row" do
+      dashboard.render
+      expect(output.string).to include("Eval:")
     end
 
     it "outputs the Open Positions section when show_positions=true" do
