@@ -486,4 +486,25 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
       end
     end
   end
+
+  describe "kill switch guard on #consider_entry" do
+    before do
+      allow(contract_manager).to receive(:rollover_needed?).and_return(false)
+      allow(contract_manager).to receive(:best_available_contract).and_return(nil)
+    end
+
+    it "raises TradingHalt::HaltedError when trading is halted" do
+      allow(TradingHalt).to receive(:assert_active!).and_raise(TradingHalt::HaltedError, "Trading is halted")
+      expect { executor.consider_entry(spot_price: 50_000.0, futures_product_id: "BIT-29AUG25-CDE") }
+        .to raise_error(TradingHalt::HaltedError)
+    end
+
+    it "proceeds when trading is active" do
+      allow(TradingHalt).to receive(:assert_active!)
+      allow(contract_manager).to receive(:rollover_needed?).and_return(false)
+      allow(executor).to receive(:resolve_trading_contract).and_return(nil)
+      expect { executor.consider_entry(spot_price: 50_000.0, futures_product_id: "BIT-29AUG25-CDE") }
+        .not_to raise_error
+    end
+  end
 end

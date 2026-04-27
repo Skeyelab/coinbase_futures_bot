@@ -158,6 +158,37 @@ module Cli
       puts "─" * 72
     end
 
+    # ─── halt ───────────────────────────────────────────────────────────────────
+    desc "halt", "Halt all trading immediately (kill switch)"
+    method_option :reason, aliases: "-r", type: :string, desc: "Reason for the halt"
+    def halt
+      status = TradingHalt.halt!(reason: options[:reason])
+      puts "#{RED}#{BOLD}🔴 Trading HALTED#{RESET}"
+      puts "   Reason : #{status[:reason] || "(none)"}"
+      puts "   As of  : #{status[:as_of]}"
+    end
+
+    # ─── resume ─────────────────────────────────────────────────────────────────
+    desc "resume", "Resume trading after a halt"
+    def resume
+      status = TradingHalt.resume!
+      puts "#{GREEN}#{BOLD}🟢 Trading RESUMED#{RESET}"
+      puts "   As of : #{status[:as_of]}"
+    end
+
+    # ─── halt_status ────────────────────────────────────────────────────────────
+    desc "halt_status", "Show current trading halt / kill-switch status"
+    def halt_status
+      s = TradingHalt.status
+      if s[:active]
+        puts "#{GREEN}#{BOLD}🟢 Trading is ACTIVE#{RESET}"
+      else
+        puts "#{RED}#{BOLD}🔴 Trading is HALTED#{RESET}"
+        puts "   Reason : #{s[:reason] || "(none)"}"
+      end
+      puts "   As of  : #{s[:as_of]}"
+    end
+
     # ─── version ────────────────────────────────────────────────────────────────
     desc "version", "Show FuturesBot version information"
     def version
