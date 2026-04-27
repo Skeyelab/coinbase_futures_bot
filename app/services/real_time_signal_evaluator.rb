@@ -7,19 +7,19 @@ class RealTimeSignalEvaluator
 
   def initialize(logger: Rails.logger)
     @logger = logger
-    @strategies = load_strategies
     @last_evaluation = {}
 
     config = Rails.application.config.real_time_signals
     @evaluation_interval = config[:evaluation_interval].seconds
-    @min_confidence_threshold = config[:min_confidence_threshold]
-    @deduplication_window = config[:deduplication_window]
-    @max_signals_per_hour = config[:max_signals_per_hour]
+
+    refresh_profile_settings
   end
 
   # Evaluate all enabled trading pairs for signals
   def evaluate_all_pairs
     return unless should_evaluate?
+
+    refresh_profile_settings
 
     enabled_pairs = TradingPair.enabled
 
@@ -84,7 +84,20 @@ class RealTimeSignalEvaluator
 
   private
 
-  def load_strategies
+  def refresh_profile_settings
+    profile = TradingProfile.effective
+    @min_confidence_threshold = profile.min_confidence_threshold.to_f
+    @deduplication_window = profile.deduplication_window
+    @max_signals_per_hour = profile.max_signals_per_hour
+
+    profile_key = [profile.id, profile.updated_at]
+    if profile_key != @cached_profile_key
+      @strategies = load_strategies(profile)
+      @cached_profile_key = profile_key
+    end
+  end
+
+  def load_strategies(profile = TradingProfile.effective)
     config = Rails.application.config.real_time_signals
     strategy_config = config[:strategies]["MultiTimeframeSignal"]
 
@@ -99,12 +112,12 @@ class RealTimeSignalEvaluator
         min_15m_candles: strategy_config[:min_15m_candles],
         min_5m_candles: strategy_config[:min_5m_candles],
         min_1m_candles: strategy_config[:min_1m_candles],
-        tp_target: strategy_config[:tp_target],
-        sl_target: strategy_config[:sl_target],
-        risk_fraction: strategy_config[:risk_fraction],
+        tp_target: profile.tp_target.to_f,
+        sl_target: profile.sl_target.to_f,
+        risk_fraction: profile.risk_fraction.to_f,
         contract_size_usd: strategy_config[:contract_size_usd],
-        max_position_size: strategy_config[:max_position_size],
-        min_position_size: strategy_config[:min_position_size]
+        max_position_size: profile.max_position_size,
+        min_position_size: profile.min_position_size
       )
     }
   end
