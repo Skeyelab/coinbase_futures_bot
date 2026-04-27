@@ -34,8 +34,8 @@ module Cli
 
     # ─── dashboard ──────────────────────────────────────────────────────────────
     desc "dashboard", "Launch the real-time full-screen TUI dashboard (keys: [i]mport, [c]lose, [o]reconcile)"
-    method_option :refresh, aliases: "-i", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
-      desc: "Auto-refresh interval in seconds"
+    method_option :refresh, aliases: ["-r", "-i"], type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
+      desc: "Auto-refresh interval in seconds (-r preferred; -i kept for backwards compatibility)"
     def dashboard
       sync_startup_positions
       TuiDashboard.new(refresh_interval: options[:refresh]).start
