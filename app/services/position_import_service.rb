@@ -72,13 +72,8 @@ class PositionImportService
     # Skip if missing required data
     return {action: :skipped, reason: "Missing required data"} unless product_id && side && entry_price
 
-    # Convert Coinbase side to our format
-    position_side = case side.downcase
-    when "long", "buy" then "LONG"
-    when "short", "sell" then "SHORT"
-    else
-      return {action: :skipped, reason: "Unknown side: #{side}"}
-    end
+    position_side = SideNormalizer.position(side)
+    return {action: :skipped, reason: "Unknown side: #{side}"} unless position_side
 
     # Try to find existing position by product_id and side
     existing_position = Position.open

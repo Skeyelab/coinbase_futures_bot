@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "coinbase_futures_bot",
+  "project_id": "79fff943-0645-4ecc-91fa-6f504c2a8d48"
+}

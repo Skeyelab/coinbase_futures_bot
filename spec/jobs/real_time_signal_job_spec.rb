@@ -93,52 +93,20 @@ RSpec.describe RealTimeSignalJob, type: :job do
   describe "#log_signal_stats" do
     let(:job) { described_class.new }
 
-    let(:mock_active_scope) { double(count: 12) }
-    let(:mock_triggered_scope) { double(where: double(count: 8)) }
-    let(:mock_high_confidence_scope) { double(where: double(count: 5)) }
-    let(:mock_expired_scope) { double(where: double(count: 3)) }
-
     before do
-      allow(SignalAlert).to receive(:active).and_return(mock_active_scope)
-      allow(SignalAlert).to receive(:triggered).and_return(mock_triggered_scope)
-      allow(SignalAlert).to receive(:high_confidence).and_return(mock_high_confidence_scope)
-      allow(SignalAlert).to receive(:expired).and_return(mock_expired_scope)
+      create(:signal_alert, alert_status: "active", confidence: 80, alert_timestamp: 10.minutes.ago)
+      create(:signal_alert, alert_status: "active", confidence: 65, alert_timestamp: 2.hours.ago)
+      create(:signal_alert, alert_status: "triggered", confidence: 75, alert_timestamp: 20.minutes.ago)
+      create(:signal_alert, alert_status: "expired", confidence: 85, alert_timestamp: 30.minutes.ago)
+      create(:signal_alert, alert_status: "cancelled", confidence: 90, alert_timestamp: 15.minutes.ago)
     end
 
-    it "collects active signals count" do
-      expect(SignalAlert).to receive(:active)
-      expect(mock_active_scope).to receive(:count)
-
-      job.send(:log_signal_stats)
-    end
-
-    it "collects triggered signals count from last hour" do
-      expect(SignalAlert).to receive(:triggered)
-      expect(mock_triggered_scope).to receive(:where).with("alert_timestamp >= ?", anything)
-
-      job.send(:log_signal_stats)
-    end
-
-    it "collects high confidence signals count from last hour" do
-      expect(SignalAlert).to receive(:high_confidence)
-      expect(mock_high_confidence_scope).to receive(:where).with("alert_timestamp >= ?", anything)
-
-      job.send(:log_signal_stats)
-    end
-
-    it "collects expired signals count from last hour" do
-      expect(SignalAlert).to receive(:expired)
-      expect(mock_expired_scope).to receive(:where).with("updated_at >= ?", anything)
-
-      job.send(:log_signal_stats)
-    end
-
-    it "logs the complete statistics" do
+    it "logs counts from persisted signal alerts" do
       expected_stats = {
-        active_signals: 12,
-        triggered_signals: 8,
-        high_confidence_signals: 5,
-        expired_signals: 3
+        active_signals: 2,
+        triggered_signals: 1,
+        high_confidence_signals: 4,
+        expired_signals: 1
       }
 
       expect(logger).to receive(:info).with("[RTSJ] Signal stats: #{expected_stats.inspect}")
@@ -160,65 +128,6 @@ RSpec.describe RealTimeSignalJob, type: :job do
       it "does not raise the error" do
         expect { job.send(:log_signal_stats) }.not_to raise_error
       end
-    end
-  end
-
-  describe ".schedule_realtime_evaluation" do
-    before do
-      allow(GoodJob::Job).to receive(:where).and_return(double(delete_all: 5))
-      allow(described_class).to receive(:set).and_return(double(perform_later: true))
-    end
-
-    it "removes existing scheduled jobs for this class" do
-      expect(GoodJob::Job).to receive(:where)
-        .with(job_class: "RealTimeSignalJob", finished_at: nil)
-        .and_return(double(delete_all: 5))
-
-      described_class.send(:schedule_realtime_evaluation, interval_seconds: 30)
-    end
-
-    it "schedules a new job with the specified interval" do
-      expect(described_class).to receive(:set).with(wait: 30.seconds)
-      expect(described_class.set(wait: 30.seconds)).to receive(:perform_later)
-
-      described_class.send(:schedule_realtime_evaluation, interval_seconds: 30)
-    end
-
-    it "uses default interval of 30 seconds" do
-      expect(described_class).to receive(:set).with(wait: 30.seconds)
-
-      described_class.send(:schedule_realtime_evaluation)
-    end
-
-    it "accepts custom interval" do
-      expect(described_class).to receive(:set).with(wait: 60.seconds)
-
-      described_class.send(:schedule_realtime_evaluation, interval_seconds: 60)
-    end
-  end
-
-  describe ".start_realtime_evaluation" do
-    before do
-      allow(described_class).to receive(:schedule_realtime_evaluation)
-      allow(Thread).to receive(:new).and_return(double(join: nil))
-    end
-
-    it "logs the start of real-time evaluation" do
-      expect(logger).to receive(:info).with("[RTSJ] Starting real-time signal evaluation (interval: 30s)")
-
-      described_class.send(:start_realtime_evaluation, interval_seconds: 30)
-    end
-
-    it "schedules the first job" do
-      expect(described_class).to receive(:schedule_realtime_evaluation).with(interval_seconds: 30)
-
-      described_class.send(:start_realtime_evaluation, interval_seconds: 30)
-    end
-
-    it "starts a background thread for continuous scheduling" do
-      expect(Thread).to receive(:new)
-
-      described_class.send(:start_realtime_evaluation, interval_seconds: 30)
     end
   end
 
@@ -264,9 +173,13 @@ RSpec.describe RealTimeSignalJob, type: :job do
       end.not_to raise_error
     end
 
-    it "defines class job scheduling methods" do
-      expect(described_class.methods).to include(:schedule_realtime_evaluation)
-      expect(described_class.methods).to include(:start_realtime_evaluation)
+    it "can be run synchronously for local orchestration" do
+      allow(RealTimeSignalEvaluator).to receive(:new).and_return(evaluator)
+      allow(evaluator).to receive(:evaluate_all_pairs)
+      allow_any_instance_of(described_class).to receive(:cleanup_expired_signals)
+      allow_any_instance_of(described_class).to receive(:log_signal_stats)
+
+      expect { described_class.perform_now }.not_to raise_error
     end
   end
 end

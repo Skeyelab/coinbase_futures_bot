@@ -33,10 +33,11 @@ module Cli
     default_command :dashboard
 
     # ─── dashboard ──────────────────────────────────────────────────────────────
-    desc "dashboard", "Launch the real-time full-screen TUI dashboard"
-    method_option :refresh, aliases: "-i", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
-      desc: "Auto-refresh interval in seconds"
+    desc "dashboard", "Launch the real-time full-screen TUI dashboard (keys: [i]mport, [c]lose, [o]reconcile)"
+    method_option :refresh, aliases: ["-r", "-i"], type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
+      desc: "Auto-refresh interval in seconds (-r preferred; -i kept for backwards compatibility)"
     def dashboard
+      sync_startup_positions
       TuiDashboard.new(refresh_interval: options[:refresh]).start
     end
 
@@ -48,6 +49,7 @@ module Cli
       desc: "Resume a specific session by ID"
     def chat
       print_banner
+      sync_startup_positions
 
       session_id = resolve_session_id(options)
       bot = ChatBotService.new(session_id)
@@ -165,6 +167,16 @@ module Cli
     end
 
     private
+
+    def sync_startup_positions
+      result = StartupPositionSync.new.call
+      return unless $stdout.tty?
+      return if result.status == :skipped
+
+      color = (result.status == :ok) ? GREEN : YELLOW
+      icon = (result.status == :ok) ? "✓" : "⚠"
+      puts "#{color}#{icon}#{RESET} #{result.message}\n"
+    end
 
     # ── Session helpers ─────────────────────────────────────────────────────────
 

@@ -26,6 +26,167 @@
 
 ### Session log
 
+#### 2026-04-27 05:24 UTC
+- Context: Reduced mock-heavy realtime specs by replacing relation doubles with real records where cheap.
+- Changes:
+  - Updated `spec/jobs/real_time_signal_job_spec.rb` to verify signal-stat logging from persisted `SignalAlert` rows instead of chained scope doubles.
+  - Updated `spec/lib/tasks/realtime_signals_rake_spec.rb` stats/cleanup/cancel coverage to use real `SignalAlert` data and captured stdout instead of mocked relations and `Kernel.puts` expectations.
+- Commands run:
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bin/standardrb --fix spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+- Files touched:
+  - `spec/jobs/real_time_signal_job_spec.rb`, `spec/lib/tasks/realtime_signals_rake_spec.rb`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - Continue the same treatment on other heavy `receive_message_chain` specs if desired.
+
+#### 2026-04-27 05:16 UTC
+- Context: Full suite validation after refactors exposed two spec regressions and one flaky scope assertion.
+- Changes:
+  - Updated `spec/jobs/health_check_job_spec.rb` and `spec/jobs/health_check_job_enhanced_spec.rb` logger doubles to allow debug logging from Coinbase clients used during health checks.
+  - Fixed `spec/models/chat_message_spec.rb` to scope the relevance-order assertion to records created in that example, eliminating cross-test flakiness under parallel execution.
+  - Re-ran the full parallel RSpec suite successfully.
+- Commands run:
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec parallel_rspec'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/jobs/health_check_job_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/jobs/health_check_job_enhanced_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/models/chat_message_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec parallel_rspec'`
+- Files touched:
+  - `spec/jobs/health_check_job_spec.rb`, `spec/jobs/health_check_job_enhanced_spec.rb`, `spec/models/chat_message_spec.rb`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - Full suite is green; optional follow-up is cleaning the repeated `stringio` gem ambiguity warning in the Ruby environment.
+
+#### 2026-04-27 05:08 UTC
+- Context: Finished remaining refactors for CLI startup sync, side normalization, and test noise reduction.
+- Changes:
+  - Added `StartupPositionSync` and moved Coinbase startup sync behavior out of `Cli::FuturesBotCli`, keeping skip/error handling behind one service.
+  - Added `SideNormalizer` and reused it from position import, reconciliation, Coinbase position handling, and entry signal creation.
+  - Normalized `SignalAlert.create_entry_signal!` buy/sell inputs to long/short while keeping existing model compatibility.
+  - Trimmed noisy `spec/rails_helper.rb` startup output by removing unconditional TestProf debug prints and duplicate support loading.
+  - Added focused specs for startup sync and side normalization; updated CLI and signal alert specs.
+- Commands run:
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/services/startup_position_sync_spec.rb spec/services/side_normalizer_spec.rb spec/lib/cli/futures_bot_cli_spec.rb spec/models/signal_alert_spec.rb spec/services/coinbase_positions_spec.rb spec/services/position_reconcile_service_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/services/startup_position_sync_spec.rb spec/models/signal_alert_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/services/startup_position_sync_spec.rb spec/services/side_normalizer_spec.rb spec/lib/cli/futures_bot_cli_spec.rb spec/models/signal_alert_spec.rb spec/services/coinbase_positions_spec.rb spec/services/position_reconcile_service_spec.rb --format progress'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bin/standardrb --fix app/services/startup_position_sync.rb app/services/side_normalizer.rb app/services/position_import_service.rb app/services/position_reconcile_service.rb app/services/trading/coinbase_positions.rb app/models/signal_alert.rb lib/cli/futures_bot_cli.rb spec/services/startup_position_sync_spec.rb spec/services/side_normalizer_spec.rb spec/lib/cli/futures_bot_cli_spec.rb spec/models/signal_alert_spec.rb spec/rails_helper.rb'`
+- Files touched:
+  - `app/services/startup_position_sync.rb`, `app/services/side_normalizer.rb`, `app/services/position_import_service.rb`, `app/services/position_reconcile_service.rb`, `app/services/trading/coinbase_positions.rb`, `app/models/signal_alert.rb`, `lib/cli/futures_bot_cli.rb`, `spec/services/startup_position_sync_spec.rb`, `spec/services/side_normalizer_spec.rb`, `spec/lib/cli/futures_bot_cli_spec.rb`, `spec/models/signal_alert_spec.rb`, `spec/rails_helper.rb`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - If desired, tighten signal-side conventions further by converting remaining buy/sell consumers to long/short-only at the API boundary.
+
+#### 2026-04-27 04:42 UTC
+- Context: Refactor 2 simplified realtime orchestration to one in-process scheduling model.
+- Changes:
+  - Added `RealtimeSignalRunner` to own interval timing and synchronous `RealTimeSignalJob.perform_now` execution.
+  - Removed self-scheduling/thread-spawning class methods from `RealTimeSignalJob`; the job now only performs a single evaluation pass.
+  - Updated realtime rake tasks to build and tick the runner instead of asking the job to schedule itself.
+  - Reworked realtime specs to cover the runner and the new rake-task integration.
+- Commands run:
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && ruby -v && bundle exec rspec spec/services/realtime_signal_runner_spec.rb spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bin/standardrb --fix app/services/realtime_signal_runner.rb app/jobs/real_time_signal_job.rb lib/tasks/realtime_signals.rake spec/services/realtime_signal_runner_spec.rb spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+  - `bash --login -lc 'source /home/skeyelab/.rvm/scripts/rvm && rvm use ruby-3.2.4@coinbase_futures_bot >/dev/null && bundle exec rspec spec/services/realtime_signal_runner_spec.rb spec/jobs/real_time_signal_job_spec.rb spec/lib/tasks/realtime_signals_rake_spec.rb'`
+- Files touched:
+  - `app/services/realtime_signal_runner.rb`, `app/jobs/real_time_signal_job.rb`, `lib/tasks/realtime_signals.rake`, `spec/services/realtime_signal_runner_spec.rb`, `spec/jobs/real_time_signal_job_spec.rb`, `spec/lib/tasks/realtime_signals_rake_spec.rb`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - Continue with refactor 3: move Coinbase startup sync side effects out of CLI entrypoints.
+
+#### 2026-04-27 04:33 UTC
+- Context: Refactor 1 extracted shared recent market price lookup used by positions and trading services.
+- Changes:
+  - Added `RecentMarketPrice.for_product` to centralize tick-then-1m-candle lookup with a 5-minute freshness window.
+  - Updated `Position`, `Trading::CoinbasePositions`, and `Trading::DayTradingPositionManager` to reuse the shared lookup while preserving existing nil/entry-price fallback behavior.
+  - Added focused spec coverage for the shared lookup service.
+- Commands run:
+  - `bundle exec rspec spec/services/recent_market_price_spec.rb`
+  - `bundle exec rspec spec/services/recent_market_price_spec.rb spec/models/position_expiry_spec.rb`
+  - `bundle exec rspec spec/services/recent_market_price_spec.rb spec/services/trading/coinbase_positions_integration_spec.rb`
+  - `bundle exec rspec spec/services/trading/day_trading_position_manager_spec.rb`
+  - `ruby -c /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/recent_market_price.rb && ruby -c /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/models/position.rb && ruby -c /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/trading/coinbase_positions.rb && ruby -c /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/trading/day_trading_position_manager.rb && ruby -c /home/skeyelab/Documents/GitHub/coinbase_futures_bot/spec/services/recent_market_price_spec.rb`
+  - `bin/standardrb --fix /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/recent_market_price.rb /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/models/position.rb /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/trading/coinbase_positions.rb /home/skeyelab/Documents/GitHub/coinbase_futures_bot/app/services/trading/day_trading_position_manager.rb /home/skeyelab/Documents/GitHub/coinbase_futures_bot/spec/services/recent_market_price_spec.rb`
+- Files touched:
+  - `app/services/recent_market_price.rb`, `app/models/position.rb`, `app/services/trading/coinbase_positions.rb`, `app/services/trading/day_trading_position_manager.rb`, `spec/services/recent_market_price_spec.rb`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - Rebuild native gems in `vendor/bundle` so RSpec/StandardRB can run normally, then continue to realtime orchestration refactor.
+
+#### 2026-04-27 04:23 UTC
+- Context: Added repository-specific agent guidance for future coding sessions.
+- Changes:
+  - Created `AGENTS.md` with verified commands, architecture notes, test/lint workflow, and repository gotchas.
+  - Documented non-obvious behaviors including startup position sync, VCR strictness, realtime orchestration, and risky helper scripts.
+- Commands run:
+  - `bundle exec rspec spec/services/position_reconcile_service_spec.rb`
+- Files touched:
+  - `AGENTS.md`, `SESSION_NOTES.md`
+- Migrations:
+  - None
+- Next steps:
+  - Rebuild native gems in `vendor/bundle` before running Ruby test commands in this environment.
+
+#### 2026-04-25 22:00 UTC
+- Context: TUI arrow-key shortcuts and hint line for refresh/section toggles.
+- Changes:
+  - `KEY_ACTIONS`: `\e[A`/`\e[B` faster/slower refresh; `\e[D`/`\e[C` toggle positions/signals.
+  - Header hint includes `[↑/↓ speed]` and `[←/→ toggle]`; specs assert mappings and hint text.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb --format progress`
+  - `bin/standardrb --fix lib/cli/tui_dashboard.rb spec/lib/cli/tui_dashboard_spec.rb`
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `SESSION_NOTES.md`
+
+#### 2026-04-25 17:30 UTC
+- Context: TUI exited on mouse wheel/arrow escape sequences because `Esc` was interpreted as immediate quit.
+- Changes:
+  - `Cli::TuiDashboard#run_interactive` now reads key input through `read_keypress`.
+  - Added `read_keypress` to consume multi-byte escape sequences; only lone `Esc` maps to quit.
+  - Added specs for lone `Esc` and buffered escape sequences (scroll/arrow style input).
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb --format documentation`
+  - `bin/standardrb --fix lib/cli/tui_dashboard.rb spec/lib/cli/tui_dashboard_spec.rb`
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - (Done in 2026-04-25 22:00 UTC entry) Arrow keys mapped; extend if more terminals need alternate sequences.
+
+#### 2026-04-24 18:30 UTC
+- Context: TUI dashboard position management (plan: import, close, reconcile).
+- Changes:
+  - `Cli::TuiDashboard`: keys `[i]` sync via `PositionImportService`, `[c]` market-close prompt (cooked stdin) via `Trading::CoinbasePositions#close_position`, `[o]` reconcile after typing `yes` via new `PositionReconcileService`.
+  - Transient flash line in render; optional DI `position_import_service`, `positions_service`, `reconcile_service` for tests.
+  - `PositionReconcileService`: marks local `OPEN` absent from Coinbase futures snapshot as `CLOSED` (`force_close!`); specs for TUI + service.
+  - `FuturesBotCli` dashboard desc notes TUI keys.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/tui_dashboard_spec.rb spec/services/position_reconcile_service_spec.rb`
+  - `bin/standardrb --fix` on touched Ruby files
+- Files touched:
+  - `lib/cli/tui_dashboard.rb`, `app/services/position_reconcile_service.rb`, `spec/lib/cli/tui_dashboard_spec.rb`, `spec/services/position_reconcile_service_spec.rb`, `lib/cli/futures_bot_cli.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - PR / `parallel_rspec` before merge if required.
+
+#### 2026-04-24 12:00 UTC
+- Context: CLI (`bin/futuresbot`) should align local `Position` rows with Coinbase when the interactive bot starts.
+- Changes:
+  - `dashboard` (default) and `chat` call `PositionImportService#import_positions_from_coinbase` before the TUI or chat loop; failures are logged and shown as a warning without aborting.
+  - Opt-out: `FUTURESBOT_SKIP_POSITION_SYNC=1` (documented in `bin/futuresbot`).
+  - Specs stub import in dashboard/chat; added ordered sync test and skip-env test.
+- Commands run:
+  - `bundle exec rspec spec/lib/cli/futures_bot_cli_spec.rb`
+  - `bin/standardrb --fix lib/cli/futures_bot_cli.rb spec/lib/cli/futures_bot_cli_spec.rb`
+- Files touched:
+  - `lib/cli/futures_bot_cli.rb`, `spec/lib/cli/futures_bot_cli_spec.rb`, `bin/futuresbot`, `SESSION_NOTES.md`
+- Next steps:
+  - Open PR from feature branch; full `parallel_rspec` if desired before merge.
+
 #### 2024-12-19 21:15 UTC
 - Context: Added comprehensive market analysis functionality to chat bot
 - Changes:

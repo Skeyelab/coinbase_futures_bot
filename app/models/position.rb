@@ -128,25 +128,9 @@ class Position < ApplicationRecord
   end
 
   def get_current_market_price
-    # Try to get current price from recent market data
-    # First try recent ticks
-    recent_tick = Tick.where(product_id: product_id)
-      .order(observed_at: :desc)
-      .first
-
-    return recent_tick.price if recent_tick && recent_tick.observed_at > 5.minutes.ago
-
-    # Fall back to most recent 1-minute candle
-    recent_candle = Candle.for_symbol(product_id)
-      .one_minute
-      .order(timestamp: :desc)
-      .first
-
-    return recent_candle.close if recent_candle && recent_candle.timestamp > 5.minutes.ago
-
-    # If no recent data, log warning and return nil
-    Rails.logger.warn("No recent price data for #{product_id}")
-    nil
+    RecentMarketPrice.for_product(product_id).tap do |price|
+      Rails.logger.warn("No recent price data for #{product_id}") unless price
+    end
   end
 
   def calculate_pnl(current_price)

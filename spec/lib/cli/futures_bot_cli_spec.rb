@@ -2,6 +2,7 @@
 
 require "rails_helper"
 require "thor"
+require "climate_control"
 require_relative "../../../lib/cli/futures_bot_cli"
 
 RSpec.describe FuturesBotCli, type: :model do
@@ -16,18 +17,58 @@ RSpec.describe FuturesBotCli, type: :model do
   # ── dashboard ────────────────────────────────────────────────────────────────
 
   describe "#dashboard" do
-    it "delegates to TuiDashboard#start" do
-      mock_tui = instance_double(TuiDashboard)
-      expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
-      expect(mock_tui).to receive(:start)
-      run_cli("dashboard")
+    context "with startup position sync" do
+      let(:startup_sync) { instance_double(StartupPositionSync) }
+      let(:sync_result) do
+        StartupPositionSync::Result.new(
+          status: :ok,
+          message: "Positions synced from Coinbase (0 new, 1 updated, 1 on exchange)"
+        )
+      end
+
+      before do
+        allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+        allow(startup_sync).to receive(:call).and_return(sync_result)
+      end
+
+      it "delegates to TuiDashboard#start" do
+        mock_tui = instance_double(TuiDashboard)
+        expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
+        expect(mock_tui).to receive(:start)
+        run_cli("dashboard")
+      end
+
+      it "syncs positions from Coinbase before starting the dashboard" do
+        mock_tui = instance_double(TuiDashboard)
+        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
+        allow(mock_tui).to receive(:start)
+        expect(startup_sync).to receive(:call).ordered
+        expect(mock_tui).to receive(:start).ordered
+        run_cli("dashboard")
+      end
+
+      it "passes a custom --refresh interval through" do
+        mock_tui = instance_double(TuiDashboard)
+        expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
+        expect(mock_tui).to receive(:start)
+        run_cli("dashboard", "--refresh", "10")
+      end
     end
 
-    it "passes a custom --refresh interval through" do
-      mock_tui = instance_double(TuiDashboard)
-      expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
-      expect(mock_tui).to receive(:start)
-      run_cli("dashboard", "--refresh", "10")
+    context "when FUTURESBOT_SKIP_POSITION_SYNC is set" do
+      it "still delegates sync skipping to StartupPositionSync" do
+        mock_tui = instance_double(TuiDashboard)
+        startup_sync = instance_double(StartupPositionSync)
+        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
+        allow(mock_tui).to receive(:start)
+        allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+        allow(startup_sync).to receive(:call).and_return(StartupPositionSync::Result.new(status: :skipped))
+
+        ClimateControl.modify(FUTURESBOT_SKIP_POSITION_SYNC: "1") do
+          expect(startup_sync).to receive(:call)
+          run_cli("dashboard")
+        end
+      end
     end
   end
 
@@ -247,8 +288,12 @@ RSpec.describe FuturesBotCli, type: :model do
   describe "#chat" do
     let(:session_id) { "test-session-abc" }
     let(:bot) { instance_double(ChatBotService) }
+    let(:startup_sync) { instance_double(StartupPositionSync) }
+    let(:sync_result) { StartupPositionSync::Result.new(status: :ok, message: "Positions synced from Coinbase (0 new, 0 updated, 0 on exchange)") }
 
     before do
+      allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
+      allow(startup_sync).to receive(:call).and_return(sync_result)
       allow(SecureRandom).to receive(:uuid).and_return(session_id)
       allow(ChatBotService).to receive(:new).with(session_id).and_return(bot)
       allow(bot).to receive(:process).and_return("✅ Command processed")
@@ -261,6 +306,12 @@ RSpec.describe FuturesBotCli, type: :model do
       allow(Signal).to receive(:trap)
       allow($stdout).to receive(:puts)
       allow($stdout).to receive(:print)
+    end
+
+    it "syncs positions from Coinbase after the banner" do
+      allow($stdin).to receive(:gets).and_return("quit\n")
+      expect(startup_sync).to receive(:call)
+      run_cli("chat")
     end
 
     it "exits cleanly on 'quit'" do

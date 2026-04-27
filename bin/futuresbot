@@ -10,6 +10,9 @@
 #   bin/futuresbot status
 #   bin/futuresbot positions
 #   bin/futuresbot signals
+#
+# On `dashboard` (default) and `chat`, positions are synced from Coinbase first.
+# Set FUTURESBOT_SKIP_POSITION_SYNC=1 to skip (e.g. CI or offline use).
 
 APP_PATH = File.expand_path("../config/application", __dir__)
 require_relative "../config/boot"
