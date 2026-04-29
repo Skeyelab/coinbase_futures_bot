@@ -917,13 +917,13 @@ class MarketAnalysisService
       .order(alert_timestamp: :desc)
       .limit(5)
       .map do |signal|
-      {
-        side: signal.side,
-        confidence: signal.confidence,
-        strategy: signal.strategy_name,
-        timestamp: signal.alert_timestamp,
-        type: signal.signal_type
-      }
+        {
+          side: signal.side,
+          confidence: signal.confidence,
+          strategy: signal.strategy_name,
+          timestamp: signal.alert_timestamp,
+          type: signal.signal_type
+        }
     end
   end
 

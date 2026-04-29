@@ -281,4 +281,25 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
       expect(position.day_trading).to be false
     end
   end
+
+  describe "kill switch guard" do
+    before do
+      allow(TradingHalt).to receive(:assert_active!).and_raise(TradingHalt::HaltedError, "Trading is halted")
+    end
+
+    it "raises HaltedError on open_position when halted" do
+      expect { service.open_position(product_id: product_id, side: "BUY", size: 1) }
+        .to raise_error(TradingHalt::HaltedError)
+    end
+
+    it "raises HaltedError on close_position when halted" do
+      expect { service.close_position(product_id: product_id) }
+        .to raise_error(TradingHalt::HaltedError)
+    end
+
+    it "raises HaltedError on increase_position when halted" do
+      expect { service.increase_position(product_id: product_id, size: 1) }
+        .to raise_error(TradingHalt::HaltedError)
+    end
+  end
 end

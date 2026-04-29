@@ -11,6 +11,10 @@ module Trading
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
+      @trailing_stop_runner = Trading::TrailingStop::Runner.new(
+        logger: logger,
+        positions_service: @positions_service
+      )
       @config = Rails.application.config.swing_trading_config || default_config
     end
 
@@ -110,11 +114,18 @@ module Trading
 
     # Close positions that hit TP/SL
     def close_tp_sl_positions
+      closed_count = 0
+      trailing_result = @trailing_stop_runner.close_triggered_positions(positions: Position.swing_trading.open)
+      closed_count += trailing_result[:closed_count]
+
       triggered_positions = check_swing_tp_sl_triggers
-      return 0 if triggered_positions.empty?
+      triggered_positions = triggered_positions.reject do |trigger_data|
+        trailing_result[:processed_ids].include?(trigger_data[:position].id) ||
+          (trigger_data[:trigger] == "stop_loss" && trigger_data[:position].trailing_stop_enabled)
+      end
+      return closed_count if triggered_positions.empty?
 
       @logger.info("Closing #{triggered_positions.size} swing positions that hit TP/SL")
-      closed_count = 0
 
       triggered_positions.each do |trigger_data|
         position = trigger_data[:position]

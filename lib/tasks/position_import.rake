@@ -92,4 +92,62 @@ namespace :positions do
       exit 1
     end
   end
+
+  desc "Deep diagnostic: inspect Coinbase position-bearing endpoints"
+  task diagnose_endpoints: :environment do
+    puts "🔎 Diagnosing Coinbase position endpoints..."
+
+    client = Coinbase::Client.new
+    advanced = client.advanced_trade
+
+    auth_status = client.auth_status
+    puts "   Auth status: advanced_trade=#{auth_status[:advanced_trade]} exchange=#{auth_status[:exchange]}"
+
+    permissions = begin
+      advanced.get_api_key_permissions
+    rescue => e
+      {"error" => "#{e.class}: #{e.message}"}
+    end
+    puts "   Key permissions: #{permissions}"
+
+    futures_positions = begin
+      advanced.list_futures_positions
+    rescue => e
+      puts "❌ futures positions call failed: #{e.class}: #{e.message}"
+      []
+    end
+    puts "   Futures positions count: #{futures_positions.size}"
+    if futures_positions.any?
+      puts "   Futures positions sample:"
+      futures_positions.first(3).each do |pos|
+        puts "      • #{pos.slice("product_id", "side", "number_of_contracts", "avg_entry_price", "portfolio_uuid")}"
+      end
+    end
+
+    accounts = begin
+      advanced.get_accounts
+    rescue => e
+      puts "❌ accounts call failed: #{e.class}: #{e.message}"
+      {}
+    end
+    account_list = accounts.is_a?(Hash) ? accounts["accounts"] || [] : Array(accounts)
+    puts "   Accounts count: #{account_list.size}"
+
+    non_zero_accounts = account_list.select do |acct|
+      raw = acct.dig("available_balance", "value") || acct.dig("balance", "value")
+      raw.to_f > 0
+    end
+    puts "   Accounts with non-zero balance: #{non_zero_accounts.size}"
+    non_zero_accounts.first(5).each do |acct|
+      puts "      • #{acct.slice("name", "uuid", "type", "currency")}"
+    end
+
+    balance_summary = begin
+      advanced.get_futures_balance_summary
+    rescue => e
+      {"error" => "#{e.class}: #{e.message}"}
+    end
+    puts "   Futures balance summary keys: #{balance_summary.is_a?(Hash) ? balance_summary.keys : balance_summary.class}"
+    puts "   Futures balance summary sample: #{balance_summary}"
+  end
 end

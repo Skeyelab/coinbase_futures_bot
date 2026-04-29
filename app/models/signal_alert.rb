@@ -37,12 +37,9 @@ class SignalAlert < ApplicationRecord
     return nil if side.nil?
 
     s = side.to_s.downcase
-    case s
-    when "buy", "long" then "long"
-    when "sell", "short" then "short"
-    when "unknown" then "unknown"
-    else s
-    end
+    return "unknown" if s == "unknown"
+
+    SideNormalizer.signal(side) || s
   end
 
   # Match duplicates across legacy rows that still used buy/sell.
@@ -174,13 +171,12 @@ class SignalAlert < ApplicationRecord
     end
   end
 
-  def self.determine_exit_side(signal_type)
-    case signal_type
-    when "stop_loss", "take_profit"
-      # For exit signals, side depends on original position
-      # This would need to be determined from position context
-    end
+  def self.determine_exit_side(_signal_type)
     "unknown"
+  end
+
+  def self.normalized_entry_side(side)
+    normalize_side_value(side)
   end
 
   private

@@ -8,6 +8,7 @@ RSpec.describe HealthCheckJob, type: :job do
 
   before do
     allow(Rails).to receive(:logger).and_return(logger)
+    allow(logger).to receive(:debug)
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
     allow(logger).to receive(:error)

@@ -126,7 +126,8 @@ RSpec.describe ChatMessage, type: :model do
 
     describe ".by_relevance" do
       it "orders by relevance_score desc" do
-        expect(ChatMessage.by_relevance.limit(2)).to eq([high_relevance_message, low_relevance_message])
+        messages = ChatMessage.where(id: [high_relevance_message.id, low_relevance_message.id]).by_relevance
+        expect(messages).to eq([high_relevance_message, low_relevance_message])
       end
     end
   end

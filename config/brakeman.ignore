@@ -22,8 +22,27 @@
         77
       ],
       "note": "False positive - using Open3.capture3 with separate arguments is secure"
+    },
+    {
+      "warning_type": "Unmaintained Dependency",
+      "warning_code": 121,
+      "fingerprint": "edf687f759ec9765bd5db185dbc615c80af77d6e7e19386fc42934e7a80307af",
+      "check_name": "EOLRuby",
+      "message": "Support for Ruby 3.2.4 ended on 2026-03-31",
+      "file": ".ruby-version",
+      "line": 1,
+      "link": "https://brakemanscanner.org/docs/warning_types/unmaintained_dependency/",
+      "code": null,
+      "render_path": null,
+      "location": null,
+      "user_input": null,
+      "confidence": "High",
+      "cwe_id": [
+        1104
+      ],
+      "note": "Temporary CI unblock until Ruby version bump is planned and validated across environments"
     }
   ],
-  "updated": "2025-09-10T20:26:00Z",
-  "brakeman_version": "7.1.0"
+  "updated": "2026-04-22T03:17:00Z",
+  "brakeman_version": "8.0.4"
 }

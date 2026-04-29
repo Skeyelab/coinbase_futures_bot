@@ -46,6 +46,33 @@ RSpec.describe MarketData::CoinbaseSpotSubscriber, type: :service do
     expect(io.read).to include("[MD-Spot] ticker:")
   end
 
+  it "falls back to message timestamp when ticker time is missing" do
+    io = StringIO.new
+    logger = build_logger(io)
+    observed_tick = nil
+    service = described_class.new(product_ids: "BTC-USD", logger: logger, on_ticker: ->(tick) { observed_tick = tick })
+
+    payload = {
+      channel: "ticker",
+      timestamp: "2026-04-24T17:00:00.000Z",
+      events: [
+        {
+          type: "update",
+          tickers: [{product_id: "BTC-USD", price: "77000.00"}]
+        }
+      ]
+    }
+
+    message = OpenStruct.new(data: payload.to_json)
+    service.send(:handle_message, message)
+
+    expect(observed_tick).to include(
+      "product_id" => "BTC-USD",
+      "price" => "77000.00",
+      "time" => "2026-04-24T17:00:00.000Z"
+    )
+  end
+
   it "ignores non-json messages" do
     io = StringIO.new
     logger = build_logger(io)
@@ -56,5 +83,38 @@ RSpec.describe MarketData::CoinbaseSpotSubscriber, type: :service do
 
     io.rewind
     expect(io.read).to eq("")
+  end
+
+  it "does not exit before websocket open callback can run" do
+    io = StringIO.new
+    logger = build_logger(io)
+    service = described_class.new(product_ids: "BTC-USD", logger: logger)
+
+    fake_socket = Class.new do
+      def on(_event, &_block)
+      end
+
+      def send(_msg)
+      end
+
+      def open?
+        false
+      end
+
+      def close
+      end
+    end.new
+
+    allow(WebSocket::Client::Simple).to receive(:connect).and_return(fake_socket)
+
+    sleep_calls = 0
+    allow(service).to receive(:sleep) do |_seconds|
+      sleep_calls += 1
+      service.instance_variable_set(:@ws, nil)
+    end
+
+    service.start
+
+    expect(sleep_calls).to be >= 1
   end
 end

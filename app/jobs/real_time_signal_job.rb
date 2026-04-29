@@ -7,16 +7,21 @@ class RealTimeSignalJob < ApplicationJob
   queue_as :realtime_signals
 
   def perform(*)
+    job_started_at = Time.current.utc
+    Rails.logger.info("[RTSJ] Tick start")
     evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
 
     # Evaluate all enabled trading pairs
-    evaluator.evaluate_all_pairs
+    cycle_stats = evaluator.evaluate_all_pairs
 
     # Clean up expired signal alerts
     cleanup_expired_signals
 
     # Log signal statistics
     log_signal_stats
+
+    elapsed = (Time.current.utc - job_started_at).round(2)
+    Rails.logger.info("[RTSJ] Tick done: cycle_stats=#{cycle_stats.inspect} elapsed=#{elapsed}s")
   end
 
   private
@@ -80,32 +85,6 @@ class RealTimeSignalJob < ApplicationJob
       scope.set_tag("error_type", "stats_collection_error")
 
       Sentry.capture_exception(e)
-    end
-  end
-
-  # Class methods for job management
-  class << self
-    def start_realtime_evaluation(interval_seconds: 30)
-      Rails.logger.info("[RTSJ] Starting real-time signal evaluation (interval: #{interval_seconds}s)")
-
-      # Schedule the first job
-      schedule_realtime_evaluation(interval_seconds: interval_seconds)
-
-      # Start a loop that continuously schedules the next job
-      Thread.new do
-        loop do
-          sleep interval_seconds
-          schedule_realtime_evaluation(interval_seconds: interval_seconds)
-        end
-      end
-    end
-
-    def schedule_realtime_evaluation(interval_seconds: 30)
-      # Remove existing scheduled jobs for this class
-      GoodJob::Job.where(job_class: name, finished_at: nil).delete_all
-
-      # Schedule new job to run every interval
-      set(wait: interval_seconds.seconds).perform_later
     end
   end
 end

@@ -9,12 +9,15 @@ Sentry.init do |config|
   config.traces_sample_rate = (ENV["SENTRY_TRACES_SAMPLE_RATE"] || 0.1).to_f
   config.profiles_sample_rate = (ENV["SENTRY_PROFILES_SAMPLE_RATE"] || 0.1).to_f
 
-  # Enable performance monitoring for background jobs
+  # Enable performance monitoring for background jobs.
+  # Some Sentry versions don't expose all tracing subscriber constants.
   config.rails.report_rescued_exceptions = true
   config.rails.tracing_subscribers = [
-    Sentry::Rails::Tracing::ActiveRecordSubscriber,
-    Sentry::Rails::Tracing::ActionControllerSubscriber
-  ]
+    "Sentry::Rails::Tracing::ActiveRecordSubscriber",
+    "Sentry::Rails::Tracing::ActionControllerSubscriber"
+  ].filter_map do |subscriber_name|
+    subscriber_name.safe_constantize
+  end
 
   # Sanitize known secrets and sensitive data
   config.inspect_exception_causes_for_exclusion = true

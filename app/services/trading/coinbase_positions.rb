@@ -99,6 +99,7 @@ module Trading
     # Returns order result hash
     def open_position(product_id:, side:, size:, type: :market, price: nil, day_trading: nil, take_profit: nil,
       stop_loss: nil)
+      TradingHalt.assert_active!(context: "CoinbasePositions#open_position")
       # Use configuration default if not specified
       day_trading = Rails.application.config.default_day_trading if day_trading.nil?
       raise "Authentication required" unless @authenticated
@@ -128,6 +129,7 @@ module Trading
     # If size is nil, attempts to infer the open size from list_open_positions for the product.
     # Returns order result hash
     def close_position(product_id:, size: nil)
+      TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
       raise "Authentication required" unless @authenticated
 
       # If explicit size provided, still infer side from current position when possible,
@@ -178,6 +180,7 @@ module Trading
     # Increase an existing position by adding more contracts in the same direction.
     # Returns order result hash
     def increase_position(product_id:, size:)
+      TradingHalt.assert_active!(context: "CoinbasePositions#increase_position")
       raise "Authentication required" unless @authenticated
 
       # Get the current position to determine the side
@@ -216,7 +219,7 @@ module Trading
         increase_local_position_record(
           product_id: product_id,
           additional_size: size,
-          additional_price: get_current_market_price(product_id),
+          additional_price: get_current_market_price(product_id) || position["avg_entry_price"]&.to_f,
           order_result: result
         )
       end
@@ -226,27 +229,9 @@ module Trading
 
     # Get current market price for a product
     def get_current_market_price(product_id)
-      # Try to get current price from recent market data
-      # This is a simplified approach - in production you might want to use real-time market data
-
-      # Try to get from recent ticks first
-      recent_tick = Tick.where(product_id: product_id)
-        .order(observed_at: :desc)
-        .first
-
-      return recent_tick.price if recent_tick && recent_tick.observed_at > 5.minutes.ago
-
-      # Fall back to most recent 1-minute candle
-      recent_candle = Candle.for_symbol(product_id)
-        .one_minute
-        .order(timestamp: :desc)
-        .first
-
-      return recent_candle.close if recent_candle && recent_candle.timestamp > 5.minutes.ago
-
-      # If no recent data, return nil (caller should handle this)
-      @logger.warn("No recent price data for #{product_id}")
-      nil
+      RecentMarketPrice.for_product(product_id).tap do |price|
+        @logger.warn("No recent price data for #{product_id}") unless price
+      end
     end
 
     # Update position method for tests
@@ -359,14 +344,8 @@ module Trading
 
     def build_order_body(product_id:, side:, size:, type:, price: nil)
       # For futures orders, use LONG/SHORT instead of buy/sell
-      side_str = case side.to_s.downcase
-      when "long" then "LONG"
-      when "short" then "SHORT"
-      when "buy" then "BUY"
-      when "sell" then "SELL"
-      else
-        raise ArgumentError, "side must be :long, :short, :buy, or :sell, got: #{side}"
-      end
+      side_str = SideNormalizer.order(side)
+      raise ArgumentError, "side must be :long, :short, :buy, or :sell, got: #{side}" unless side_str
 
       order_config = case type.to_sym
       when :market
@@ -409,28 +388,14 @@ module Trading
       ) || "0"
       side = pos["side"] || pos["position_side"] || pos.dig("position", "side")
 
-      # For futures orders, use LONG/SHORT instead of buy/sell
-      normalized_side = case side.to_s.upcase
-      when "LONG" then :long
-      when "SHORT" then :short
-      when "BUY" then :buy
-      when "SELL" then :sell
-      else :long # Default to long
-      end
-
-      [size.to_s, normalized_side]
+      [size.to_s, SideNormalizer.order_symbol(side) || :long]
     end
 
     # --- Local Position Record Management ---
 
     def create_local_position_record(product_id:, side:, size:, entry_price:, day_trading:, take_profit:, stop_loss:,
       order_result:)
-      # Convert side to LONG/SHORT for futures
-      position_side = case side.to_s.downcase
-      when "long", "buy" then "LONG"
-      when "short", "sell" then "SHORT"
-      else "LONG"
-      end
+      position_side = SideNormalizer.position(side) || "LONG"
 
       # Calculate take profit and stop loss if not provided
       if take_profit.nil? && day_trading
@@ -460,7 +425,9 @@ module Trading
         status: "OPEN",
         day_trading: day_trading,
         take_profit: take_profit,
-        stop_loss: stop_loss
+        stop_loss: stop_loss,
+        trailing_stop_enabled: ActiveModel::Type::Boolean.new.cast(ENV.fetch("TRAILING_STOP_ENABLED", "false")),
+        trailing_stop_state: {}
       )
 
       @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")
@@ -473,6 +440,8 @@ module Trading
       # Find the most recent open position for this product
       position = Position.open.by_product(product_id).order(:entry_time).last
       return unless position
+
+      close_price ||= position.entry_price
 
       # Close the position
       position.close_position!(close_price)
@@ -755,12 +724,7 @@ module Trading
         close_position(product_id: product_id, size: size)
 
         # Open new position in current month contract
-        # Convert side: if we had a LONG position, we want to open a LONG position
-        new_side = case side.to_s.upcase
-        when "LONG" then :long
-        when "SHORT" then :short
-        else :long
-        end
+        new_side = SideNormalizer.order_symbol(side) || :long
 
         open_position(
           product_id: target_contract,
