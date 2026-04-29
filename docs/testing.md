@@ -45,7 +45,6 @@ spec/
 │       └── multi_timeframe_signal_spec.rb
 ├── support/             # Test support files
 │   ├── vcr.rb          # VCR configuration
-│   ├── rspec_rails.rb  # Rails test helpers
 │   └── climate_control.rb # Environment variable helpers
 ├── tasks/               # Rake task specs
 │   └── market_data_rake_spec.rb

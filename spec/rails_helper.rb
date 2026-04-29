@@ -163,7 +163,6 @@ RSpec.configure do |config|
     Rails.cache.delete(TradingHalt::CACHE_KEY_REASON)
 
     puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
-    ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
     clear_performed_jobs
 
@@ -185,6 +184,8 @@ RSpec.configure do |config|
 
   # Add safety for database operations
   config.before(:suite) do
+    ActiveJob::Base.queue_adapter = :test
+
     # Ensure database is available before starting tests
     ActiveRecord::Base.connection.execute("SELECT 1") if defined?(ActiveRecord::Base) && ActiveRecord::Base.connection
   rescue => e

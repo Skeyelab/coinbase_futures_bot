@@ -77,7 +77,6 @@ spec/
 │       └── coinbase_positions_spec.rb
 ├── support/                  # Test support files
 │   ├── vcr.rb               # VCR configuration
-│   ├── rspec_rails.rb       # Rails test helpers
 │   ├── climate_control.rb   # Environment variable helpers
 │   ├── factory_helpers.rb   # FactoryBot helpers
 │   └── test_env_setup.rb    # Test environment setup
