@@ -8,7 +8,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
   let!(:trading_pair) { create(:trading_pair, enabled: true, product_id: "BTC-29DEC24-CDE") }
   let(:mock_signal) do
     {
-      side: :buy,
+      side: :long,
       price: 50_000.0,
       quantity: 1,
       tp: 52_000.0,
@@ -157,7 +157,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "logs the signal details" do
         expect(job).to receive(:puts).with(
-          "[Signal] #{trading_pair.product_id} side=buy price=50000.0 qty=1 tp=52000.0 sl=49000.0 conf=80%"
+          "[Signal] #{trading_pair.product_id} side=long price=50000.0 qty=1 tp=52000.0 sl=49000.0 conf=80%"
         )
 
         job.perform
@@ -167,7 +167,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         expect(SlackNotificationService).to receive(:signal_generated).with(
           {
             symbol: trading_pair.product_id,
-            side: :buy,
+            side: :long,
             price: 50_000.0,
             quantity: 1,
             tp: 52_000.0,
@@ -379,7 +379,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       it "validates signal quality assessment for bullish conditions" do
         # Mock strategy to return a high-confidence signal
         allow(mock_strategy).to receive(:signal).and_return({
-          side: :buy,
+          side: :long,
           price: 50_800.0,
           quantity: 2,
           tp: 51_000.0,
@@ -388,7 +388,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         })
 
         expect(job).to receive(:puts).with(
-          /\[Signal\] #{trading_pair.product_id} side=buy price=50800\.0 qty=2 tp=51000\.0 sl=50600\.0 conf=85\.5%/
+          /\[Signal\] #{trading_pair.product_id} side=long price=50800\.0 qty=2 tp=51000\.0 sl=50600\.0 conf=85\.5%/
         )
 
         job.perform(equity_usd: 25_000.0)
@@ -416,7 +416,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       it "generates short signals with proper risk management parameters" do
         # Mock strategy to return a short signal
         allow(mock_strategy).to receive(:signal).and_return({
-          side: :sell,
+          side: :short,
           price: 49_200.0,
           quantity: 1,
           tp: 49_000.0,
@@ -425,7 +425,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         })
 
         expect(job).to receive(:puts).with(
-          /\[Signal\] #{trading_pair.product_id} side=sell price=49200\.0 qty=1 tp=49000\.0 sl=49400\.0 conf=78\.2%/
+          /\[Signal\] #{trading_pair.product_id} side=short price=49200\.0 qty=1 tp=49000\.0 sl=49400\.0 conf=78\.2%/
         )
 
         job.perform(equity_usd: 15_000.0)
@@ -789,7 +789,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     it "validates signal structure and completeness" do
       complete_signal = {
-        side: :buy,
+        side: :long,
         price: 50_800.0,
         quantity: 2,
         tp: 51_000.0,
@@ -801,7 +801,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       expect(SlackNotificationService).to receive(:signal_generated).with({
         symbol: trading_pair.product_id,
-        side: :buy,
+        side: :long,
         price: 50_800.0,
         quantity: 2,
         tp: 51_000.0,
@@ -814,7 +814,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     it "validates risk-reward ratios in generated signals" do
       signal_with_good_rr = {
-        side: :buy,
+        side: :long,
         price: 50_000.0,
         quantity: 1,
         tp: 50_400.0,    # 400 point profit
@@ -833,7 +833,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     it "handles edge case signals with extreme values" do
       extreme_signal = {
-        side: :sell,
+        side: :short,
         price: 100_000.0,  # Extreme price
         quantity: 10,      # Large quantity
         tp: 95_000.0,

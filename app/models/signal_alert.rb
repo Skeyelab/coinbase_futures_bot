@@ -7,7 +7,7 @@ class SignalAlert < ApplicationRecord
 
   validates :symbol, :side, :signal_type, :strategy_name, :confidence, presence: true
   validates :symbol, format: {with: /\A[A-Z0-9-]+\z/, message: "must be valid trading symbol"}
-  validates :side, inclusion: {in: %w[long short buy sell unknown]}
+  validates :side, inclusion: {in: %w[long short unknown]}
   validates :signal_type, inclusion: {in: %w[entry exit stop_loss take_profit]}
   validates :alert_status, inclusion: {in: %w[active triggered expired cancelled]}, allow_nil: true
   validates :confidence, numericality: {greater_than: 0, less_than_or_equal_to: 100}
@@ -15,6 +15,7 @@ class SignalAlert < ApplicationRecord
   validates :quantity, numericality: {only_integer: true, greater_than: 0}, allow_nil: true
   validates :timeframe, inclusion: {in: %w[1m 5m 15m 1h 6h 1d]}, allow_nil: true
 
+  before_validation :canonicalize_side
   before_create :set_defaults
 
   scope :active, -> { where(alert_status: "active") }
@@ -31,12 +32,35 @@ class SignalAlert < ApplicationRecord
   scope :exit_signals, -> { where(signal_type: %w[exit stop_loss take_profit]) }
 
   # Class methods for creating different types of signals
+  # Normalize buy/sell (and symbol forms) to long/short for storage and APIs.
+  def self.normalize_side_value(side)
+    return nil if side.nil?
+
+    s = side.to_s.downcase
+    case s
+    when "buy", "long" then "long"
+    when "sell", "short" then "short"
+    when "unknown" then "unknown"
+    else s
+    end
+  end
+
+  # Match duplicates across legacy rows that still used buy/sell.
+  def self.sides_for_duplicate_match(side)
+    c = normalize_side_value(side)
+    case c
+    when "long" then %w[long buy]
+    when "short" then %w[short sell]
+    else [c]
+    end
+  end
+
   def self.create_entry_signal!(symbol:, side:, strategy_name:, confidence:, entry_price:,
     stop_loss:, take_profit:, quantity:, timeframe:,
     metadata: {}, strategy_data: {})
     create!(
       symbol: symbol,
-      side: side,
+      side: normalize_side_value(side),
       signal_type: "entry",
       strategy_name: strategy_name,
       confidence: confidence,
@@ -160,6 +184,10 @@ class SignalAlert < ApplicationRecord
   end
 
   private
+
+  def canonicalize_side
+    self.side = self.class.normalize_side_value(side) if side.present?
+  end
 
   def set_defaults
     self.alert_status ||= "active"
