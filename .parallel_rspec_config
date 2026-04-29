@@ -1,14 +1,11 @@
-# Parallel RSpec configuration for local development
-# Use this for maximum local performance with 8 processes
+# Options for `bin/parallel_rspec` (wired to parallel_tests CLI — not read by the gem alone).
+# Omit `processes` to use parallel_tests default (CPU count or PARALLEL_TEST_PROCESSORS).
 
-# Group slow tests together to avoid one process taking too long
+# Heavy specs in one worker to reduce tail latency (each line is a -s regex fragment).
 single:
   - "spec/services/coinbase_rest_spec.rb"
   - "spec/models/trading_pair_spec.rb"
   - "spec/tasks/market_data_rake_spec.rb"
 
-# Maximum processes for local development
-processes: 8
-
-# Use runtime-based grouping for better distribution
+# Applied only when tmp/parallel_runtime_rspec.log exists (see bin/parallel_rspec).
 group_by: runtime

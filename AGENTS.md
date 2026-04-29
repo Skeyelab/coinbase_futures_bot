@@ -33,10 +33,10 @@
 ### Testing
 
 - Single file / targeted debug: `bundle exec rspec spec/path/to/file_spec.rb`
-- Full suite (preferred for whole-repo checks): `bundle exec parallel_rspec`
+- Full suite (preferred for whole-repo checks): `bin/parallel_rspec` (YAML-driven) or `bundle exec parallel_rspec` (CLI only; ignores `.parallel_rspec_config` unless you pass flags yourself).
 - Coverage run: `COVERAGE=true bundle exec rspec`
 - RSpec defaults to random order and documentation formatter via `.rspec`.
-- `parallel_rspec` uses `.rspec_parallel` and local process grouping config.
+- `parallel_rspec` reads `.rspec_parallel` for RSpec options; `bin/parallel_rspec` adds `-n` / `--group-by` / `-s` from `PARALLEL_RSPEC_CONFIG` (default `.parallel_rspec_config`).
 
 ### Lint / security
 
@@ -65,7 +65,7 @@
 ## High-value gotchas
 
 - `bin/setup` is not a harmless bootstrap script. It also runs `git config core.hooksPath .githooks`. Do not run it casually in automation if you want to avoid mutating local git config.
-- `bin/parallel_rspec_local` copies `.parallel_rspec_config.local` over `.parallel_rspec_config` before running tests. That mutates a tracked file.
+- `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` to `.parallel_rspec_config.local` and reuses `bin/parallel_rspec` (no file copying).
 - The UI credentials used by the positions web UI are `POSITIONS_UI_USERNAME` and `POSITIONS_UI_PASSWORD` (`app/controllers/positions_controller.rb`), while `.env.example` documents different names under “API Authentication”. Trust controller code, not the example text.
 - `bin/futuresbot dashboard` and `bin/futuresbot chat` both sync positions from Coinbase on startup unless `FUTURESBOT_SKIP_POSITION_SYNC` is set.
 - The repository’s `.env.example` contains credential-like Coinbase values. Treat that file as shape/examples only; never reuse or commit secrets from it.
