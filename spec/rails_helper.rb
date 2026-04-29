@@ -157,6 +157,11 @@ RSpec.configure do |config|
 
   # Test effectiveness validation
   config.before(:each) do |example|
+    # TradingHalt shares Rails.cache with legacy chat/trading keys; examples that
+    # pause trading must not leak `trading_active: false` into unrelated specs.
+    Rails.cache.delete(TradingHalt::CACHE_KEY_ACTIVE)
+    Rails.cache.delete(TradingHalt::CACHE_KEY_REASON)
+
     puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
     ActiveJob::Base.queue_adapter = :test
     clear_enqueued_jobs
