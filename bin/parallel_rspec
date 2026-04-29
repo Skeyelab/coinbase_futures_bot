@@ -55,5 +55,8 @@ config_path = ENV.fetch("PARALLEL_RSPEC_CONFIG", ".parallel_rspec_config")
 config_path = File.expand_path(config_path, ROOT)
 
 flags = parallel_flags_from_config(config_path)
+# Reduces allocator churn when many Ruby processes share one host (common parallel win).
+ENV["MALLOC_ARENA_MAX"] ||= "2"
+
 cmd = ["bundle", "exec", "parallel_rspec", *flags, *ARGV]
 exec(*cmd)

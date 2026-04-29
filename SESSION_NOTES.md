@@ -26,6 +26,21 @@
 
 ### Session log
 
+#### 2026-04-29 14:30 UTC
+- Context: Further parallel / suite speed tweaks after wall-clock discussion.
+- Changes:
+  - `ActiveJob::Base.queue_adapter = :test` once in `before(:suite)`; dropped per-example assignment.
+  - Removed redundant `spec/support/rspec_rails.rb` (duplicated ActiveJob clears for job/task vs global hook).
+  - `.rspec_parallel`: `--require spec_helper` (parallel `-O` replaces `.rspec`; restores SimpleCov + shared RSpec config).
+  - `bin/parallel_rspec`: default `MALLOC_ARENA_MAX=2` for multi-process allocator behavior.
+  - `docs/testing.md` / wiki tree: dropped stale `rspec_rails.rb` line.
+- Commands run:
+  - `bin/standardrb --fix spec/rails_helper.rb bin/parallel_rspec`
+- Files touched:
+  - `spec/rails_helper.rb`, `spec/support/rspec_rails.rb` (deleted), `.rspec_parallel`, `bin/parallel_rspec`, `docs/testing.md`, `wiki/Testing-Guide.md`, `SESSION_NOTES.md`
+- Next steps:
+  - On `ruby-3.2.4@coinbase_futures_bot`, run `bundle exec rspec spec/jobs/health_check_job_spec.rb -O .rspec_parallel` and a full `bin/parallel_rspec_local` to confirm green.
+
 #### 2026-04-29 12:00 UTC
 - Context: Parallel RSpec YAML was never consumed by the `parallel_tests` gem; local script overwrote tracked config.
 - Changes:

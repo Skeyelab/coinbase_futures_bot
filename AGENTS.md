@@ -37,7 +37,7 @@
 - Full suite (preferred for whole-repo checks): `bin/parallel_rspec` (YAML-driven) or `bundle exec parallel_rspec` (CLI only; ignores `.parallel_rspec_config` unless you pass flags yourself).
 - Coverage run: `COVERAGE=true bundle exec rspec`
 - RSpec defaults to random order and documentation formatter via `.rspec`.
-- `parallel_rspec` reads `.rspec_parallel` for RSpec options; `bin/parallel_rspec` adds `-n` / `--group-by` / `-s` from `PARALLEL_RSPEC_CONFIG` (default `.parallel_rspec_config`).
+- `parallel_rspec` reads `.rspec_parallel` for RSpec options; `bin/parallel_rspec` adds `-n` / `--group-by` / `-s` from `PARALLEL_RSPEC_CONFIG` (default `.parallel_rspec_config`) and sets `MALLOC_ARENA_MAX=2` unless already set.
 
 ### Lint / security
 
