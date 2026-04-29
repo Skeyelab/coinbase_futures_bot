@@ -1,14 +1,11 @@
-# Parallel RSpec configuration for local development
-# Use this for maximum local performance with 8 processes
+# Local overrides — use `bin/parallel_rspec_local` (see bin/parallel_rspec).
 
-# Group slow tests together to avoid one process taking too long
 single:
   - "spec/services/coinbase_rest_spec.rb"
   - "spec/models/trading_pair_spec.rb"
   - "spec/tasks/market_data_rake_spec.rb"
 
-# Maximum processes for local development
+# Cap/adjust if DB contention hurts wall time; unset to use CPU default.
 processes: 8
 
-# Use runtime-based grouping for better distribution
 group_by: runtime

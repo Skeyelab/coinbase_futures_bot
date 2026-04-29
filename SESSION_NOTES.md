@@ -26,6 +26,20 @@
 
 ### Session log
 
+#### 2026-04-29 12:00 UTC
+- Context: Parallel RSpec YAML was never consumed by the `parallel_tests` gem; local script overwrote tracked config.
+- Changes:
+  - Added `bin/parallel_rspec` to map `.parallel_rspec_config` → CLI (`-n`, `--group-by runtime` only when `tmp/parallel_runtime_rspec.log` exists, `-s` per `single:`).
+  - `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` and loads the same runner (no `cp`).
+  - Dropped `--profile 10` from `.rspec_parallel`; default YAML omits `processes` (CPU / `PARALLEL_TEST_PROCESSORS`); local file keeps `processes: 8`.
+- Commands run:
+  - `bin/standardrb --fix bin/parallel_rspec bin/parallel_rspec_local`
+  - `bin/parallel_rspec --help` (smoke)
+- Files touched:
+  - `bin/parallel_rspec`, `bin/parallel_rspec_local`, `.parallel_rspec_config`, `.parallel_rspec_config.local`, `.rspec_parallel`, `AGENTS.md`, `SESSION_NOTES.md`
+- Next steps:
+  - Prefer `bin/parallel_rspec` for full suite so singles/runtime apply; use Ruby 3.2.4 gemset when running (avoid mixed 3.4/3.2 native ext errors).
+
 #### 2026-04-30 00:00 UTC
 - Context: Finished merge of `origin/main` into `feat/signals-longshort-guard-api-cleanup` for PR #181; resolved conflicts.
 - Changes:
