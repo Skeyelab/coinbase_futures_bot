@@ -7,6 +7,8 @@ Welcome to the comprehensive documentation for the **Coinbase Futures Bot** - an
 ## 🚀 Quick Navigation
 
 ### 📚 Getting Started
+- **[User Guide](User-Guide)** - How to analyze the market, place trades, and watch positions
+- **[CLI Reference](CLI-Reference)** - `bin/futuresbot` dashboard, chat, positions, signals, and more
 - **[Getting Started](Getting-Started)** - Complete setup guide with prerequisites
 - **[Configuration](Configuration)** - Environment variables and settings
 - **[Development](Development)** - Local development workflow and tools
