@@ -16,6 +16,7 @@ RSpec.configure do |config|
   config.around(:each) do |example|
     # Use longer timeout for known slow tests
     timeout_seconds = case example.full_description
+    when /ChatMemoryService/ then 120 # Bulk insert + prune can exceed default under load
     when /upsert.*candles/ then 60 # Candle tests are slow
     when /MarketDataSubscribeJob/ then 45 # Subscription tests need time
     when /integration/ then 45 # Integration tests

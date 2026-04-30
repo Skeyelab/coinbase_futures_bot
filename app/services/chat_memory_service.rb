@@ -161,6 +161,6 @@ class ChatMemoryService
       .limit(100)
       .pluck(:id)
 
-    @session.chat_messages.where.not(id: keeper_ids).destroy_all
+    @session.chat_messages.where.not(id: keeper_ids).delete_all
   end
 end
