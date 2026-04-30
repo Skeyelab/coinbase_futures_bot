@@ -26,6 +26,19 @@
 
 ### Session log
 
+#### 2026-04-30 00:15 UTC
+- Context: `parallel_rspec` reported 4 failures (Sentry health breadcrumb + ChatMemory timeouts/savepoints).
+- Changes:
+  - HealthController spec: spy with `have_received` + `hash_including` so `db.query` breadcrumbs from middleware do not break the expectation.
+  - ChatMemoryService specs: `insert_all` helper for large fixtures; `prune_old_messages` uses `delete_all` instead of row-wise `destroy_all`.
+  - `timeout_helper`: 120s cap for `ChatMemoryService` examples.
+- Commands run:
+  - `bundle exec rspec spec/services/chat_memory_service_spec.rb spec/controllers/health_controller_enhanced_spec.rb:202`
+- Files touched:
+  - `spec/controllers/health_controller_enhanced_spec.rb`, `spec/services/chat_memory_service_spec.rb`, `app/services/chat_memory_service.rb`, `spec/support/timeout_helper.rb`, `SESSION_NOTES.md`
+- Next steps:
+  - Re-run full `parallel_rspec` locally to confirm 0 failures.
+
 #### 2026-04-29 14:30 UTC
 - Context: Further parallel / suite speed tweaks after wall-clock discussion.
 - Changes:

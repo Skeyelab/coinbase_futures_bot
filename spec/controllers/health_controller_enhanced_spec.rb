@@ -200,14 +200,18 @@ RSpec.describe HealthController, type: :controller do
     end
 
     it "adds breadcrumb for health check requests" do
-      expect(SentryHelper).to receive(:add_breadcrumb).with(
-        message: "Health check requested",
-        category: "health_check",
-        level: "info",
-        data: {controller: "health", action: "show"}
-      )
+      allow(SentryHelper).to receive(:add_breadcrumb).and_call_original
 
       get :show
+
+      expect(SentryHelper).to have_received(:add_breadcrumb).with(
+        hash_including(
+          message: "Health check requested",
+          category: "health_check",
+          level: "info",
+          data: {controller: "health", action: "show"}
+        )
+      ).at_least(:once)
     end
 
     context "when database connectivity fails" do
