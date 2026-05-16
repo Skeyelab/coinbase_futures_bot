@@ -27,7 +27,7 @@ jobs:
         run: bin/standardrb
 
   security:
-    name: Brakeman (security)
+    name: Security scans
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -37,8 +37,11 @@ jobs:
           ruby-version-file: '.ruby-version'
           bundler-cache: true
 
-      - name: Static security scan
+      - name: Brakeman (static analysis)
         run: bin/brakeman --no-pager
+
+      - name: Bundler Audit (dependency vulnerabilities)
+        run: bundle exec bundler-audit check --update
 
   test:
     name: Rails tests with coverage

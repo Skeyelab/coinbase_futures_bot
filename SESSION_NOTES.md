@@ -26,6 +26,34 @@
 
 ### Session log
 
+#### 2026-05-16 00:45 UTC
+- Context: Aligning repo with ericdahl-dev/rails-platform conventions (GitHub issue #186).
+- Changes:
+  - **Dockerfile**: Fixed Ruby version (3.2.2→3.2.4), removed `# syntax=` line, added jemalloc `LD_PRELOAD`, excluded `:test` group from `BUNDLE_WITHOUT`
+  - **docker-compose.yml**: Added web + worker services matching platform pattern
+  - **production.rb**: Env-driven `assume_ssl`/`force_ssl`, SSL excludes `/up`, host authorization via `APP_HOST`/`RAILS_ALLOWED_HOSTS`, `silence_healthcheck_path`, GoodJob `:external` mode
+  - **development.rb**: Explicit GoodJob `:async` mode
+  - **config/initializers/0_pg_gssenc_fork_safety.rb**: macOS fork safety for libpq GSS/Kerberos
+  - **config/initializers/good_job_auth.rb**: HTTP Basic auth for GoodJob dashboard in non-local envs
+  - **config/routes.rb**: GoodJob mounted at `/jobs` in all environments (auth-protected), removed dev-only gating
+  - **config/database.yml**: Pool minimum 5, `TEST_ENV_NUMBER` for parallel tests, removed verbose comments, dropped hardcoded production database name
+  - **config/cable.yml**: Removed Redis dependency in production (switched to `async`)
+  - **Gemfile**: Added `bundler-audit` gem
+  - **CI**: Added `bundler-audit check --update` step to security job
+  - **AGENTS.md**: Merged Beads integration block from CLAUDE.md
+  - **CLAUDE.md**: Removed (platform standard: single `AGENTS.md`)
+  - **Procfile.dev**: Added for development workflow
+- Commands run:
+  - `bundle install`, `bin/standardrb --fix`, `bin/brakeman --no-pager`, `bundle exec bundler-audit check --update`
+- Files touched:
+  - `Dockerfile`, `docker-compose.yml`, `Procfile.dev`, `Gemfile`, `Gemfile.lock`, `config/environments/production.rb`, `config/environments/development.rb`, `config/database.yml`, `config/cable.yml`, `config/routes.rb`, `config/initializers/0_pg_gssenc_fork_safety.rb`, `config/initializers/good_job_auth.rb`, `.github/workflows/ci.yml`, `AGENTS.md`, `SESSION_NOTES.md`
+- Migrations: None
+- Next steps:
+  - Consider adding `solid_cable` gem for Postgres-backed Action Cable (replaces `async` adapter in production)
+  - Consider switching from `standard` to `rubocop-rails-omakase` (significant formatting change, separate PR)
+  - Consider adding Pundit if authorization becomes needed
+  - Upgrade nokogiri to fix bundler-audit findings
+
 #### 2026-04-27 05:24 UTC
 - Context: Reduced mock-heavy realtime specs by replacing relation doubles with real records where cheap.
 - Changes:
