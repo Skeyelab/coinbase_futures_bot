@@ -73,7 +73,7 @@ gem "sentry-rails"
 gem "sentry-ruby"
 
 # JWT for Coinbase App (Advanced Trade) ES256 authentication
-gem "jwt", "~> 3.1"
+gem "jwt", "~> 3.2"
 
 # Slack integration for notifications and bot control
 gem "slack-ruby-client", "~> 3.1"
