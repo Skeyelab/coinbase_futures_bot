@@ -59,12 +59,21 @@ RSpec.describe SignalAlert, type: :model do
     end
 
     describe "side validation" do
-      it "accepts valid sides" do
-        valid_sides = %w[long short buy sell]
-        valid_sides.each do |side|
+      it "accepts canonical sides" do
+        %w[long short unknown].each do |side|
           signal = described_class.new(valid_attributes.merge(side: side))
           expect(signal).to be_valid
         end
+      end
+
+      it "normalizes legacy buy/sell to long/short before validation" do
+        longish = described_class.new(valid_attributes.merge(side: "buy"))
+        expect(longish).to be_valid
+        expect(longish.side).to eq("long")
+
+        shortish = described_class.new(valid_attributes.merge(side: "sell"))
+        expect(shortish).to be_valid
+        expect(shortish.side).to eq("short")
       end
 
       it "rejects invalid sides" do

@@ -318,7 +318,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
 
         if signal
-          expect(signal[:side]).to eq(:buy)
+          expect(signal[:side]).to eq(:long)
           expect(signal[:price]).to be > 0
           expect(signal[:quantity]).to be > 0
           expect(signal[:tp]).to be > signal[:price]
@@ -346,7 +346,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       end
 
       it "validates sentiment gating for long entries" do
-        sentiment_allowed = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :buy)
+        sentiment_allowed = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :long)
         expect(sentiment_allowed).to be true
       end
 
@@ -390,7 +390,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         signal = strategy.signal(symbol: "BTC-USD", equity_usd: 10_000)
 
         if signal
-          expect(signal[:side]).to eq(:sell)
+          expect(signal[:side]).to eq(:short)
           expect(signal[:price]).to be > 0
           expect(signal[:quantity]).to be > 0
           expect(signal[:tp]).to be < signal[:price]
@@ -550,7 +550,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           avg_score: 0.1, z_score: 1.5
         )
 
-        result = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :buy)
+        result = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :long)
         expect(result).to be false
       end
 
@@ -1110,7 +1110,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       end
 
       # Check sentiment gate
-      sentiment_ok = strat.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :buy)
+      sentiment_ok = strat.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :long)
       puts "  Sentiment gate allows: #{sentiment_ok}"
 
     else
@@ -1122,7 +1122,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     # without throwing errors, even if it doesn't generate a signal
     expect(order).to be_nil.or be_a(Hash)
     if order
-      expect(order[:side]).to eq(:buy)
+      expect(order[:side]).to eq(:long)
     end
   end
 
@@ -1197,7 +1197,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     # without throwing errors, even if it doesn't generate a signal
     expect(order).to be_nil.or be_a(Hash)
     if order
-      expect(order[:side]).to eq(:buy)
+      expect(order[:side]).to eq(:long)
     end
   end
 
@@ -1412,11 +1412,11 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
   describe "Order Hash Generation" do
     let(:strategy) { described_class.new }
 
-    it "generates valid order hash for buy signal" do
-      order = strategy.send(:order_hash, :buy, 50_000.0, 2, 50_200.0, 49_800.0, 85.5)
+    it "generates valid order hash for long signal" do
+      order = strategy.send(:order_hash, :long, 50_000.0, 2, 50_200.0, 49_800.0, 85.5)
 
       expect(order).to include(
-        side: :buy,
+        side: :long,
         price: 50_000.0,
         quantity: 2,
         tp: 50_200.0,
@@ -1425,11 +1425,11 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       )
     end
 
-    it "generates valid order hash for sell signal" do
-      order = strategy.send(:order_hash, :sell, 50_000.0, 3, 49_800.0, 50_200.0, 75.2)
+    it "generates valid order hash for short signal" do
+      order = strategy.send(:order_hash, :short, 50_000.0, 3, 49_800.0, 50_200.0, 75.2)
 
       expect(order).to include(
-        side: :sell,
+        side: :short,
         price: 50_000.0,
         quantity: 3,
         tp: 49_800.0,
@@ -1439,7 +1439,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     end
 
     it "returns nil for zero quantity" do
-      order = strategy.send(:order_hash, :buy, 50_000.0, 0, 50_200.0, 49_800.0, 85.5)
+      order = strategy.send(:order_hash, :long, 50_000.0, 0, 50_200.0, 49_800.0, 85.5)
       expect(order).to be_nil
     end
   end
@@ -1474,12 +1474,12 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         expect(signal).to have_key(:confidence)
 
         # Validate signal logic
-        expect([:buy, :sell]).to include(signal[:side])
+        expect([:long, :short]).to include(signal[:side])
         expect(signal[:price]).to be > 40_000  # Reasonable BTC price
         expect(signal[:quantity]).to be_between(1, 5)  # Within position limits
         expect(signal[:confidence]).to be_between(0, 100)
 
-        if signal[:side] == :buy
+        if signal[:side] == :long
           expect(signal[:tp]).to be > signal[:price]
           expect(signal[:sl]).to be < signal[:price]
         else

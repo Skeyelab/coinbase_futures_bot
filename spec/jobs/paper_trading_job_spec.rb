@@ -97,7 +97,7 @@ RSpec.describe PaperTradingJob, type: :job do
 
         # Mock strategy signal
         signal = {
-          side: :buy,
+          side: :long,
           price: 50_000.0,
           quantity: 0.1,
           tp: 51_000.0,
@@ -203,7 +203,7 @@ RSpec.describe PaperTradingJob, type: :job do
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
         signal = {
-          side: :buy,
+          side: :long,
           price: 50_000.0,
           quantity: 0.1,
           tp: 51_000.0,
@@ -255,7 +255,7 @@ RSpec.describe PaperTradingJob, type: :job do
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
         signal = {
-          side: :buy,
+          side: :long,
           price: 50_000.0,
           quantity: 0.0,  # Zero quantity
           tp: 51_000.0,

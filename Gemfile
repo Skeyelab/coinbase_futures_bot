@@ -80,3 +80,6 @@ gem "slack-ruby-client", "~> 3.1"
 
 # Pagination for API endpoints
 gem "kaminari", "~> 1.2"
+
+gem "guard", "~> 2.20", group: :development
+gem "guard-rspec", "~> 4.7", group: :development
