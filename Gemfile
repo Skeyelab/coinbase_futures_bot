@@ -25,7 +25,7 @@ gem "bootsnap", require: false
 # gem "rack-cors"
 
 # HTTP client for Coinbase REST
-gem "faraday", "~> 2.11"
+gem "faraday", "~> 2.14"
 
 # WebSocket client for market data subscriptions
 gem "websocket-client-simple", "~> 0.8"
