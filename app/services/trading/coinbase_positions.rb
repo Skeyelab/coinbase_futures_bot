@@ -560,24 +560,11 @@ module Trading
     # See: https://docs.cdp.coinbase.com/coinbase-app/authentication-authorization/api-key-authentication
     def format_jwt_uri(http_method, request_path, params, body)
       # Coinbase expects: "METHOD api.coinbase.com/path" format for the uri claim
+      # Query params must NOT be included in the uri claim
       method = http_method.to_s.upcase
       host = "api.coinbase.com"
 
-      path_with_query = case method
-      when "GET", "DELETE"
-        if params&.any?
-          query = params.map { |k, v| "#{k}=#{v}" }.join("&")
-          "#{request_path}?#{query}"
-        else
-          request_path
-        end
-      when "POST", "PUT"
-        request_path
-      else
-        request_path
-      end
-
-      "#{method} #{host}#{path_with_query}"
+      "#{method} #{host}#{request_path}"
     end
 
     def load_credentials_from_file

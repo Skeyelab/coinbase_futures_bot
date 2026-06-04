@@ -128,7 +128,7 @@ module Cli
       latest_tick_at = Tick.maximum(:observed_at)
       live_prices = latest_prices_by_product
       futures_live_prices, spot_live_prices = split_live_prices(live_prices)
-      last_signal_eval_at = SignalAlert.maximum(:alert_timestamp)
+      last_signal_eval_at = Rails.cache.read("real_time_signal_job.last_eval_at") || SignalAlert.maximum(:alert_timestamp)
 
       @data = {
         day_pos_count: Position.open.day_trading.count,

@@ -28,6 +28,15 @@ RSpec.describe RealTimeSignalJob, type: :job do
       job.perform
     end
 
+    it "writes last_eval_at to cache after performing" do
+      freeze_time do
+        job.perform
+
+        cached = Rails.cache.read("real_time_signal_job.last_eval_at")
+        expect(cached).to eq(Time.current.utc)
+      end
+    end
+
     it "calls evaluate_all_pairs on the evaluator" do
       expect(evaluator).to receive(:evaluate_all_pairs)
 

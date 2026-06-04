@@ -294,7 +294,16 @@ RSpec.describe TuiDashboard do
         expect(dashboard.instance_variable_get(:@error)).to be_nil
       end
 
-      it "populates last_signal_eval_at from most recent signal alert" do
+      it "populates last_signal_eval_at from cache when available" do
+        freeze_time do
+          Rails.cache.write("real_time_signal_job.last_eval_at", Time.current.utc)
+          dashboard.refresh_data
+          expect(dashboard.instance_variable_get(:@data)[:last_signal_eval_at]).to eq(Time.current.utc)
+        end
+      end
+
+      it "falls back to most recent signal alert when cache is empty" do
+        Rails.cache.delete("real_time_signal_job.last_eval_at")
         alert = create(:signal_alert)
         dashboard.refresh_data
         expect(dashboard.instance_variable_get(:@data)[:last_signal_eval_at]).to be_within(1.second).of(alert.alert_timestamp)

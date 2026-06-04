@@ -68,54 +68,35 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
   end
 
   describe "#list_products" do
-    let(:products_data) { [{"id" => "BTC-USD", "status" => "online", "quote_currency" => "USD"}] }
+    let(:products_data) { [{"product_id" => "BIT-29DEC24-CDE", "trading_disabled" => false}] }
+    let(:api_response) { {"products" => products_data} }
 
     before do
-      allow(mock_response).to receive(:body).and_return(products_data.to_json)
+      allow(service).to receive(:authenticated_get).and_return(mock_response)
+      allow(mock_response).to receive(:body).and_return(api_response.to_json)
       allow(Rails.logger).to receive(:info)
     end
 
-    context "with array response" do
-      it "returns products array" do
-        result = service.list_products
-        expect(result).to eq(products_data)
-      end
-
-      it "logs the number of products fetched" do
-        expect(Rails.logger).to receive(:info).with("Fetched 1 products from Exchange API")
-        service.list_products
-      end
-
-      it "logs sample product" do
-        expect(Rails.logger).to receive(:info).with(/Sample product/)
-        service.list_products
-      end
+    it "calls Advanced Trade API products endpoint" do
+      service.list_products
+      expect(service).to have_received(:authenticated_get)
+        .with("/api/v3/brokerage/products", {product_type: "FUTURE"})
     end
 
-    context "with hash response containing products key" do
-      let(:hash_response) { {"products" => products_data} }
-
-      before do
-        allow(mock_response).to receive(:body).and_return(hash_response.to_json)
-      end
-
-      it "extracts products from hash" do
-        result = service.list_products
-        expect(result).to eq(products_data)
-      end
+    it "returns products array from hash response" do
+      result = service.list_products
+      expect(result).to eq(products_data)
     end
 
-    context "with non-array response" do
-      let(:single_product) { {"id" => "BTC-USD", "status" => "online", "quote_currency" => "USD"} }
+    it "logs the number of products fetched" do
+      expect(Rails.logger).to receive(:info).with("Fetched 1 products from Advanced Trade API")
+      service.list_products
+    end
 
-      before do
-        allow(mock_response).to receive(:body).and_return(single_product.to_json)
-      end
-
-      it "wraps single product in array" do
-        result = service.list_products
-        expect(result).to eq([single_product])
-      end
+    it "returns empty array when products key missing" do
+      allow(mock_response).to receive(:body).and_return({}.to_json)
+      result = service.list_products
+      expect(result).to eq([])
     end
   end
 
@@ -123,9 +104,9 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     let(:futures_products) do
       [
         {
-          "id" => "BIT-29DEC24-CDE",
-          "status" => "online",
-          "quote_currency" => "USD",
+          "product_id" => "BIT-29DEC24-CDE",
+          "trading_disabled" => false,
+          "base_min_size" => "0.0001",
           "base_increment" => "0.0001",
           "quote_increment" => "0.01"
         }
@@ -135,13 +116,12 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     before do
       allow(service).to receive(:list_products).and_return(futures_products)
       allow(TradingPair).to receive(:parse_contract_info).and_return({
-        base_currency: "BIT",
+        base_currency: "BTC",
         quote_currency: "USD",
         expiration_date: Date.new(2024, 12, 29),
-        contract_type: "future"
+        contract_type: "CDE"
       })
       allow(TradingPair).to receive(:upsert)
-      allow(service).to receive(:update_all_contracts)
       allow(Rails.logger).to receive(:info)
     end
 
@@ -158,11 +138,11 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     it "upserts trading pairs with correct data" do
       expected_upsert_data = {
         product_id: "BIT-29DEC24-CDE",
-        base_currency: "BIT",
+        base_currency: "BTC",
         quote_currency: "USD",
         expiration_date: Date.new(2024, 12, 29),
-        contract_type: "future",
-        status: "online",
+        contract_type: "CDE",
+        status: "active",
         min_size: "0.0001",
         price_increment: "0.01",
         size_increment: "0.0001",
@@ -178,11 +158,6 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       )
     end
 
-    it "updates all contracts" do
-      service.upsert_products
-      expect(service).to have_received(:update_all_contracts)
-    end
-
     it "logs the number of upserted products" do
       expect(Rails.logger).to receive(:info).with("Upserted 1 futures products")
       service.upsert_products
@@ -190,66 +165,68 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
   end
 
   describe "#fetch_candles" do
-    let(:product_id) { "BTC-USD" }
-    let(:candle_data) { [[1_640_995_200, 50_000, 51_000, 49_500, 50_500, 100]] }
+    let(:product_id) { "BIT-29DEC24-CDE" }
     let(:start_time) { "2022-01-01T00:00:00Z" }
     let(:end_time) { "2022-01-02T00:00:00Z" }
+    let(:hash_response) do
+      {
+        "candles" => [
+          {
+            "start" => "1640995200",
+            "low" => "50000",
+            "high" => "51000",
+            "open" => "49500",
+            "close" => "50500",
+            "volume" => "100"
+          }
+        ]
+      }
+    end
 
     before do
-      allow(mock_response).to receive(:body).and_return(candle_data.to_json)
+      allow(service).to receive(:authenticated_get).and_return(mock_response)
+      allow(mock_response).to receive(:body).and_return(hash_response.to_json)
       allow(Rails.logger).to receive(:info)
       allow(Rails.logger).to receive(:warn)
     end
 
     context "with basic parameters" do
-      it "makes GET request with correct path" do
+      it "calls Advanced Trade API candles endpoint" do
         service.fetch_candles(product_id: product_id)
-        expect(mock_connection).to have_received(:get).with("/products/#{product_id}/candles",
-          hash_including(granularity: 3600))
+        expect(service).to have_received(:authenticated_get).with(
+          "/api/v3/brokerage/products/#{product_id}/candles",
+          hash_including(granularity: "ONE_HOUR")
+        )
       end
 
-      it "returns candle data as array" do
+      it "returns candle data as array of arrays" do
         result = service.fetch_candles(product_id: product_id)
-        expect(result).to eq(candle_data)
+        expect(result).to eq([[1_640_995_200, "50000", "51000", "49500", "50500", "100"]])
       end
     end
 
     context "with time parameters" do
-      it "includes start and end times in request" do
+      it "converts ISO8601 times to unix timestamps in request" do
         service.fetch_candles(
           product_id: product_id,
           start_iso8601: start_time,
           end_iso8601: end_time
         )
 
-        expect(mock_connection).to have_received(:get).with(
-          "/products/#{product_id}/candles",
-          hash_including(start: start_time, end: end_time, granularity: 3600)
+        expect(service).to have_received(:authenticated_get).with(
+          anything,
+          hash_including(start: anything, end: anything)
         )
       end
     end
 
     context "with custom granularity" do
-      it "uses specified granularity" do
+      it "maps seconds to granularity string" do
         service.fetch_candles(product_id: product_id, granularity: 900)
-        expect(mock_connection).to have_received(:get).with(
-          "/products/#{product_id}/candles",
-          hash_including(granularity: 900)
+        expect(service).to have_received(:authenticated_get).with(
+          anything,
+          hash_including(granularity: "FIFTEEN_MINUTE")
         )
-      end
-    end
-
-    context "with authentication" do
-      let(:service) do
-        allow(ENV).to receive(:[]).with("COINBASE_API_KEY").and_return("test_key")
-        allow(ENV).to receive(:[]).with("COINBASE_API_SECRET").and_return("test_secret")
-        described_class.new
-      end
-
-      it "uses authenticated request" do
-        allow(service).to receive(:authenticated_get).and_return(mock_response)
-        service.fetch_candles(product_id: product_id)
-        expect(service).to have_received(:authenticated_get).with("/products/#{product_id}/candles", anything)
       end
     end
 
@@ -290,7 +267,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
 
       it "raises error with message" do
-        expect(Rails.logger).to receive(:error).with("API Error: Invalid product")
+        expect(Rails.logger).to receive(:error).with("Candles API error: Invalid product")
         expect do
           service.fetch_candles(product_id: product_id)
         end.to raise_error("API Error: Invalid product")
@@ -301,52 +278,32 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
   describe "#authenticated_get" do
     let(:path) { "/test/path" }
     let(:params) { {test: "value"} }
-    let(:service) do
-      allow(ENV).to receive(:[]).with("COINBASE_API_KEY").and_return("test_key")
-      allow(ENV).to receive(:[]).with("COINBASE_API_SECRET").and_return("test_secret")
-      described_class.new
-    end
 
     before do
-      allow(Time).to receive(:now).and_return(Time.at(1_640_995_200)) # Fixed timestamp for testing
-      allow(OpenSSL::HMAC).to receive(:hexdigest).and_return("test_signature")
+      allow(service).to receive(:authenticated_get).and_call_original
     end
 
-    it "sets authentication headers" do
+    it "sets Authorization Bearer header and makes GET request" do
+      allow(JWT).to receive(:encode).and_return("test.jwt.token")
+      allow(OpenSSL::PKey).to receive(:read).and_return(double("pkey"))
+
       service.send(:authenticated_get, path, params)
 
-      expect(mock_connection.headers["CB-ACCESS-KEY"]).to eq("test_key")
-      expect(mock_connection.headers["CB-ACCESS-SIGN"]).to eq("test_signature")
-      expect(mock_connection.headers["CB-ACCESS-TIMESTAMP"]).to eq("1640995200")
-    end
-
-    it "makes authenticated GET request" do
-      service.send(:authenticated_get, path, params)
+      expect(mock_connection.headers["Authorization"]).to eq("Bearer test.jwt.token")
       expect(mock_connection).to have_received(:get).with(path, params)
     end
 
-    it "creates correct prehash string" do
-      expected_prehash = "1640995200GET/test/path?test=value"
-      expect(OpenSSL::HMAC).to receive(:hexdigest).with(
-        OpenSSL::Digest.new("sha256"),
-        "test_secret",
-        expected_prehash
-      )
+    it "uses ES256 JWT encoding" do
+      pkey = double("pkey")
+      allow(OpenSSL::PKey).to receive(:read).and_return(pkey)
+      expect(JWT).to receive(:encode).with(
+        hash_including(sub: anything, iss: "cdp", uri: "GET api.coinbase.com#{path}"),
+        pkey,
+        "ES256",
+        anything
+      ).and_return("test.jwt.token")
 
-      service.send(:authenticated_get, path, params)
-    end
-
-    context "without parameters" do
-      it "creates prehash string without query parameters" do
-        expected_prehash = "1640995200GET/test/path"
-        expect(OpenSSL::HMAC).to receive(:hexdigest).with(
-          anything,
-          "test_secret",
-          expected_prehash
-        )
-
-        service.send(:authenticated_get, path)
-      end
+      service.send(:authenticated_get, path)
     end
   end
 

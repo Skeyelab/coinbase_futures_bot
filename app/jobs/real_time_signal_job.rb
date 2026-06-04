@@ -20,6 +20,8 @@ class RealTimeSignalJob < ApplicationJob
     # Log signal statistics
     log_signal_stats
 
+    Rails.cache.write("real_time_signal_job.last_eval_at", Time.current.utc, expires_in: 10.minutes)
+
     elapsed = (Time.current.utc - job_started_at).round(2)
     Rails.logger.info("[RTSJ] Tick done: cycle_stats=#{cycle_stats.inspect} elapsed=#{elapsed}s")
   end
