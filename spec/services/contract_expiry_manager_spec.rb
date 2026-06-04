@@ -5,11 +5,21 @@ require "rails_helper"
 RSpec.describe ContractExpiryManager, type: :service do
   let(:logger) { double("logger", info: nil, warn: nil, error: nil) }
   let(:positions_service) { double("positions_service") }
+  let(:lifecycle) { double("lifecycle") }
   let(:slack_service) { double("slack_service", alert: nil) }
   let(:expiry_manager) { described_class.new(logger: logger) }
 
+  def success_result
+    Trading::PositionLifecycle::Result.new(success: true, close_price: 50_000.0, reason: nil, fallback: false)
+  end
+
+  def failure_result
+    Trading::PositionLifecycle::Result.new(success: false, close_price: nil, reason: nil, fallback: false)
+  end
+
   before do
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+    allow(Trading::PositionLifecycle).to receive(:new).and_return(lifecycle)
     stub_const("SlackNotificationService", slack_service)
     travel_to Date.new(2025, 8, 25) # Monday, August 25, 2025
   end
@@ -50,15 +60,15 @@ RSpec.describe ContractExpiryManager, type: :service do
 
     context "when positions close successfully" do
       before do
-        allow(positions_service).to receive(:close_position).and_return({"success" => true})
+        allow(lifecycle).to receive(:close) { |pos, reason:|
+          pos.force_close!(50_000.0, reason)
+          success_result
+        }
       end
 
       it "closes all expiring positions" do
         result = expiry_manager.close_expiring_positions(2)
-
         expect(result).to eq(2)
-        expect(positions_service).to have_received(:close_position).with(product_id: "BIT-27AUG25-CDE")
-        expect(positions_service).to have_received(:close_position).with(product_id: "BIT-26AUG25-CDE")
       end
 
       it "sends notification for successful closures" do
@@ -79,32 +89,26 @@ RSpec.describe ContractExpiryManager, type: :service do
       end
     end
 
-    context "when API closure fails but local closure succeeds" do
+    context "when lifecycle falls back to local closure" do
       before do
-        allow(positions_service).to receive(:close_position).and_raise(StandardError, "API error")
-        allow_any_instance_of(Position).to receive(:get_current_market_price).and_return(50000.0)
-        allow_any_instance_of(Position).to receive(:force_close!)
+        allow(lifecycle).to receive(:close) { |pos, reason:|
+          pos.force_close!(50_000.0, reason)
+          Trading::PositionLifecycle::Result.new(success: true, close_price: 50_000.0, reason: reason, fallback: true)
+        }
       end
 
-      it "falls back to local closure" do
+      it "still counts as closed" do
         result = expiry_manager.close_expiring_positions(2)
-
         expect(result).to eq(2)
-        # Since we're using allow_any_instance_of, we can't use have_received on specific instances
-        # Instead, we verify the result and that the method was called
       end
     end
 
-    context "when both API and local closure fail" do
+    context "when lifecycle fails (no price available)" do
       before do
-        allow(positions_service).to receive(:close_position).and_raise(StandardError, "API error")
-        allow_any_instance_of(Position).to receive(:get_current_market_price).and_return(nil)
+        allow(lifecycle).to receive(:close).and_return(failure_result)
       end
 
-      it "logs errors and returns 0" do
-        expect(logger).to receive(:error).with(/API closure failed/)
-        expect(logger).to receive(:error).with(/Cannot close position.*no current price/)
-
+      it "returns 0" do
         result = expiry_manager.close_expiring_positions(2)
         expect(result).to eq(0)
       end
@@ -121,14 +125,15 @@ RSpec.describe ContractExpiryManager, type: :service do
       let!(:expired_position) { create(:position, product_id: "BIT-24AUG25-CDE", status: "OPEN") }
 
       before do
-        allow(positions_service).to receive(:close_position).and_return({"success" => true})
+        allow(lifecycle).to receive(:close) { |pos, reason:|
+          pos.force_close!(50_000.0, reason)
+          success_result
+        }
       end
 
       it "closes expired positions" do
         result = expiry_manager.close_expired_positions
-
         expect(result).to eq(1)
-        expect(positions_service).to have_received(:close_position).with(product_id: "BIT-24AUG25-CDE")
       end
 
       it "sends emergency notification" do
@@ -189,7 +194,10 @@ RSpec.describe ContractExpiryManager, type: :service do
     let!(:expiring_position) { create(:position, product_id: "BIT-27AUG25-CDE", status: "OPEN", size: 10) }
 
     before do
-      allow(positions_service).to receive(:close_position).and_return({"success" => true})
+      allow(lifecycle).to receive(:close) { |pos, reason:|
+        pos.force_close!(50_000.0, reason)
+        success_result
+      }
     end
 
     it "monitors balance impact and sends notification" do
@@ -290,46 +298,19 @@ RSpec.describe ContractExpiryManager, type: :service do
     describe "#close_single_position" do
       let(:position) { create(:position, product_id: "BIT-25AUG25-CDE", status: "OPEN") }
 
-      context "when API closure succeeds" do
-        before do
-          allow(positions_service).to receive(:close_position).and_return({"success" => true})
-        end
+      context "when lifecycle succeeds" do
+        before { allow(lifecycle).to receive(:close).and_return(success_result) }
 
-        it "closes position via API and returns 1" do
-          result = expiry_manager.send(:close_single_position, position, "Test reason")
-
-          expect(result).to eq(1)
-          expect(positions_service).to have_received(:close_position).with(product_id: position.product_id)
+        it "returns 1" do
+          expect(expiry_manager.send(:close_single_position, position, "Test reason")).to eq(1)
         end
       end
 
-      context "when API closure fails" do
-        before do
-          allow(positions_service).to receive(:close_position).and_return({"success" => false})
-          allow(position).to receive(:get_current_market_price).and_return(50000.0)
-          allow(position).to receive(:force_close!)
-        end
+      context "when lifecycle fails" do
+        before { allow(lifecycle).to receive(:close).and_return(failure_result) }
 
-        it "falls back to local closure" do
-          result = expiry_manager.send(:close_single_position, position, "Test reason")
-
-          expect(result).to eq(1)
-          expect(position).to have_received(:force_close!).with(50000.0, "Test reason")
-        end
-      end
-
-      context "when both API and local closure fail" do
-        before do
-          allow(positions_service).to receive(:close_position).and_raise(StandardError, "API error")
-          allow(position).to receive(:get_current_market_price).and_return(nil)
-        end
-
-        it "returns 0 and logs error" do
-          expect(logger).to receive(:error).with(/API closure failed/)
-          expect(logger).to receive(:error).with(/Cannot close position.*no current price/)
-
-          result = expiry_manager.send(:close_single_position, position, "Test reason")
-          expect(result).to eq(0)
+        it "returns 0" do
+          expect(expiry_manager.send(:close_single_position, position, "Test reason")).to eq(0)
         end
       end
     end
