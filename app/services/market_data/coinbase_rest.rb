@@ -9,12 +9,22 @@ module MarketData
   class CoinbaseRest
     DEFAULT_BASE = "https://api.coinbase.com"
 
-    # Granularity strings for Advanced Trade API
+    # Granularity strings for Advanced Trade API candle endpoint.
+    # Full enum per OpenAPI spec (api.coinbase.com/api/v3/brokerage/products/{id}/candles).
+    # NOTE: ONE_MINUTE and FIVE_MINUTE are valid enum values but return 400 for
+    # Coinbase futures product IDs (BIT-*, ET-*, NOL-*). They work for spot products
+    # (BTC-USD, ETH-USD). Use the Exchange API (api.exchange.coinbase.com) with integer
+    # granularity (60, 300) if 1m/5m candles on spot proxies are needed.
     GRANULARITY = {
       60 => "ONE_MINUTE",
       300 => "FIVE_MINUTE",
       900 => "FIFTEEN_MINUTE",
-      3600 => "ONE_HOUR"
+      1800 => "THIRTY_MINUTE",
+      3600 => "ONE_HOUR",
+      7200 => "TWO_HOUR",
+      14400 => "FOUR_HOUR",
+      21600 => "SIX_HOUR",
+      86400 => "ONE_DAY"
     }.freeze
 
     def initialize(base_url: ENV.fetch("COINBASE_REST_URL", DEFAULT_BASE))
@@ -254,6 +264,52 @@ module MarketData
       end
 
       Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
+    end
+
+    # Upsert 30-minute candles
+    def upsert_30m_candles(product_id:, start_time:, end_time: Time.now.utc)
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 1800)
+      return unless data.is_a?(Array)
+
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        Candle.create_or_find_by(symbol: product_id, timeframe: "30m", timestamp: ts) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 30m candles for #{product_id}")
+    end
+
+    # Upsert 1-day candles
+    def upsert_1d_candles(product_id:, start_time:, end_time: Time.now.utc)
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 86400)
+      return unless data.is_a?(Array)
+
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        Candle.create_or_find_by(symbol: product_id, timeframe: "1d", timestamp: ts) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 1d candles for #{product_id}")
     end
 
     # Upsert 5-minute candles

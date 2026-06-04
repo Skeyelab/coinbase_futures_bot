@@ -42,7 +42,7 @@ The algorithm that analyzes market data and produces Signals. Answers *when* to 
 A Position with no intraday closure requirement. Held across days until stop-loss, take-profit, or manual exit. A per-Position property; contrast with Day Trade.
 
 ### Timeframe
-The candlestick resolution used by a Strategy — e.g. 1m, 5m, 15m, 1h, 1d. Different Underlyings may use different timeframe sets (e.g. daily timeframes matter more for commodities driven by weekly reports). **Open question:** whether available timeframes are constrained by what Coinbase's API supports or are freely configurable per-Underlying. See [#195](https://github.com/Skeyelab/coinbase_futures_bot/issues/195).
+The candlestick resolution used by a Strategy. Coinbase futures contracts (`BIT-*`, `ET-*`, `NOL-*`) support **15m, 30m, 1h, 2h, 6h, 1d** via the Advanced Trade API. ONE_MINUTE and FIVE_MINUTE are valid API enum values but return 400 for futures product IDs — they only work for spot products (BTC-USD, ETH-USD) on the Exchange API (`api.exchange.coinbase.com`) with integer-second granularity. The same supported timeframe set applies to all underlyings (BTC, ETH, oil) — there is no per-underlying restriction. Timeframe configuration is therefore global, not per-Underlying. Resolved by [#195](https://github.com/Skeyelab/coinbase_futures_bot/issues/195).
 
 ### Underlying
 The asset a Contract is based on — e.g. BTC, ETH, crude oil. A first-class grouping concept: Contracts sharing the same Underlying share sentiment sources, Strategy configuration, and Risk Profile assignment. Rollover moves between Contracts within the same Underlying. Not currently a model in the code — parsed implicitly from the Contract product ID prefix.
