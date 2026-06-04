@@ -16,6 +16,8 @@ RSpec.describe FetchCandlesJob, type: :job do
   def stub_rest(mock_rest)
     allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
     allow(mock_rest).to receive(:upsert_products)
+    allow(mock_rest).to receive(:upsert_1m_candles)
+    allow(mock_rest).to receive(:upsert_5m_candles)
     allow(mock_rest).to receive(:upsert_15m_candles)
     allow(mock_rest).to receive(:upsert_30m_candles)
     allow(mock_rest).to receive(:upsert_1h_candles)
@@ -45,13 +47,15 @@ RSpec.describe FetchCandlesJob, type: :job do
       expect(mock_rest).not_to have_received(:upsert_1h_candles)
     end
 
-    it "calls all four candle timeframe methods per pair" do
+    it "calls all six candle timeframe methods per pair" do
       mock_rest = instance_double(MarketData::CoinbaseRest)
       stub_rest(mock_rest)
 
       btc_pair
       described_class.perform_now(backfill_days: 7)
 
+      expect(mock_rest).to have_received(:upsert_1m_candles).once
+      expect(mock_rest).to have_received(:upsert_5m_candles).once
       expect(mock_rest).to have_received(:upsert_15m_candles).once
       expect(mock_rest).to have_received(:upsert_30m_candles).once
       expect(mock_rest).to have_received(:upsert_1h_candles).once
@@ -61,13 +65,15 @@ RSpec.describe FetchCandlesJob, type: :job do
     it "handles errors gracefully for individual candle timeframes" do
       mock_rest = instance_double(MarketData::CoinbaseRest)
       stub_rest(mock_rest)
-      allow(mock_rest).to receive(:upsert_15m_candles).and_raise("15m API Error")
+      allow(mock_rest).to receive(:upsert_1m_candles).and_raise("1m API Error")
       allow(Rails.logger).to receive(:error)
       allow(Sentry).to receive(:with_scope).and_yield(double("scope").as_null_object)
       allow(Sentry).to receive(:capture_exception)
 
       btc_pair
       expect { described_class.perform_now(backfill_days: 7) }.not_to raise_error
+      expect(mock_rest).to have_received(:upsert_5m_candles).once
+      expect(mock_rest).to have_received(:upsert_15m_candles).once
       expect(mock_rest).to have_received(:upsert_30m_candles).once
       expect(mock_rest).to have_received(:upsert_1h_candles).once
       expect(mock_rest).to have_received(:upsert_1d_candles).once

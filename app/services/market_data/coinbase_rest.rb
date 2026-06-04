@@ -11,10 +11,11 @@ module MarketData
 
     # Granularity strings for Advanced Trade API candle endpoint.
     # Full enum per OpenAPI spec (api.coinbase.com/api/v3/brokerage/products/{id}/candles).
-    # NOTE: ONE_MINUTE and FIVE_MINUTE are valid enum values but return 400 for
-    # Coinbase futures product IDs (BIT-*, ET-*, NOL-*). They work for spot products
-    # (BTC-USD, ETH-USD). Use the Exchange API (api.exchange.coinbase.com) with integer
-    # granularity (60, 300) if 1m/5m candles on spot proxies are needed.
+    # All granularities work for futures product IDs (BIT-*, ET-*, NOL-*) — including
+    # ONE_MINUTE and FIVE_MINUTE. The constraint is a hard limit of 350 candles per request:
+    #   1m  → max window ≤5h50m (use 5h chunks = 300 candles)
+    #   5m  → max window ≤1d10h  (use 24h chunks = 288 candles)
+    #   15m → max window ≤3d14h  (use 3d chunks = 288 candles)
     GRANULARITY = {
       60 => "ONE_MINUTE",
       300 => "FIVE_MINUTE",
@@ -315,7 +316,8 @@ module MarketData
     # Upsert 5-minute candles
     def upsert_5m_candles(product_id:, start_time:, end_time: Time.now.utc)
       # For larger date ranges, use chunked fetching to avoid API limits
-      if (end_time - start_time) > 2.days
+      # 5m: 350 candles * 300s = 105,000s ≈ 29h max; use 1.day (288 candles) per chunk
+      if (end_time - start_time) > 1.day
         upsert_5m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
@@ -357,12 +359,12 @@ module MarketData
     end
 
     # Upsert 5-minute candles using chunked fetching for large date ranges
-    def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 2)
+    def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 24)
       all_data = []
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [current_start + chunk_hours.hours, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -408,7 +410,8 @@ module MarketData
     # Upsert 1-minute candles
     def upsert_1m_candles(product_id:, start_time:, end_time: Time.now.utc)
       # For larger date ranges, use chunked fetching to avoid API limits
-      if (end_time - start_time) > 1.day
+      # 1m: 350 candles * 60s = 21,000s ≈ 5h50m max; use 5h (300 candles) per chunk
+      if (end_time - start_time) > 5.hours
         upsert_1m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
@@ -450,12 +453,12 @@ module MarketData
     end
 
     # Upsert 1-minute candles using chunked fetching for large date ranges
-    def upsert_1m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 1)
+    def upsert_1m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 5)
       all_data = []
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [current_start + chunk_hours.hours, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
