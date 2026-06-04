@@ -38,7 +38,7 @@ bin/futuresbot dashboard --refresh 10   # refresh every 10 s
 | `+` / `=` | Refresh faster (decrease interval by 1 s, min 1 s) |
 | `-` | Refresh slower (increase interval by 1 s) |
 
-The dashboard shows: current UTC time, open day-trading positions, open swing positions, active signal count, GoodJob worker status, and recent signal activity.
+The dashboard shows: last-refresh timestamp, open day-trading and swing position counts, active signal count, chat session count, Coinbase WebSocket connection status (LIVE/STALE with age), an open-positions table with unrealized PnL, an active-signals table, and live Futures and Spot price panels.
 
 Because `dashboard` is the default command, `bin/futuresbot` with no arguments opens the dashboard.
 
