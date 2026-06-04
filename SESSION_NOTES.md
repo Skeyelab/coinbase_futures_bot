@@ -26,6 +26,19 @@
 
 ### Session log
 
+#### 2026-06-04 12:05 EDT
+- Context: Revised Conductor setup fix after confirming this repo uses Doppler, not shared `.env` files.
+- Changes:
+  - Replaced `.env`-symlink setup approach in `conductor.json` with non-interactive `doppler setup` scoped to the workspace.
+  - Runs `bin/rails db:prepare` through `doppler run`, while preserving workspace-local `DATABASE_URL` and `TEST_DATABASE_URL` so Doppler secrets do not force the nonexistent local `postgres` role.
+  - Defaults setup to Doppler project `coinbase-futures-bot` config `dev`, while allowing overrides via `DOPPLER_PROJECT`, `DOPPLER_CONFIG`, `CONDUCTOR_SETUP_DATABASE_URL`, and `CONDUCTOR_SETUP_TEST_DATABASE_URL`.
+- Commands run:
+  - `DATABASE_URL=postgresql:///coinbase_futures_bot_development TEST_DATABASE_URL=postgresql:///coinbase_futures_bot_test doppler run --project coinbase-futures-bot --config dev --preserve-env="DATABASE_URL,TEST_DATABASE_URL" -- bin/rails db:prepare`
+- Files touched:
+  - `conductor.json`, `SESSION_NOTES.md`
+- Next steps:
+  - Re-run Conductor workspace setup from a fresh workspace to confirm Doppler bootstraps automatically.
+
 #### 2026-06-04 15:50 UTC
 - Context: Re-merged latest `origin/main` into PR #187 after base branch advanced again.
 - Changes:

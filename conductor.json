@@ -1,5 +1,5 @@
 {
   "scripts": {
-    "setup": "if [ -f \"$CONDUCTOR_ROOT_PATH/.env\" ] && [ ! -e .env ]; then ln -s \"$CONDUCTOR_ROOT_PATH/.env\" .env; fi\nbundle check || bundle install\nbin/rails db:prepare"
+    "setup": "export DOPPLER_PROJECT=\"${DOPPLER_PROJECT:-coinbase-futures-bot}\"\nexport DOPPLER_CONFIG=\"${DOPPLER_CONFIG:-dev}\"\ndoppler setup --project \"$DOPPLER_PROJECT\" --config \"$DOPPLER_CONFIG\" --scope . --no-interactive\nbundle check || bundle install\nDATABASE_URL=\"${CONDUCTOR_SETUP_DATABASE_URL:-postgresql:///coinbase_futures_bot_development}\" TEST_DATABASE_URL=\"${CONDUCTOR_SETUP_TEST_DATABASE_URL:-postgresql:///coinbase_futures_bot_test}\" doppler run --project \"$DOPPLER_PROJECT\" --config \"$DOPPLER_CONFIG\" --preserve-env=\"DATABASE_URL,TEST_DATABASE_URL\" -- bin/rails db:prepare"
   }
 }
