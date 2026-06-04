@@ -9,6 +9,7 @@ module Trading
     def initialize(logger: Rails.logger)
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)
+      @lifecycle = PositionLifecycle.new(positions_service: @positions_service, logger: logger)
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
       @trailing_stop_runner = Trading::TrailingStop::Runner.new(
         logger: logger,
@@ -211,33 +212,8 @@ module Trading
 
     def close_single_position(position, reason: "Day trading closure")
       @logger.info("Closing position #{position.id}: #{position.side} #{position.size} #{position.product_id} - #{reason}")
-
-      # Get current market price for accurate PnL calculation
-      current_price = get_current_price_for_position(position)
-      return 0 unless current_price
-
-      # Close the position in Coinbase
-      begin
-        result = @positions_service.close_position(
-          product_id: position.product_id,
-          size: position.size
-        )
-
-        if result["success"] || result["order_id"]
-          # Update local position record
-          position.force_close!(current_price, reason)
-          @logger.info("Successfully closed position #{position.id} with PnL: #{position.pnl}")
-          1
-        else
-          @logger.error("Failed to close position #{position.id} in Coinbase: #{result}")
-          0
-        end
-      rescue => e
-        @logger.error("Exception closing position #{position.id} in Coinbase: #{e.message}")
-        # Still update local record to prevent infinite retry loops
-        position.force_close!(current_price, "#{reason} (API error: #{e.message})")
-        1
-      end
+      result = @lifecycle.close(position, reason: reason)
+      result.success? ? 1 : 0
     end
 
     def get_current_price_for_position(position)

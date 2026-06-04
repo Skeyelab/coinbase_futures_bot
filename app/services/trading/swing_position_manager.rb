@@ -10,6 +10,7 @@ module Trading
     def initialize(logger: Rails.logger)
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)
+      @lifecycle = PositionLifecycle.new(positions_service: @positions_service, logger: logger)
       @coinbase = Coinbase::AdvancedTradeClient.new(logger: logger)
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
       @trailing_stop_runner = Trading::TrailingStop::Runner.new(
@@ -362,23 +363,10 @@ module Trading
     private
 
     # Close a single swing position
-    def close_swing_position(position, current_price, reason)
+    def close_swing_position(position, _current_price, reason)
       @logger.info("Closing swing position #{position.id}: #{reason}")
-
-      # Use Coinbase API to close the position
-      result = @positions_service.close_position(
-        product_id: position.product_id,
-        size: position.size
-      )
-
-      if result && !result["error"]
-        position.close_position!(current_price)
-        @logger.info("Successfully closed swing position #{position.id} at #{current_price}")
-      else
-        error_msg = result&.dig("error") || "Unknown error"
-        @logger.error("Failed to close swing position #{position.id} via API: #{error_msg}")
-        raise "API closure failed: #{error_msg}"
-      end
+      result = @lifecycle.close(position, reason: reason)
+      raise "Lifecycle close failed for position #{position.id}" unless result.success?
     end
 
     # Get current market price for a product
