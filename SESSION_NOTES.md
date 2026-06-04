@@ -26,6 +26,20 @@
 
 ### Session log
 
+#### 2026-06-04 00:00 UTC
+- Context: Resolved `origin/main` merge conflicts for PR #187 (`feat: align repo with rails-platform conventions`).
+- Changes:
+  - Kept platform-convention move to single `AGENTS.md`; left `CLAUDE.md` deleted.
+  - Merged `SESSION_NOTES.md` histories so the 2026-05-16 platform-alignment entry stays above prior mainline entries.
+  - Removed duplicate Beads integration block from `AGENTS.md` introduced by auto-merge.
+- Commands run:
+  - `git merge --no-commit --no-ff origin/main`
+  - `bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
+- Files touched:
+  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted)
+- Next steps:
+  - Commit merge result and push updated PR branch.
+
 #### 2026-05-16 00:45 UTC
 - Context: Aligning repo with ericdahl-dev/rails-platform conventions (GitHub issue #186).
 - Changes:
@@ -53,6 +67,94 @@
   - Consider switching from `standard` to `rubocop-rails-omakase` (significant formatting change, separate PR)
   - Consider adding Pundit if authorization becomes needed
   - Upgrade nokogiri to fix bundler-audit findings
+
+#### 2026-04-30 00:00 UTC
+- Context: Finished merge of `origin/main` into `feat/signals-longshort-guard-api-cleanup` for PR #181; resolved conflicts.
+- Changes:
+  - `SignalAlert.normalize_side_value` delegates known sides to `SideNormalizer.signal`, keeps `unknown`, single path for `create_entry_signal!` / `normalized_entry_side`.
+  - Merged `AGENTS.md` (main body + learned prefs); merged `SESSION_NOTES` session log (Apr‑29 entries then Apr‑27 block from main).
+  - Beads: kept branch `issues.jsonl`, took main `metadata.json` `project_id`; regenerated `Gemfile.lock` via `bundle install`.
+- Commands run:
+  - `bundle install` and `bundle exec rspec spec/models/signal_alert_spec.rb spec/services/side_normalizer_spec.rb spec/services/real_time_signal_evaluator_spec.rb` under `ruby-3.2.4@coinbase_futures_bot` (186 examples, 0 failures)
+  - `bin/standardrb --fix app/models/signal_alert.rb`
+- Files touched:
+  - `app/models/signal_alert.rb`, `AGENTS.md`, `SESSION_NOTES.md`, `Gemfile.lock`, `.beads/issues.jsonl`, `.beads/metadata.json`
+- Next steps:
+  - `git commit` to complete merge; push branch; confirm PR #181 conflict-free.
+
+#### 2026-04-29 23:30 UTC
+- Context: Completed canonical long/short signal direction end-to-end (Beads `coinbase_futures_bot-1777499033010-23-ecaeb9da`).
+- Changes:
+  - Strategies (`MultiTimeframeSignal`, `Pullback1h`) emit `:long` / `:short` in order hashes; sentiment gate accepts long/short (legacy buy/sell still allowed).
+  - `SignalAlert` validates `long`/`short`/`unknown` only and normalizes buy/sell (and symbol forms) before save; `create_entry_signal!` passes normalized side.
+  - Added `lib/signal_side.rb` to map canonical sides to simulator fill (`:buy`/`:sell`) and `Position` model sides (`LONG`/`SHORT`); wired `PaperTradingJob`, `CalibrationJob`, `RapidSignalEvaluationJob`.
+  - `RealTimeSignalEvaluator#duplicate_signal?` matches legacy DB rows still storing `buy`/`sell` when the new signal is canonical.
+  - Updated affected specs; Guard was stopped so CI-style `rspec` could run to completion.
+- Commands run:
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec bin/standardrb --fix` (touched Ruby paths)
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/models/signal_alert_spec.rb spec/jobs/generate_signals_job_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/rapid_signal_evaluation_job_spec.rb` (407 examples, 0 failures)
+  - `bd close coinbase_futures_bot-1777499033010-23-ecaeb9da --reason \"Strategies emit :long/:short; SignalAlert canonicalizes on save; simulator/Position boundaries use SignalSide; dedupe matches legacy buy/sell rows.\"`
+- Files touched:
+  - `app/models/signal_alert.rb`, `app/services/strategy/multi_timeframe_signal.rb`, `app/services/strategy/pullback_1h.rb`, `app/services/real_time_signal_evaluator.rb`
+  - `app/jobs/paper_trading_job.rb`, `app/jobs/calibration_job.rb`, `app/jobs/rapid_signal_evaluation_job.rb`
+  - `lib/signal_side.rb`, related `spec/**` files, `SESSION_NOTES.md`
+- Next steps:
+  - Commit on a feature branch (not `main`) when ready; run full suite / CI if scope grows.
+
+#### 2026-04-29 22:07 UTC
+- Context: Completed P1 signal-controller seam consolidation and verified behavior in project Ruby environment.
+- Changes:
+  - Confirmed canonical `SignalController` route usage and removed duplicate `SignalsController` module.
+  - Installed dependencies in `ruby-3.2.4@coinbase_futures_bot` and ran targeted signal request/controller specs successfully.
+  - Closed Beads issue `coinbase_futures_bot-1777499033810-30-4ea17473`; this unblocked follow-on issue `coinbase_futures_bot-1777499033010-23-ecaeb9da`.
+- Commands run:
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle install`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/requests/signal_controller_spec.rb spec/controllers/signal_controller_spec.rb`
+  - `bd close coinbase_futures_bot-1777499033810-30-4ea17473 --reason \"Removed duplicate SignalsController; canonical SignalController remains; signal request/controller specs passing.\" --suggest-next`
+- Files touched:
+  - `app/controllers/signals_controller.rb` (deleted)
+  - `SESSION_NOTES.md` (updated)
+- Next steps:
+  - Long/short normalization issue completed in later session log entry.
+
+#### 2026-04-29 22:00 UTC
+- Context: Added Guard + guard-rspec setup so RSpec can auto-run on file changes.
+- Changes:
+  - Added `guard` and `guard-rspec` gems in development group via Bundler.
+  - Added a project `Guardfile` with RSpec watches for `spec/`, `app/`, and `lib/`.
+  - Verified no linter issues for `Gemfile` and `Guardfile`.
+  - Attempted Guard runtime validation; blocked by local Ruby extension mismatch (`date_core.bundle` linked against Ruby 3.2 while running Ruby 3.4.6).
+- Commands run:
+  - `bundle add guard guard-rspec --group development`
+  - `bundle exec guard init rspec` (failed due Ruby extension mismatch)
+  - `bundle exec guard -v` (failed due same mismatch)
+  - `gem pristine date --version 3.4.1 && gem pristine racc --version 1.8.1`
+  - `bundle exec guard -v` (still failing due same mismatch)
+- Files touched:
+  - `Gemfile`
+  - `Gemfile.lock`
+  - `Guardfile`
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Switch to project Ruby/gemset from quickstart (`ruby-3.2.4@coinbase_futures_bot`) and run `bundle install`.
+  - Re-run `bundle exec guard` to confirm startup in aligned Ruby env.
+
+#### 2026-04-29 21:52 UTC
+- Context: Started P1 architecture issue to remove duplicate signal controller seam and keep one canonical signal API module.
+- Changes:
+  - Claimed Beads issue `coinbase_futures_bot-1777499033810-30-4ea17473` for controller seam consolidation.
+  - Deleted duplicate controller file `app/controllers/signals_controller.rb` (unreferenced duplicate of `SignalController`).
+  - Verified routing already targets `controller: "signal"` in `config/routes.rb`, so no route changes required.
+- Commands run:
+  - `bd update coinbase_futures_bot-1777499033810-30-4ea17473 --claim`
+  - `bundle exec rspec spec/requests/signal_controller_spec.rb spec/controllers/signal_controller_spec.rb` (failed: missing gems / wrong Ruby env)
+  - `bd dep add ...` (linked issue dependencies for sequencing work)
+- Files touched:
+  - `app/controllers/signals_controller.rb` (deleted)
+  - `SESSION_NOTES.md` (updated)
+- Next steps:
+  - Activate project Ruby/gemset (`ruby-3.2.4@coinbase_futures_bot`) and run targeted signal specs.
+  - If specs pass, close the Beads issue and commit/push.
 
 #### 2026-04-27 05:24 UTC
 - Context: Reduced mock-heavy realtime specs by replacing relation doubles with real records where cheap.
@@ -3493,5 +3595,4 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
-
 
