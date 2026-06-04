@@ -12,92 +12,64 @@ class FetchCandlesJob < ApplicationJob
       fetch_1m_candles(rest, pair, backfill_days)
       fetch_5m_candles(rest, pair, backfill_days)
       fetch_15m_candles(rest, pair, backfill_days)
+      fetch_30m_candles(rest, pair, backfill_days)
       fetch_1h_candles(rest, pair, backfill_days)
+      fetch_1d_candles(rest, pair, backfill_days)
     end
   end
 
   private
 
   def fetch_1m_candles(rest, pair, backfill_days)
-    # Choose the later of (last known + 1m) and (backfill_days ago)
-    # Use shorter backfill for 1m candles since they're very frequent
-    backfill_days_1m = [backfill_days.to_i, 1].min # Cap at 1 day for 1m
-    start_time = [last_candle_time(pair.product_id, "1m")&.+(1.minute), backfill_days_1m.days.ago].compact.max
+    # 1m: cap single request at 5h (300 candles); chunked for longer windows
+    backfill_hours_1m = [backfill_days.to_i * 24, 6].min
+    start_time = [last_candle_time(pair.product_id, "1m")&.+(1.minute), backfill_hours_1m.hours.ago].compact.max
 
-    # Use chunked fetching for large date ranges to avoid API limits
-    if backfill_days_1m > 1
-      rest.upsert_1m_candles_chunked(
-        product_id: pair.product_id,
-        start_time: start_time,
-        end_time: Time.now.utc,
-        chunk_days: 1
-      )
-    else
-      rest.upsert_1m_candles(
-        product_id: pair.product_id,
-        start_time: start_time,
-        end_time: Time.now.utc
-      )
-    end
+    rest.upsert_1m_candles(
+      product_id: pair.product_id,
+      start_time: start_time,
+      end_time: Time.now.utc
+    )
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 1m candles for #{pair.product_id}: #{e.message}")
-
-    # Track candle fetching errors with specific context
     Sentry.with_scope do |scope|
       scope.set_tag("job_type", "fetch_candles")
       scope.set_tag("timeframe", "1m")
       scope.set_tag("product_id", pair.product_id)
       scope.set_tag("error_type", "candle_fetch_error")
-
       scope.set_context("candle_fetch", {
         product_id: pair.product_id,
         timeframe: "1m",
         backfill_days: backfill_days,
         start_time: start_time&.iso8601
       })
-
       Sentry.capture_exception(e)
     end
   end
 
   def fetch_5m_candles(rest, pair, backfill_days)
-    # Choose the later of (last known + 5m) and (backfill_days ago)
-    # Use shorter backfill for 5m candles since they're frequent
-    backfill_days_5m = [backfill_days.to_i, 2].min # Cap at 2 days for 5m
+    # 5m: cap single request at 24h (288 candles); chunked for longer windows
+    backfill_days_5m = [backfill_days.to_i, 1].min
     start_time = [last_candle_time(pair.product_id, "5m")&.+(5.minutes), backfill_days_5m.days.ago].compact.max
 
-    # Use chunked fetching for large date ranges to avoid API limits
-    if backfill_days_5m > 2
-      rest.upsert_5m_candles_chunked(
-        product_id: pair.product_id,
-        start_time: start_time,
-        end_time: Time.now.utc,
-        chunk_days: 2
-      )
-    else
-      rest.upsert_5m_candles(
-        product_id: pair.product_id,
-        start_time: start_time,
-        end_time: Time.now.utc
-      )
-    end
+    rest.upsert_5m_candles(
+      product_id: pair.product_id,
+      start_time: start_time,
+      end_time: Time.now.utc
+    )
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 5m candles for #{pair.product_id}: #{e.message}")
-
-    # Track candle fetching errors with specific context
     Sentry.with_scope do |scope|
       scope.set_tag("job_type", "fetch_candles")
       scope.set_tag("timeframe", "5m")
       scope.set_tag("product_id", pair.product_id)
       scope.set_tag("error_type", "candle_fetch_error")
-
       scope.set_context("candle_fetch", {
         product_id: pair.product_id,
         timeframe: "5m",
-        backfill_days: backfill_days_5m,
+        backfill_days: backfill_days,
         start_time: start_time&.iso8601
       })
-
       Sentry.capture_exception(e)
     end
   end
@@ -180,6 +152,34 @@ class FetchCandlesJob < ApplicationJob
         start_time: start_time&.iso8601
       })
 
+      Sentry.capture_exception(e)
+    end
+  end
+
+  def fetch_30m_candles(rest, pair, backfill_days)
+    start_time = [last_candle_time(pair.product_id, "30m")&.+(30.minutes), backfill_days.to_i.days.ago].compact.max
+    rest.upsert_30m_candles(product_id: pair.product_id, start_time: start_time, end_time: Time.now.utc)
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 30m candles for #{pair.product_id}: #{e.message}")
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "30m")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_context("candle_fetch", {product_id: pair.product_id, timeframe: "30m", start_time: start_time&.iso8601})
+      Sentry.capture_exception(e)
+    end
+  end
+
+  def fetch_1d_candles(rest, pair, backfill_days)
+    start_time = [last_candle_time(pair.product_id, "1d")&.+(1.day), backfill_days.to_i.days.ago].compact.max
+    rest.upsert_1d_candles(product_id: pair.product_id, start_time: start_time, end_time: Time.now.utc)
+  rescue => e
+    Rails.logger.error("[Candles] Failed to fetch 1d candles for #{pair.product_id}: #{e.message}")
+    Sentry.with_scope do |scope|
+      scope.set_tag("job_type", "fetch_candles")
+      scope.set_tag("timeframe", "1d")
+      scope.set_tag("product_id", pair.product_id)
+      scope.set_context("candle_fetch", {product_id: pair.product_id, timeframe: "1d", start_time: start_time&.iso8601})
       Sentry.capture_exception(e)
     end
   end

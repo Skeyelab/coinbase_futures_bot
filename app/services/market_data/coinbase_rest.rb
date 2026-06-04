@@ -9,12 +9,23 @@ module MarketData
   class CoinbaseRest
     DEFAULT_BASE = "https://api.coinbase.com"
 
-    # Granularity strings for Advanced Trade API
+    # Granularity strings for Advanced Trade API candle endpoint.
+    # Full enum per OpenAPI spec (api.coinbase.com/api/v3/brokerage/products/{id}/candles).
+    # All granularities work for futures product IDs (BIT-*, ET-*, NOL-*) — including
+    # ONE_MINUTE and FIVE_MINUTE. The constraint is a hard limit of 350 candles per request:
+    #   1m  → max window ≤5h50m (use 5h chunks = 300 candles)
+    #   5m  → max window ≤1d10h  (use 24h chunks = 288 candles)
+    #   15m → max window ≤3d14h  (use 3d chunks = 288 candles)
     GRANULARITY = {
       60 => "ONE_MINUTE",
       300 => "FIVE_MINUTE",
       900 => "FIFTEEN_MINUTE",
-      3600 => "ONE_HOUR"
+      1800 => "THIRTY_MINUTE",
+      3600 => "ONE_HOUR",
+      7200 => "TWO_HOUR",
+      14400 => "FOUR_HOUR",
+      21600 => "SIX_HOUR",
+      86400 => "ONE_DAY"
     }.freeze
 
     def initialize(base_url: ENV.fetch("COINBASE_REST_URL", DEFAULT_BASE))
@@ -35,11 +46,29 @@ module MarketData
     end
 
     def list_products
-      resp = authenticated_get("/api/v3/brokerage/products", {product_type: "FUTURE"})
-      data = JSON.parse(resp.body)
-      products = data["products"] || []
-      Rails.logger.info("Fetched #{products.count} products from Advanced Trade API")
-      products
+      all_products = []
+      cursor = nil
+
+      loop do
+        params = {
+          product_type: "FUTURE",
+          contract_expiry_type: "EXPIRING",
+          expiring_contract_status: "STATUS_UNEXPIRED"
+        }
+        params[:cursor] = cursor if cursor
+
+        resp = authenticated_get("/api/v3/brokerage/products", params)
+        data = JSON.parse(resp.body)
+        page_products = data["products"] || []
+        all_products.concat(page_products)
+
+        pagination = data["pagination"] || {}
+        break unless pagination["has_next"]
+        cursor = pagination["next_cursor"]
+      end
+
+      Rails.logger.info("Fetched #{all_products.count} products from Advanced Trade API")
+      all_products
     end
 
     def upsert_products
@@ -47,7 +76,7 @@ module MarketData
       futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET|NOL)-/ && !p["trading_disabled"] }
 
       futures_products.each do |p|
-        contract_info = TradingPair.parse_contract_info(p["product_id"])
+        contract_info = build_contract_info(p)
         next unless contract_info
 
         TradingPair.upsert({
@@ -256,10 +285,57 @@ module MarketData
       Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
     end
 
+    # Upsert 30-minute candles
+    def upsert_30m_candles(product_id:, start_time:, end_time: Time.now.utc)
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 1800)
+      return unless data.is_a?(Array)
+
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        Candle.create_or_find_by(symbol: product_id, timeframe: "30m", timestamp: ts) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 30m candles for #{product_id}")
+    end
+
+    # Upsert 1-day candles
+    def upsert_1d_candles(product_id:, start_time:, end_time: Time.now.utc)
+      data = fetch_candles(product_id: product_id, start_iso8601: start_time.iso8601, end_iso8601: end_time.iso8601, granularity: 86400)
+      return unless data.is_a?(Array)
+
+      data.sort_by { |arr| arr[0].to_i }.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+
+        Candle.create_or_find_by(symbol: product_id, timeframe: "1d", timestamp: ts) do |candle|
+          candle.open = open
+          candle.high = high
+          candle.low = low
+          candle.close = close
+          candle.volume = volume
+        end
+      end
+
+      Rails.logger.info("Completed upserting 1d candles for #{product_id}")
+    end
+
     # Upsert 5-minute candles
     def upsert_5m_candles(product_id:, start_time:, end_time: Time.now.utc)
       # For larger date ranges, use chunked fetching to avoid API limits
-      if (end_time - start_time) > 2.days
+      # 5m: 350 candles * 300s = 105,000s ≈ 29h max; use 1.day (288 candles) per chunk
+      if (end_time - start_time) > 1.day
         upsert_5m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
@@ -301,12 +377,12 @@ module MarketData
     end
 
     # Upsert 5-minute candles using chunked fetching for large date ranges
-    def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 2)
+    def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 24)
       all_data = []
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [current_start + chunk_hours.hours, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -352,7 +428,8 @@ module MarketData
     # Upsert 1-minute candles
     def upsert_1m_candles(product_id:, start_time:, end_time: Time.now.utc)
       # For larger date ranges, use chunked fetching to avoid API limits
-      if (end_time - start_time) > 1.day
+      # 1m: 350 candles * 60s = 21,000s ≈ 5h50m max; use 5h (300 candles) per chunk
+      if (end_time - start_time) > 5.hours
         upsert_1m_candles_chunked(product_id: product_id, start_time: start_time, end_time: end_time)
         return
       end
@@ -394,12 +471,12 @@ module MarketData
     end
 
     # Upsert 1-minute candles using chunked fetching for large date ranges
-    def upsert_1m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 1)
+    def upsert_1m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 5)
       all_data = []
       current_start = start_time
 
       while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
+        current_end = [current_start + chunk_hours.hours, end_time].min
         begin
           chunk_data = fetch_candles(
             product_id: product_id,
@@ -465,6 +542,31 @@ module MarketData
     end
 
     private
+
+    # Build contract info hash from API product object.
+    # Prefers future_product_details.contract_expiry (RFC3339) over regex date parsing
+    # from product_id. Falls back to TradingPair.parse_contract_info for legacy/unknown shapes.
+    def build_contract_info(product)
+      parsed = TradingPair.parse_contract_info(product["product_id"])
+      return nil unless parsed
+
+      # Override expiration_date if the API provides a richer timestamp
+      details = product["future_product_details"]
+      if details && (expiry_str = details["contract_expiry"]).present?
+        begin
+          parsed = parsed.merge(expiration_date: Time.parse(expiry_str).utc.to_date)
+        rescue ArgumentError, TypeError
+          # fallback to regex-parsed date already in parsed
+        end
+      end
+
+      # Map FUTURES_ASSET_TYPE_ENERGY (oil) etc. to correct base currency if not already set
+      if details && (asset_type = details["futures_asset_type"])
+        parsed = parsed.merge(base_currency: "OIL") if asset_type == "FUTURES_ASSET_TYPE_ENERGY" && parsed[:base_currency] == "NOL"
+      end
+
+      parsed
+    end
 
     def authenticated_get(path, params = {})
       now = Time.now.to_i

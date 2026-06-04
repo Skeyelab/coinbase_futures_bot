@@ -42,7 +42,7 @@ The algorithm that analyzes market data and produces Signals. Answers *when* to 
 A Position with no intraday closure requirement. Held across days until stop-loss, take-profit, or manual exit. A per-Position property; contrast with Day Trade.
 
 ### Timeframe
-The candlestick resolution used by a Strategy — e.g. 1m, 5m, 15m, 1h, 1d. Different Underlyings may use different timeframe sets (e.g. daily timeframes matter more for commodities driven by weekly reports). **Open question:** whether available timeframes are constrained by what Coinbase's API supports or are freely configurable per-Underlying. See [#195](https://github.com/Skeyelab/coinbase_futures_bot/issues/195).
+The candlestick resolution used by a Strategy. Coinbase futures contracts (`BIT-*`, `ET-*`, `NOL-*`) support **all nine Advanced Trade API granularities**: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 1d. The constraint is a hard limit of **350 candles per request** — not the granularity itself. Requests exceeding 350 candles return 400. Safe single-request windows: 1m ≤5h50m, 5m ≤1d10h, 15m ≤3d14h. The `FetchCandlesJob` uses chunked fetching (5h for 1m, 24h for 5m, 3d for 15m) to backfill longer periods. The same supported timeframe set applies to all underlyings (BTC, ETH, oil) — there is no per-underlying restriction. Resolved by [#195](https://github.com/Skeyelab/coinbase_futures_bot/issues/195).
 
 ### Underlying
 The asset a Contract is based on — e.g. BTC, ETH, crude oil. A first-class grouping concept: Contracts sharing the same Underlying share sentiment sources, Strategy configuration, and Risk Profile assignment. Rollover moves between Contracts within the same Underlying. Not currently a model in the code — parsed implicitly from the Contract product ID prefix.
