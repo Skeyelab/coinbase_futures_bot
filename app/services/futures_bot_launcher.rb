@@ -17,13 +17,14 @@ class FuturesBotLauncher
   def initialize(
     logger: Rails.logger,
     tui: nil,
-    tui_refresh: Cli::TuiDashboard::DEFAULT_REFRESH,
+    tui_refresh: nil,
     signal_interval: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i,
     skip_market_data: ENV["FUTURESBOT_SKIP_MARKET_DATA"].present?,
     skip_signal_runner: ENV["FUTURESBOT_SKIP_SIGNAL_RUNNER"].present?
   )
     @logger = logger
-    @tui = tui || Cli::TuiDashboard.new(refresh_interval: tui_refresh)
+    @tui = tui || :bubbletea
+    @tui_refresh = tui_refresh
     @signal_interval = signal_interval
     @skip_market_data = skip_market_data
     @skip_signal_runner = skip_signal_runner
@@ -44,7 +45,12 @@ class FuturesBotLauncher
     start_signal_runner unless @skip_signal_runner
 
     @logger.info("[Launcher] Launching TUI dashboard...")
-    @tui.start
+    if @tui == :bubbletea
+      require "tui"
+      Bubbletea.run(Tui::App.new, alt_screen: true)
+    else
+      @tui.start
+    end
   ensure
     shutdown
   end
