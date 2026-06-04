@@ -199,9 +199,8 @@ jobs:
           done
           echo "PostgreSQL is ready!"
 
-          # Create worker DBs manually (parallel_tests is dev-only gem, rake tasks unavailable in CI)
-          # Worker 1 uses the default DB; worker 2 gets a numbered suffix DB
-          bin/rails db:create db:migrate
+          # Create both numbered worker DBs (--first-is-1 means workers use suffix 1 and 2)
+          TEST_ENV_NUMBER=1 bin/rails db:create db:migrate
           TEST_ENV_NUMBER=2 bin/rails db:create db:migrate
           echo "Database setup complete"
 
@@ -261,12 +260,12 @@ jobs:
 
           # Verify database connectivity with real operations
           echo "=== VERIFYING REAL DATABASE OPERATIONS ==="
-          bin/rails runner "puts 'Database: ' + ActiveRecord::Base.connection.current_database"
-          bin/rails runner "puts 'Tables: ' + ActiveRecord::Base.connection.tables.join(', ')"
+          TEST_ENV_NUMBER=1 bin/rails runner "puts 'Database: ' + ActiveRecord::Base.connection.current_database"
+          TEST_ENV_NUMBER=1 bin/rails runner "puts 'Tables: ' + ActiveRecord::Base.connection.tables.join(', ')"
 
           # Test real database operations
           echo "=== TESTING REAL DATABASE OPERATIONS ==="
-          bin/rails runner "
+          TEST_ENV_NUMBER=1 bin/rails runner "
             begin
               # Create a test record
               test_pos = Position.create!(

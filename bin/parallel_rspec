@@ -58,5 +58,5 @@ flags = parallel_flags_from_config(config_path)
 # Reduces allocator churn when many Ruby processes share one host (common parallel win).
 ENV["MALLOC_ARENA_MAX"] ||= "2"
 
-cmd = ["bundle", "exec", "parallel_rspec", *flags, *ARGV]
+cmd = ["bundle", "exec", "parallel_rspec", "--first-is-1", *flags, *ARGV]
 exec(*cmd)
