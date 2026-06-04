@@ -26,6 +26,17 @@
 
 ### Session log
 
+#### 2026-06-04 15:44 UTC
+- Context: Added shared Conductor workspace setup for this Rails repo.
+- Changes:
+  - Created root `conductor.json` with `scripts.setup` only.
+  - Setup script reuses root `.env` via symlink when present, runs `bundle check || bundle install`, then `bin/rails db:prepare`.
+  - Intentionally avoided `bin/setup` because it mutates git hooks and restarts the app.
+- Files touched:
+  - `conductor.json`, `SESSION_NOTES.md`
+- Next steps:
+  - If teammates want copied env files instead of symlinks, move that concern to Conductor Files to copy or `.worktreeinclude`.
+
 #### 2026-04-30 00:00 UTC
 - Context: Finished merge of `origin/main` into `feat/signals-longshort-guard-api-cleanup` for PR #181; resolved conflicts.
 - Changes:
@@ -3553,5 +3564,4 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
-
 

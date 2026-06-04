@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "setup": "if [ -f \"$CONDUCTOR_ROOT_PATH/.env\" ] && [ ! -e .env ]; then ln -s \"$CONDUCTOR_ROOT_PATH/.env\" .env; fi\nbundle check || bundle install\nbin/rails db:prepare"
+  }
+}
