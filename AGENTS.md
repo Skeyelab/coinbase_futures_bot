@@ -9,10 +9,9 @@
 
 ## Learned Workspace Facts
 
-- This workspace uses `bd` (beads) as the primary issue tracker workflow.
-- Running `bd prime` is expected before active issue execution.
-- Beads dependency ordering is managed explicitly with `bd dep add`.
-- Issue planning often spans both GitHub issues and Beads dependencies.
+- This workspace uses GitHub Issues as the only issue tracker workflow.
+- Use `gh` for issue listing, review, editing, and closure.
+- Express dependency/order in GitHub issue bodies, linked issues, or PR references rather than a secondary tracker.
 
 ## What this repo is
 
@@ -55,12 +54,13 @@
 - Day trading close workflow: `bin/rake day_trading:manage`
 - Kill switch: `bin/futuresbot halt [--reason "..."]` / `bin/futuresbot resume`
 
-### Beads issue tracker
+### GitHub issue tracker
 
-- List issues: `bd list` / `bd ready`
-- Sync with GitHub: `GITHUB_TOKEN="$(gh auth token)" bd github sync`
-  - Note: `bd config set github.token` is written to config.yaml but not read by `bd github sync` (bd bug); use the env var workaround above.
-- Push to Dolt remote: `bd dolt push` (no remote configured yet)
+- List issues: `gh issue list`
+- View issue: `gh issue view <number>`
+- Create issue: `gh issue create`
+- Edit issue: `gh issue edit <number>`
+- Close issue: `gh issue close <number>`
 
 ## High-value gotchas
 
