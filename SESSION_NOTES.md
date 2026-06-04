@@ -26,6 +26,21 @@
 
 ### Session log
 
+#### 2026-06-04 20:50 UTC
+- Context: Added docs-only CI bypass so repo does not burn Ruby lint/test time on prose-only PRs.
+- Changes:
+  - Added `changes` job in `.github/workflows/ci.yml` to classify docs-only pull requests from changed paths.
+  - Kept existing required check names (`StandardRB (lint)`, `Security scans`, `Rails tests with coverage`, `Generate Coverage Badge`) but turned them into fast pass/no-op jobs for docs-only PRs.
+  - Left push-to-main behavior unchanged: full CI still runs outside pull requests.
+- Commands run:
+  - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); puts "yaml-ok"'`
+  - `rg -n "docs_only|Docs-only PR" .github/workflows/ci.yml`
+- Files touched:
+  - `.github/workflows/ci.yml`
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Open PR and verify one docs-only diff shows skipped/no-op lint/test jobs while code PRs still run full CI.
+
 #### 2026-06-04 20:34 UTC
 - Context: Refreshed PR #174 against `origin/main` to clear merge conflicts before manual landing.
 - Changes:
