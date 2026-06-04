@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs parallel_tests with options from PARALLEL_RSPEC_CONFIG (YAML), default
+# `.parallel_rspec_config`. Does not overwrite tracked files — use
+# `bin/parallel_rspec_local` for `.parallel_rspec_config.local`.
+
+require "bundler/setup"
+require "yaml"
+
+ROOT = File.expand_path("..", __dir__)
+Dir.chdir(ROOT)
+
+def parallel_flags_from_config(path)
+  return [] unless File.file?(path)
+
+  raw = YAML.safe_load_file(path, permitted_classes: [],
+    permitted_symbols: [],
+    aliases: false)
+  config = raw.is_a?(Hash) ? raw : {}
+  flags = []
+
+  processes = config["processes"]
+  if processes.is_a?(Integer) && processes.positive?
+    flags.push("-n", processes.to_s)
+  end
+
+  # Forcing runtime without tmp/parallel_runtime_rspec.log makes parallel_tests abort.
+  group_by = config["group_by"].to_s
+  if group_by == "runtime"
+    log = ENV.fetch("PARALLEL_RSPEC_RUNTIME_LOG", "tmp/parallel_runtime_rspec.log")
+    log = File.expand_path(log, ROOT)
+    group_by = "" unless File.file?(log) && File.size(log).positive?
+  end
+  flags.push("--group-by", group_by) if %w[runtime filesize found].include?(group_by)
+
+  singles = config["single"]
+  if singles.is_a?(Array)
+    singles.each do |entry|
+      next unless entry.is_a?(String) && !entry.strip.empty?
+
+      flags.push("-s", Regexp.escape(entry.strip))
+    end
+  end
+
+  flags.push("--isolate") if config["isolate"] == true
+
+  flags
+rescue Psych::SyntaxError => e
+  warn "WARNING: invalid YAML in #{path}: #{e.message}"
+  []
+end
+
+config_path = ENV.fetch("PARALLEL_RSPEC_CONFIG", ".parallel_rspec_config")
+config_path = File.expand_path(config_path, ROOT)
+
+flags = parallel_flags_from_config(config_path)
+# Reduces allocator churn when many Ruby processes share one host (common parallel win).
+ENV["MALLOC_ARENA_MAX"] ||= "2"
+
+cmd = ["bundle", "exec", "parallel_rspec", *flags, *ARGV]
+exec(*cmd)

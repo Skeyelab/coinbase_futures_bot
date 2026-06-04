@@ -1,4 +1,5 @@
+# `-O .rspec_parallel` replaces default `.rspec`; keep spec_helper so SimpleCov + RSpec config match.
+--require spec_helper
 --color
 --format progress
---profile 10
 --order random

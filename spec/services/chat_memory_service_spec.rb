@@ -7,6 +7,27 @@ RSpec.describe ChatMemoryService, type: :service do
   let(:service) { described_class.new(session_id) }
   let(:session) { service.instance_variable_get(:@session) }
 
+  # Batched insert avoids 100+ FactoryBot creates (slow / flaky under parallel + Timeout).
+  def bulk_chat_messages(session, count:, relevance_score:, timestamp:, message_type: "user")
+    now = Time.current
+    (0...count).each_slice(250) do |indices|
+      rows = indices.map do |i|
+        {
+          chat_session_id: session.id,
+          content: "bulk-#{i}",
+          message_type: message_type,
+          timestamp: timestamp,
+          profit_impact: "unknown",
+          relevance_score: relevance_score,
+          metadata: {},
+          created_at: now,
+          updated_at: now
+        }
+      end
+      ChatMessage.insert_all(rows)
+    end
+  end
+
   describe "#initialize" do
     it "creates or finds chat session" do
       expect { service }.to change(ChatSession, :count).by(1)
@@ -61,7 +82,7 @@ RSpec.describe ChatMemoryService, type: :service do
 
     context "when session has too many messages" do
       before do
-        create_list(:chat_message, 201, chat_session: session)
+        bulk_chat_messages(session, count: 201, relevance_score: 1.0, timestamp: 2.hours.ago)
       end
 
       it "prunes old messages" do
@@ -277,9 +298,9 @@ RSpec.describe ChatMemoryService, type: :service do
   describe "message pruning behavior" do
     it "automatically prunes when session exceeds 200 messages" do
       # Create 201 messages to trigger pruning
-      create_list(:chat_message, 50, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
-      create_list(:chat_message, 50, chat_session: session, relevance_score: 3.0, timestamp: 3.hours.ago)
-      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+      bulk_chat_messages(session, count: 50, relevance_score: 1.0, timestamp: 5.hours.ago)
+      bulk_chat_messages(session, count: 50, relevance_score: 3.0, timestamp: 3.hours.ago)
+      bulk_chat_messages(session, count: 101, relevance_score: 5.0, timestamp: 1.hour.ago)
 
       # This should trigger pruning automatically
       service.store("New message", :user, :high)
@@ -290,8 +311,8 @@ RSpec.describe ChatMemoryService, type: :service do
 
     it "prioritizes high relevance messages during pruning" do
       # Create mix of low and high relevance messages beyond threshold
-      create_list(:chat_message, 100, chat_session: session, relevance_score: 1.0, timestamp: 5.hours.ago)
-      create_list(:chat_message, 101, chat_session: session, relevance_score: 5.0, timestamp: 1.hour.ago)
+      bulk_chat_messages(session, count: 100, relevance_score: 1.0, timestamp: 5.hours.ago)
+      bulk_chat_messages(session, count: 101, relevance_score: 5.0, timestamp: 1.hour.ago)
 
       # Trigger pruning
       service.store("New message", :user, :high)

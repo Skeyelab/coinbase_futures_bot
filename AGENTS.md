@@ -6,12 +6,16 @@
 - Prefer concise, smart implementations and brief communication.
 - Prefer TDD and keep unit testing as a first-class requirement.
 - Keep issue work agent-ready with explicit scope and acceptance criteria.
+- Align the active Ruby with `.ruby-version` before Bundler-heavy work; mismatched shells cause native-extension load failures unrelated to app code.
 
 ## Learned Workspace Facts
 
-- This workspace uses GitHub Issues as the only issue tracker workflow.
-- Use `gh` for issue listing, review, editing, and closure.
-- Express dependency/order in GitHub issue bodies, linked issues, or PR references rather than a secondary tracker.
+- This workspace uses `bd` (beads) as the primary issue tracker workflow.
+- Running `bd prime` is expected before active issue execution.
+- Beads dependency ordering is managed explicitly with `bd dep add`.
+- Issue planning often spans both GitHub issues and Beads dependencies.
+- Guard + `guard-rspec` are wired for local RSpec-on-change (`bundle exec guard`); use a project `Guardfile` and pause Guard when you need an exclusive run (long single-process or CI-style).
+- When the shell default Ruby does not match `.ruby-version`, run commands through the project RVM gemset (quickstart: `ruby-3.2.4@coinbase_futures_bot`, e.g. `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec …`) so `bundle exec` and native gems stay consistent.
 
 ## What this repo is
 
@@ -33,10 +37,10 @@
 ### Testing
 
 - Single file / targeted debug: `bundle exec rspec spec/path/to/file_spec.rb`
-- Full suite (preferred for whole-repo checks): `bundle exec parallel_rspec`
+- Full suite (preferred for whole-repo checks): `bin/parallel_rspec` (YAML-driven) or `bundle exec parallel_rspec` (CLI only; ignores `.parallel_rspec_config` unless you pass flags yourself).
 - Coverage run: `COVERAGE=true bundle exec rspec`
 - RSpec defaults to random order and documentation formatter via `.rspec`.
-- `parallel_rspec` uses `.rspec_parallel` and local process grouping config.
+- `parallel_rspec` reads `.rspec_parallel` for RSpec options; `bin/parallel_rspec` adds `-n` / `--group-by` / `-s` from `PARALLEL_RSPEC_CONFIG` (default `.parallel_rspec_config`) and sets `MALLOC_ARENA_MAX=2` unless already set.
 
 ### Lint / security
 
@@ -54,18 +58,17 @@
 - Day trading close workflow: `bin/rake day_trading:manage`
 - Kill switch: `bin/futuresbot halt [--reason "..."]` / `bin/futuresbot resume`
 
-### GitHub issue tracker
+### Beads issue tracker
 
-- List issues: `gh issue list`
-- View issue: `gh issue view <number>`
-- Create issue: `gh issue create`
-- Edit issue: `gh issue edit <number>`
-- Close issue: `gh issue close <number>`
+- List issues: `bd list` / `bd ready`
+- Sync with GitHub: `GITHUB_TOKEN="$(gh auth token)" bd github sync`
+  - Note: `bd config set github.token` is written to config.yaml but not read by `bd github sync` (bd bug); use the env var workaround above.
+- Push to Dolt remote: `bd dolt push` (no remote configured yet)
 
 ## High-value gotchas
 
 - `bin/setup` is not a harmless bootstrap script. It also runs `git config core.hooksPath .githooks`. Do not run it casually in automation if you want to avoid mutating local git config.
-- `bin/parallel_rspec_local` copies `.parallel_rspec_config.local` over `.parallel_rspec_config` before running tests. That mutates a tracked file.
+- `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` to `.parallel_rspec_config.local` and reuses `bin/parallel_rspec` (no file copying).
 - The UI credentials used by the positions web UI are `POSITIONS_UI_USERNAME` and `POSITIONS_UI_PASSWORD` (`app/controllers/positions_controller.rb`), while `.env.example` documents different names under “API Authentication”. Trust controller code, not the example text.
 - `bin/futuresbot dashboard` and `bin/futuresbot chat` both sync positions from Coinbase on startup unless `FUTURESBOT_SKIP_POSITION_SYNC` is set.
 - The repository’s `.env.example` contains credential-like Coinbase values. Treat that file as shape/examples only; never reuse or commit secrets from it.

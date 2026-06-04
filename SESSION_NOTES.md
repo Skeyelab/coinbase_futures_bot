@@ -26,154 +26,47 @@
 
 ### Session log
 
-#### 2026-06-04 20:25 UTC
-- Context: Refreshed PR #173 against `origin/main` and addressed inline review comments before merge.
+#### 2026-04-30 00:15 UTC
+- Context: `parallel_rspec` reported 4 failures (Sentry health breadcrumb + ChatMemory timeouts/savepoints).
 - Changes:
-  - Merged `origin/main` into `feat/futuresbot-start` and resolved the only conflict by keeping current `main`'s `.beads/issues.jsonl`.
-  - Updated `FuturesBotLauncher` to derive spot IDs from enabled futures pairs, stop subscribers cooperatively, and use kill only as a fallback after join timeout.
-  - Added `stop` hooks to both Coinbase WebSocket subscribers and tightened launcher/subscriber specs around shutdown behavior.
+  - HealthController spec: spy with `have_received` + `hash_including` so `db.query` breadcrumbs from middleware do not break the expectation.
+  - ChatMemoryService specs: `insert_all` helper for large fixtures; `prune_old_messages` uses `delete_all` instead of row-wise `destroy_all`.
+  - `timeout_helper`: 120s cap for `ChatMemoryService` examples.
 - Commands run:
-  - `git merge origin/main`
-  - `bundle exec rspec spec/services/futuresbot_launcher_spec.rb spec/services/coinbase_spot_subscriber_spec.rb spec/services/coinbase_futures_subscriber_spec.rb spec/lib/cli/futures_bot_cli_spec.rb`
-  - `bin/standardrb app/services/futures_bot_launcher.rb app/services/market_data/coinbase_spot_subscriber.rb app/services/market_data/coinbase_futures_subscriber.rb spec/services/futuresbot_launcher_spec.rb spec/services/coinbase_spot_subscriber_spec.rb spec/services/coinbase_futures_subscriber_spec.rb`
+  - `bundle exec rspec spec/services/chat_memory_service_spec.rb spec/controllers/health_controller_enhanced_spec.rb:202`
 - Files touched:
-  - `app/services/futures_bot_launcher.rb`
-  - `app/services/market_data/coinbase_spot_subscriber.rb`
-  - `app/services/market_data/coinbase_futures_subscriber.rb`
-  - `spec/services/futuresbot_launcher_spec.rb`
-  - `spec/services/coinbase_spot_subscriber_spec.rb`
-  - `spec/services/coinbase_futures_subscriber_spec.rb`
-  - `SESSION_NOTES.md`
+  - `spec/controllers/health_controller_enhanced_spec.rb`, `spec/services/chat_memory_service_spec.rb`, `app/services/chat_memory_service.rb`, `spec/support/timeout_helper.rb`, `SESSION_NOTES.md`
 - Next steps:
-  - Push refreshed PR #173 branch.
-  - Refresh PR #174 against `origin/main`, then push and merge once CI is green.
-#### 2026-06-04 12:10 EDT
-- Context: Diagnosed why PRs were merging before CI finished, then fixed repo protection.
-- Changes:
-  - Confirmed `main` had no branch protection or rulesets, so `gh pr merge --auto` merged immediately because zero checks were required.
-  - Applied GitHub branch protection to `main` with strict required status checks:
-    - `StandardRB (lint)`
-    - `Security scans`
-    - `Rails tests with coverage`
-- Commands run:
-  - `gh api repos/Skeyelab/coinbase_futures_bot/branches/main/protection`
-  - `gh api --method PUT repos/Skeyelab/coinbase_futures_bot/branches/main/protection ...`
-- Files touched:
-  - `SESSION_NOTES.md`
-- Next steps:
-  - If direct pushes or reviewless PR merges should also be blocked, add required PR reviews and/or admin enforcement.
-#### 2026-06-04 20:50 UTC
-- Context: Added docs-only CI bypass so repo does not burn Ruby lint/test time on prose-only PRs.
-- Changes:
-  - Added `changes` job in `.github/workflows/ci.yml` to classify docs-only pull requests from changed paths.
-  - Kept existing required check names (`StandardRB (lint)`, `Security scans`, `Rails tests with coverage`, `Generate Coverage Badge`) but turned them into fast pass/no-op jobs for docs-only PRs.
-  - Left push-to-main behavior unchanged: full CI still runs outside pull requests.
-- Commands run:
-  - `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); puts "yaml-ok"'`
-  - `rg -n "docs_only|Docs-only PR" .github/workflows/ci.yml`
-- Files touched:
-  - `.github/workflows/ci.yml`
-  - `SESSION_NOTES.md`
-- Next steps:
-  - Open PR and verify one docs-only diff shows skipped/no-op lint/test jobs while code PRs still run full CI.
+  - Re-run full `parallel_rspec` locally to confirm 0 failures.
 
-#### 2026-06-04 20:34 UTC
-- Context: Refreshed PR #174 against `origin/main` to clear merge conflicts before manual landing.
+#### 2026-04-29 14:30 UTC
+- Context: Further parallel / suite speed tweaks after wall-clock discussion.
 - Changes:
-  - Merged `origin/main` into `feat/executor-basis-rollover`.
-  - Resolved the only conflict by keeping current `main`'s `.beads/issues.jsonl`; executor code stayed unchanged from the PR.
-  - Re-ran targeted executor spec coverage after the base refresh.
+  - `ActiveJob::Base.queue_adapter = :test` once in `before(:suite)`; dropped per-example assignment.
+  - Removed redundant `spec/support/rspec_rails.rb` (duplicated ActiveJob clears for job/task vs global hook).
+  - `.rspec_parallel`: `--require spec_helper` (parallel `-O` replaces `.rspec`; restores SimpleCov + shared RSpec config).
+  - `bin/parallel_rspec`: default `MALLOC_ARENA_MAX=2` for multi-process allocator behavior.
+  - `docs/testing.md` / wiki tree: dropped stale `rspec_rails.rb` line.
 - Commands run:
-  - `git merge origin/main`
-  - `bundle exec rspec spec/services/execution/futures_executor_spec.rb`
-  - `bin/standardrb app/services/execution/futures_executor.rb spec/services/execution/futures_executor_spec.rb`
+  - `bin/standardrb --fix spec/rails_helper.rb bin/parallel_rspec`
 - Files touched:
-  - `SESSION_NOTES.md`
+  - `spec/rails_helper.rb`, `spec/support/rspec_rails.rb` (deleted), `.rspec_parallel`, `bin/parallel_rspec`, `docs/testing.md`, `wiki/Testing-Guide.md`, `SESSION_NOTES.md`
 - Next steps:
-  - Push refreshed PR #174 branch.
-  - Wait for CI on PRs #173 and #174, then merge any branch GitHub marks ready.
+  - On `ruby-3.2.4@coinbase_futures_bot`, run `bundle exec rspec spec/jobs/health_check_job_spec.rb -O .rspec_parallel` and a full `bin/parallel_rspec_local` to confirm green.
 
-#### 2026-06-04 12:05 EDT
-- Context: Revised Conductor setup fix after confirming this repo uses Doppler, not shared `.env` files.
+#### 2026-04-29 12:00 UTC
+- Context: Parallel RSpec YAML was never consumed by the `parallel_tests` gem; local script overwrote tracked config.
 - Changes:
-  - Replaced `.env`-symlink setup approach in `conductor.json` with non-interactive `doppler setup` scoped to the workspace.
-  - Runs `bin/rails db:prepare` through `doppler run`, while preserving workspace-local `DATABASE_URL` and `TEST_DATABASE_URL` so Doppler secrets do not force the nonexistent local `postgres` role.
-  - Defaults setup to Doppler project `coinbase-futures-bot` config `dev`, while allowing overrides via `DOPPLER_PROJECT`, `DOPPLER_CONFIG`, `CONDUCTOR_SETUP_DATABASE_URL`, and `CONDUCTOR_SETUP_TEST_DATABASE_URL`.
+  - Added `bin/parallel_rspec` to map `.parallel_rspec_config` → CLI (`-n`, `--group-by runtime` only when `tmp/parallel_runtime_rspec.log` exists, `-s` per `single:`).
+  - `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` and loads the same runner (no `cp`).
+  - Dropped `--profile 10` from `.rspec_parallel`; default YAML omits `processes` (CPU / `PARALLEL_TEST_PROCESSORS`); local file keeps `processes: 8`.
 - Commands run:
-  - `DATABASE_URL=postgresql:///coinbase_futures_bot_development TEST_DATABASE_URL=postgresql:///coinbase_futures_bot_test doppler run --project coinbase-futures-bot --config dev --preserve-env="DATABASE_URL,TEST_DATABASE_URL" -- bin/rails db:prepare`
+  - `bin/standardrb --fix bin/parallel_rspec bin/parallel_rspec_local`
+  - `bin/parallel_rspec --help` (smoke)
 - Files touched:
-  - `conductor.json`, `SESSION_NOTES.md`
+  - `bin/parallel_rspec`, `bin/parallel_rspec_local`, `.parallel_rspec_config`, `.parallel_rspec_config.local`, `.rspec_parallel`, `AGENTS.md`, `SESSION_NOTES.md`
 - Next steps:
-  - Re-run Conductor workspace setup from a fresh workspace to confirm Doppler bootstraps automatically.
-
-#### 2026-06-04 15:50 UTC
-- Context: Re-merged latest `origin/main` into PR #187 after base branch advanced again.
-- Changes:
-  - Kept single-file agent guidance model by leaving `CLAUDE.md` deleted.
-  - Merged new mainline Conductor setup docs (`conductor.json` + session note) with prior PR #187 conflict-resolution history.
-  - Verified signal-side regression slice still passes after the merge commit and follow-up rebase merge.
-- Commands run:
-  - `git merge --no-commit --no-ff origin/main`
-  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle install`
-  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
-  - `git push origin HEAD:cursor/rails-platform-conventions-e2d1`
-- Files touched:
-  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted), `conductor.json`
-- Next steps:
-  - Confirm GitHub marks PR #187 mergeable after branch status refresh.
-
-#### 2026-06-04 15:44 UTC
-- Context: Added shared Conductor workspace setup for this Rails repo.
-- Changes:
-  - Created root `conductor.json` with `scripts.setup` only.
-  - Setup script reuses root `.env` via symlink when present, runs `bundle check || bundle install`, then `bin/rails db:prepare`.
-  - Intentionally avoided `bin/setup` because it mutates git hooks and restarts the app.
-- Files touched:
-  - `conductor.json`, `SESSION_NOTES.md`
-- Next steps:
-  - If teammates want copied env files instead of symlinks, move that concern to Conductor Files to copy or `.worktreeinclude`.
-
-#### 2026-06-04 00:00 UTC
-- Context: Resolved `origin/main` merge conflicts for PR #187 (`feat: align repo with rails-platform conventions`).
-- Changes:
-  - Kept platform-convention move to single `AGENTS.md`; left `CLAUDE.md` deleted.
-  - Merged `SESSION_NOTES.md` histories so the 2026-05-16 platform-alignment entry stays above prior mainline entries.
-  - Removed duplicate Beads integration block from `AGENTS.md` introduced by auto-merge.
-- Commands run:
-  - `git merge --no-commit --no-ff origin/main`
-  - `bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
-- Files touched:
-  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted)
-- Next steps:
-  - Commit merge result and push updated PR branch.
-
-#### 2026-05-16 00:45 UTC
-- Context: Aligning repo with ericdahl-dev/rails-platform conventions (GitHub issue #186).
-- Changes:
-  - **Dockerfile**: Fixed Ruby version (3.2.2→3.2.4), removed `# syntax=` line, added jemalloc `LD_PRELOAD`, excluded `:test` group from `BUNDLE_WITHOUT`
-  - **docker-compose.yml**: Added web + worker services matching platform pattern
-  - **production.rb**: Env-driven `assume_ssl`/`force_ssl`, SSL excludes `/up`, host authorization via `APP_HOST`/`RAILS_ALLOWED_HOSTS`, `silence_healthcheck_path`, GoodJob `:external` mode
-  - **development.rb**: Explicit GoodJob `:async` mode
-  - **config/initializers/0_pg_gssenc_fork_safety.rb**: macOS fork safety for libpq GSS/Kerberos
-  - **config/initializers/good_job_auth.rb**: HTTP Basic auth for GoodJob dashboard in non-local envs
-  - **config/routes.rb**: GoodJob mounted at `/jobs` in all environments (auth-protected), removed dev-only gating
-  - **config/database.yml**: Pool minimum 5, `TEST_ENV_NUMBER` for parallel tests, removed verbose comments, dropped hardcoded production database name
-  - **config/cable.yml**: Removed Redis dependency in production (switched to `async`)
-  - **Gemfile**: Added `bundler-audit` gem
-  - **CI**: Added `bundler-audit check --update` step to security job
-  - **AGENTS.md**: Merged Beads integration block from CLAUDE.md
-  - **CLAUDE.md**: Removed (platform standard: single `AGENTS.md`)
-  - **Procfile.dev**: Added for development workflow
-- Commands run:
-  - `bundle install`, `bin/standardrb --fix`, `bin/brakeman --no-pager`, `bundle exec bundler-audit check --update`
-- Files touched:
-  - `Dockerfile`, `docker-compose.yml`, `Procfile.dev`, `Gemfile`, `Gemfile.lock`, `config/environments/production.rb`, `config/environments/development.rb`, `config/database.yml`, `config/cable.yml`, `config/routes.rb`, `config/initializers/0_pg_gssenc_fork_safety.rb`, `config/initializers/good_job_auth.rb`, `.github/workflows/ci.yml`, `AGENTS.md`, `SESSION_NOTES.md`
-- Migrations: None
-- Next steps:
-  - Consider adding `solid_cable` gem for Postgres-backed Action Cable (replaces `async` adapter in production)
-  - Consider switching from `standard` to `rubocop-rails-omakase` (significant formatting change, separate PR)
-  - Consider adding Pundit if authorization becomes needed
-  - Upgrade nokogiri to fix bundler-audit findings
+  - Prefer `bin/parallel_rspec` for full suite so singles/runtime apply; use Ruby 3.2.4 gemset when running (avoid mixed 3.4/3.2 native ext errors).
 
 #### 2026-04-30 00:00 UTC
 - Context: Finished merge of `origin/main` into `feat/signals-longshort-guard-api-cleanup` for PR #181; resolved conflicts.
@@ -3702,3 +3595,5 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
+
+
