@@ -11,6 +11,7 @@ class ContractExpiryManager
   def initialize(logger: Rails.logger)
     @logger = logger
     @positions_service = Trading::CoinbasePositions.new(logger: logger)
+    @lifecycle = Trading::PositionLifecycle.new(positions_service: @positions_service, logger: logger)
     @slack_service = SlackNotificationService
   end
 
@@ -195,40 +196,8 @@ class ContractExpiryManager
   # Close a single position with comprehensive error handling
   def close_single_position(position, reason)
     @logger.info("Closing position #{position.id} (#{position.product_id}): #{reason}")
-
-    begin
-      # Try to close via Coinbase API first
-      result = @positions_service.close_position(product_id: position.product_id)
-
-      if result["success"] || result["order_id"]
-        @logger.info("Successfully closed position #{position.id} via API")
-        1
-      else
-        @logger.warn("API closure failed for position #{position.id}, using local closure")
-        # Fall back to local closure
-        current_price = position.get_current_market_price
-        if current_price
-          position.force_close!(current_price, reason)
-          @logger.info("Successfully closed position #{position.id} locally")
-          1
-        else
-          @logger.error("Cannot close position #{position.id}: no current price available")
-          0
-        end
-      end
-    rescue => e
-      @logger.error("API closure failed for position #{position.id}: #{e.message}")
-      # Fall back to local closure
-      current_price = position.get_current_market_price
-      if current_price
-        position.force_close!(current_price, reason)
-        @logger.info("Successfully closed position #{position.id} locally after API failure")
-        1
-      else
-        @logger.error("Cannot close position #{position.id}: API failed and no current price available")
-        0
-      end
-    end
+    result = @lifecycle.close(position, reason: reason)
+    result.success? ? 1 : 0
   end
 
   # Send Slack notifications for expiry closures
