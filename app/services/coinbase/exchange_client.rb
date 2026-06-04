@@ -32,6 +32,10 @@ module Coinbase
       end
     end
 
+    def authenticated?
+      @authenticated
+    end
+
     # Test authentication with accounts endpoint
     def test_auth
       raise "Authentication required" unless @authenticated
