@@ -26,6 +26,22 @@
 
 ### Session log
 
+#### 2026-06-04 20:34 UTC
+- Context: Refreshed PR #174 against `origin/main` to clear merge conflicts before manual landing.
+- Changes:
+  - Merged `origin/main` into `feat/executor-basis-rollover`.
+  - Resolved the only conflict by keeping current `main`'s `.beads/issues.jsonl`; executor code stayed unchanged from the PR.
+  - Re-ran targeted executor spec coverage after the base refresh.
+- Commands run:
+  - `git merge origin/main`
+  - `bundle exec rspec spec/services/execution/futures_executor_spec.rb`
+  - `bin/standardrb app/services/execution/futures_executor.rb spec/services/execution/futures_executor_spec.rb`
+- Files touched:
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Push refreshed PR #174 branch.
+  - Wait for CI on PRs #173 and #174, then merge any branch GitHub marks ready.
+
 #### 2026-06-04 12:05 EDT
 - Context: Revised Conductor setup fix after confirming this repo uses Doppler, not shared `.env` files.
 - Changes:
