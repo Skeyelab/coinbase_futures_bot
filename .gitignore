@@ -66,3 +66,8 @@ spec/examples.txt
 .dolt/
 *.db
 .beads-credential-key
+
+# Local scratch/debug scripts
+*.scratch.rb
+debug_*.rb
+check_*.rb

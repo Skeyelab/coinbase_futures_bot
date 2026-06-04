@@ -105,19 +105,19 @@ class Position < ApplicationRecord
 
   # Contract expiry methods
   def days_until_expiry
-    FuturesContract.days_until_expiry(product_id)
+    Contract.days_until_expiry(product_id)
   end
 
   def expiring_soon?(buffer_days = 2)
-    FuturesContract.expiring_soon?(product_id, buffer_days)
+    Contract.expiring_soon?(product_id, buffer_days)
   end
 
   def expired?
-    FuturesContract.expired?(product_id)
+    Contract.expired?(product_id)
   end
 
   def expiry_date
-    FuturesContract.parse_expiry_date(product_id)
+    Contract.parse_expiry_date(product_id)
   end
 
   def needs_expiry_closure?(buffer_days = 2)
@@ -125,7 +125,7 @@ class Position < ApplicationRecord
   end
 
   def margin_impact_near_expiry
-    FuturesContract.margin_impact_near_expiry(product_id)
+    Contract.margin_impact_near_expiry(product_id)
   end
 
   def get_current_market_price
@@ -238,15 +238,15 @@ class Position < ApplicationRecord
 
   # Contract expiry class methods
   def self.positions_approaching_expiry(buffer_days = 2)
-    FuturesContract.find_expiring_positions(buffer_days)
+    Contract.find_expiring_positions(buffer_days)
   end
 
   def self.positions_expiring_today
-    FuturesContract.find_expiring_positions(0)
+    Contract.find_expiring_positions(0)
   end
 
   def self.expired_positions
-    FuturesContract.find_expired_positions
+    Contract.find_expired_positions
   end
 
   def self.close_expiring_positions(buffer_days = 2, close_price = nil, reason = "Contract expiry")

@@ -151,14 +151,11 @@ module Execution
       product_id
     end
 
-    # Extract asset from product ID
     def extract_asset_from_product_id(product_id)
-      case product_id
-      when /^(BTC|ETH)(-USD)?$/
-        ::Regexp.last_match(1)
-      when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
-        product_id.start_with?("BIT") ? "BTC" : "ETH"
-      end
+      match = product_id.match(/^(BTC|ETH)(-USD)?$/)
+      return match[1] if match
+
+      MarketData::FuturesContractManager::ASSET_MAPPING.invert[product_id.split("-").first]
     end
 
     private

@@ -108,7 +108,7 @@ class RapidSignalEvaluationJob < ApplicationJob
       # Create position tracking record
       Position.create!(
         product_id: contract_id,
-        side: SignalSide.position_model_side(signal[:side]),
+        side: SideNormalizer.position(signal[:side]),
         size: signal[:quantity],
         entry_price: signal[:price],
         entry_time: Time.current,

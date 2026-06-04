@@ -3,6 +3,36 @@
 class MarketAnalysisService
   include SentryServiceTracking
 
+  TREND_SCORES = {
+    "strong_uptrend" => 3,
+    "uptrend" => 2,
+    "strong_downtrend" => -3,
+    "downtrend" => -2
+  }.freeze
+
+  SIGNAL_QUALITY_SCORES = {
+    "excellent" => 2,
+    "good" => 1,
+    "fair" => 0
+  }.freeze
+
+  RISK_PENALTY_SCORES = {"high" => 3, "medium" => 1}.freeze
+
+  RSI_ZONES = [
+    [0..30, "Oversold"],
+    [30..50, "Bearish"],
+    [50..70, "Bullish"],
+    [70..100, "Overbought"]
+  ].freeze
+
+  VOLATILITY_RISK_TIERS = [[0..3, "low"], [3..6, "medium"]].freeze
+  SENTIMENT_RISK_TIERS = [[0..1.0, "low"], [1.0..2.0, "medium"]].freeze
+  SENTIMENT_STRENGTH_TIERS = [[0..0.5, "weak"], [0.5..1.0, "moderate"], [1.0..2.0, "strong"]].freeze
+
+  POSITION_RISK_TIERS = [[0..5000, "low"], [5000..15_000, "medium"]].freeze
+
+  TRADE_RISK_RATES = {"low" => 0.02, "medium" => 0.015}.freeze
+
   def initialize(symbol: nil, timeframe: "1h")
     @symbol = symbol || "BTC-USD"
     @timeframe = timeframe
@@ -233,19 +263,16 @@ class MarketAnalysisService
     }
   end
 
+  TIMEFRAME_SCOPE = {
+    "1m" => :one_minute,
+    "5m" => :five_minute,
+    "15m" => :fifteen_minute,
+    "1h" => :hourly
+  }.freeze
+
   def get_recent_candles
-    case @timeframe
-    when "1m"
-      Candle.for_symbol(@symbol).one_minute.order(:timestamp).last(100)
-    when "5m"
-      Candle.for_symbol(@symbol).five_minute.order(:timestamp).last(100)
-    when "15m"
-      Candle.for_symbol(@symbol).fifteen_minute.order(:timestamp).last(100)
-    when "1h"
-      Candle.for_symbol(@symbol).hourly.order(:timestamp).last(100)
-    else
-      Candle.for_symbol(@symbol).hourly.order(:timestamp).last(100)
-    end
+    scope = TIMEFRAME_SCOPE.fetch(@timeframe, :hourly)
+    Candle.for_symbol(@symbol).public_send(scope).order(:timestamp).last(100)
   end
 
   def calculate_price_change(candles, period)
@@ -392,16 +419,8 @@ class MarketAnalysisService
   end
 
   def classify_sentiment_strength(z_score)
-    case z_score.abs
-    when 0..0.5
-      "weak"
-    when 0.5..1.0
-      "moderate"
-    when 1.0..2.0
-      "strong"
-    else
-      "extreme"
-    end
+    SENTIMENT_STRENGTH_TIERS.each { |range, label| return label if range.cover?(z_score.abs) }
+    "extreme"
   end
 
   def largest_position(positions)
@@ -422,14 +441,8 @@ class MarketAnalysisService
     total_exposure = positions.sum { |p| (p.size * p.entry_price).abs }
     return "low" if total_exposure < 1000
 
-    case total_exposure
-    when 0..5000
-      "low"
-    when 5000..15_000
-      "medium"
-    else
-      "high"
-    end
+    POSITION_RISK_TIERS.each { |range, level| return level if range.cover?(total_exposure) }
+    "high"
   end
 
   def assess_signal_quality(signals)
@@ -560,15 +573,8 @@ class MarketAnalysisService
     return "unknown" if candles.empty?
 
     volatility = calculate_volatility(candles)
-
-    case volatility
-    when 0..3
-      "low"
-    when 3..6
-      "medium"
-    else
-      "high"
-    end
+    VOLATILITY_RISK_TIERS.each { |range, level| return level if range.cover?(volatility) }
+    "high"
   end
 
   def assess_sentiment_risk
@@ -578,15 +584,8 @@ class MarketAnalysisService
       .first
 
     z_score = sentiment&.z_score&.to_f || 0
-
-    case z_score.abs
-    when 0..1.0
-      "low"
-    when 1.0..2.0
-      "medium"
-    else
-      "high"
-    end
+    SENTIMENT_RISK_TIERS.each { |range, level| return level if range.cover?(z_score.abs) }
+    "high"
   end
 
   def calculate_overall_risk
@@ -654,18 +653,7 @@ class MarketAnalysisService
   end
 
   def score_trend(trend_direction)
-    case trend_direction
-    when "strong_uptrend"
-      3
-    when "uptrend"
-      2
-    when "strong_downtrend"
-      -3
-    when "downtrend"
-      -2
-    else
-      0
-    end
+    TREND_SCORES.fetch(trend_direction, 0)
   end
 
   def score_momentum(momentum_15m, momentum_5m)
@@ -699,27 +687,11 @@ class MarketAnalysisService
   end
 
   def score_signals(signal_quality)
-    case signal_quality
-    when "excellent"
-      2
-    when "good"
-      1
-    when "fair"
-      0
-    else
-      -1
-    end
+    SIGNAL_QUALITY_SCORES.fetch(signal_quality, -1)
   end
 
   def score_risk(risk_level)
-    case risk_level
-    when "high"
-      3
-    when "medium"
-      1
-    else
-      0
-    end
+    RISK_PENALTY_SCORES.fetch(risk_level, 0)
   end
 
   def generate_long_recommendation(price_data, technical, risk)
@@ -773,15 +745,7 @@ class MarketAnalysisService
 
   def calculate_position_size(entry_price, stop_loss, risk_level)
     base_equity = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
-    risk_per_trade = case risk_level
-    when "low"
-      0.02
-    when "medium"
-      0.015
-    else
-      0.01
-    end
-
+    risk_per_trade = TRADE_RISK_RATES.fetch(risk_level, 0.01)
     risk_amount = base_equity * risk_per_trade
     price_risk = (entry_price - stop_loss).abs
     (risk_amount / price_risk).round(2)
@@ -849,18 +813,8 @@ class MarketAnalysisService
   end
 
   def rsi_interpretation(rsi)
-    case rsi
-    when 0..30
-      "Oversold"
-    when 30..50
-      "Bearish"
-    when 50..70
-      "Bullish"
-    when 70..100
-      "Overbought"
-    else
-      "Unknown"
-    end
+    RSI_ZONES.each { |range, label| return label if range.cover?(rsi) }
+    "Unknown"
   end
 
   def get_market_data(symbol)
