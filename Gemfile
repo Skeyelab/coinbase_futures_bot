@@ -37,6 +37,9 @@ group :development, :test do
   # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
   gem "brakeman", require: false
 
+  # Audit Gemfile.lock for known vulnerabilities
+  gem "bundler-audit", require: false
+
   # StandardRB for Ruby code formatting and linting [https://github.com/standardrb/standard]
   gem "standard", ">= 1.35.1", require: false
 

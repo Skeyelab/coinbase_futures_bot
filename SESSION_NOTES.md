@@ -26,6 +26,22 @@
 
 ### Session log
 
+#### 2026-06-04 15:50 UTC
+- Context: Re-merged latest `origin/main` into PR #187 after base branch advanced again.
+- Changes:
+  - Kept single-file agent guidance model by leaving `CLAUDE.md` deleted.
+  - Merged new mainline Conductor setup docs (`conductor.json` + session note) with prior PR #187 conflict-resolution history.
+  - Verified signal-side regression slice still passes after the merge commit and follow-up rebase merge.
+- Commands run:
+  - `git merge --no-commit --no-ff origin/main`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle install`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
+  - `git push origin HEAD:cursor/rails-platform-conventions-e2d1`
+- Files touched:
+  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted), `conductor.json`
+- Next steps:
+  - Confirm GitHub marks PR #187 mergeable after branch status refresh.
+
 #### 2026-06-04 15:44 UTC
 - Context: Added shared Conductor workspace setup for this Rails repo.
 - Changes:
@@ -36,6 +52,48 @@
   - `conductor.json`, `SESSION_NOTES.md`
 - Next steps:
   - If teammates want copied env files instead of symlinks, move that concern to Conductor Files to copy or `.worktreeinclude`.
+
+#### 2026-06-04 00:00 UTC
+- Context: Resolved `origin/main` merge conflicts for PR #187 (`feat: align repo with rails-platform conventions`).
+- Changes:
+  - Kept platform-convention move to single `AGENTS.md`; left `CLAUDE.md` deleted.
+  - Merged `SESSION_NOTES.md` histories so the 2026-05-16 platform-alignment entry stays above prior mainline entries.
+  - Removed duplicate Beads integration block from `AGENTS.md` introduced by auto-merge.
+- Commands run:
+  - `git merge --no-commit --no-ff origin/main`
+  - `bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
+- Files touched:
+  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted)
+- Next steps:
+  - Commit merge result and push updated PR branch.
+
+#### 2026-05-16 00:45 UTC
+- Context: Aligning repo with ericdahl-dev/rails-platform conventions (GitHub issue #186).
+- Changes:
+  - **Dockerfile**: Fixed Ruby version (3.2.2→3.2.4), removed `# syntax=` line, added jemalloc `LD_PRELOAD`, excluded `:test` group from `BUNDLE_WITHOUT`
+  - **docker-compose.yml**: Added web + worker services matching platform pattern
+  - **production.rb**: Env-driven `assume_ssl`/`force_ssl`, SSL excludes `/up`, host authorization via `APP_HOST`/`RAILS_ALLOWED_HOSTS`, `silence_healthcheck_path`, GoodJob `:external` mode
+  - **development.rb**: Explicit GoodJob `:async` mode
+  - **config/initializers/0_pg_gssenc_fork_safety.rb**: macOS fork safety for libpq GSS/Kerberos
+  - **config/initializers/good_job_auth.rb**: HTTP Basic auth for GoodJob dashboard in non-local envs
+  - **config/routes.rb**: GoodJob mounted at `/jobs` in all environments (auth-protected), removed dev-only gating
+  - **config/database.yml**: Pool minimum 5, `TEST_ENV_NUMBER` for parallel tests, removed verbose comments, dropped hardcoded production database name
+  - **config/cable.yml**: Removed Redis dependency in production (switched to `async`)
+  - **Gemfile**: Added `bundler-audit` gem
+  - **CI**: Added `bundler-audit check --update` step to security job
+  - **AGENTS.md**: Merged Beads integration block from CLAUDE.md
+  - **CLAUDE.md**: Removed (platform standard: single `AGENTS.md`)
+  - **Procfile.dev**: Added for development workflow
+- Commands run:
+  - `bundle install`, `bin/standardrb --fix`, `bin/brakeman --no-pager`, `bundle exec bundler-audit check --update`
+- Files touched:
+  - `Dockerfile`, `docker-compose.yml`, `Procfile.dev`, `Gemfile`, `Gemfile.lock`, `config/environments/production.rb`, `config/environments/development.rb`, `config/database.yml`, `config/cable.yml`, `config/routes.rb`, `config/initializers/0_pg_gssenc_fork_safety.rb`, `config/initializers/good_job_auth.rb`, `.github/workflows/ci.yml`, `AGENTS.md`, `SESSION_NOTES.md`
+- Migrations: None
+- Next steps:
+  - Consider adding `solid_cable` gem for Postgres-backed Action Cable (replaces `async` adapter in production)
+  - Consider switching from `standard` to `rubocop-rails-omakase` (significant formatting change, separate PR)
+  - Consider adding Pundit if authorization becomes needed
+  - Upgrade nokogiri to fix bundler-audit findings
 
 #### 2026-04-30 00:00 UTC
 - Context: Finished merge of `origin/main` into `feat/signals-longshort-guard-api-cleanup` for PR #181; resolved conflicts.
@@ -3564,4 +3622,3 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
-
