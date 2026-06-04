@@ -79,7 +79,7 @@ module MarketData
         contract_info = build_contract_info(p)
         next unless contract_info
 
-        TradingPair.upsert({
+        Contract.upsert({
           product_id: p["product_id"],
           base_currency: contract_info[:base_currency],
           quote_currency: contract_info[:quote_currency],
@@ -92,7 +92,7 @@ module MarketData
           enabled: true,
           created_at: Time.now.utc,
           updated_at: Time.now.utc
-        }, unique_by: :index_trading_pairs_on_product_id)
+        }, unique_by: :index_contracts_on_product_id)
       end
 
       Rails.logger.info("Upserted #{futures_products.count} futures products")
@@ -545,9 +545,9 @@ module MarketData
 
     # Build contract info hash from API product object.
     # Prefers future_product_details.contract_expiry (RFC3339) over regex date parsing
-    # from product_id. Falls back to TradingPair.parse_contract_info for legacy/unknown shapes.
+    # from product_id. Falls back to Contract.parse_contract_info for legacy/unknown shapes.
     def build_contract_info(product)
-      parsed = TradingPair.parse_contract_info(product["product_id"])
+      parsed = Contract.parse_contract_info(product["product_id"])
       return nil unless parsed
 
       # Override expiration_date if the API provides a richer timestamp

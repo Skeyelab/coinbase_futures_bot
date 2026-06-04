@@ -528,7 +528,7 @@ class SlackCommandHandler
     end
 
     def get_positions(filter = "")
-      positions = Position.includes(:trading_pair)
+      positions = Position.includes(:contract)
 
       positions = case filter.downcase
       when "open"
@@ -543,7 +543,7 @@ class SlackCommandHandler
         positions.open # Default to open positions
       else
         # Assume it's a symbol filter
-        positions.joins(:trading_pair).where("trading_pairs.product_id ILIKE ?", "%#{filter}%")
+        positions.joins(:contract).where("contracts.product_id ILIKE ?", "%#{filter}%")
       end
 
       positions.order(entry_time: :desc).limit(10)

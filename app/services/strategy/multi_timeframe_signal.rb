@@ -312,7 +312,7 @@ module Strategy
 
         if best_contract
           # Check if it's current month or upcoming month for logging
-          contract = TradingPair.find_by(product_id: best_contract)
+          contract = Contract.find_by(product_id: best_contract)
           if contract&.current_month?
             Rails.logger.info("[STRATEGY] Using current month contract #{best_contract} for asset #{asset}")
           elsif contract&.upcoming_month?

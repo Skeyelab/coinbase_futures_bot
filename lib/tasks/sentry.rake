@@ -156,7 +156,7 @@ namespace :sentry do
     start_time = Time.current
 
     # Execute a few database queries
-    TradingPair.count
+    Contract.count
     Position.count
     SignalAlert.limit(10).to_a
 

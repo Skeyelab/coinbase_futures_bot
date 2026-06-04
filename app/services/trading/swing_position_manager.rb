@@ -24,13 +24,13 @@ module Trading
 
     # Find positions close to contract expiry
     def positions_approaching_expiry
-      swing_positions = Position.swing_trading.open.includes(:trading_pair)
+      swing_positions = Position.swing_trading.open.includes(:contract)
       expiring_positions = []
 
       swing_positions.each do |position|
-        next unless position.trading_pair&.expiration_date
+        next unless position.contract&.expiration_date
 
-        days_to_expiry = (position.trading_pair.expiration_date.to_date - Date.current).to_i
+        days_to_expiry = (position.contract.expiration_date.to_date - Date.current).to_i
         expiring_positions << position if days_to_expiry <= @config[:expiry_buffer_days]
       end
 
@@ -40,14 +40,14 @@ module Trading
     # Find positions held longer than max_hold_days
     def positions_exceeding_max_hold
       max_hold_time = @config[:max_hold_days].days.ago
-      Position.swing_trading.open.where("entry_time < ?", max_hold_time).includes(:trading_pair)
+      Position.swing_trading.open.where("entry_time < ?", max_hold_time).includes(:contract)
     end
 
     # Risk management methods
 
     # Check take profit/stop loss for swing positions
     def check_swing_tp_sl_triggers
-      positions = Position.swing_trading.open.includes(:trading_pair)
+      positions = Position.swing_trading.open.includes(:contract)
       return [] if positions.empty?
 
       triggered_positions = []
@@ -150,7 +150,7 @@ module Trading
 
     # Get comprehensive summary of all swing positions
     def get_swing_position_summary
-      positions = Position.swing_trading.open.includes(:trading_pair)
+      positions = Position.swing_trading.open.includes(:contract)
 
       summary = {
         total_positions: positions.count,
@@ -188,8 +188,8 @@ module Trading
           unrealized_pnl: current_pnl,
           take_profit: position.take_profit,
           stop_loss: position.stop_loss,
-          contract_expiry: position.trading_pair&.expiration_date,
-          days_to_expiry: position.trading_pair&.expiration_date ? (position.trading_pair.expiration_date.to_date - Date.current).to_i : nil
+          contract_expiry: position.contract&.expiration_date,
+          days_to_expiry: position.contract&.expiration_date ? (position.contract.expiration_date.to_date - Date.current).to_i : nil
         }
 
         summary[:positions] << position_data

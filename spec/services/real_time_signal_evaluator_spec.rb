@@ -238,7 +238,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
   end
 
   describe "#evaluate_all_pairs" do
-    let!(:trading_pair) { create(:trading_pair, enabled: true) }
+    let!(:contract) { create(:contract, enabled: true) }
     let(:mock_strategy) { instance_double(Strategy::MultiTimeframeSignal) }
     let(:mock_signal) { {side: "long", price: 50_000, confidence: 80, sl: 49_000, tp: 52_000, quantity: 1} }
 
@@ -253,7 +253,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
     context "when no enabled trading pairs exist" do
       before do
-        TradingPair.update_all(enabled: false)
+        Contract.update_all(enabled: false)
       end
 
       it "logs warning and returns early" do
@@ -277,7 +277,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
         evaluator.evaluate_all_pairs
 
-        expect(evaluator).to have_received(:evaluate_pair).with(trading_pair)
+        expect(evaluator).to have_received(:evaluate_pair).with(contract)
       end
 
       it "updates last evaluation timestamp" do
@@ -353,7 +353,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
   end
 
   describe "#evaluate_pair" do
-    let(:trading_pair) { create(:trading_pair, product_id: "BTC-29DEC24-CDE") }
+    let(:contract) { create(:contract, product_id: "BTC-29DEC24-CDE") }
     let(:mock_strategy) { instance_double(Strategy::MultiTimeframeSignal) }
     let(:mock_signal) { {side: "long", price: 50_000, confidence: 80, sl: 49_000, tp: 52_000, quantity: 1} }
 
@@ -370,19 +370,19 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
     it "resolves symbol from trading pair" do
       allow(evaluator).to receive(:resolve_symbol).and_return("BTC-29DEC24-CDE")
 
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       expect(evaluator).to have_received(:resolve_symbol).with("BTC-29DEC24-CDE")
     end
 
     it "uses configured equity amount" do
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       expect(ENV).to have_received(:fetch).with("SIGNAL_EQUITY_USD", "10000")
     end
 
     it "evaluates each strategy for the symbol" do
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       expect(evaluator.strategies["MultiTimeframeSignal"]).to have_received(:signal).with(
         symbol: anything,
@@ -391,7 +391,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
     end
 
     it "creates signal alert when strategy returns valid signal" do
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       expect(SignalAlert).to have_received(:create_entry_signal!).with(
         symbol: anything,
@@ -409,13 +409,13 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
     end
 
     it "logs successful signal creation" do
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       expect(logger).to have_received(:info).with(/Created signal alert/)
     end
 
     it "updates last evaluation timestamp for symbol" do
-      evaluator.evaluate_pair(trading_pair)
+      evaluator.evaluate_pair(contract)
 
       # The symbol should be resolved from the trading pair
       resolved_symbol = evaluator.send(:resolve_symbol, "BTC-29DEC24-CDE")
@@ -428,7 +428,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
       end
 
       it "logs the error and continues" do
-        expect { evaluator.evaluate_pair(trading_pair) }.not_to raise_error
+        expect { evaluator.evaluate_pair(contract) }.not_to raise_error
 
         expect(logger).to have_received(:error).with(/Error evaluating MultiTimeframeSignal/)
         expect(logger).to have_received(:error).with(/Strategy error/)

@@ -135,7 +135,7 @@ class MarginWindowMonitoringJob < ApplicationJob
   end
 
   def check_swing_position_margins(margin_window)
-    swing_positions = Position.swing_trading.open.includes(:trading_pair)
+    swing_positions = Position.swing_trading.open.includes(:contract)
     return if swing_positions.empty?
 
     @logger.info("Checking margin requirements for #{swing_positions.count} swing positions")

@@ -21,7 +21,7 @@ class RealTimeSignalEvaluator
 
     refresh_profile_settings
 
-    enabled_pairs = TradingPair.enabled
+    enabled_pairs = Contract.enabled
 
     if enabled_pairs.empty?
       @logger.warn("[RTSE] No enabled trading pairs found. Run market data sync first.")
@@ -59,8 +59,8 @@ class RealTimeSignalEvaluator
   end
 
   # Evaluate a specific trading pair for signals
-  def evaluate_pair(trading_pair)
-    symbol = resolve_symbol(trading_pair.product_id)
+  def evaluate_pair(contract)
+    symbol = resolve_symbol(contract.product_id)
     equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
     pair_stats = {signals_created: 0, insufficient_data: 0}
 

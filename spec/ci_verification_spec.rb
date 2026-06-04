@@ -44,11 +44,11 @@ RSpec.describe "CI Environment Verification", :ci_only do
     puts "✅ Real database operations verified"
   end
 
-  it "can create and destroy TradingPair records" do
-    initial_count = TradingPair.count
+  it "can create and destroy Contract records" do
+    initial_count = Contract.count
 
     expect do
-      TradingPair.create!(
+      Contract.create!(
         product_id: "CI-TEST-USD",
         base_currency: "CI",
         quote_currency: "USD",
@@ -59,25 +59,25 @@ RSpec.describe "CI Environment Verification", :ci_only do
         price_increment: 0.01,
         size_increment: 0.001
       )
-    end.to change { TradingPair.count }.by(1)
+    end.to change { Contract.count }.by(1)
 
     # Verify the record was created
-    pair = TradingPair.last
+    pair = Contract.last
     expect(pair.product_id).to eq("CI-TEST-USD")
     expect(pair.base_currency).to eq("CI")
     expect(pair.quote_currency).to eq("USD")
 
     # Clean up - destroy the test record
-    expect { pair.destroy! }.to change { TradingPair.count }.by(-1)
-    expect(TradingPair.count).to eq(initial_count)
+    expect { pair.destroy! }.to change { Contract.count }.by(-1)
+    expect(Contract.count).to eq(initial_count)
 
-    puts "✅ TradingPair operations verified"
+    puts "✅ Contract operations verified"
   end
 
   it "can access test files" do
     expect(File.exist?("spec/ci_verification_spec.rb")).to be true
     expect(File.exist?("app/models/position.rb")).to be true
-    expect(File.exist?("app/models/trading_pair.rb")).to be true
+    expect(File.exist?("app/models/contract.rb")).to be true
     puts "✅ Test file access verified"
   end
 
@@ -90,7 +90,7 @@ RSpec.describe "CI Environment Verification", :ci_only do
     # Test basic database operations
     expect(ActiveRecord::Base.connection).to be_active
     expect(ActiveRecord::Base.connection.tables).to include("positions")
-    expect(ActiveRecord::Base.connection.tables).to include("trading_pairs")
+    expect(ActiveRecord::Base.connection.tables).to include("contracts")
     puts "✅ ActiveRecord operations verified"
   end
 end

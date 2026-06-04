@@ -68,9 +68,9 @@ module TestEffectiveness
       puts "Current Position count: #{count}"
     end
 
-    if defined?(TradingPair)
-      count = TradingPair.count
-      puts "Current TradingPair count: #{count}"
+    if defined?(Contract)
+      count = Contract.count
+      puts "Current Contract count: #{count}"
     end
 
     # Verify database tables exist

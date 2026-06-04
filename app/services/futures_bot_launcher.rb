@@ -72,15 +72,15 @@ class FuturesBotLauncher
   private
 
   def start_market_data
-    trading_pairs = TradingPair.enabled.to_a
-    futures_product_ids = trading_pairs.map(&:product_id).compact.uniq
+    contracts = Contract.enabled.to_a
+    futures_product_ids = contracts.map(&:product_id).compact.uniq
 
     if futures_product_ids.empty?
       @logger.warn("[Launcher] No enabled trading pairs found – skipping market data subscription.")
       return
     end
 
-    spot_product_ids = trading_pairs.filter_map do |pair|
+    spot_product_ids = contracts.filter_map do |pair|
       asset = pair.underlying_asset.presence
       "#{asset}-USD" if asset
     end.uniq

@@ -29,12 +29,12 @@ module Trading
 
     # Get all day trading positions that need closure
     def positions_needing_closure
-      Position.positions_needing_closure.includes(:trading_pair)
+      Position.positions_needing_closure.includes(:contract)
     end
 
     # Get all day trading positions approaching closure time
     def positions_approaching_closure
-      Position.positions_approaching_closure.includes(:trading_pair)
+      Position.positions_approaching_closure.includes(:contract)
     end
 
     # Close all day trading positions that need closure

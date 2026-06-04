@@ -139,13 +139,13 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
 
     before do
       allow(service).to receive(:list_products).and_return(futures_products)
-      allow(TradingPair).to receive(:parse_contract_info).and_return({
+      allow(Contract).to receive(:parse_contract_info).and_return({
         base_currency: "BTC",
         quote_currency: "USD",
         expiration_date: Date.new(2024, 12, 29),
         contract_type: "CDE"
       })
-      allow(TradingPair).to receive(:upsert)
+      allow(Contract).to receive(:upsert)
       allow(Rails.logger).to receive(:info)
     end
 
@@ -156,7 +156,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
 
     it "parses contract info for futures products" do
       service.upsert_products
-      expect(TradingPair).to have_received(:parse_contract_info).with("BIT-29DEC24-CDE")
+      expect(Contract).to have_received(:parse_contract_info).with("BIT-29DEC24-CDE")
     end
 
     it "upserts trading pairs with correct data" do
@@ -176,9 +176,9 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       }
 
       service.upsert_products
-      expect(TradingPair).to have_received(:upsert).with(
+      expect(Contract).to have_received(:upsert).with(
         hash_including(expected_upsert_data),
-        unique_by: :index_trading_pairs_on_product_id
+        unique_by: :index_contracts_on_product_id
       )
     end
 
@@ -189,7 +189,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       allow(service).to receive(:list_products).and_return([product_with_details])
 
       service.upsert_products
-      expect(TradingPair).to have_received(:upsert).with(
+      expect(Contract).to have_received(:upsert).with(
         hash_including(expiration_date: Date.new(2025, 1, 10)),
         anything
       )
@@ -204,7 +204,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
         "quote_increment" => "0.01"
       }
       allow(service).to receive(:list_products).and_return([nol_product])
-      allow(TradingPair).to receive(:parse_contract_info).with("NOL-19JUN26-CDE").and_return({
+      allow(Contract).to receive(:parse_contract_info).with("NOL-19JUN26-CDE").and_return({
         base_currency: "NOL",
         quote_currency: "USD",
         expiration_date: Date.new(2026, 6, 19),
@@ -212,7 +212,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       })
 
       service.upsert_products
-      expect(TradingPair).to have_received(:upsert).with(
+      expect(Contract).to have_received(:upsert).with(
         hash_including(product_id: "NOL-19JUN26-CDE"),
         anything
       )
@@ -234,14 +234,14 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
         }
       ]
       allow(service).to receive(:list_products).and_return(nol_products)
-      allow(TradingPair).to receive(:parse_contract_info).and_return({
+      allow(Contract).to receive(:parse_contract_info).and_return({
         base_currency: "OIL",
         quote_currency: "USD",
         expiration_date: Date.new(2026, 6, 19),
         contract_type: "CDE"
       })
       service.upsert_products
-      expect(TradingPair).to have_received(:parse_contract_info).with("NOL-19JUN26-CDE")
+      expect(Contract).to have_received(:parse_contract_info).with("NOL-19JUN26-CDE")
     end
   end
 

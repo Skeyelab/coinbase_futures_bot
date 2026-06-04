@@ -71,20 +71,20 @@ namespace :ci do
         puts "⚠️  Position model not available"
       end
 
-      # Test TradingPair creation
-      if defined?(TradingPair)
-        test_pair = TradingPair.create!(
+      # Test Contract creation
+      if defined?(Contract)
+        test_pair = Contract.create!(
           product_id: "CI-VERIFY-PAIR",
           symbol: "CI-VERIFY",
           enabled: true,
           contract_type: "futures",
           expiration_date: 1.month.from_now
         )
-        puts "✅ TradingPair creation test passed (ID: #{test_pair.id})"
+        puts "✅ Contract creation test passed (ID: #{test_pair.id})"
         test_pair.destroy
-        puts "✅ TradingPair deletion test passed"
+        puts "✅ Contract deletion test passed"
       else
-        puts "⚠️  TradingPair model not available"
+        puts "⚠️  Contract model not available"
       end
     rescue => e
       puts "❌ Database operation test failed: #{e.message}"

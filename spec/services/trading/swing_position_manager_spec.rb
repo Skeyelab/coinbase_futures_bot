@@ -172,15 +172,15 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
   end
 
   describe "#positions_approaching_expiry?" do
-    let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 1.day.from_now) }
+    let(:contract) { create(:contract, product_id: "BTC-USD-PERP", expiration_date: 1.day.from_now) }
 
     context "with positions approaching expiry" do
       before do
         create(:position,
           day_trading: false,
           status: "OPEN",
-          product_id: trading_pair.product_id,
-          trading_pair: trading_pair)
+          product_id: contract.product_id,
+          contract: contract)
         allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
       end
 
@@ -190,14 +190,14 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     end
 
     context "with no positions approaching expiry" do
-      let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD-PERP", expiration_date: 10.days.from_now) }
+      let(:contract) { create(:contract, product_id: "BTC-USD-PERP", expiration_date: 10.days.from_now) }
 
       before do
         create(:position,
           day_trading: false,
           status: "OPEN",
-          product_id: trading_pair.product_id,
-          trading_pair: trading_pair)
+          product_id: contract.product_id,
+          contract: contract)
         allow(ENV).to receive(:fetch).with("SWING_EXPIRY_BUFFER_DAYS", 2).and_return("2")
       end
 

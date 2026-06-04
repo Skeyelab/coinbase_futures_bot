@@ -4,8 +4,8 @@ require "rails_helper"
 
 RSpec.describe CalibrationJob, type: :job do
   let(:job) { described_class.new }
-  let!(:enabled_pair) { create(:trading_pair, enabled: true, product_id: "BTC-29DEC24-CDE") }
-  let!(:disabled_pair) { create(:trading_pair, enabled: false, product_id: "ETH-29DEC24-CDE") }
+  let!(:enabled_pair) { create(:contract, enabled: true, product_id: "BTC-29DEC24-CDE") }
+  let!(:disabled_pair) { create(:contract, enabled: false, product_id: "ETH-29DEC24-CDE") }
 
   # Mock objects for dependencies
   let(:mock_simulator) { instance_double(PaperTrading::ExchangeSimulator) }
@@ -36,7 +36,7 @@ RSpec.describe CalibrationJob, type: :job do
       end
 
       it "skips disabled trading pairs" do
-        expect(TradingPair).to receive(:enabled).and_call_original
+        expect(Contract).to receive(:enabled).and_call_original
 
         job.perform
       end
@@ -44,7 +44,7 @@ RSpec.describe CalibrationJob, type: :job do
 
     context "with no enabled trading pairs" do
       before do
-        TradingPair.update_all(enabled: false)
+        Contract.update_all(enabled: false)
       end
 
       it "completes without error when no enabled pairs exist" do
@@ -58,7 +58,7 @@ RSpec.describe CalibrationJob, type: :job do
     end
 
     context "with multiple enabled trading pairs" do
-      let!(:additional_pair) { create(:trading_pair, enabled: true, product_id: "DOGE-29DEC24-CDE") }
+      let!(:additional_pair) { create(:contract, enabled: true, product_id: "DOGE-29DEC24-CDE") }
 
       it "processes all enabled pairs" do
         expect(job).to receive(:calibrate_pair).twice

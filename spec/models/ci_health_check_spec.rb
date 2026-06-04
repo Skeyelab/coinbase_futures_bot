@@ -9,7 +9,7 @@ RSpec.describe "CI Health Check", type: :model do
 
   it "can create and query a simple record" do
     # Test basic database operations
-    test_pair = TradingPair.create!(
+    test_pair = Contract.create!(
       product_id: "TEST-USD",
       base_currency: "TEST",
       quote_currency: "USD",
@@ -21,21 +21,21 @@ RSpec.describe "CI Health Check", type: :model do
     )
 
     expect(test_pair).to be_persisted
-    expect(TradingPair.find_by(product_id: "TEST-USD")).to eq(test_pair)
+    expect(Contract.find_by(product_id: "TEST-USD")).to eq(test_pair)
 
     # Clean up
     test_pair.destroy
   end
 
   it "can perform basic model operations" do
-    expect(TradingPair.count).to be >= 0
+    expect(Contract.count).to be >= 0
     expect(Position.count).to be >= 0
     expect(Tick.count).to be >= 0
   end
 
   it "has proper database schema" do
     # Verify key tables exist and have expected columns
-    expect(ActiveRecord::Base.connection.table_exists?("trading_pairs")).to be true
+    expect(ActiveRecord::Base.connection.table_exists?("contracts")).to be true
     expect(ActiveRecord::Base.connection.table_exists?("positions")).to be true
     expect(ActiveRecord::Base.connection.table_exists?("ticks")).to be true
     expect(ActiveRecord::Base.connection.table_exists?("candles")).to be true

@@ -48,7 +48,7 @@ class Position < ApplicationRecord
   after_update :log_position_updated
 
   # Associations
-  belongs_to :trading_pair, primary_key: :product_id, foreign_key: :product_id, optional: true
+  belongs_to :contract, primary_key: :product_id, foreign_key: :product_id, optional: true
   has_many :orders, dependent: :nullify
 
   # Instance methods

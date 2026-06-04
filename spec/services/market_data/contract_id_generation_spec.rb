@@ -214,41 +214,41 @@ RSpec.describe "Contract ID Generation Logic", type: :service do
     end
   end
 
-  describe "Integration with real TradingPair creation" do
-    it "creates actual TradingPair records with correct expiration dates" do
+  describe "Integration with real Contract creation" do
+    it "creates actual Contract records with correct expiration dates" do
       # Test the full workflow without mocking dates
       contract_id = manager.discover_current_month_contract("BTC")
 
       expect(contract_id).to be_present
-      trading_pair = TradingPair.find_by(product_id: contract_id)
-      expect(trading_pair).to be_present
+      contract = Contract.find_by(product_id: contract_id)
+      expect(contract).to be_present
 
       # Verify the expiration date is actually a Friday
-      expect(trading_pair.expiration_date.friday?).to be true
+      expect(contract.expiration_date.friday?).to be true
 
       # Verify it's in the current month
-      expect(trading_pair.expiration_date.month).to eq(Date.current.month)
-      expect(trading_pair.expiration_date.year).to eq(Date.current.year)
+      expect(contract.expiration_date.month).to eq(Date.current.month)
+      expect(contract.expiration_date.year).to eq(Date.current.year)
 
       # Verify it's the last Friday of the month
-      next_friday = trading_pair.expiration_date + 7.days
-      expect(next_friday).to be > trading_pair.expiration_date.end_of_month
+      next_friday = contract.expiration_date + 7.days
+      expect(next_friday).to be > contract.expiration_date.end_of_month
     end
 
     it "creates upcoming month contracts with correct future dates" do
       contract_id = manager.discover_upcoming_month_contract("ETH")
 
       expect(contract_id).to be_present
-      trading_pair = TradingPair.find_by(product_id: contract_id)
-      expect(trading_pair).to be_present
+      contract = Contract.find_by(product_id: contract_id)
+      expect(contract).to be_present
 
       # Verify the expiration date is a Friday
-      expect(trading_pair.expiration_date.friday?).to be true
+      expect(contract.expiration_date.friday?).to be true
 
       # Verify it's in the next month
       next_month = Date.current.next_month
-      expect(trading_pair.expiration_date.month).to eq(next_month.month)
-      expect(trading_pair.expiration_date.year).to eq(next_month.year)
+      expect(contract.expiration_date.month).to eq(next_month.month)
+      expect(contract.expiration_date.year).to eq(next_month.year)
     end
   end
 

@@ -159,8 +159,8 @@ namespace :positions do
       high_duration = swing_positions.where("entry_time < ?", 10.days.ago).count
       puts "  Positions >10 days old: #{high_duration}"
 
-      if swing_positions.joins("LEFT JOIN trading_pairs ON positions.product_id = trading_pairs.product_id").where("trading_pairs.expires_at < ?", 7.days.from_now).exists?
-        expiring_contracts = swing_positions.joins("LEFT JOIN trading_pairs ON positions.product_id = trading_pairs.product_id").where("trading_pairs.expires_at < ?", 7.days.from_now).count
+      if swing_positions.joins("LEFT JOIN contracts ON positions.product_id = contracts.product_id").where("contracts.expires_at < ?", 7.days.from_now).exists?
+        expiring_contracts = swing_positions.joins("LEFT JOIN contracts ON positions.product_id = contracts.product_id").where("contracts.expires_at < ?", 7.days.from_now).count
         puts "  Positions with contracts expiring <7 days: #{expiring_contracts}"
       end
     else

@@ -55,25 +55,25 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     describe "#discover_current_month_contract" do
       it "creates BTC current month contract if it does not exist" do
         expected_contract_id = expected_contract_id_for_month("BTC", current_date)
-        expect(TradingPair.find_by(product_id: expected_contract_id)).to be_nil
+        expect(Contract.find_by(product_id: expected_contract_id)).to be_nil
 
         contract_id = manager.discover_current_month_contract("BTC")
         expect(contract_id).to eq(expected_contract_id)
 
-        trading_pair = TradingPair.find_by(product_id: expected_contract_id)
-        expect(trading_pair).to be_present
-        expect(trading_pair.base_currency).to eq("BTC")
-        expect(trading_pair.quote_currency).to eq("USD")
-        expect(trading_pair.expiration_date).to eq(Date.new(2025, 8, 29))
-        expect(trading_pair.contract_type).to eq("CDE")
-        expect(trading_pair.enabled).to be true
+        contract = Contract.find_by(product_id: expected_contract_id)
+        expect(contract).to be_present
+        expect(contract.base_currency).to eq("BTC")
+        expect(contract.quote_currency).to eq("USD")
+        expect(contract.expiration_date).to eq(Date.new(2025, 8, 29))
+        expect(contract.contract_type).to eq("CDE")
+        expect(contract.enabled).to be true
       end
 
       it "returns existing contract ID if contract already exists" do
         expected_contract_id = expected_contract_id_for_month("BTC", current_date)
 
         # Create existing contract
-        TradingPair.create!(
+        Contract.create!(
           product_id: expected_contract_id,
           base_currency: "BTC",
           quote_currency: "USD",
@@ -91,7 +91,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       context "when current month contract exists" do
         let(:expected_contract_id) { expected_contract_id_for_month("BTC", current_date) }
         let!(:btc_contract) do
-          TradingPair.create!(
+          Contract.create!(
             product_id: expected_contract_id,
             base_currency: "BTC",
             quote_currency: "USD",
@@ -110,7 +110,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         it "discovers and creates the contract" do
           expected_contract_id = expected_contract_id_for_month("BTC", current_date)
           expect(manager.current_month_contract("BTC")).to eq(expected_contract_id)
-          expect(TradingPair.find_by(product_id: expected_contract_id)).to be_present
+          expect(Contract.find_by(product_id: expected_contract_id)).to be_present
         end
       end
     end
@@ -118,23 +118,23 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
   describe "#active_futures_contracts" do
     let!(:btc_current) do
-      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 8, 29), enabled: true)
     end
     let!(:eth_current) do
-      TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD",
+      Contract.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD",
         expiration_date: Date.new(2025, 8, 29), enabled: true)
     end
     let!(:btc_next) do
-      TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 9, 30), enabled: true)
     end
     let!(:expired_contract) do
-      TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 7, 31), enabled: true)
     end
     let!(:disabled_contract) do
-      TradingPair.create!(product_id: "BIT-31DEC25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-31DEC25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 12, 31), enabled: false)
     end
 
@@ -147,15 +147,15 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
   describe "#expiring_contracts" do
     let!(:expiring_soon) do
-      TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 8, 17), enabled: true)
     end
     let!(:expiring_later) do
-      TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 8, 29), enabled: true)
     end
     let!(:expiring_next_month) do
-      TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+      Contract.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
         expiration_date: Date.new(2025, 9, 30), enabled: true)
     end
 
@@ -175,7 +175,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   describe "#rollover_needed?" do
     context "when contracts are expiring soon" do
       let!(:expiring_soon) do
-        TradingPair.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
+        Contract.create!(product_id: "BIT-17AUG25-CDE", base_currency: "BTC", quote_currency: "USD",
           expiration_date: Date.new(2025, 8, 17), enabled: true)
       end
 
@@ -186,7 +186,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
     context "when no contracts are expiring soon" do
       let!(:expiring_later) do
-        TradingPair.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
+        Contract.create!(product_id: "BIT-30SEP25-CDE", base_currency: "BTC", quote_currency: "USD",
           expiration_date: Date.new(2025, 9, 30), enabled: true)
       end
 
@@ -222,23 +222,23 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
     describe "#discover_upcoming_month_contract" do
       it "creates BTC upcoming month contract if it does not exist" do
-        expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
 
         contract_id = manager.discover_upcoming_month_contract("BTC")
         expect(contract_id).to eq("BIT-26SEP25-CDE")
 
-        trading_pair = TradingPair.find_by(product_id: "BIT-26SEP25-CDE")
-        expect(trading_pair).to be_present
-        expect(trading_pair.base_currency).to eq("BTC")
-        expect(trading_pair.quote_currency).to eq("USD")
-        expect(trading_pair.expiration_date).to eq(Date.new(2025, 9, 26))
-        expect(trading_pair.contract_type).to eq("CDE")
-        expect(trading_pair.enabled).to be true
+        contract = Contract.find_by(product_id: "BIT-26SEP25-CDE")
+        expect(contract).to be_present
+        expect(contract.base_currency).to eq("BTC")
+        expect(contract.quote_currency).to eq("USD")
+        expect(contract.expiration_date).to eq(Date.new(2025, 9, 26))
+        expect(contract.contract_type).to eq("CDE")
+        expect(contract.enabled).to be true
       end
 
       it "returns existing contract ID if contract already exists" do
         # Create existing contract
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-26SEP25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -255,7 +255,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     describe "#upcoming_month_contract" do
       context "when upcoming month contract exists" do
         let!(:btc_upcoming_contract) do
-          TradingPair.create!(
+          Contract.create!(
             product_id: "BIT-26SEP25-CDE",
             base_currency: "BTC",
             quote_currency: "USD",
@@ -273,7 +273,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       context "when no upcoming month contract exists" do
         it "discovers and creates the contract" do
           expect(manager.upcoming_month_contract("BTC")).to eq("BIT-26SEP25-CDE")
-          expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_present
+          expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_present
         end
       end
     end
@@ -281,7 +281,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     describe "#best_available_contract" do
       context "when current month contract is available and tradeable" do
         let!(:btc_current) do
-          TradingPair.create!(
+          Contract.create!(
             product_id: "BIT-29AUG25-CDE",
             base_currency: "BTC",
             quote_currency: "USD",
@@ -303,7 +303,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         end
 
         let!(:btc_current) do
-          TradingPair.create!(
+          Contract.create!(
             product_id: "BIT-29AUG25-CDE",
             base_currency: "BTC",
             quote_currency: "USD",
@@ -314,7 +314,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         end
 
         let!(:btc_upcoming) do
-          TradingPair.create!(
+          Contract.create!(
             product_id: "BIT-26SEP25-CDE",
             base_currency: "BTC",
             quote_currency: "USD",
@@ -333,7 +333,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         it "discovers and creates current month contract first" do
           contract_id = manager.best_available_contract("BTC")
           expect(contract_id).to eq("BIT-29AUG25-CDE")
-          expect(TradingPair.find_by(product_id: "BIT-29AUG25-CDE")).to be_present
+          expect(Contract.find_by(product_id: "BIT-29AUG25-CDE")).to be_present
         end
 
         context "when current month discovery fails" do
@@ -345,7 +345,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
           it "falls back to discovering upcoming month contract" do
             contract_id = manager.best_available_contract("BTC")
             expect(contract_id).to eq("BIT-26SEP25-CDE")
-            expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_present
+            expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_present
           end
         end
       end
@@ -353,13 +353,13 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
     describe "#update_upcoming_month_contracts" do
       it "creates upcoming month contracts for BTC and ETH" do
-        expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
 
         manager.update_upcoming_month_contracts
 
-        btc_contract = TradingPair.find_by(product_id: "BIT-26SEP25-CDE")
-        eth_contract = TradingPair.find_by(product_id: "ET-26SEP25-CDE")
+        btc_contract = Contract.find_by(product_id: "BIT-26SEP25-CDE")
+        eth_contract = Contract.find_by(product_id: "ET-26SEP25-CDE")
 
         expect(btc_contract).to be_present
         expect(eth_contract).to be_present
@@ -373,29 +373,29 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
         manager.update_upcoming_month_contracts
 
-        expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
       end
     end
 
     describe "#update_all_contracts" do
       it "updates both current and upcoming month contracts" do
-        expect(TradingPair.find_by(product_id: "BIT-29AUG25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "ET-29AUG25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-29AUG25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "ET-29AUG25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "ET-26SEP25-CDE")).to be_nil
 
         manager.update_all_contracts
 
         # Check current month contracts
-        btc_current = TradingPair.find_by(product_id: "BIT-29AUG25-CDE")
-        eth_current = TradingPair.find_by(product_id: "ET-29AUG25-CDE")
+        btc_current = Contract.find_by(product_id: "BIT-29AUG25-CDE")
+        eth_current = Contract.find_by(product_id: "ET-29AUG25-CDE")
         expect(btc_current).to be_present
         expect(eth_current).to be_present
 
         # Check upcoming month contracts
-        btc_upcoming = TradingPair.find_by(product_id: "BIT-26SEP25-CDE")
-        eth_upcoming = TradingPair.find_by(product_id: "ET-26SEP25-CDE")
+        btc_upcoming = Contract.find_by(product_id: "BIT-26SEP25-CDE")
+        eth_upcoming = Contract.find_by(product_id: "ET-26SEP25-CDE")
         expect(btc_upcoming).to be_present
         expect(eth_upcoming).to be_present
       end
@@ -403,13 +403,13 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
     describe "#update_current_month_contracts" do
       it "creates current month contracts for BTC and ETH" do
-        expect(TradingPair.find_by(product_id: "BIT-29AUG25-CDE")).to be_nil
-        expect(TradingPair.find_by(product_id: "ET-29AUG25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "BIT-29AUG25-CDE")).to be_nil
+        expect(Contract.find_by(product_id: "ET-29AUG25-CDE")).to be_nil
 
         manager.update_current_month_contracts
 
-        btc_contract = TradingPair.find_by(product_id: "BIT-29AUG25-CDE")
-        eth_contract = TradingPair.find_by(product_id: "ET-29AUG25-CDE")
+        btc_contract = Contract.find_by(product_id: "BIT-29AUG25-CDE")
+        eth_contract = Contract.find_by(product_id: "ET-29AUG25-CDE")
 
         expect(btc_contract).to be_present
         expect(eth_contract).to be_present
@@ -418,7 +418,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       it "disables expired contracts" do
-        expired_contract = TradingPair.create!(
+        expired_contract = Contract.create!(
           product_id: "BIT-31JUL25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -472,25 +472,25 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         expect(month_abbr).to eq(next_month_abbr)
       end
 
-      it "creates TradingPair records with correct Friday expiration dates" do
+      it "creates Contract records with correct Friday expiration dates" do
         # Test full integration without date mocking
         contract_id = manager.discover_current_month_contract("BTC")
 
-        trading_pair = TradingPair.find_by(product_id: contract_id)
-        expect(trading_pair).to be_present
+        contract = Contract.find_by(product_id: contract_id)
+        expect(contract).to be_present
 
         # The core validation: expiration date must be a Friday
-        expect(trading_pair.expiration_date.friday?).to be(true),
-          "Expiration date #{trading_pair.expiration_date} should be a Friday"
+        expect(contract.expiration_date.friday?).to be(true),
+          "Expiration date #{contract.expiration_date} should be a Friday"
 
         # Must be in the current month
-        expect(trading_pair.expiration_date.month).to eq(Date.current.month)
-        expect(trading_pair.expiration_date.year).to eq(Date.current.year)
+        expect(contract.expiration_date.month).to eq(Date.current.month)
+        expect(contract.expiration_date.year).to eq(Date.current.year)
 
         # Must be the last Friday of the month
-        next_friday = trading_pair.expiration_date + 7.days
-        expect(next_friday).to be > trading_pair.expiration_date.end_of_month,
-          "#{trading_pair.expiration_date} should be the last Friday of the month"
+        next_friday = contract.expiration_date + 7.days
+        expect(next_friday).to be > contract.expiration_date.end_of_month,
+          "#{contract.expiration_date} should be the last Friday of the month"
       end
 
       it "fails appropriately when contract generation logic is broken" do
@@ -617,7 +617,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       it "returns nil when contract info parsing fails" do
-        allow(TradingPair).to receive(:parse_contract_info).and_return(nil)
+        allow(Contract).to receive(:parse_contract_info).and_return(nil)
 
         result = manager_with_logger.discover_current_month_contract("BTC")
         expect(result).to be_nil
@@ -625,8 +625,8 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
       it "returns nil and logs error when trading pair save fails" do
         # Create an invalid trading pair that will fail validation
-        invalid_pair = TradingPair.new
-        allow(TradingPair).to receive(:find_or_initialize_by).and_return(invalid_pair)
+        invalid_pair = Contract.new
+        allow(Contract).to receive(:find_or_initialize_by).and_return(invalid_pair)
         allow(invalid_pair).to receive(:assign_attributes)
         allow(invalid_pair).to receive(:save).and_return(false)
         allow(invalid_pair).to receive(:errors).and_return(
@@ -651,15 +651,15 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       it "returns nil when contract info parsing fails" do
-        allow(TradingPair).to receive(:parse_contract_info).and_return(nil)
+        allow(Contract).to receive(:parse_contract_info).and_return(nil)
 
         result = manager_with_logger.discover_upcoming_month_contract("BTC")
         expect(result).to be_nil
       end
 
       it "returns nil and logs error when trading pair save fails" do
-        invalid_pair = TradingPair.new
-        allow(TradingPair).to receive(:find_or_initialize_by).and_return(invalid_pair)
+        invalid_pair = Contract.new
+        allow(Contract).to receive(:find_or_initialize_by).and_return(invalid_pair)
         allow(invalid_pair).to receive(:assign_attributes)
         allow(invalid_pair).to receive(:save).and_return(false)
         allow(invalid_pair).to receive(:errors).and_return(
@@ -733,13 +733,13 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
     describe "contract status management" do
       it "sets correct default attributes for new contracts" do
         contract_id = manager.discover_current_month_contract("BTC")
-        trading_pair = TradingPair.find_by(product_id: contract_id)
+        contract = Contract.find_by(product_id: contract_id)
 
-        expect(trading_pair.enabled).to be true
-        expect(trading_pair.status).to eq("online")
-        expect(trading_pair.base_currency).to eq("BTC")
-        expect(trading_pair.quote_currency).to eq("USD")
-        expect(trading_pair.contract_type).to eq("CDE")
+        expect(contract.enabled).to be true
+        expect(contract.status).to eq("online")
+        expect(contract.base_currency).to eq("BTC")
+        expect(contract.quote_currency).to eq("USD")
+        expect(contract.contract_type).to eq("CDE")
       end
     end
   end
@@ -749,7 +749,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   describe "contract lifecycle management" do
     describe "#expiring_contracts with various scenarios" do
       let!(:expiring_today) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-15AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -758,7 +758,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
       let!(:expiring_tomorrow) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-16AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -767,7 +767,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
       let!(:disabled_expiring) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-17AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -776,7 +776,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
       let!(:expired_yesterday) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-14AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -816,7 +816,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       it "returns true when contracts expire exactly on the threshold" do
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-18AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -899,10 +899,10 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
 
   # === INTEGRATION WITH TRADING_PAIR MODEL ===
 
-  describe "TradingPair integration" do
+  describe "Contract integration" do
     describe "scope interactions" do
       let!(:active_current) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-29AUG25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -911,7 +911,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
       let!(:active_upcoming) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-26SEP25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -920,7 +920,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
       let!(:disabled_contract) {
-        TradingPair.create!(
+        Contract.create!(
           product_id: "BIT-31DEC25-CDE",
           base_currency: "BTC",
           quote_currency: "USD",
@@ -929,34 +929,34 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         )
       }
 
-      it "interacts correctly with TradingPair.current_month_for_asset" do
-        contracts = TradingPair.current_month_for_asset("BTC")
+      it "interacts correctly with Contract.current_month_for_asset" do
+        contracts = Contract.current_month_for_asset("BTC")
         expect(contracts).to contain_exactly(active_current)
       end
 
-      it "interacts correctly with TradingPair.upcoming_month_for_asset" do
-        contracts = TradingPair.upcoming_month_for_asset("BTC")
+      it "interacts correctly with Contract.upcoming_month_for_asset" do
+        contracts = Contract.upcoming_month_for_asset("BTC")
         expect(contracts).to contain_exactly(active_upcoming)
       end
 
-      it "interacts correctly with TradingPair.best_available_for_asset" do
-        best_contract = TradingPair.best_available_for_asset("BTC")
+      it "interacts correctly with Contract.best_available_for_asset" do
+        best_contract = Contract.best_available_for_asset("BTC")
         expect(best_contract).to eq(active_current)
       end
     end
 
     describe "contract info parsing integration" do
-      it "correctly utilizes TradingPair.parse_contract_info" do
+      it "correctly utilizes Contract.parse_contract_info" do
         # This tests the integration between the manager and the model
         contract_id = manager.discover_current_month_contract("BTC")
-        trading_pair = TradingPair.find_by(product_id: contract_id)
+        contract = Contract.find_by(product_id: contract_id)
 
-        parsed_info = TradingPair.parse_contract_info(contract_id)
+        parsed_info = Contract.parse_contract_info(contract_id)
 
-        expect(trading_pair.base_currency).to eq(parsed_info[:base_currency])
-        expect(trading_pair.quote_currency).to eq(parsed_info[:quote_currency])
-        expect(trading_pair.expiration_date).to eq(parsed_info[:expiration_date])
-        expect(trading_pair.contract_type).to eq(parsed_info[:contract_type])
+        expect(contract.base_currency).to eq(parsed_info[:base_currency])
+        expect(contract.quote_currency).to eq(parsed_info[:quote_currency])
+        expect(contract.expiration_date).to eq(parsed_info[:expiration_date])
+        expect(contract.contract_type).to eq(parsed_info[:contract_type])
       end
     end
   end

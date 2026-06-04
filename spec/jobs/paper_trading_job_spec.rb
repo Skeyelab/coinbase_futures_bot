@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe PaperTradingJob, type: :job do
   let(:btc_pair) do
-    TradingPair.find_or_create_by(product_id: "BTC-USD") do |tp|
+    Contract.find_or_create_by(product_id: "BTC-USD") do |tp|
       tp.base_currency = "BTC"
       tp.quote_currency = "USD"
       tp.status = "online"
@@ -13,7 +13,7 @@ RSpec.describe PaperTradingJob, type: :job do
   end
 
   let(:eth_pair) do
-    TradingPair.find_or_create_by(product_id: "ETH-USD") do |tp|
+    Contract.find_or_create_by(product_id: "ETH-USD") do |tp|
       tp.base_currency = "ETH"
       tp.quote_currency = "USD"
       tp.status = "online"
@@ -22,7 +22,7 @@ RSpec.describe PaperTradingJob, type: :job do
   end
 
   let(:disabled_pair) do
-    TradingPair.find_or_create_by(product_id: "DISABLED-USD") do |tp|
+    Contract.find_or_create_by(product_id: "DISABLED-USD") do |tp|
       tp.base_currency = "DISABLED"
       tp.quote_currency = "USD"
       tp.status = "online"
@@ -154,7 +154,7 @@ RSpec.describe PaperTradingJob, type: :job do
     context "with no trading pairs" do
       it "handles missing trading pairs gracefully" do
         # Remove all trading pairs
-        TradingPair.destroy_all
+        Contract.destroy_all
 
         expect { described_class.perform_now }.not_to raise_error
         expect(mock_rest).to have_received(:upsert_products).once

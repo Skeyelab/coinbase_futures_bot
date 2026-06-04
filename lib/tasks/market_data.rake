@@ -34,7 +34,7 @@ namespace :market_data do
     days = (args[:days] || 30).to_i
     rest = MarketData::CoinbaseRest.new
 
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
@@ -61,7 +61,7 @@ namespace :market_data do
 
     # Use existing BTC-USD product for now (spot trading)
     # TODO: Research correct futures API endpoints for BTC-USD
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
@@ -88,7 +88,7 @@ namespace :market_data do
 
     # Use existing BTC-USD product for now (spot trading)
     # TODO: Research correct futures API endpoints for BTC-USD
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
@@ -113,7 +113,7 @@ namespace :market_data do
     days = (args[:days] || 1).to_i
     rest = MarketData::CoinbaseRest.new
 
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
@@ -131,7 +131,7 @@ namespace :market_data do
   desc "Test different candle granularities to see what the API supports"
   task test_granularities: :environment do
     rest = MarketData::CoinbaseRest.new
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
 
     unless btc_pair
       puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."

@@ -24,9 +24,9 @@ RSpec.describe "market_data rake tasks", type: :task do
     Rake::Task["market_data:test_granularities"].reenable
     Rake::Task["market_data:subscribe_futures"].reenable
 
-    TradingPair.delete_all
+    Contract.delete_all
     Candle.delete_all
-    @btc_pair = TradingPair.create!(
+    @btc_pair = Contract.create!(
       product_id: "BTC-USD",
       base_currency: "BTC",
       quote_currency: "USD",

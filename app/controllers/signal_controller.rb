@@ -8,7 +8,7 @@ class SignalController < ApplicationController
 
   # GET /signals - List all active signals
   def index
-    signals = SignalAlert.includes(:trading_pair)
+    signals = SignalAlert.includes(:contract)
       .active
       .order(confidence: :desc, alert_timestamp: :desc)
 
@@ -55,9 +55,9 @@ class SignalController < ApplicationController
 
     if params[:symbol]
       # Evaluate specific symbol
-      trading_pair = TradingPair.find_by(product_id: params[:symbol])
-      if trading_pair
-        evaluator.evaluate_pair(trading_pair)
+      contract = Contract.find_by(product_id: params[:symbol])
+      if contract
+        evaluator.evaluate_pair(contract)
 
         # Track successful signal evaluation
         SentryHelper.add_breadcrumb(
@@ -75,7 +75,7 @@ class SignalController < ApplicationController
         # Track trading pair not found errors
         Sentry.with_scope do |scope|
           scope.set_tag("controller", "signal")
-          scope.set_tag("error_type", "trading_pair_not_found")
+          scope.set_tag("error_type", "contract_not_found")
           scope.set_context("request", {symbol: params[:symbol]})
 
           Sentry.capture_message("Trading pair not found for signal evaluation", level: "warning")

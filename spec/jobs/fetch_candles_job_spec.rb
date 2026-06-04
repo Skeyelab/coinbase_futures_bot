@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe FetchCandlesJob, type: :job do
   let(:btc_pair) do
-    TradingPair.find_or_create_by(product_id: "BIT-26JUN26-CDE") do |tp|
+    Contract.find_or_create_by(product_id: "BIT-26JUN26-CDE") do |tp|
       tp.base_currency = "BTC"
       tp.quote_currency = "USD"
       tp.status = "active"
@@ -37,7 +37,7 @@ RSpec.describe FetchCandlesJob, type: :job do
     end
 
     it "returns early if no enabled trading pairs found" do
-      TradingPair.update_all(enabled: false)
+      Contract.update_all(enabled: false)
 
       mock_rest = instance_double(MarketData::CoinbaseRest)
       stub_rest(mock_rest)

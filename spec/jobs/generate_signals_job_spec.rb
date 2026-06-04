@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe GenerateSignalsJob, type: :job do
   let(:job) { described_class.new }
   let(:mock_strategy) { instance_double(Strategy::MultiTimeframeSignal) }
-  let!(:trading_pair) { create(:trading_pair, enabled: true, product_id: "BTC-29DEC24-CDE") }
+  let!(:contract) { create(:contract, enabled: true, product_id: "BTC-29DEC24-CDE") }
   let(:mock_signal) do
     {
       side: :long,
@@ -126,14 +126,14 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "processes all enabled trading pairs" do
         expect(mock_strategy).to receive(:signal).with(
-          {symbol: trading_pair.product_id, equity_usd: 10_000.0}
+          {symbol: contract.product_id, equity_usd: 10_000.0}
         )
 
         job.perform
       end
 
       it "logs analysis start for each pair" do
-        expect(job).to receive(:puts).with("Analyzing #{trading_pair.product_id}...")
+        expect(job).to receive(:puts).with("Analyzing #{contract.product_id}...")
 
         job.perform
       end
@@ -146,7 +146,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "uses provided equity amount" do
         expect(mock_strategy).to receive(:signal).with(
-          {symbol: trading_pair.product_id, equity_usd: 25_000.0}
+          {symbol: contract.product_id, equity_usd: 25_000.0}
         )
 
         job.perform(equity_usd: 25_000.0)
@@ -166,7 +166,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       it "calls executor with signal price and product_id" do
         expect(mock_executor).to receive(:consider_entry).with(
           spot_price: mock_signal[:price],
-          futures_product_id: trading_pair.product_id
+          futures_product_id: contract.product_id
         )
         job.perform
       end
@@ -193,7 +193,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "logs the signal details" do
         expect(job).to receive(:puts).with(
-          "[Signal] #{trading_pair.product_id} side=long price=50000.0 qty=1 tp=52000.0 sl=49000.0 conf=80%"
+          "[Signal] #{contract.product_id} side=long price=50000.0 qty=1 tp=52000.0 sl=49000.0 conf=80%"
         )
 
         job.perform
@@ -202,7 +202,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       it "sends Slack notification" do
         expect(SlackNotificationService).to receive(:signal_generated).with(
           {
-            symbol: trading_pair.product_id,
+            symbol: contract.product_id,
             side: :long,
             price: 50_000.0,
             quantity: 1,
@@ -222,7 +222,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       end
 
       it "logs no-entry message" do
-        expect(job).to receive(:puts).with("[Signal] #{trading_pair.product_id} no-entry")
+        expect(job).to receive(:puts).with("[Signal] #{contract.product_id} no-entry")
 
         job.perform
       end
@@ -236,7 +236,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     context "when no enabled trading pairs exist" do
       before do
-        TradingPair.update_all(enabled: false)
+        Contract.update_all(enabled: false)
       end
 
       it "still initializes strategy but processes no pairs" do
@@ -248,7 +248,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
     end
 
     context "when multiple trading pairs exist" do
-      let!(:trading_pair2) { create(:trading_pair, enabled: true, product_id: "ETH-29DEC24-CDE") }
+      let!(:contract2) { create(:contract, enabled: true, product_id: "ETH-29DEC24-CDE") }
 
       before do
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
@@ -257,7 +257,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       end
 
       it "processes all enabled pairs" do
-        enabled_count = TradingPair.enabled.count
+        enabled_count = Contract.enabled.count
         expect(mock_strategy).to receive(:signal).exactly(enabled_count).times
 
         job.perform
@@ -309,11 +309,11 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
   describe "error handling" do
     before do
-      # Mock TradingPair.enabled to return only our test trading pair
-      allow(TradingPair).to receive(:enabled) do
+      # Mock Contract.enabled to return only our test trading pair
+      allow(Contract).to receive(:enabled) do
         double.tap do |relation|
           allow(relation).to receive(:find_each) do |&block|
-            block.call(trading_pair)
+            block.call(contract)
           end
         end
       end
@@ -385,14 +385,14 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create comprehensive candle data for bullish scenario
         candle_data = create_comprehensive_candle_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           trend: :up,
           base_price: 50_000.0
         )
         Candle.insert_all(candle_data)
 
         # Create positive sentiment
-        create_sentiment_data(symbol: trading_pair.product_id, z_score: 2.5, avg_score: 0.4)
+        create_sentiment_data(symbol: contract.product_id, z_score: 2.5, avg_score: 0.4)
 
         # Enable sentiment filtering
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
@@ -424,7 +424,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         })
 
         expect(job).to receive(:puts).with(
-          /\[Signal\] #{trading_pair.product_id} side=long price=50800\.0 qty=2 tp=51000\.0 sl=50600\.0 conf=85\.5%/
+          /\[Signal\] #{contract.product_id} side=long price=50800\.0 qty=2 tp=51000\.0 sl=50600\.0 conf=85\.5%/
         )
 
         job.perform(equity_usd: 25_000.0)
@@ -435,14 +435,14 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create comprehensive candle data for bearish scenario
         candle_data = create_comprehensive_candle_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           trend: :down,
           base_price: 50_000.0
         )
         Candle.insert_all(candle_data)
 
         # Create negative sentiment
-        create_sentiment_data(symbol: trading_pair.product_id, z_score: -2.5, avg_score: -0.4)
+        create_sentiment_data(symbol: contract.product_id, z_score: -2.5, avg_score: -0.4)
 
         # Enable sentiment filtering
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
@@ -461,7 +461,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         })
 
         expect(job).to receive(:puts).with(
-          /\[Signal\] #{trading_pair.product_id} side=short price=49200\.0 qty=1 tp=49000\.0 sl=49400\.0 conf=78\.2%/
+          /\[Signal\] #{contract.product_id} side=short price=49200\.0 qty=1 tp=49000\.0 sl=49400\.0 conf=78\.2%/
         )
 
         job.perform(equity_usd: 15_000.0)
@@ -480,7 +480,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
           # Oscillating price around base
           price = 50_000.0 + (Math.sin(i * 0.3) * 200)
           candle_data << {
-            symbol: trading_pair.product_id, timeframe: "1h", timestamp: timestamp,
+            symbol: contract.product_id, timeframe: "1h", timestamp: timestamp,
             open: price - 50, high: price + 100, low: price - 100, close: price,
             volume: 1000, created_at: Time.current, updated_at: Time.current
           }
@@ -489,14 +489,14 @@ RSpec.describe GenerateSignalsJob, type: :job do
         Candle.insert_all(candle_data)
 
         # Neutral sentiment
-        create_sentiment_data(symbol: trading_pair.product_id, z_score: 0.3, avg_score: 0.05)
+        create_sentiment_data(symbol: contract.product_id, z_score: 0.3, avg_score: 0.05)
       end
 
       it "avoids false signals in sideways markets" do
         # Strategy should return nil for sideways markets
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
-        expect(job).to receive(:puts).with("[Signal] #{trading_pair.product_id} no-entry")
+        expect(job).to receive(:puts).with("[Signal] #{contract.product_id} no-entry")
         expect(SlackNotificationService).not_to receive(:signal_generated)
 
         job.perform(equity_usd: 10_000.0)
@@ -509,7 +509,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create complete dataset across all timeframes
         candle_data = create_comprehensive_candle_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           trend: :up
         )
         Candle.insert_all(candle_data)
@@ -556,7 +556,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create minimal data that's insufficient for signal generation
         Candle.create!(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           timeframe: "1h",
           timestamp: 1.hour.ago,
           open: 50_000, high: 50_100, low: 49_900, close: 50_050,
@@ -567,7 +567,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       it "handles insufficient data gracefully" do
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
-        expect(job).to receive(:puts).with("[Signal] #{trading_pair.product_id} no-entry")
+        expect(job).to receive(:puts).with("[Signal] #{contract.product_id} no-entry")
         expect(SlackNotificationService).not_to receive(:signal_generated)
 
         job.perform
@@ -579,7 +579,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
     before do
       # Create sufficient market data
       candle_data = create_comprehensive_candle_data(
-        symbol: trading_pair.product_id,
+        symbol: contract.product_id,
         trend: :up
       )
       Candle.insert_all(candle_data)
@@ -593,18 +593,18 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "filters out signals when sentiment is below threshold" do
         # Create weak sentiment that should filter out signals
-        create_sentiment_data(symbol: trading_pair.product_id, z_score: 1.0, avg_score: 0.1)
+        create_sentiment_data(symbol: contract.product_id, z_score: 1.0, avg_score: 0.1)
 
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
-        expect(job).to receive(:puts).with("[Signal] #{trading_pair.product_id} no-entry")
+        expect(job).to receive(:puts).with("[Signal] #{contract.product_id} no-entry")
 
         job.perform
       end
 
       it "allows signals when sentiment meets threshold" do
         # Create strong positive sentiment
-        create_sentiment_data(symbol: trading_pair.product_id, z_score: 2.0, avg_score: 0.4)
+        create_sentiment_data(symbol: contract.product_id, z_score: 2.0, avg_score: 0.4)
 
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
 
@@ -654,7 +654,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
           price = base_price + volatility_factor
 
           candle_data << {
-            symbol: trading_pair.product_id, timeframe: "1h", timestamp: timestamp,
+            symbol: contract.product_id, timeframe: "1h", timestamp: timestamp,
             open: price - 200, high: price + 800, low: price - 800, close: price,
             volume: 2000 + (i * 20), created_at: Time.current, updated_at: Time.current
           }
@@ -674,7 +674,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create low volume market data
         candle_data = create_comprehensive_candle_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           trend: :up
         )
 
@@ -699,7 +699,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
     before do
       # Create market data
       candle_data = create_comprehensive_candle_data(
-        symbol: trading_pair.product_id,
+        symbol: contract.product_id,
         trend: :up
       )
       Candle.insert_all(candle_data)
@@ -721,7 +721,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     it "validates trading strategy integration with futures contracts" do
       # Test with futures contract symbols
-      create(:trading_pair, enabled: true, product_id: "BIT-29AUG25-CDE")
+      create(:contract, enabled: true, product_id: "BIT-29AUG25-CDE")
 
       allow(mock_strategy).to receive(:signal) do |args|
         # Verify futures contract symbol is passed correctly (it can be BTC or BIT format)
@@ -762,7 +762,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create valid candle data first, then simulate corruption during processing
         Candle.create!(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           timeframe: "1h",
           timestamp: 1.hour.ago,
           open: 50_000, high: 50_100, low: 49_900, close: 50_050,
@@ -792,8 +792,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     context "when database operations fail" do
       before do
-        # Mock TradingPair.enabled to raise an error
-        allow(TradingPair).to receive(:enabled).and_raise(ActiveRecord::ConnectionTimeoutError.new("Database timeout"))
+        # Mock Contract.enabled to raise an error
+        allow(Contract).to receive(:enabled).and_raise(ActiveRecord::ConnectionTimeoutError.new("Database timeout"))
       end
 
       it "propagates database errors" do
@@ -817,7 +817,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
     before do
       # Create comprehensive market data
       candle_data = create_comprehensive_candle_data(
-        symbol: trading_pair.product_id,
+        symbol: contract.product_id,
         trend: :up
       )
       Candle.insert_all(candle_data)
@@ -836,7 +836,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       allow(mock_strategy).to receive(:signal).and_return(complete_signal)
 
       expect(SlackNotificationService).to receive(:signal_generated).with({
-        symbol: trading_pair.product_id,
+        symbol: contract.product_id,
         side: :long,
         price: 50_800.0,
         quantity: 2,
@@ -888,7 +888,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
       before do
         # Create realistic BTC market data
         candle_data = create_comprehensive_candle_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           base_price: 45_000.0,
           trend: :up
         )
@@ -896,7 +896,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
         # Create realistic sentiment data
         create_sentiment_data(
-          symbol: trading_pair.product_id,
+          symbol: contract.product_id,
           z_score: 1.8,
           avg_score: 0.25
         )
@@ -919,11 +919,11 @@ RSpec.describe GenerateSignalsJob, type: :job do
     end
 
     context "with multiple trading pairs" do
-      let!(:eth_pair) { create(:trading_pair, enabled: true, product_id: "ET-29AUG25-CDE") }
+      let!(:eth_pair) { create(:contract, enabled: true, product_id: "ET-29AUG25-CDE") }
 
       before do
         # Create market data for both BTC and ETH
-        [trading_pair.product_id, eth_pair.product_id].each do |symbol|
+        [contract.product_id, eth_pair.product_id].each do |symbol|
           candle_data = create_comprehensive_candle_data(
             symbol: symbol,
             base_price: symbol.start_with?("BTC") ? 45_000.0 : 2_800.0,

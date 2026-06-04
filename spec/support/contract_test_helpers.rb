@@ -21,12 +21,12 @@ module ContractTestHelpers
     "#{prefix}-#{date_str}-CDE"
   end
 
-  # Creates a TradingPair with dynamically generated contract ID
-  def create_trading_pair_for_month(asset, month_date, **options)
+  # Creates a Contract with dynamically generated contract ID
+  def create_contract_for_month(asset, month_date, **options)
     contract_id = generate_expected_contract_id(asset, month_date)
     expiration_date = extract_expiration_date_from_contract_id(contract_id)
 
-    TradingPair.create!({
+    Contract.create!({
       product_id: contract_id,
       base_currency: asset.upcase,
       quote_currency: "USD",
@@ -96,11 +96,11 @@ module ContractTestHelpers
 
     assets.each do |asset|
       # Current month contract
-      current_contract = create_trading_pair_for_month(asset, reference_date)
+      current_contract = create_contract_for_month(asset, reference_date)
       contracts["#{asset.downcase}_current"] = current_contract
 
       # Upcoming month contract
-      upcoming_contract = create_trading_pair_for_month(asset, reference_date.next_month)
+      upcoming_contract = create_contract_for_month(asset, reference_date.next_month)
       contracts["#{asset.downcase}_upcoming"] = upcoming_contract
     end
 
@@ -108,21 +108,21 @@ module ContractTestHelpers
   end
 
   # Verifies that a contract is properly configured for trading
-  def verify_trading_contract(trading_pair, expected_asset:, expected_expiration_month:)
-    expect(trading_pair).to be_present
-    expect(trading_pair.base_currency).to eq(expected_asset.upcase)
-    expect(trading_pair.quote_currency).to eq("USD")
-    expect(trading_pair.contract_type).to eq("CDE")
-    expect(trading_pair.enabled).to be true
+  def verify_trading_contract(contract, expected_asset:, expected_expiration_month:)
+    expect(contract).to be_present
+    expect(contract.base_currency).to eq(expected_asset.upcase)
+    expect(contract.quote_currency).to eq("USD")
+    expect(contract.contract_type).to eq("CDE")
+    expect(contract.enabled).to be true
 
     # Verify expiration date is a Friday in the expected month
-    expect(trading_pair.expiration_date.friday?).to be true
-    expect(trading_pair.expiration_date.month).to eq(expected_expiration_month.month)
-    expect(trading_pair.expiration_date.year).to eq(expected_expiration_month.year)
+    expect(contract.expiration_date.friday?).to be true
+    expect(contract.expiration_date.month).to eq(expected_expiration_month.month)
+    expect(contract.expiration_date.year).to eq(expected_expiration_month.year)
 
     # Verify it's the last Friday of the month
-    next_friday = trading_pair.expiration_date + 7.days
-    expect(next_friday).to be > trading_pair.expiration_date.end_of_month
+    next_friday = contract.expiration_date + 7.days
+    expect(next_friday).to be > contract.expiration_date.end_of_month
   end
 
   # Test edge cases for last Friday calculation
