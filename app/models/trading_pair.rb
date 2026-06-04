@@ -34,6 +34,7 @@ class TradingPair < ApplicationRecord
     base_currency = case prefix
     when "BIT" then "BTC"
     when "ET" then "ETH"
+    when "NOL" then "OIL"
     else prefix
     end
 

@@ -187,6 +187,27 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       expect(Rails.logger).to receive(:info).with("Upserted 1 futures products")
       service.upsert_products
     end
+
+    it "includes NOL (oil) futures products in filter" do
+      nol_products = [
+        {
+          "product_id" => "NOL-19JUN26-CDE",
+          "status" => "online",
+          "quote_currency" => "USD",
+          "base_increment" => "0.01",
+          "quote_increment" => "0.01"
+        }
+      ]
+      allow(service).to receive(:list_products).and_return(nol_products)
+      allow(TradingPair).to receive(:parse_contract_info).and_return({
+        base_currency: "OIL",
+        quote_currency: "USD",
+        expiration_date: Date.new(2026, 6, 19),
+        contract_type: "CDE"
+      })
+      service.upsert_products
+      expect(TradingPair).to have_received(:parse_contract_info).with("NOL-19JUN26-CDE")
+    end
   end
 
   describe "#fetch_candles" do
