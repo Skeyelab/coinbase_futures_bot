@@ -168,7 +168,7 @@ class ContractExpiryManager
     validation_results = []
 
     positions.each do |position|
-      expiry_info = FuturesContract.get_expiry_info(position.product_id, positions_service: @positions_service)
+      expiry_info = Contract.get_expiry_info(position.product_id, positions_service: @positions_service)
 
       result = {
         position_id: position.id,

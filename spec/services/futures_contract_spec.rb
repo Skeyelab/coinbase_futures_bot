@@ -38,12 +38,13 @@ RSpec.describe FuturesContract, type: :service do
       end
 
       it "handles 2-digit years correctly" do
-        # Years 00-69 should be 2000-2069
+        # Ruby Date.strptime("%y"): 00-68 -> 2000-2068, 69-99 -> 1969-1999
         expect(FuturesContract.parse_expiry_date("BIT-15JAN00-CDE")).to eq(Date.new(2000, 1, 15))
         expect(FuturesContract.parse_expiry_date("BIT-15JAN30-CDE")).to eq(Date.new(2030, 1, 15))
-        expect(FuturesContract.parse_expiry_date("BIT-15JAN69-CDE")).to eq(Date.new(2069, 1, 15))
+        expect(FuturesContract.parse_expiry_date("BIT-15JAN68-CDE")).to eq(Date.new(2068, 1, 15))
 
-        # Years 70-99 should be 1970-1999
+        # Years 69-99 map to 1969-1999
+        expect(FuturesContract.parse_expiry_date("BIT-15JAN69-CDE")).to eq(Date.new(1969, 1, 15))
         expect(FuturesContract.parse_expiry_date("BIT-15JAN70-CDE")).to eq(Date.new(1970, 1, 15))
         expect(FuturesContract.parse_expiry_date("BIT-15JAN99-CDE")).to eq(Date.new(1999, 1, 15))
       end

@@ -445,13 +445,12 @@ module Trading
         status: "filled",
         placed_at: Time.current,
         filled_at: Time.current,
-        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
+        coinbase_order_id: extract_order_id(order_result)
       )
 
       @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")
     rescue => e
       @logger.error("Failed to create local position record: #{e.message}")
-      # Don't fail the main operation if local record creation fails
     end
 
     def update_local_position_record(product_id:, size:, close_price:, order_result:)
@@ -472,7 +471,7 @@ module Trading
         status: "filled",
         placed_at: Time.current,
         filled_at: Time.current,
-        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
+        coinbase_order_id: extract_order_id(order_result)
       )
 
       # Close the position
@@ -480,7 +479,6 @@ module Trading
       @logger.info("Updated local position record #{position.id} as closed with PnL: #{position.pnl}")
     rescue => e
       @logger.error("Failed to update local position record: #{e.message}")
-      # Don't fail the main operation if local record update fails
     end
 
     def increase_local_position_record(product_id:, additional_size:, additional_price:, order_result:)
@@ -503,7 +501,7 @@ module Trading
         status: "filled",
         placed_at: Time.current,
         filled_at: Time.current,
-        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
+        coinbase_order_id: extract_order_id(order_result)
       )
 
       # Update the position
@@ -515,7 +513,10 @@ module Trading
       @logger.info("Updated local position record #{position.id}: size increased to #{total_size}, new avg entry: #{new_entry_price}")
     rescue => e
       @logger.error("Failed to update local position record for increase: #{e.message}")
-      # Don't fail the main operation if local record update fails
+    end
+
+    def extract_order_id(order_result)
+      order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
     end
 
     def persist_order(position:, contract_id:, side:, order_type:, quantity:, status:,
@@ -550,12 +551,7 @@ module Trading
       begin
         @conn.get(path, params)
       rescue Faraday::ClientError => e
-        @logger.error("Request failed: #{e.class} - #{e.message}")
-        if e.response
-          @logger.error("Response status: #{e.response[:status]}")
-          @logger.error("Response headers: #{e.response[:headers]}")
-          @logger.error("Response body: #{e.response[:body]}")
-        end
+        log_faraday_error(e)
         raise
       end
     end
@@ -572,14 +568,7 @@ module Trading
       begin
         @conn.post(path, body_json)
       rescue Faraday::ClientError => e
-        @logger.error("Request failed: #{e.class} - #{e.message}")
-        if e.response
-          @logger.error("Response status: #{e.response[:status]}")
-          @logger.error("Response headers: #{e.response[:headers]}")
-          @logger.error("Response body: #{e.response[:body]}")
-        end
-
-        # Extract error message from response body for consistent error handling
+        log_faraday_error(e)
         body = (e.response && e.response[:body]).to_s
         message = begin
           parsed = JSON.parse(body)
@@ -587,9 +576,17 @@ module Trading
         rescue
           body.presence || e.message
         end
-
         raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
       end
+    end
+
+    def log_faraday_error(e)
+      @logger.error("Request failed: #{e.class} - #{e.message}")
+      return unless e.response
+
+      @logger.error("Response status: #{e.response[:status]}")
+      @logger.error("Response headers: #{e.response[:headers]}")
+      @logger.error("Response body: #{e.response[:body]}")
     end
 
     # Build ES256 JWT per Coinbase App API requirements (Authorization: Bearer <JWT>)

@@ -29,6 +29,13 @@ class SideNormalizer
     "SELL" => :sell
   }.freeze
 
+  SIMULATOR_SIDES = {
+    "long" => :buy,
+    "buy" => :buy,
+    "short" => :sell,
+    "sell" => :sell
+  }.freeze
+
   def self.position(value)
     POSITION_SIDES[value.to_s.downcase]
   end
@@ -43,5 +50,9 @@ class SideNormalizer
 
   def self.order_symbol(value)
     ORDER_SIDE_SYMBOLS[value.to_s.upcase]
+  end
+
+  def self.simulator_fill_side(value)
+    SIMULATOR_SIDES[value.to_s.downcase] || value.to_s.downcase.to_sym
   end
 end

@@ -315,7 +315,7 @@ RSpec.describe CalibrationJob, type: :job do
       it "places limit orders when signals are generated" do
         expect(mock_simulator).to receive(:place_limit).with(
           symbol: sample_candles.last.symbol,
-          side: SignalSide.simulator_fill_side(mock_order[:side]),
+          side: SideNormalizer.simulator_fill_side(mock_order[:side]),
           price: mock_order[:price],
           quantity: mock_order[:quantity],
           tp: mock_order[:tp],
