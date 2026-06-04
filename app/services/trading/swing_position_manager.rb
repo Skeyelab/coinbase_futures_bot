@@ -10,6 +10,7 @@ module Trading
     def initialize(logger: Rails.logger)
       @logger = logger
       @positions_service = CoinbasePositions.new(logger: logger)
+      @coinbase = Coinbase::AdvancedTradeClient.new(logger: logger)
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
       @trailing_stop_runner = Trading::TrailingStop::Runner.new(
         logger: logger,
@@ -201,18 +202,11 @@ module Trading
 
     # Get balance and margin information for swing trading
     def get_swing_balance_summary
-      return {error: "Authentication required"} unless @positions_service.instance_variable_get(:@authenticated)
+      return {error: "Authentication required"} unless @coinbase.authenticated?
 
       begin
-        # Get futures balance summary
-        path = "/api/v3/brokerage/cfm/balance_summary"
-        resp = @positions_service.send(:authenticated_get, path, {})
-        balance_data = JSON.parse(resp.body)
-
-        # Get margin window information
-        margin_path = "/api/v3/brokerage/cfm/intraday_margin_setting"
-        margin_resp = @positions_service.send(:authenticated_get, margin_path, {})
-        margin_data = JSON.parse(margin_resp.body)
+        balance_data = @coinbase.get_futures_balance_summary
+        margin_data = @coinbase.get_current_margin_window
 
         {
           futures_buying_power: balance_data.dig("futures_buying_power").to_f,
@@ -389,23 +383,7 @@ module Trading
 
     # Get current market price for a product
     def get_current_price(product_id)
-      # Use API call to get current market price
-      begin
-        path = "/api/v3/brokerage/market/product_book"
-        params = {product_id: product_id, limit: 1}
-        resp = @positions_service.send(:authenticated_get, path, params)
-        data = JSON.parse(resp.body)
-
-        if data["pricebook"] && data["pricebook"]["bids"]&.any? && data["pricebook"]["asks"]&.any?
-          bid = data["pricebook"]["bids"][0]["price"].to_f
-          ask = data["pricebook"]["asks"][0]["price"].to_f
-          return (bid + ask) / 2.0
-        end
-      rescue => e
-        @logger.error("Failed to get current price for #{product_id}: #{e.message}")
-      end
-
-      nil
+      @coinbase.market_price(product_id)
     end
 
     # Calculate risk metrics for swing positions
