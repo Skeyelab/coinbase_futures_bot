@@ -84,10 +84,10 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       expect(payload["uri"]).to eq("GET api.coinbase.com/api/v3/brokerage/cfm/positions")
     end
 
-    it "formats JWT URI correctly for different HTTP methods" do
-      # GET with params
+    it "formats JWT URI correctly (excludes query params per Coinbase spec)" do
+      # GET: query params must NOT appear in URI claim
       uri = service.send(:format_jwt_uri, "GET", "/api/v3/brokerage/cfm/positions", {product_id: "BTC-USD"}, nil)
-      expect(uri).to eq("GET api.coinbase.com/api/v3/brokerage/cfm/positions?product_id=BTC-USD")
+      expect(uri).to eq("GET api.coinbase.com/api/v3/brokerage/cfm/positions")
 
       # POST without params
       uri = service.send(:format_jwt_uri, "POST", "/api/v3/brokerage/orders", nil, "{}")

@@ -15,7 +15,7 @@ class ApplicationJob < ActiveJob::Base
       scope.set_tag("priority", priority) if respond_to?(:priority)
 
       # Add job arguments as context
-      scope.set_context("job_arguments", arguments) if arguments.present?
+      scope.set_context("job_arguments", {args: arguments}) if arguments.present?
 
       # Add execution context
       scope.set_context("job_execution", {

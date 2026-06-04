@@ -26,27 +26,20 @@ RSpec.describe FetchCandlesJob, type: :job do
   end
 
   describe "#perform" do
-    it "fetches 1m, 5m, 15m, and 1h candles" do
-      with_integration_vcr("fetch_candles_job_perform_all_timeframes") do
-        # Clear existing candles to avoid conflicts
-        Candle.where(symbol: "BTC-USD").destroy_all
+    it "fetches candles for all enabled pairs" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
+      allow(mock_rest).to receive(:upsert_products)
+      allow(mock_rest).to receive(:upsert_1m_candles)
+      allow(mock_rest).to receive(:upsert_5m_candles)
+      allow(mock_rest).to receive(:upsert_15m_candles)
+      allow(mock_rest).to receive(:upsert_1h_candles)
+      allow(Rails.logger).to receive(:info)
 
-        # Just test that the job runs without error
-        expect { described_class.perform_now(backfill_days: 1) }.not_to raise_error
-
-        # Verify that some candles were created (may vary based on API response)
-        total_candles = Candle.where(symbol: "BTC-USD").count
-        expect(total_candles).to be >= 0
-
-        if total_candles > 0
-          # Verify we have candles in different timeframes
-          timeframes = Candle.where(symbol: "BTC-USD").distinct.pluck(:timeframe)
-          # NOTE: VCR cassette may not have all timeframes, so we check what's available
-          expect(timeframes).to include("5m", "15m", "1h")
-          # Log what timeframes we actually got for debugging
-          puts "Available timeframes in VCR cassette: #{timeframes.join(", ")}"
-        end
-      end
+      btc_pair
+      expect { described_class.perform_now(backfill_days: 1) }.not_to raise_error
+      expect(mock_rest).to have_received(:upsert_products)
+      expect(mock_rest).to have_received(:upsert_1h_candles).with(hash_including(product_id: "BTC-USD"))
     end
 
     it "returns early if no BTC trading pair found" do
