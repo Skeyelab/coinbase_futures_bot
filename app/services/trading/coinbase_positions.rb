@@ -38,6 +38,10 @@ module Trading
       @contract_manager = MarketData::FuturesContractManager.new(logger: logger)
     end
 
+    def authenticated?
+      @authenticated
+    end
+
     # Test method to validate auth with simpler endpoint first
     def test_auth_with_accounts
       raise "Authentication required" unless @authenticated

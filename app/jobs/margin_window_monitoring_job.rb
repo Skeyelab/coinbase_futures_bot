@@ -21,7 +21,7 @@ class MarginWindowMonitoringJob < ApplicationJob
     )
 
     # Check if we have authentication
-    unless @positions_service.instance_variable_get(:@authenticated)
+    unless @positions_service.authenticated?
       @logger.error("Margin window monitoring requires authentication")
       return
     end

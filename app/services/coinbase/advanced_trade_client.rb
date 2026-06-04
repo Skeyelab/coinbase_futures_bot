@@ -34,6 +34,10 @@ module Coinbase
       end
     end
 
+    def authenticated?
+      @authenticated
+    end
+
     # Test authentication with accounts endpoint
     def test_auth
       raise "Authentication required" unless @authenticated
@@ -130,6 +134,28 @@ module Coinbase
         end
         raise Faraday::ClientError.new("#{e.message}#{": #{message}" if message}", response: e.response)
       end
+    end
+
+    # Get mid-market price for a product from the order book.
+    # Returns Float or nil when unavailable.
+    def market_price(product_id)
+      raise "Authentication required" unless @authenticated
+
+      path = "/api/v3/brokerage/market/product_book"
+      resp = authenticated_get(path, {product_id: product_id, limit: 1})
+      data = JSON.parse(resp.body)
+
+      pricebook = data["pricebook"]
+      bids = pricebook&.dig("bids")
+      asks = pricebook&.dig("asks")
+      return nil unless bids&.any? && asks&.any?
+
+      bid = bids[0]["price"].to_f
+      ask = asks[0]["price"].to_f
+      (bid + ask) / 2.0
+    rescue => e
+      @logger.error("market_price failed for #{product_id}: #{e.message}")
+      nil
     end
 
     # Get product ticker (for price data)

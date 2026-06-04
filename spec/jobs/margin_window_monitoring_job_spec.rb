@@ -29,7 +29,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
       end
 
       before do
-        allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
+        allow(positions_service).to receive(:authenticated?).and_return(true)
         allow(advanced_trade_client).to receive(:get_current_margin_window).and_return(margin_window_data)
         allow(advanced_trade_client).to receive(:get_futures_balance_summary).and_return({
           "futures_buying_power" => "10000.0",
@@ -130,7 +130,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
 
     context "when authentication is not available" do
       before do
-        allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(false)
+        allow(positions_service).to receive(:authenticated?).and_return(false)
       end
 
       it "logs error and returns early" do
@@ -144,7 +144,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
       let(:api_error) { StandardError.new("API connection failed") }
 
       before do
-        allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
+        allow(positions_service).to receive(:authenticated?).and_return(true)
         allow(advanced_trade_client).to receive(:get_current_margin_window).and_raise(api_error)
         sentry_scope = double("sentry_scope")
         allow(sentry_scope).to receive(:set_tag)
@@ -192,7 +192,7 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
       let(:swing_manager) { instance_double(Trading::SwingPositionManager) }
 
       before do
-        allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
+        allow(positions_service).to receive(:authenticated?).and_return(true)
         allow(advanced_trade_client).to receive(:get_current_margin_window).and_return(margin_window_data)
         allow(advanced_trade_client).to receive(:get_futures_balance_summary).and_return(balance_summary)
         allow(Position).to receive_message_chain(:swing_trading, :open, :where, :includes).and_return([position])
