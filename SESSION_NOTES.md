@@ -26,6 +26,33 @@
 
 ### Session log
 
+#### 2026-06-04 15:50 UTC
+- Context: Re-merged latest `origin/main` into PR #187 after base branch advanced again.
+- Changes:
+  - Kept single-file agent guidance model by leaving `CLAUDE.md` deleted.
+  - Merged new mainline Conductor setup docs (`conductor.json` + session note) with prior PR #187 conflict-resolution history.
+  - Verified signal-side regression slice still passes after the merge commit and follow-up rebase merge.
+- Commands run:
+  - `git merge --no-commit --no-ff origin/main`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle install`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/models/signal_alert_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/generate_signals_job_spec.rb`
+  - `git push origin HEAD:cursor/rails-platform-conventions-e2d1`
+- Files touched:
+  - `AGENTS.md`, `SESSION_NOTES.md`, `CLAUDE.md` (kept deleted), `conductor.json`
+- Next steps:
+  - Confirm GitHub marks PR #187 mergeable after branch status refresh.
+
+#### 2026-06-04 15:44 UTC
+- Context: Added shared Conductor workspace setup for this Rails repo.
+- Changes:
+  - Created root `conductor.json` with `scripts.setup` only.
+  - Setup script reuses root `.env` via symlink when present, runs `bundle check || bundle install`, then `bin/rails db:prepare`.
+  - Intentionally avoided `bin/setup` because it mutates git hooks and restarts the app.
+- Files touched:
+  - `conductor.json`, `SESSION_NOTES.md`
+- Next steps:
+  - If teammates want copied env files instead of symlinks, move that concern to Conductor Files to copy or `.worktreeinclude`.
+
 #### 2026-06-04 00:00 UTC
 - Context: Resolved `origin/main` merge conflicts for PR #187 (`feat: align repo with rails-platform conventions`).
 - Changes:
@@ -3595,4 +3622,3 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
-
