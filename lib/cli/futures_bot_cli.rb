@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "thor"
-require_relative "tui_dashboard"
+require_relative "../tui"
 
 # Cli::FuturesBotCli provides a Thor-based command-line interface for
 # interacting with the Coinbase Futures Bot from the shell.
@@ -35,11 +35,9 @@ module Cli
 
     # ─── dashboard ──────────────────────────────────────────────────────────────
     desc "dashboard", "Launch the real-time full-screen TUI dashboard (keys: [i]mport, [c]lose, [o]reconcile)"
-    method_option :refresh, aliases: ["-r", "-i"], type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
-      desc: "Auto-refresh interval in seconds (-r preferred; -i kept for backwards compatibility)"
     def dashboard
       sync_startup_positions
-      TuiDashboard.new(refresh_interval: options[:refresh]).start
+      Bubbletea.run(Tui::App.new, alt_screen: true)
     end
 
     # ─── chat ───────────────────────────────────────────────────────────────────
@@ -161,7 +159,7 @@ module Cli
 
     # ─── start ──────────────────────────────────────────────────────────────────
     desc "start", "Launch TUI dashboard + market data feed + signal evaluation in one command"
-    method_option :refresh, aliases: "-r", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
+    method_option :refresh, aliases: "-r", type: :numeric, default: 5,
       desc: "TUI auto-refresh interval in seconds"
     def start
       sync_startup_positions

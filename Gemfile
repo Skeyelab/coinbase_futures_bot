@@ -86,3 +86,9 @@ gem "kaminari", "~> 1.2"
 
 gem "guard", "~> 2.20", group: :development
 gem "guard-rspec", "~> 4.7", group: :development
+
+# Charm Ruby TUI framework
+gem "bubbletea", "~> 0.1"
+gem "lipgloss", "~> 0.1"
+gem "bubbles", "~> 0.1"
+gem "gum", "~> 0.3"
