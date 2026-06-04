@@ -22,6 +22,9 @@ RSpec.describe GenerateSignalsJob, type: :job do
     allow(SlackNotificationService).to receive(:signal_generated)
     # Allow puts to be called without mocking it
     allow(job).to receive(:puts).and_call_original
+    # Default: paper trading on so executor not called unless test overrides
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("PAPER_TRADING_MODE").and_return("true")
   end
 
   # Helper method to create comprehensive candle data for testing
@@ -147,6 +150,39 @@ RSpec.describe GenerateSignalsJob, type: :job do
         )
 
         job.perform(equity_usd: 25_000.0)
+      end
+    end
+
+    context "when strategy returns a signal and live trading is enabled" do
+      let(:mock_executor) { instance_double(Execution::FuturesExecutor) }
+
+      before do
+        allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        allow(Execution::FuturesExecutor).to receive(:new).and_return(mock_executor)
+        allow(mock_executor).to receive(:consider_entry)
+        allow(ENV).to receive(:[]).with("PAPER_TRADING_MODE").and_return("false")
+      end
+
+      it "calls executor with signal price and product_id" do
+        expect(mock_executor).to receive(:consider_entry).with(
+          spot_price: mock_signal[:price],
+          futures_product_id: trading_pair.product_id
+        )
+        job.perform
+      end
+    end
+
+    context "when strategy returns a signal and paper trading is enabled" do
+      let(:mock_executor) { instance_double(Execution::FuturesExecutor) }
+
+      before do
+        allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        # PAPER_TRADING_MODE=true already set in outer before block
+      end
+
+      it "does not call executor" do
+        expect(mock_executor).not_to receive(:consider_entry)
+        job.perform
       end
     end
 

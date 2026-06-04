@@ -25,7 +25,7 @@ class GenerateSignalsJob < ApplicationJob
           confidence: order[:confidence]
         })
 
-        # TODO: hand off to a real executor once implemented for futures
+        execute_order(pair.product_id, order[:price]) unless paper_trading?
       else
         puts "[Signal] #{pair.product_id} no-entry"
       end
@@ -39,5 +39,16 @@ class GenerateSignalsJob < ApplicationJob
     Float(value)
   rescue ArgumentError, TypeError
     0.0
+  end
+
+  def paper_trading?
+    ENV["PAPER_TRADING_MODE"] == "true"
+  end
+
+  def execute_order(product_id, price)
+    Execution::FuturesExecutor.new.consider_entry(
+      spot_price: price,
+      futures_product_id: product_id
+    )
   end
 end

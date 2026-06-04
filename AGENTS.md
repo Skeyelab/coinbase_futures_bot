@@ -6,12 +6,16 @@
 - Prefer concise, smart implementations and brief communication.
 - Prefer TDD and keep unit testing as a first-class requirement.
 - Keep issue work agent-ready with explicit scope and acceptance criteria.
+- Align the active Ruby with `.ruby-version` before Bundler-heavy work; mismatched shells cause native-extension load failures unrelated to app code.
 
 ## Learned Workspace Facts
 
-- This workspace uses GitHub Issues as the only issue tracker workflow.
-- Use `gh` for issue listing, review, editing, and closure.
-- Express dependency/order in GitHub issue bodies, linked issues, or PR references rather than a secondary tracker.
+- This workspace uses `bd` (beads) as the primary issue tracker workflow.
+- Running `bd prime` is expected before active issue execution.
+- Beads dependency ordering is managed explicitly with `bd dep add`.
+- Issue planning often spans both GitHub issues and Beads dependencies.
+- Guard + `guard-rspec` are wired for local RSpec-on-change (`bundle exec guard`); use a project `Guardfile` and pause Guard when you need an exclusive run (long single-process or CI-style).
+- When the shell default Ruby does not match `.ruby-version`, run commands through the project RVM gemset (quickstart: `ruby-3.2.4@coinbase_futures_bot`, e.g. `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec …`) so `bundle exec` and native gems stay consistent.
 
 ## What this repo is
 
@@ -54,13 +58,12 @@
 - Day trading close workflow: `bin/rake day_trading:manage`
 - Kill switch: `bin/futuresbot halt [--reason "..."]` / `bin/futuresbot resume`
 
-### GitHub issue tracker
+### Beads issue tracker
 
-- List issues: `gh issue list`
-- View issue: `gh issue view <number>`
-- Create issue: `gh issue create`
-- Edit issue: `gh issue edit <number>`
-- Close issue: `gh issue close <number>`
+- List issues: `bd list` / `bd ready`
+- Sync with GitHub: `GITHUB_TOKEN="$(gh auth token)" bd github sync`
+  - Note: `bd config set github.token` is written to config.yaml but not read by `bd github sync` (bd bug); use the env var workaround above.
+- Push to Dolt remote: `bd dolt push` (no remote configured yet)
 
 ## High-value gotchas
 
