@@ -25,7 +25,7 @@ gem "bootsnap", require: false
 # gem "rack-cors"
 
 # HTTP client for Coinbase REST
-gem "faraday", "~> 2.11"
+gem "faraday", "~> 2.14"
 
 # WebSocket client for market data subscriptions
 gem "websocket-client-simple", "~> 0.8"
@@ -36,6 +36,9 @@ group :development, :test do
 
   # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
   gem "brakeman", require: false
+
+  # Audit Gemfile.lock for known vulnerabilities
+  gem "bundler-audit", require: false
 
   # StandardRB for Ruby code formatting and linting [https://github.com/standardrb/standard]
   gem "standard", ">= 1.35.1", require: false
@@ -68,15 +71,18 @@ group :test do
   gem "simplecov-json", "~> 0.2", require: false
 end
 
-gem "good_job", "~> 4.12"
+gem "good_job", "~> 4.19"
 gem "sentry-rails"
 gem "sentry-ruby"
 
 # JWT for Coinbase App (Advanced Trade) ES256 authentication
-gem "jwt", "~> 3.1"
+gem "jwt", "~> 3.2"
 
 # Slack integration for notifications and bot control
 gem "slack-ruby-client", "~> 3.1"
 
 # Pagination for API endpoints
 gem "kaminari", "~> 1.2"
+
+gem "guard", "~> 2.20", group: :development
+gem "guard-rspec", "~> 4.7", group: :development

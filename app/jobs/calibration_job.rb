@@ -40,7 +40,8 @@ class CalibrationJob < ApplicationJob
     candles.each_cons(300) do |window|
       order = strat.signal(candles: window, symbol: window.last.symbol, equity_usd: sim.equity_usd)
       if order && order[:quantity].to_f > 0
-        sim.place_limit(symbol: window.last.symbol, side: order[:side], price: order[:price], quantity: order[:quantity], tp: order[:tp], sl: order[:sl])
+        sim.place_limit(symbol: window.last.symbol, side: SignalSide.simulator_fill_side(order[:side]),
+          price: order[:price], quantity: order[:quantity], tp: order[:tp], sl: order[:sl])
       end
       sim.on_candle(window.last)
     end

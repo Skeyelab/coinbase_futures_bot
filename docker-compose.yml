@@ -1,0 +1,36 @@
+services:
+  web:
+    build: .
+    command: ["./bin/rails", "server", "-b", "0.0.0.0"]
+    expose:
+      - "3000"
+    environment:
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      APP_HOST: ${APP_HOST}
+      RAILS_ALLOWED_HOSTS: ${RAILS_ALLOWED_HOSTS:-}
+      RAILS_ASSUME_SSL: ${RAILS_ASSUME_SSL:-true}
+      RAILS_FORCE_SSL: ${RAILS_FORCE_SSL:-true}
+      RAILS_LOG_LEVEL: ${RAILS_LOG_LEVEL:-info}
+      RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      GOOD_JOB_EXECUTION_MODE: async
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["bundle", "exec", "good_job", "start"]
+    environment:
+      RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      APP_HOST: ${APP_HOST}
+      RAILS_LOG_LEVEL: ${RAILS_LOG_LEVEL:-info}
+      RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
+      GOOD_JOB_EXECUTION_MODE: external
+    restart: unless-stopped

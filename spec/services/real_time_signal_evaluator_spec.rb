@@ -612,6 +612,26 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
         expect(evaluator.send(:duplicate_signal?, strategy_name, symbol, signal)).to be false
       end
     end
+
+    context "when legacy row still has buy side in database" do
+      let(:signal) { {side: :long, confidence: 80} }
+
+      before do
+        legacy = create(:signal_alert,
+          strategy_name: strategy_name,
+          symbol: symbol,
+          side: "long",
+          signal_type: "entry",
+          alert_status: "active",
+          confidence: 80,
+          alert_timestamp: 5.minutes.ago)
+        legacy.update_column(:side, "buy")
+      end
+
+      it "treats canonical long as duplicate of legacy buy" do
+        expect(evaluator.send(:duplicate_signal?, strategy_name, symbol, signal)).to be true
+      end
+    end
   end
 
   describe "#create_signal_alert" do
