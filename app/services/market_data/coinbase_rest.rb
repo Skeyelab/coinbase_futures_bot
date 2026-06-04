@@ -46,19 +46,37 @@ module MarketData
     end
 
     def list_products
-      resp = authenticated_get("/api/v3/brokerage/products", {product_type: "FUTURE"})
-      data = JSON.parse(resp.body)
-      products = data["products"] || []
-      Rails.logger.info("Fetched #{products.count} products from Advanced Trade API")
-      products
+      all_products = []
+      cursor = nil
+
+      loop do
+        params = {
+          product_type: "FUTURE",
+          contract_expiry_type: "EXPIRING",
+          expiring_contract_status: "STATUS_UNEXPIRED"
+        }
+        params[:cursor] = cursor if cursor
+
+        resp = authenticated_get("/api/v3/brokerage/products", params)
+        data = JSON.parse(resp.body)
+        page_products = data["products"] || []
+        all_products.concat(page_products)
+
+        pagination = data["pagination"] || {}
+        break unless pagination["has_next"]
+        cursor = pagination["next_cursor"]
+      end
+
+      Rails.logger.info("Fetched #{all_products.count} products from Advanced Trade API")
+      all_products
     end
 
     def upsert_products
       products = list_products
-      futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET)-/ && !p["trading_disabled"] }
+      futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET|NOL)-/ && !p["trading_disabled"] }
 
       futures_products.each do |p|
-        contract_info = TradingPair.parse_contract_info(p["product_id"])
+        contract_info = build_contract_info(p)
         next unless contract_info
 
         TradingPair.upsert({
@@ -524,6 +542,31 @@ module MarketData
     end
 
     private
+
+    # Build contract info hash from API product object.
+    # Prefers future_product_details.contract_expiry (RFC3339) over regex date parsing
+    # from product_id. Falls back to TradingPair.parse_contract_info for legacy/unknown shapes.
+    def build_contract_info(product)
+      parsed = TradingPair.parse_contract_info(product["product_id"])
+      return nil unless parsed
+
+      # Override expiration_date if the API provides a richer timestamp
+      details = product["future_product_details"]
+      if details && (expiry_str = details["contract_expiry"]).present?
+        begin
+          parsed = parsed.merge(expiration_date: Time.parse(expiry_str).utc.to_date)
+        rescue ArgumentError, TypeError
+          # fallback to regex-parsed date already in parsed
+        end
+      end
+
+      # Map FUTURES_ASSET_TYPE_ENERGY (oil) etc. to correct base currency if not already set
+      if details && (asset_type = details["futures_asset_type"])
+        parsed = parsed.merge(base_currency: "OIL") if asset_type == "FUTURES_ASSET_TYPE_ENERGY" && parsed[:base_currency] == "NOL"
+      end
+
+      parsed
+    end
 
     def authenticated_get(path, params = {})
       now = Time.now.to_i

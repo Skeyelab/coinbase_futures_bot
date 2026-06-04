@@ -69,7 +69,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
 
   describe "#list_products" do
     let(:products_data) { [{"product_id" => "BIT-29DEC24-CDE", "trading_disabled" => false}] }
-    let(:api_response) { {"products" => products_data} }
+    let(:api_response) { {"products" => products_data, "pagination" => {"has_next" => false}} }
 
     before do
       allow(service).to receive(:authenticated_get).and_return(mock_response)
@@ -77,10 +77,14 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       allow(Rails.logger).to receive(:info)
     end
 
-    it "calls Advanced Trade API products endpoint" do
+    it "calls Advanced Trade API products endpoint with EXPIRING server-side filters" do
       service.list_products
       expect(service).to have_received(:authenticated_get)
-        .with("/api/v3/brokerage/products", {product_type: "FUTURE"})
+        .with("/api/v3/brokerage/products", hash_including(
+          product_type: "FUTURE",
+          contract_expiry_type: "EXPIRING",
+          expiring_contract_status: "STATUS_UNEXPIRED"
+        ))
     end
 
     it "returns products array from hash response" do
@@ -94,9 +98,29 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
     end
 
     it "returns empty array when products key missing" do
-      allow(mock_response).to receive(:body).and_return({}.to_json)
+      allow(mock_response).to receive(:body).and_return({"pagination" => {"has_next" => false}}.to_json)
       result = service.list_products
       expect(result).to eq([])
+    end
+
+    it "paginates through all pages when has_next is true" do
+      page1_resp = instance_double(Faraday::Response)
+      page2_resp = instance_double(Faraday::Response)
+      page1_body = {"products" => [{"product_id" => "BIT-29DEC24-CDE"}], "pagination" => {"has_next" => true, "next_cursor" => "cursor_abc"}}.to_json
+      page2_body = {"products" => [{"product_id" => "ET-29DEC24-CDE"}], "pagination" => {"has_next" => false}}.to_json
+
+      allow(page1_resp).to receive(:body).and_return(page1_body)
+      allow(page2_resp).to receive(:body).and_return(page2_body)
+
+      call_count = 0
+      allow(service).to receive(:authenticated_get) do |_path, params|
+        call_count += 1
+        (call_count == 1) ? page1_resp : page2_resp
+      end
+
+      result = service.list_products
+      expect(result.map { |p| p["product_id"] }).to eq(["BIT-29DEC24-CDE", "ET-29DEC24-CDE"])
+      expect(service).to have_received(:authenticated_get).twice
     end
   end
 
@@ -125,7 +149,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       allow(Rails.logger).to receive(:info)
     end
 
-    it "filters for online USD futures products" do
+    it "calls list_products" do
       service.upsert_products
       expect(service).to have_received(:list_products)
     end
@@ -155,6 +179,42 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       expect(TradingPair).to have_received(:upsert).with(
         hash_including(expected_upsert_data),
         unique_by: :index_trading_pairs_on_product_id
+      )
+    end
+
+    it "prefers contract_expiry from future_product_details over product_id date parsing" do
+      product_with_details = futures_products.first.merge(
+        "future_product_details" => {"contract_expiry" => "2025-01-10T16:00:00Z"}
+      )
+      allow(service).to receive(:list_products).and_return([product_with_details])
+
+      service.upsert_products
+      expect(TradingPair).to have_received(:upsert).with(
+        hash_including(expiration_date: Date.new(2025, 1, 10)),
+        anything
+      )
+    end
+
+    it "includes NOL- futures products" do
+      nol_product = {
+        "product_id" => "NOL-19JUN26-CDE",
+        "trading_disabled" => false,
+        "base_min_size" => "1",
+        "base_increment" => "1",
+        "quote_increment" => "0.01"
+      }
+      allow(service).to receive(:list_products).and_return([nol_product])
+      allow(TradingPair).to receive(:parse_contract_info).with("NOL-19JUN26-CDE").and_return({
+        base_currency: "NOL",
+        quote_currency: "USD",
+        expiration_date: Date.new(2026, 6, 19),
+        contract_type: "CDE"
+      })
+
+      service.upsert_products
+      expect(TradingPair).to have_received(:upsert).with(
+        hash_including(product_id: "NOL-19JUN26-CDE"),
+        anything
       )
     end
 
