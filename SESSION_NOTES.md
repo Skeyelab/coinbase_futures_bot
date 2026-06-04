@@ -26,6 +26,28 @@
 
 ### Session log
 
+#### 2026-06-04 20:25 UTC
+- Context: Refreshed PR #173 against `origin/main` and addressed inline review comments before merge.
+- Changes:
+  - Merged `origin/main` into `feat/futuresbot-start` and resolved the only conflict by keeping current `main`'s `.beads/issues.jsonl`.
+  - Updated `FuturesBotLauncher` to derive spot IDs from enabled futures pairs, stop subscribers cooperatively, and use kill only as a fallback after join timeout.
+  - Added `stop` hooks to both Coinbase WebSocket subscribers and tightened launcher/subscriber specs around shutdown behavior.
+- Commands run:
+  - `git merge origin/main`
+  - `bundle exec rspec spec/services/futuresbot_launcher_spec.rb spec/services/coinbase_spot_subscriber_spec.rb spec/services/coinbase_futures_subscriber_spec.rb spec/lib/cli/futures_bot_cli_spec.rb`
+  - `bin/standardrb app/services/futures_bot_launcher.rb app/services/market_data/coinbase_spot_subscriber.rb app/services/market_data/coinbase_futures_subscriber.rb spec/services/futuresbot_launcher_spec.rb spec/services/coinbase_spot_subscriber_spec.rb spec/services/coinbase_futures_subscriber_spec.rb`
+- Files touched:
+  - `app/services/futures_bot_launcher.rb`
+  - `app/services/market_data/coinbase_spot_subscriber.rb`
+  - `app/services/market_data/coinbase_futures_subscriber.rb`
+  - `spec/services/futuresbot_launcher_spec.rb`
+  - `spec/services/coinbase_spot_subscriber_spec.rb`
+  - `spec/services/coinbase_futures_subscriber_spec.rb`
+  - `SESSION_NOTES.md`
+- Next steps:
+  - Push refreshed PR #173 branch.
+  - Refresh PR #174 against `origin/main`, then push and merge once CI is green.
+
 #### 2026-06-04 15:50 UTC
 - Context: Re-merged latest `origin/main` into PR #187 after base branch advanced again.
 - Changes:

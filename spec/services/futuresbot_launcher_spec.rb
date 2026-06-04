@@ -76,7 +76,9 @@ RSpec.describe FuturesBotLauncher do
         allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_return(mock_spot)
         allow(MarketData::CoinbaseFuturesSubscriber).to receive(:new).and_return(mock_futures)
         allow(mock_spot).to receive(:start)
+        allow(mock_spot).to receive(:stop)
         allow(mock_futures).to receive(:start)
+        allow(mock_futures).to receive(:stop)
       end
 
       subject(:launcher) do
@@ -98,7 +100,7 @@ RSpec.describe FuturesBotLauncher do
         expect(launcher.futures_thread).to be_a(Thread)
       end
 
-      it "passes enabled product ids to subscribers" do
+      it "passes derived spot product ids and enabled futures product ids to subscribers" do
         # Intercept thread creation to run the block synchronously for inspection
         allow(Thread).to receive(:new).and_wrap_original do |original, &block|
           block.call
@@ -106,6 +108,9 @@ RSpec.describe FuturesBotLauncher do
         end
         launcher.start
         expect(MarketData::CoinbaseSpotSubscriber).to have_received(:new).with(
+          hash_including(product_ids: ["BTC-USD"])
+        )
+        expect(MarketData::CoinbaseFuturesSubscriber).to have_received(:new).with(
           hash_including(product_ids: ["BIT-29AUG25-CDE"])
         )
       end
@@ -155,16 +160,27 @@ RSpec.describe FuturesBotLauncher do
   end
 
   describe "#shutdown" do
-    it "kills alive threads" do
+    it "kills threads that do not stop in time" do
       t = Thread.new { sleep 60 }
       launcher.instance_variable_set(:@spot_thread, t)
       launcher.shutdown
-      t.join(1) # give kill a moment to take effect
       expect(t.alive?).to be false
     end
 
     it "tolerates nil threads" do
       expect { launcher.shutdown }.not_to raise_error
+    end
+
+    it "stops subscribers cooperatively before killing threads" do
+      spot_subscriber = instance_double(MarketData::CoinbaseSpotSubscriber, stop: true)
+      futures_subscriber = instance_double(MarketData::CoinbaseFuturesSubscriber, stop: true)
+      launcher.instance_variable_set(:@spot_subscriber, spot_subscriber)
+      launcher.instance_variable_set(:@futures_subscriber, futures_subscriber)
+
+      expect(spot_subscriber).to receive(:stop)
+      expect(futures_subscriber).to receive(:stop)
+
+      launcher.shutdown
     end
   end
 end

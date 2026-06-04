@@ -50,11 +50,15 @@ module MarketData
         # Keep the subscriber alive for the full websocket lifecycle.
         # We intentionally gate on @ws presence (not open?) to avoid a race
         # where open? can still be false before the :open callback fires.
-        sleep 1 while @ws
+        sleep 0.1 while @ws
       rescue => e
         @logger.error("[MD-Spot] Failed to establish WebSocket connection: #{e.message}")
         @ws = nil
       end
+    end
+
+    def stop
+      mark_ws_as_closed
     end
 
     private
