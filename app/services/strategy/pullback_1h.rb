@@ -44,7 +44,7 @@ module Strategy
       qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: 0.005)
 
       {
-        side: :buy,
+        side: :long,
         price: entry,
         quantity: qty,
         tp: tp,

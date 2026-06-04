@@ -35,7 +35,7 @@ module Strategy
 
     # Decide on a potential entry.
     # Returns:
-    #   { side:, price:, quantity:, tp:, sl:, confidence: } or nil
+    #   { side: :long | :short, price:, quantity:, tp:, sl:, confidence: } or nil
     def signal(symbol:, equity_usd: 10_000.0)
       # Support current month contracts only
       # For current month contracts, use the symbol directly
@@ -104,7 +104,7 @@ module Strategy
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
           conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5,
             ema1: ema1, last_price: last_close_1m)
-          return order_hash(:buy, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :buy)
+          return order_hash(:long, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :long)
         end
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
@@ -115,7 +115,7 @@ module Strategy
         qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
         conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1,
           last_price: last_close_1m)
-        return order_hash(:sell, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :sell)
+        return order_hash(:short, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :short)
       end
 
       nil
@@ -289,7 +289,8 @@ module Strategy
       z = latest_sentiment_z(symbol)
       return false if z.abs < threshold
 
-      (side == :buy && z > 0) || (side == :sell && z < 0)
+      (side == :long && z > 0) || (side == :short && z < 0) ||
+        (side == :buy && z > 0) || (side == :sell && z < 0)
     end
 
     # Resolve the actual trading symbol to use

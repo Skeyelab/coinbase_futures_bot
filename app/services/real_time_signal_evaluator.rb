@@ -215,7 +215,7 @@ class RealTimeSignalEvaluator
     SignalAlert.where(
       strategy_name: strategy_name,
       symbol: symbol,
-      side: signal[:side],
+      side: SignalAlert.sides_for_duplicate_match(signal[:side]),
       signal_type: "entry",
       alert_status: "active"
     ).where("alert_timestamp >= ?", @deduplication_window.ago)

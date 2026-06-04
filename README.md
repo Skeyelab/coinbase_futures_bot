@@ -10,6 +10,7 @@ A fully-featured automated cryptocurrency futures trading bot with AI-powered ch
 
 ## Features
 
+- **🖥️ Full-Screen TUI Dashboard**: Real-time terminal dashboard — the primary operator interface (`bin/futuresbot`)
 - **🤖 AI-Powered Chat Interface**: Natural language command processing with OpenRouter (Claude 3.5) and ChatGPT fallback
 - **Multi-timeframe Trading Strategies**: 1h trend analysis, 15m confirmation, 5m entry signals, 1m micro-timing
 - **Real-time Market Data**: WebSocket integration with Coinbase spot and futures APIs
@@ -105,17 +106,37 @@ See [Development Guide](docs/development.md) for detailed setup instructions.
 ## Quick Reference
 
 ### Starting the Bot
+
+The **primary interface** is the full-screen TUI dashboard.  Everything you
+need—positions, signals, live prices, and chat—is accessible from there.
+
 ```bash
-# 1. Start Rails server
+# Launch the TUI dashboard (primary interface)
+bin/futuresbot
+
+# Launch with a custom refresh interval (seconds)
+bin/futuresbot dashboard --refresh 10
+
+# Open the built-in AI chat interface
+bin/futuresbot chat
+
+# Resume the most recent chat session
+bin/futuresbot chat --resume
+
+# Quick one-shot status summary
+bin/futuresbot status
+```
+
+#### Background services (run alongside the TUI)
+
+```bash
+# Start the Rails server (API & WebSocket)
 bin/rails server
 
-# 2. Access GoodJob dashboard
+# Access the GoodJob dashboard
 open http://localhost:3000/good_job
 
-# 3. Start AI chat interface
-bin/rails chat_bot:start
-
-# 4. Start real-time signal system
+# Start the real-time signal system
 bin/rake realtime:signals
 ```
 
@@ -148,6 +169,7 @@ FORCE=true bin/rake realtime:cancel_all
 
 ## 📚 Documentation
 
+- **[TUI Dashboard](docs/tui.md)** - Primary operator interface: full-screen terminal dashboard
 - **[Architecture Overview](docs/architecture.md)** - System design and component relationships
 - **[Development Guide](docs/development.md)** - Setup, workflow, and debugging
 - **[Configuration](docs/configuration.md)** - Environment variables and settings
@@ -193,16 +215,51 @@ bin/rake day_trading:manage            # Run full management cycle
 curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 ```
 
+### 🖥️ TUI Dashboard (Primary Interface)
+
+The `bin/futuresbot` script launches a full-screen, auto-refreshing terminal
+dashboard.  Run it instead of — or alongside — `bin/rails server`.
+
+```bash
+# Launch TUI (default command)
+bin/futuresbot
+
+# Equivalent explicit form
+bin/futuresbot dashboard
+
+# Custom refresh interval
+bin/futuresbot dashboard --refresh 10
+```
+
+**TUI key-bindings** (no Enter required):
+
+| Key | Action |
+|-----|--------|
+| `q` / `Q` / `Esc` / `Ctrl+C` | Quit |
+| `r` / `R` | Force immediate refresh |
+| `p` / `P` | Toggle open-positions panel |
+| `s` / `S` | Toggle active-signals panel |
+| `+` / `=` | Faster auto-refresh (–1 s, min 1 s) |
+| `-` | Slower auto-refresh (+1 s) |
+
+**Panels displayed:**
+
+- **Status bar** — day & swing position counts, active signals, Coinbase connectivity (`LIVE` / `STALE`)
+- **Open Positions** — entry price, size, type, and live unrealized PnL per position
+- **Active Signals** — symbol, side, signal type, confidence %, and strategy
+- **Futures Live Prices** — latest tick per futures product
+- **Spot Prices** — latest tick per spot product
+
 ### AI-Powered Chat Interface 🤖
 
 The bot includes a comprehensive AI-powered chat interface for natural language interaction:
 
 ```bash
-# Start the interactive chat interface
-bin/rails chat_bot:start
+# Start the interactive chat interface (built into the TUI CLI)
+bin/futuresbot chat
 
 # Resume your last session
-bin/rails chat_bot:start --resume
+bin/futuresbot chat --resume
 
 # Example natural language commands:
 FuturesBot> show my positions

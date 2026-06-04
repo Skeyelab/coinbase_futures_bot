@@ -8,17 +8,11 @@ Rails.application.routes.draw do
   # Extended health check with database connection pool info
   get "health" => "health#show"
 
+  # GoodJob dashboard — protected by Rack::Auth::Basic outside local dev
+  # (see config/initializers/good_job_auth.rb)
+  mount GoodJob::Engine => "/jobs"
+
   if Rails.env.development?
-    # Mount GoodJob dashboard in development only
-    mount GoodJob::Engine => "/good_job"
-
-    # Workaround for GoodJob dashboard POST vs PUT method issues
-    post "/good_job/jobs/:id/force_discard", to: "good_job/jobs#force_discard"
-    post "/good_job/jobs/:id/discard", to: "good_job/jobs#discard"
-    post "/good_job/jobs/:id/reschedule", to: "good_job/jobs#reschedule"
-    post "/good_job/jobs/:id/retry", to: "good_job/jobs#retry"
-    post "/good_job/jobs/mass_update", to: "good_job/jobs#mass_update"
-
     # Simple Sentry smoke test route
     get "/boom", to: ->(_env) { raise "Sentry smoke test" }
   end
