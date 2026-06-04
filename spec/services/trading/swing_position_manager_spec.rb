@@ -8,14 +8,17 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
   let(:contract_manager) { instance_double(MarketData::FuturesContractManager) }
   let(:manager) { described_class.new(logger: logger) }
 
+  let(:coinbase_client) { instance_double(Coinbase::AdvancedTradeClient) }
+
   before do
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
     allow(logger).to receive(:error)
     allow(logger).to receive(:debug)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+    allow(Coinbase::AdvancedTradeClient).to receive(:new).and_return(coinbase_client)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
-    allow(positions_service).to receive(:instance_variable_get).with(:@authenticated).and_return(true)
+    allow(coinbase_client).to receive(:authenticated?).and_return(true)
   end
 
   describe "#cleanup_old_positions" do

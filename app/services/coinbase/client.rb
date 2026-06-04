@@ -79,19 +79,19 @@ module Coinbase
     # Get authentication status
     def auth_status
       {
-        advanced_trade: @advanced_trade.instance_variable_get(:@authenticated),
-        exchange: @exchange.instance_variable_get(:@authenticated)
+        advanced_trade: @advanced_trade.authenticated?,
+        exchange: @exchange.authenticated?
       }
     end
 
     # Check if we can access futures data
     def can_access_futures?
-      @advanced_trade.instance_variable_get(:@authenticated)
+      @advanced_trade.authenticated?
     end
 
     # Check if we can access spot trading
     def can_access_spot_trading?
-      @exchange.instance_variable_get(:@authenticated)
+      @exchange.authenticated?
     end
   end
 end
