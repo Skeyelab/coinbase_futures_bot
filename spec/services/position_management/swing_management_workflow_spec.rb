@@ -36,6 +36,38 @@ RSpec.describe PositionManagement::SwingManagementWorkflow do
     )
   end
 
+  it "handles expiry, max-hold, and TP/SL branches" do
+    allow(manager).to receive(:positions_approaching_expiry).and_return([double(:position)])
+    allow(manager).to receive(:close_expiring_positions).and_return(1)
+    allow(manager).to receive(:positions_exceeding_max_hold).and_return([double(:position)])
+    allow(manager).to receive(:close_max_hold_positions).and_return(2)
+    allow(manager).to receive(:check_swing_tp_sl_triggers).and_return([{}])
+    allow(manager).to receive(:close_tp_sl_positions).and_return(3)
+    allow(manager).to receive(:check_swing_risk_limits).and_return({risk_status: "acceptable", violations: []})
+
+    result = workflow.call
+
+    expect(result).to be_success
+    expect(result.metadata[:expiry_closed_count]).to eq(1)
+    expect(result.metadata[:max_hold_closed_count]).to eq(2)
+    expect(result.metadata[:tp_sl_closed_count]).to eq(3)
+    expect(SlackNotificationService).to have_received(:alert).with(
+      "warning",
+      "Swing Positions Closed - Contract Expiry",
+      "Closed 1 swing positions approaching contract expiry."
+    )
+    expect(SlackNotificationService).to have_received(:alert).with(
+      "warning",
+      "Swing Positions Closed - Max Hold Exceeded",
+      "Closed 2 swing positions that exceeded maximum holding period."
+    )
+    expect(SlackNotificationService).to have_received(:alert).with(
+      "info",
+      "Swing Positions Closed - TP/SL Triggered",
+      "Closed 3 swing positions that hit take profit or stop loss levels."
+    )
+  end
+
   it "raises and sends critical alert when orchestration fails" do
     allow(manager).to receive(:positions_approaching_expiry).and_raise(StandardError, "boom")
 

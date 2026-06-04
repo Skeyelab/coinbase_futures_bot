@@ -29,6 +29,17 @@ RSpec.describe PositionManagement::EndOfDayClosureWorkflow do
 
     expect(result).to be_success
     expect(result.metadata[:open_count]).to eq(0)
+    expect(result.alerts).to be_empty
     expect(manager).not_to have_received(:force_close_all_day_trading_positions)
+  end
+
+  it "tracks failed closure attempts when no positions were closed" do
+    allow(manager).to receive(:get_position_summary).and_return({open_count: 2})
+    allow(manager).to receive(:force_close_all_day_trading_positions).and_return(0)
+
+    result = workflow.call
+
+    expect(result).to be_success
+    expect(result.metadata[:closed_count]).to eq(0)
   end
 end

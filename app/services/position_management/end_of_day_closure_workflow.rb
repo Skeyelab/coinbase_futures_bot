@@ -20,7 +20,8 @@ module PositionManagement
         return WorkflowResult.new(
           workflow: "end_of_day_position_closure",
           status: :success,
-          metadata: {open_count: 0}
+          metadata: {open_count: 0},
+          alerts: []
         )
       end
 
@@ -42,7 +43,12 @@ module PositionManagement
       end
 
       logger.info("Completed end-of-day position closure workflow")
-      WorkflowResult.new(workflow: "end_of_day_position_closure", status: :success, metadata: metadata)
+      WorkflowResult.new(
+        workflow: "end_of_day_position_closure",
+        status: :success,
+        metadata: metadata,
+        alerts: []
+      )
     rescue => e
       logger.error("End-of-day position closure workflow failed: #{e.message}")
       logger.error(e.backtrace.join("\n"))

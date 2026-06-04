@@ -4,6 +4,10 @@ module PositionManagement
   class SwingRiskMonitoringWorkflow
     include AlertPolicy
 
+    MAX_HOLD_TIME_HOURS = 96
+    SUMMARY_HOUR = 10
+    SUMMARY_WINDOW_MINUTES = 30
+
     attr_reader :logger
 
     def initialize(manager: Trading::SwingPositionManager.new(logger: Rails.logger), logger: Rails.logger)
@@ -120,14 +124,14 @@ module PositionManagement
                  "Consider diversifying swing positions across more assets."
       )
 
-      if risk_metrics[:avg_hold_time_hours] && risk_metrics[:avg_hold_time_hours] > 96
+      if risk_metrics[:avg_hold_time_hours] && risk_metrics[:avg_hold_time_hours] > MAX_HOLD_TIME_HOURS
         logger.info("Average swing position hold time: #{risk_metrics[:avg_hold_time_hours].round(1)} hours")
       end
     end
 
     def send_periodic_summary(position_summary, balance_summary, alerts)
       return if position_summary[:total_positions] == 0
-      return unless Time.zone.now.hour == 10 && Time.zone.now.min < 30
+      return unless Time.zone.now.hour == SUMMARY_HOUR && Time.zone.now.min < SUMMARY_WINDOW_MINUTES
 
       notify(
         alerts,
@@ -155,14 +159,14 @@ module PositionManagement
       end
 
       risk_metrics = position_summary[:risk_metrics]
-      alerts = []
-      alerts << "#{risk_metrics[:positions_approaching_expiry]} approaching expiry" if risk_metrics[:positions_approaching_expiry] > 0
-      alerts << "#{risk_metrics[:positions_exceeding_max_hold]} exceeding max hold" if risk_metrics[:positions_exceeding_max_hold] > 0
+      summary_alerts = []
+      summary_alerts << "#{risk_metrics[:positions_approaching_expiry]} approaching expiry" if risk_metrics[:positions_approaching_expiry] > 0
+      summary_alerts << "#{risk_metrics[:positions_exceeding_max_hold]} exceeding max hold" if risk_metrics[:positions_exceeding_max_hold] > 0
       if risk_metrics[:max_asset_concentration] && risk_metrics[:max_asset_concentration] > 0.5
-        alerts << "High asset concentration (#{(risk_metrics[:max_asset_concentration] * 100).round(1)}%)"
+        summary_alerts << "High asset concentration (#{(risk_metrics[:max_asset_concentration] * 100).round(1)}%)"
       end
 
-      text += "\n⚠️ **Alerts**: #{alerts.join(", ")}" if alerts.any?
+      text += "\n⚠️ **Alerts**: #{summary_alerts.join(", ")}" if summary_alerts.any?
       text
     end
 

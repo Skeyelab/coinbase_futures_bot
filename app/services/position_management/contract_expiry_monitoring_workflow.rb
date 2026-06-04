@@ -4,6 +4,8 @@ module PositionManagement
   class ContractExpiryMonitoringWorkflow
     include AlertPolicy
 
+    MARGIN_WARNING_CHECK_DAYS = 5
+
     attr_reader :logger
 
     def initialize(expiry_manager: ContractExpiryManager.new(logger: Rails.logger), logger: Rails.logger)
@@ -18,7 +20,7 @@ module PositionManagement
       logger.info("Starting contract expiry monitoring workflow (emergency: #{emergency_check})")
 
       metadata = if emergency_check
-        perform_emergency_check
+        perform_emergency_check(alerts)
       else
         perform_regular_monitoring(buffer_days, alerts)
       end
@@ -89,7 +91,7 @@ module PositionManagement
         logger.info("No positions expiring within #{buffer_days} days")
       end
 
-      margin_warnings = @expiry_manager.check_margin_requirements_near_expiry(5)
+      margin_warnings = @expiry_manager.check_margin_requirements_near_expiry(MARGIN_WARNING_CHECK_DAYS)
       if margin_warnings.any?
         logger.warn("Found #{margin_warnings.size} positions with increased margin requirements near expiry")
       end
@@ -115,7 +117,7 @@ module PositionManagement
       }
     end
 
-    def perform_emergency_check
+    def perform_emergency_check(alerts)
       logger.info("Performing emergency expiry check")
 
       expired_positions = Position.expired_positions
@@ -139,10 +141,11 @@ module PositionManagement
         else
           logger.error("EMERGENCY: Could not close any expired positions - CRITICAL ISSUE")
 
-          SlackNotificationService.alert(
-            "error",
-            "CRITICAL: Cannot Close Expired Positions",
-            "Found #{expired_positions.size} expired positions but could not close any. IMMEDIATE MANUAL INTERVENTION REQUIRED."
+          notify(
+            alerts,
+            severity: "error",
+            title: "CRITICAL: Cannot Close Expired Positions",
+            message: "Found #{expired_positions.size} expired positions but could not close any. IMMEDIATE MANUAL INTERVENTION REQUIRED."
           )
         end
       else
