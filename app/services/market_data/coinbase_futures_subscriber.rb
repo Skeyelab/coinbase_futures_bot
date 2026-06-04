@@ -66,9 +66,14 @@ module MarketData
       end
     end
 
+    def stop
+      mark_ws_as_closed
+    end
+
     private
 
     def mark_ws_as_closed
+      @ws&.close if @ws&.respond_to?(:close)
       @ws = nil
     end
 

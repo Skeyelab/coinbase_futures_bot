@@ -117,4 +117,17 @@ RSpec.describe MarketData::CoinbaseSpotSubscriber, type: :service do
 
     expect(sleep_calls).to be >= 1
   end
+
+  it "closes the websocket on stop" do
+    io = StringIO.new
+    logger = build_logger(io)
+    service = described_class.new(product_ids: "BTC-USD", logger: logger)
+    fake_socket = double("WebSocket", open?: true, close: true)
+    service.instance_variable_set(:@ws, fake_socket)
+
+    service.stop
+
+    expect(fake_socket).to have_received(:close)
+    expect(service.instance_variable_get(:@ws)).to be_nil
+  end
 end

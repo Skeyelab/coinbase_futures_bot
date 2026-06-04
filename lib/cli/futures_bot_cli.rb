@@ -7,6 +7,7 @@ require_relative "tui_dashboard"
 # interacting with the Coinbase Futures Bot from the shell.
 #
 # Usage:
+#   bin/futuresbot start            # Launch all-in-one: TUI + market data + signals
 #   bin/futuresbot dashboard         # Real-time full-screen TUI dashboard
 #   bin/futuresbot chat              # Start interactive chat
 #   bin/futuresbot status            # Show system status
@@ -156,6 +157,15 @@ module Cli
       end
 
       puts "─" * 72
+    end
+
+    # ─── start ──────────────────────────────────────────────────────────────────
+    desc "start", "Launch TUI dashboard + market data feed + signal evaluation in one command"
+    method_option :refresh, aliases: "-r", type: :numeric, default: TuiDashboard::DEFAULT_REFRESH,
+      desc: "TUI auto-refresh interval in seconds"
+    def start
+      sync_startup_positions
+      FuturesBotLauncher.new(tui_refresh: options[:refresh]).start
     end
 
     # ─── halt ───────────────────────────────────────────────────────────────────
