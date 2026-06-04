@@ -5,11 +5,14 @@ require "rails_helper"
 RSpec.describe Execution::FuturesExecutor, type: :service do
   let(:logger) { instance_double(Logger) }
   let(:contract_manager) { instance_double(MarketData::FuturesContractManager) }
+  let(:trade_client) { instance_double(Coinbase::AdvancedTradeClient) }
   let(:executor) { described_class.new(logger: logger) }
   let(:basis_threshold_bps) { 50 }
 
   before do
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
+    allow(Coinbase::AdvancedTradeClient).to receive(:new).and_return(trade_client)
+    allow(trade_client).to receive(:get_product_ticker).and_return({"best_bid" => "50000.0", "best_ask" => "50100.0"})
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
   end
@@ -86,9 +89,15 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
       end
 
       context "when basis is within threshold" do
-        it "logs successful entry consideration" do
+        before do
+          allow(trade_client).to receive(:get_product_ticker).and_return(
+            {"best_bid" => "50000.0", "best_ask" => "50000.0"}
+          )
+        end
+
+        it "logs successful entry consideration with mark price and basis" do
           expect(logger).to receive(:info).with(
-            "[EXEC] would place order on #{trading_contract} at spot=#{spot_price} (basis=0.0bps) @ #{timestamp}"
+            /would place order on #{trading_contract}.*basis=0.0bps.*@ #{timestamp}/
           )
 
           executor.consider_entry(
@@ -107,13 +116,15 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
       end
 
       context "when basis exceeds threshold" do
-        it "currently always uses spot price as futures mark placeholder" do
-          # NOTE: Current implementation uses spot_price as futures_mark placeholder
-          # Basis calculation: ((futures_mark - spot_price) / spot_price.to_f) * 10_000
-          # With futures_mark = spot_price, basis is always 0.0
-          expect(logger).to receive(:info).with(
-            "[EXEC] would place order on #{trading_contract} at spot=#{spot_price} (basis=0.0bps) @ #{timestamp}"
+        before do
+          allow(executor).to receive(:resolve_trading_contract).and_return(trading_contract)
+          allow(trade_client).to receive(:get_product_ticker).and_return(
+            {"best_bid" => "52600.0", "best_ask" => "52700.0"} # ~+5% basis on 50k spot
           )
+        end
+
+        it "skips entry when basis exceeds threshold" do
+          expect(logger).to receive(:info).with(/skip: basis .* > #{basis_threshold_bps}bps/)
 
           executor.consider_entry(
             spot_price: spot_price,
@@ -123,8 +134,22 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
         end
       end
 
-      # NOTE: Future enhancement could include actual futures price fetching
-      # Current implementation uses spot_price as placeholder for futures_mark
+      context "when mark price fetch fails" do
+        before do
+          allow(trade_client).to receive(:get_product_ticker).and_raise(StandardError, "API error")
+        end
+
+        it "falls back to spot price and proceeds" do
+          expect(logger).to receive(:warn).with(/fetch_futures_mark_price failed/)
+          expect(logger).to receive(:info).with(/would place order.*basis=0.0bps/)
+
+          executor.consider_entry(
+            spot_price: spot_price,
+            futures_product_id: futures_product_id,
+            at: timestamp
+          )
+        end
+      end
     end
 
     context "when contract resolution fails" do
@@ -249,20 +274,78 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
     let(:from_contract) { "BTC-29DEC24-CDE" }
     let(:to_contract) { "BTC-30JAN25-CDE" }
     let(:asset) { "BTC" }
+    let(:positions_service) { instance_double(Trading::CoinbasePositions) }
+    let(:open_position) { create(:position, product_id: from_contract, side: "LONG", size: 5, day_trading: true) }
+
+    before do
+      allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+      allow(positions_service).to receive(:close_position).and_return({"success" => true})
+      allow(positions_service).to receive(:open_position).and_return({"success" => true})
+    end
 
     context "when contracts are different" do
-      it "logs rollover start" do
-        expect(logger).to receive(:info).with(
-          "[EXEC] Rolling over #{asset} from #{from_contract} to #{to_contract}"
-        )
-        executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+      context "with open positions" do
+        before { open_position }
+
+        it "logs rollover start" do
+          expect(logger).to receive(:info).with(/Rolling over #{asset} from #{from_contract} to #{to_contract}/)
+          executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+        end
+
+        it "closes position on the expiring contract" do
+          expect(positions_service).to receive(:close_position).with(
+            product_id: from_contract,
+            size: 5.0
+          )
+          executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+        end
+
+        it "re-opens equivalent size on the target contract" do
+          expect(positions_service).to receive(:open_position).with(
+            hash_including(
+              product_id: to_contract,
+              side: :buy,
+              size: 5.0
+            )
+          )
+          executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+        end
+
+        it "logs rollover completion" do
+          expect(logger).to receive(:info).with(/Rollover completed: #{from_contract} -> #{to_contract}/)
+          executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+        end
+
+        context "when close fails" do
+          before do
+            allow(positions_service).to receive(:close_position).and_raise(StandardError, "close failed")
+          end
+
+          it "logs error and skips re-open" do
+            expect(logger).to receive(:error).with(/Failed to close #{from_contract}/)
+            expect(positions_service).not_to receive(:open_position)
+            executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+          end
+        end
+
+        context "when open fails" do
+          before do
+            allow(positions_service).to receive(:open_position).and_raise(StandardError, "open failed")
+          end
+
+          it "logs error but does not raise" do
+            expect(logger).to receive(:error).with(/Failed to open #{to_contract}/)
+            expect { executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset) }.not_to raise_error
+          end
+        end
       end
 
-      it "logs rollover completion" do
-        expect(logger).to receive(:info).with(
-          "[EXEC] Rollover completed: #{from_contract} -> #{to_contract}"
-        )
-        executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+      context "with no open positions" do
+        it "logs skip and does not call positions service" do
+          expect(logger).to receive(:info).with(/No open positions found for #{from_contract}/)
+          expect(Trading::CoinbasePositions).not_to receive(:new)
+          executor.rollover_contract(from_contract: from_contract, to_contract: to_contract, asset: asset)
+        end
       end
     end
 
