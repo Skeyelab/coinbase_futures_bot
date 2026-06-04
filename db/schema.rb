@@ -147,6 +147,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
     t.index ["scheduled_at"], name: "index_good_jobs_on_scheduled_at", where: "(finished_at IS NULL)"
   end
 
+  create_table "orders", force: :cascade do |t|
+    t.string "coinbase_order_id"
+    t.string "contract_id", null: false
+    t.datetime "created_at", null: false
+    t.decimal "fill_price", precision: 20, scale: 8
+    t.datetime "filled_at"
+    t.string "order_type", default: "market", null: false
+    t.datetime "placed_at"
+    t.bigint "position_id"
+    t.decimal "quantity", precision: 20, scale: 8, null: false
+    t.string "side", null: false
+    t.string "status", default: "pending", null: false
+    t.decimal "target_price", precision: 20, scale: 8
+    t.datetime "updated_at", null: false
+    t.index ["coinbase_order_id"], name: "index_orders_on_coinbase_order_id", unique: true, where: "(coinbase_order_id IS NOT NULL)"
+    t.index ["contract_id"], name: "index_orders_on_contract_id"
+    t.index ["position_id"], name: "index_orders_on_position_id"
+    t.index ["status"], name: "index_orders_on_status"
+  end
+
   create_table "positions", force: :cascade do |t|
     t.datetime "close_time"
     t.datetime "created_at", null: false
@@ -266,4 +286,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
   end
 
   add_foreign_key "chat_messages", "chat_sessions"
+  add_foreign_key "orders", "positions"
 end

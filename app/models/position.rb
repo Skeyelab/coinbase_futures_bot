@@ -49,6 +49,7 @@ class Position < ApplicationRecord
 
   # Associations
   belongs_to :trading_pair, primary_key: :product_id, foreign_key: :product_id, optional: true
+  has_many :orders, dependent: :nullify
 
   # Instance methods
   def open?
