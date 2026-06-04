@@ -26,6 +26,22 @@
 
 ### Session log
 
+#### 2026-06-04 12:10 EDT
+- Context: Diagnosed why PRs were merging before CI finished, then fixed repo protection.
+- Changes:
+  - Confirmed `main` had no branch protection or rulesets, so `gh pr merge --auto` merged immediately because zero checks were required.
+  - Applied GitHub branch protection to `main` with strict required status checks:
+    - `StandardRB (lint)`
+    - `Security scans`
+    - `Rails tests with coverage`
+- Commands run:
+  - `gh api repos/Skeyelab/coinbase_futures_bot/branches/main/protection`
+  - `gh api --method PUT repos/Skeyelab/coinbase_futures_bot/branches/main/protection ...`
+- Files touched:
+  - `SESSION_NOTES.md`
+- Next steps:
+  - If direct pushes or reviewless PR merges should also be blocked, add required PR reviews and/or admin enforcement.
+
 #### 2026-06-04 12:05 EDT
 - Context: Revised Conductor setup fix after confirming this repo uses Doppler, not shared `.env` files.
 - Changes:
