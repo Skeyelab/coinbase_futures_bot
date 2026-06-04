@@ -199,9 +199,10 @@ jobs:
           done
           echo "PostgreSQL is ready!"
 
-          # Create primary DB, migrate, then clone into parallel worker DBs
+          # Create worker DBs manually (parallel_tests is dev-only gem, rake tasks unavailable in CI)
+          # Worker 1 uses the default DB; worker 2 gets a numbered suffix DB
           bin/rails db:create db:migrate
-          bundle exec rake parallel:create parallel:prepare
+          TEST_ENV_NUMBER=2 bin/rails db:create db:migrate
           echo "Database setup complete"
 
       - name: Debug environment
