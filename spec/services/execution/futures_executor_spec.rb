@@ -202,7 +202,7 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
   end
 
   describe "#perform_rollover" do
-    let(:expiring_contract) { build(:trading_pair, product_id: "BTC-29DEC24-CDE", base_currency: "BTC") }
+    let(:expiring_contract) { build(:contract, product_id: "BTC-29DEC24-CDE", base_currency: "BTC") }
     let(:expiring_contracts) { [expiring_contract] }
     let(:target_contract) { "BTC-30JAN25-CDE" }
 
@@ -232,7 +232,7 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
     end
 
     context "when contract has no underlying asset" do
-      let(:contract_without_asset) { build(:trading_pair, product_id: "UNKNOWN-PRODUCT", base_currency: nil) }
+      let(:contract_without_asset) { build(:contract, product_id: "UNKNOWN-PRODUCT", base_currency: nil) }
 
       before do
         allow(contract_manager).to receive(:expiring_contracts).and_return([contract_without_asset])
@@ -383,11 +383,11 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
 
     context "when product_id is already a specific contract" do
       let(:contract_product_id) { "BTC-29DEC24-CDE" }
-      let(:contract) { build(:trading_pair, product_id: contract_product_id) }
+      let(:contract) { build(:contract, product_id: contract_product_id) }
 
       context "when contract exists and is not expired" do
         before do
-          allow(TradingPair).to receive(:find_by).and_return(contract)
+          allow(Contract).to receive(:find_by).and_return(contract)
           allow(contract).to receive(:expired?).and_return(false)
         end
 
@@ -399,7 +399,7 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
 
       context "when contract is expired" do
         before do
-          allow(TradingPair).to receive(:find_by).and_return(contract)
+          allow(Contract).to receive(:find_by).and_return(contract)
           allow(contract).to receive(:expired?).and_return(true)
         end
 
@@ -412,7 +412,7 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
 
       context "when contract is not found" do
         before do
-          allow(TradingPair).to receive(:find_by).and_return(nil)
+          allow(Contract).to receive(:find_by).and_return(nil)
         end
 
         it "logs warning and returns nil" do
@@ -426,11 +426,11 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
     context "when product_id is an asset symbol" do
       let(:asset_symbol) { "BTC" }
       let(:best_contract) { "BTC-29DEC24-CDE" }
-      let(:contract) { build(:trading_pair, product_id: best_contract) }
+      let(:contract) { build(:contract, product_id: best_contract) }
 
       before do
         allow(contract_manager).to receive(:best_available_contract).and_return(best_contract)
-        allow(TradingPair).to receive(:find_by).and_return(contract)
+        allow(Contract).to receive(:find_by).and_return(contract)
       end
 
       context "when best contract is current month" do
@@ -559,7 +559,7 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
 
     context "when trading pair lookup fails" do
       before do
-        allow(TradingPair).to receive(:find_by).and_raise(StandardError.new("DB error"))
+        allow(Contract).to receive(:find_by).and_raise(StandardError.new("DB error"))
       end
 
       it "raises database errors during contract resolution" do

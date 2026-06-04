@@ -7,7 +7,7 @@ class FetchCandlesJob < ApplicationJob
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
-    TradingPair.enabled.find_each do |pair|
+    Contract.enabled.find_each do |pair|
       Rails.logger.info("[Candles] Fetching candles for #{pair.product_id}")
       fetch_1m_candles(rest, pair, backfill_days)
       fetch_5m_candles(rest, pair, backfill_days)

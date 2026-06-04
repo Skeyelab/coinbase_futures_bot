@@ -313,7 +313,7 @@ module Trading
       raise "No suitable contract found for #{asset}" unless best_contract
 
       # Check if it's current or upcoming month for logging
-      contract = TradingPair.find_by(product_id: best_contract)
+      contract = Contract.find_by(product_id: best_contract)
       contract_type = if contract&.current_month?
         "current month"
       elsif contract&.upcoming_month?
@@ -751,7 +751,7 @@ module Trading
       return unless current_month_contract
 
       expiring_positions = positions.select do |pos|
-        contract = TradingPair.find_by(product_id: pos["product_id"])
+        contract = Contract.find_by(product_id: pos["product_id"])
         contract&.expiration_date && contract.expiration_date <= Date.current + 3.days
       end
 

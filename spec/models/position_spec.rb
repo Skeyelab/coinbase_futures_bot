@@ -3,7 +3,7 @@
 require "rails_helper"
 
 RSpec.describe Position, type: :model do
-  let(:trading_pair) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", enabled: true) }
+  let(:contract) { Contract.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", enabled: true) }
 
   let(:valid_position) do
     Position.new(
@@ -264,8 +264,8 @@ RSpec.describe Position, type: :model do
   end
 
   describe "associations" do
-    it "belongs to trading_pair" do
-      expect(valid_position).to respond_to(:trading_pair)
+    it "belongs to contract" do
+      expect(valid_position).to respond_to(:contract)
     end
   end
 

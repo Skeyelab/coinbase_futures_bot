@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 FactoryBot.define do
-  factory :trading_pair do
+  factory :contract do
     # Dynamic contract ID generation to reduce hardcoded values
     transient do
       contract_month { Date.current }

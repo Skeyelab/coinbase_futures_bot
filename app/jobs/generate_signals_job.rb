@@ -8,7 +8,7 @@ class GenerateSignalsJob < ApplicationJob
       ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21, min_1h_candles: 60, min_15m_candles: 80
     )
 
-    TradingPair.enabled.find_each do |pair|
+    Contract.enabled.find_each do |pair|
       puts "Analyzing #{pair.product_id}..."
       order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
       if order

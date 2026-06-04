@@ -94,43 +94,43 @@ RSpec.describe "Realtime Signals Rake Tasks" do
     end
 
     describe "evaluate_symbol task logic" do
-      let(:trading_pair) { instance_double(TradingPair, product_id: "BTC-USD") }
+      let(:contract) { instance_double(Contract, product_id: "BTC-USD") }
 
       context "with valid symbol" do
         before do
-          allow(TradingPair).to receive(:find_by).and_return(trading_pair)
+          allow(Contract).to receive(:find_by).and_return(contract)
           allow(RealTimeSignalEvaluator).to receive(:new).and_return(evaluator)
           allow(evaluator).to receive(:evaluate_pair)
         end
 
         it "finds trading pair and evaluates signals" do
-          expect(TradingPair).to receive(:find_by).with(product_id: "BTC-USD")
+          expect(Contract).to receive(:find_by).with(product_id: "BTC-USD")
           expect(RealTimeSignalEvaluator).to receive(:new).with(logger: Rails.logger)
-          expect(evaluator).to receive(:evaluate_pair).with(trading_pair)
+          expect(evaluator).to receive(:evaluate_pair).with(contract)
 
           # Test the core logic
           symbol = "BTC-USD"
           Rails.logger.info("[RTS] Evaluating signals for #{symbol}...")
-          trading_pair = TradingPair.find_by(product_id: symbol)
-          raise "Trading pair not found" if trading_pair.nil?
+          contract = Contract.find_by(product_id: symbol)
+          raise "Trading pair not found" if contract.nil?
 
           evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
-          evaluator.evaluate_pair(trading_pair)
+          evaluator.evaluate_pair(contract)
           Rails.logger.info("[RTS] Signal evaluation completed for #{symbol}.")
         end
       end
 
       context "with invalid symbol" do
         before do
-          allow(TradingPair).to receive(:find_by).with(product_id: "INVALID-SYMBOL").and_return(nil)
+          allow(Contract).to receive(:find_by).with(product_id: "INVALID-SYMBOL").and_return(nil)
         end
 
         it "handles non-existent symbol" do
           symbol = "INVALID-SYMBOL"
           expect(logger).to receive(:error).with("[RTS] Trading pair not found: #{symbol}")
 
-          trading_pair = TradingPair.find_by(product_id: symbol)
-          if trading_pair.nil?
+          contract = Contract.find_by(product_id: symbol)
+          if contract.nil?
             Rails.logger.error("[RTS] Trading pair not found: #{symbol}")
             # Do not exit the test process; simulate task failure by returning
             next
@@ -305,11 +305,11 @@ RSpec.describe "Realtime Signals Rake Tasks" do
       describe "#start_market_data_subscriptions" do
         let(:spot_subscriber) { instance_double(MarketData::CoinbaseSpotSubscriber) }
         let(:futures_subscriber) { instance_double(MarketData::CoinbaseFuturesSubscriber) }
-        let(:trading_pairs_relation) { instance_double(ActiveRecord::Relation) }
+        let(:contracts_relation) { instance_double(ActiveRecord::Relation) }
 
         before do
-          allow(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
-          allow(trading_pairs_relation).to receive(:pluck).and_return(["BTC-USD"])
+          allow(Contract).to receive(:enabled).and_return(contracts_relation)
+          allow(contracts_relation).to receive(:pluck).and_return(["BTC-USD"])
           allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_return(spot_subscriber)
           allow(MarketData::CoinbaseFuturesSubscriber).to receive(:new).and_return(futures_subscriber)
           allow(spot_subscriber).to receive(:start)
@@ -318,8 +318,8 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         end
 
         it "creates subscribers for enabled trading pairs" do
-          expect(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
-          expect(trading_pairs_relation).to receive(:pluck).with(:product_id).and_return(["BTC-USD"])
+          expect(Contract).to receive(:enabled).and_return(contracts_relation)
+          expect(contracts_relation).to receive(:pluck).with(:product_id).and_return(["BTC-USD"])
 
           expect(MarketData::CoinbaseSpotSubscriber).to receive(:new).with(hash_including(
             product_ids: ["BTC-USD"],
@@ -335,7 +335,7 @@ RSpec.describe "Realtime Signals Rake Tasks" do
           ))
 
           # Test the core subscription logic
-          product_ids = TradingPair.enabled.pluck(:product_id)
+          product_ids = Contract.enabled.pluck(:product_id)
 
           if product_ids.empty?
             Rails.logger.warn("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
@@ -362,11 +362,11 @@ RSpec.describe "Realtime Signals Rake Tasks" do
         end
 
         it "handles no enabled trading pairs" do
-          allow(TradingPair).to receive(:enabled).and_return(trading_pairs_relation)
-          allow(trading_pairs_relation).to receive(:pluck).and_return([])
+          allow(Contract).to receive(:enabled).and_return(contracts_relation)
+          allow(contracts_relation).to receive(:pluck).and_return([])
           expect(logger).to receive(:warn).with("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
 
-          product_ids = TradingPair.enabled.pluck(:product_id)
+          product_ids = Contract.enabled.pluck(:product_id)
           if product_ids.empty?
             Rails.logger.warn("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")
           end

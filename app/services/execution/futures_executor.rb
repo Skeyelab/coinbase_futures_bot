@@ -122,7 +122,7 @@ module Execution
       return nil unless product_id&.present?
 
       if product_id.match?(/\d{2}[A-Z]{3}\d{2}/)
-        contract = TradingPair.find_by(product_id: product_id)
+        contract = Contract.find_by(product_id: product_id)
         return product_id if contract && !contract.expired?
 
         @logger.warn("[EXEC] Contract #{product_id} is expired or not found")
@@ -133,7 +133,7 @@ module Execution
       if asset
         best_contract = @contract_manager.best_available_contract(asset)
         if best_contract
-          contract = TradingPair.find_by(product_id: best_contract)
+          contract = Contract.find_by(product_id: best_contract)
           if contract&.current_month?
             @logger.info("[EXEC] Resolved #{product_id} to current month contract: #{best_contract}")
           elsif contract&.upcoming_month?

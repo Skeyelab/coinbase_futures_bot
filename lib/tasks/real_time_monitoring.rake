@@ -6,7 +6,7 @@ namespace :real_time do
     puts "Setting up BTC-USD and ETH-USD pairs for real-time monitoring..."
 
     # Create or update BTC-USD spot pair
-    btc_pair = TradingPair.find_or_create_by(product_id: "BTC-USD") do |pair|
+    btc_pair = Contract.find_or_create_by(product_id: "BTC-USD") do |pair|
       pair.base_currency = "BTC"
       pair.quote_currency = "USD"
       pair.enabled = true
@@ -19,7 +19,7 @@ namespace :real_time do
     puts "✓ BTC-USD pair: #{btc_pair.product_id} (enabled: #{btc_pair.enabled})"
 
     # Create or update ETH-USD spot pair
-    eth_pair = TradingPair.find_or_create_by(product_id: "ETH-USD") do |pair|
+    eth_pair = Contract.find_or_create_by(product_id: "ETH-USD") do |pair|
       pair.base_currency = "ETH"
       pair.quote_currency = "USD"
       pair.enabled = true
@@ -40,7 +40,7 @@ namespace :real_time do
 
     # Verify setup
     puts "\nCurrent trading pairs:"
-    TradingPair.enabled.each do |pair|
+    Contract.enabled.each do |pair|
       contract_type = ""
       if pair.expiration_date
         if pair.current_month?
@@ -60,12 +60,12 @@ namespace :real_time do
     puts "Starting real-time monitoring for BTC-USD and ETH-USD..."
 
     # Verify pairs exist
-    unless TradingPair.find_by(product_id: "BTC-USD")&.enabled?
+    unless Contract.find_by(product_id: "BTC-USD")&.enabled?
       puts "ERROR: BTC-USD pair not found or not enabled. Run 'rake real_time:setup_pairs' first."
       exit 1
     end
 
-    unless TradingPair.find_by(product_id: "ETH-USD")&.enabled?
+    unless Contract.find_by(product_id: "ETH-USD")&.enabled?
       puts "ERROR: ETH-USD pair not found or not enabled. Run 'rake real_time:setup_pairs' first."
       exit 1
     end
@@ -98,8 +98,8 @@ namespace :real_time do
     puts
 
     # Check trading pairs
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
-    eth_pair = TradingPair.find_by(product_id: "ETH-USD")
+    btc_pair = Contract.find_by(product_id: "BTC-USD")
+    eth_pair = Contract.find_by(product_id: "ETH-USD")
 
     puts "Trading Pairs:"
     puts "  BTC-USD: #{if btc_pair

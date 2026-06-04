@@ -7,7 +7,7 @@ class PaperTradingJob < ApplicationJob
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
-    TradingPair.enabled.find_each do |pair|
+    Contract.enabled.find_each do |pair|
       run_for_pair(pair)
     end
   end

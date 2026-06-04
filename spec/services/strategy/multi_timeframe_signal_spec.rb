@@ -1210,7 +1210,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     end
 
     let!(:btc_current_month) do
-      TradingPair.create!(
+      Contract.create!(
         product_id: "BIT-29AUG25-CDE",
         base_currency: "BTC",
         quote_currency: "USD",
@@ -1221,7 +1221,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     end
 
     let!(:btc_upcoming_month) do
-      TradingPair.create!(
+      Contract.create!(
         product_id: "BIT-26SEP25-CDE",
         base_currency: "BTC",
         quote_currency: "USD",
@@ -1392,9 +1392,9 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       allow(MarketData::FuturesContractManager).to receive(:new).and_return(mock_manager)
       allow(mock_manager).to receive(:best_available_contract).with("BTC").and_return("BIT-29AUG25-CDE")
 
-      # Mock TradingPair lookup
-      mock_pair = instance_double(TradingPair)
-      allow(TradingPair).to receive(:find_by).and_return(mock_pair)
+      # Mock Contract lookup
+      mock_pair = instance_double(Contract)
+      allow(Contract).to receive(:find_by).and_return(mock_pair)
       allow(mock_pair).to receive(:current_month?).and_return(true)
 
       result = strategy.send(:resolve_trading_symbol, "BTC")

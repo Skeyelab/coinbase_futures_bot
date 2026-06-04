@@ -8,8 +8,8 @@ RSpec.configure do |config|
     # Check if database connection is available
     if ActiveRecord::Base.connection.active?
       # Clean database once at start - only if tables exist
-      if ActiveRecord::Base.connection.table_exists?("trading_pairs")
-        ActiveRecord::Base.connection.execute("TRUNCATE TABLE trading_pairs RESTART IDENTITY CASCADE;")
+      if ActiveRecord::Base.connection.table_exists?("contracts")
+        ActiveRecord::Base.connection.execute("TRUNCATE TABLE contracts RESTART IDENTITY CASCADE;")
       end
       if ActiveRecord::Base.connection.table_exists?("candles")
         ActiveRecord::Base.connection.execute("TRUNCATE TABLE candles RESTART IDENTITY CASCADE;")
@@ -30,8 +30,8 @@ RSpec.configure do |config|
   # Use fast truncation only for tests that need it
   config.before(:each, :database_cleanup) do
     if ActiveRecord::Base.connection.active?
-      if ActiveRecord::Base.connection.table_exists?("trading_pairs")
-        ActiveRecord::Base.connection.execute("DELETE FROM trading_pairs;")
+      if ActiveRecord::Base.connection.table_exists?("contracts")
+        ActiveRecord::Base.connection.execute("DELETE FROM contracts;")
       end
       if ActiveRecord::Base.connection.table_exists?("candles")
         ActiveRecord::Base.connection.execute("DELETE FROM candles;")

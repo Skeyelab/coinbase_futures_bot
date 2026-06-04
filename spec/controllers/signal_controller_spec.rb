@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe SignalController, type: :controller do
   let(:api_key) { "test_api_key_123" }
-  let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD") }
+  let(:contract) { create(:contract, product_id: "BTC-USD") }
   let(:signal_alert) { create(:signal_alert, symbol: "BTC-USD") }
   let(:real_time_evaluator) { instance_double(RealTimeSignalEvaluator) }
 
@@ -319,7 +319,7 @@ RSpec.describe SignalController, type: :controller do
       end
 
       it "evaluates specific symbol when provided" do
-        trading_pair # Create the trading pair
+        contract # Create the trading pair
         allow(controller_instance).to receive(:params).and_return(
           ActionController::Parameters.new(symbol: "BTC-USD")
         )
@@ -341,7 +341,7 @@ RSpec.describe SignalController, type: :controller do
       end
 
       it "handles evaluator errors" do
-        trading_pair # Create the trading pair
+        contract # Create the trading pair
         allow(controller_instance).to receive(:params).and_return(
           ActionController::Parameters.new(symbol: "BTC-USD")
         )
@@ -356,7 +356,7 @@ RSpec.describe SignalController, type: :controller do
         allow(controller_instance).to receive(:params).and_return(
           ActionController::Parameters.new(symbol: "BTC-USD")
         )
-        trading_pair # Create the trading pair
+        contract # Create the trading pair
 
         expect { controller_instance.evaluate }.not_to raise_error
         expect(SentryHelper).to have_received(:add_breadcrumb).at_least(:once)

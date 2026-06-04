@@ -170,10 +170,10 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
     end
 
     context "with swing positions and margin violations" do
-      let(:trading_pair) { double("TradingPair", expiration_date: 1.month.from_now) }
+      let(:contract) { double("Contract", expiration_date: 1.month.from_now) }
       let(:position) do
         double("Position", id: 1, product_id: "BTC-USD-PERP", size: 10, entry_price: 50_000, calculate_pnl: 100.0,
-          side: "long", entry_time: Time.current, age_in_hours: 24.5, take_profit: 55_000, stop_loss: 45_000, trading_pair: trading_pair, hit_take_profit?: false, hit_stop_loss?: false)
+          side: "long", entry_time: Time.current, age_in_hours: 24.5, take_profit: 55_000, stop_loss: 45_000, contract: contract, hit_take_profit?: false, hit_stop_loss?: false)
       end
       let(:balance_summary) do
         {

@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe "Signals API", type: :request do
   let(:api_key) { "test_api_key_123" }
-  let(:trading_pair) { create(:trading_pair, product_id: "BTC-USD") }
+  let(:contract) { create(:contract, product_id: "BTC-USD") }
   let(:signal_alert) { create(:signal_alert, symbol: "BTC-USD") }
   let(:real_time_evaluator) { instance_double(RealTimeSignalEvaluator) }
 
@@ -299,7 +299,7 @@ RSpec.describe "Signals API", type: :request do
 
     context "with valid symbol parameter" do
       before do
-        trading_pair # Create the trading pair
+        contract # Create the trading pair
       end
 
       it "evaluates specific symbol successfully" do
@@ -310,7 +310,7 @@ RSpec.describe "Signals API", type: :request do
         expect(response).to have_http_status(:success)
         json_response = JSON.parse(response.body)
         expect(json_response["message"]).to eq("Evaluated signals for BTC-USD")
-        expect(real_time_evaluator).to have_received(:evaluate_pair).with(trading_pair)
+        expect(real_time_evaluator).to have_received(:evaluate_pair).with(contract)
       end
 
       it "adds Sentry breadcrumbs for single pair evaluation" do
@@ -352,7 +352,7 @@ RSpec.describe "Signals API", type: :request do
 
     context "when RealTimeSignalEvaluator raises an error" do
       before do
-        trading_pair # Create the trading pair
+        contract # Create the trading pair
         allow(real_time_evaluator).to receive(:evaluate_pair).and_raise(StandardError, "Evaluation failed")
       end
 

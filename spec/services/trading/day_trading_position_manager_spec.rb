@@ -57,9 +57,9 @@ RSpec.describe Trading::DayTradingPositionManager do
       expect(result).not_to include(today_position)
     end
 
-    it "includes trading_pair association" do
+    it "includes contract association" do
       result = manager.positions_needing_closure
-      expect(result.first.association(:trading_pair)).to be_loaded
+      expect(result.first.association(:contract)).to be_loaded
     end
 
     it "returns empty array when no positions need closure" do
@@ -79,9 +79,9 @@ RSpec.describe Trading::DayTradingPositionManager do
       expect(result).not_to include(recent_position)
     end
 
-    it "includes trading_pair association" do
+    it "includes contract association" do
       result = manager.positions_approaching_closure
-      expect(result.first.association(:trading_pair)).to be_loaded
+      expect(result.first.association(:contract)).to be_loaded
     end
   end
 

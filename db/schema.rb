@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_04_202020) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -55,6 +55,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
     t.index ["active"], name: "index_chat_sessions_on_active"
     t.index ["session_id"], name: "index_chat_sessions_on_session_id", unique: true
     t.index ["updated_at"], name: "index_chat_sessions_on_updated_at"
+  end
+
+  create_table "contracts", force: :cascade do |t|
+    t.string "base_currency"
+    t.string "contract_type"
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.date "expiration_date"
+    t.decimal "min_size", precision: 20, scale: 10
+    t.decimal "price_increment", precision: 20, scale: 10
+    t.string "product_id", null: false
+    t.string "quote_currency"
+    t.decimal "size_increment", precision: 20, scale: 10
+    t.string "status"
+    t.bigint "underlying_id"
+    t.datetime "updated_at", null: false
+    t.index ["expiration_date"], name: "index_contracts_on_expiration_date"
+    t.index ["product_id"], name: "index_contracts_on_product_id", unique: true
+    t.index ["underlying_id"], name: "index_contracts_on_underlying_id"
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -250,23 +269,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
     t.index ["product_id", "observed_at"], name: "index_ticks_on_product_id_and_observed_at"
   end
 
-  create_table "trading_pairs", force: :cascade do |t|
-    t.string "base_currency"
-    t.string "contract_type"
-    t.datetime "created_at", null: false
-    t.boolean "enabled", default: true, null: false
-    t.date "expiration_date"
-    t.decimal "min_size", precision: 20, scale: 10
-    t.decimal "price_increment", precision: 20, scale: 10
-    t.string "product_id", null: false
-    t.string "quote_currency"
-    t.decimal "size_increment", precision: 20, scale: 10
-    t.string "status"
-    t.datetime "updated_at", null: false
-    t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
-    t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
-  end
-
   create_table "trading_profiles", force: :cascade do |t|
     t.boolean "active", default: false, null: false
     t.datetime "created_at", null: false
@@ -285,6 +287,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
     t.index ["active"], name: "index_trading_profiles_one_active", unique: true, where: "(active IS TRUE)"
   end
 
+  create_table "underlyings", force: :cascade do |t|
+    t.string "asset_class"
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.string "symbol"
+    t.datetime "updated_at", null: false
+    t.index ["symbol"], name: "index_underlyings_on_symbol", unique: true
+  end
+
   add_foreign_key "chat_messages", "chat_sessions"
+  add_foreign_key "contracts", "underlyings"
   add_foreign_key "orders", "positions"
 end

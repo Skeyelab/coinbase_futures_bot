@@ -38,7 +38,7 @@ module MarketData
 
     # Get current month contract product ID for an asset
     def current_month_contract(asset)
-      contract = TradingPair.current_month_for_asset(asset).first
+      contract = Contract.current_month_for_asset(asset).first
       return contract&.product_id if contract
 
       # If no current month contract found, try to discover it
@@ -47,7 +47,7 @@ module MarketData
 
     # Get upcoming month contract product ID for an asset
     def upcoming_month_contract(asset)
-      contract = TradingPair.upcoming_month_for_asset(asset).first
+      contract = Contract.upcoming_month_for_asset(asset).first
       return contract&.product_id if contract
 
       # If no upcoming month contract found, try to discover it
@@ -56,7 +56,7 @@ module MarketData
 
     # Get the best available contract for trading (current month preferred, upcoming as fallback)
     def best_available_contract(asset)
-      contract = TradingPair.best_available_for_asset(asset)
+      contract = Contract.best_available_for_asset(asset)
       return contract&.product_id if contract
 
       # If no contracts found, try to discover current month first
@@ -73,12 +73,12 @@ module MarketData
       return nil unless contract_id
 
       # Parse contract info
-      contract_info = TradingPair.parse_contract_info(contract_id)
+      contract_info = Contract.parse_contract_info(contract_id)
       return nil unless contract_info
 
       # Create or update the trading pair
-      trading_pair = TradingPair.find_or_initialize_by(product_id: contract_id)
-      trading_pair.assign_attributes(
+      contract = Contract.find_or_initialize_by(product_id: contract_id)
+      contract.assign_attributes(
         base_currency: contract_info[:base_currency],
         quote_currency: contract_info[:quote_currency],
         expiration_date: contract_info[:expiration_date],
@@ -87,11 +87,11 @@ module MarketData
         status: "online"
       )
 
-      if trading_pair.save
+      if contract.save
         @logger.info("Created current month contract: #{contract_id}")
         contract_id
       else
-        @logger.error("Failed to create contract #{contract_id}: #{trading_pair.errors.full_messages}")
+        @logger.error("Failed to create contract #{contract_id}: #{contract.errors.full_messages}")
         nil
       end
     end
@@ -102,12 +102,12 @@ module MarketData
       return nil unless contract_id
 
       # Parse contract info
-      contract_info = TradingPair.parse_contract_info(contract_id)
+      contract_info = Contract.parse_contract_info(contract_id)
       return nil unless contract_info
 
       # Create or update the trading pair
-      trading_pair = TradingPair.find_or_initialize_by(product_id: contract_id)
-      trading_pair.assign_attributes(
+      contract = Contract.find_or_initialize_by(product_id: contract_id)
+      contract.assign_attributes(
         base_currency: contract_info[:base_currency],
         quote_currency: contract_info[:quote_currency],
         expiration_date: contract_info[:expiration_date],
@@ -116,11 +116,11 @@ module MarketData
         status: "online"
       )
 
-      if trading_pair.save
+      if contract.save
         @logger.info("Created upcoming month contract: #{contract_id}")
         contract_id
       else
-        @logger.error("Failed to create upcoming month contract #{contract_id}: #{trading_pair.errors.full_messages}")
+        @logger.error("Failed to create upcoming month contract #{contract_id}: #{contract.errors.full_messages}")
         nil
       end
     end
@@ -162,13 +162,13 @@ module MarketData
 
     # Get all active futures contracts
     def active_futures_contracts
-      TradingPair.active
+      Contract.active
     end
 
     # Get contracts that are expiring soon (within next 7 days)
     def expiring_contracts(days_ahead: 7)
       cutoff_date = Date.current + days_ahead.days
-      TradingPair.enabled
+      Contract.enabled
         .where("expiration_date <= ? AND expiration_date > ?", cutoff_date, Date.current)
     end
 
@@ -192,7 +192,7 @@ module MarketData
       end
 
       # Disable expired contracts
-      expired_contracts = TradingPair.enabled
+      expired_contracts = Contract.enabled
         .where(base_currency: asset)
         .where("expiration_date < ?", current_date)
 

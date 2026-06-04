@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe TradingPair, type: :model do
+RSpec.describe Contract, type: :model do
   let(:current_date) { Date.new(2025, 8, 15) } # Mid-August 2025
 
   before do
@@ -12,25 +12,25 @@ RSpec.describe TradingPair, type: :model do
 
   describe "validations" do
     it "validates presence and uniqueness of product_id" do
-      pair = TradingPair.create!(product_id: "BTC-USD", base_currency: "BTC", quote_currency: "USD")
+      pair = Contract.create!(product_id: "BTC-USD", base_currency: "BTC", quote_currency: "USD")
       expect(pair).to be_valid
 
-      duplicate = TradingPair.new(product_id: "BTC-USD", base_currency: "BTC", quote_currency: "USD")
+      duplicate = Contract.new(product_id: "BTC-USD", base_currency: "BTC", quote_currency: "USD")
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:product_id]).to include("has already been taken")
     end
   end
 
   describe "scopes" do
-    let!(:btc_current_month) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
-    let!(:eth_current_month) { TradingPair.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
-    let!(:btc_upcoming_month) { TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
-    let!(:eth_upcoming_month) { TradingPair.create!(product_id: "ET-26SEP25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
-    let!(:expired_contract) { TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31), enabled: true) }
+    let!(:btc_current_month) { Contract.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:eth_current_month) { Contract.create!(product_id: "ET-29AUG25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
+    let!(:btc_upcoming_month) { Contract.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
+    let!(:eth_upcoming_month) { Contract.create!(product_id: "ET-26SEP25-CDE", base_currency: "ETH", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26), enabled: true) }
+    let!(:expired_contract) { Contract.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31), enabled: true) }
 
     describe ".active" do
       it "returns only enabled and non-expired contracts" do
-        active = TradingPair.active
+        active = Contract.active
         expect(active).to include(btc_current_month, eth_current_month, btc_upcoming_month, eth_upcoming_month)
         expect(active).not_to include(expired_contract)
       end
@@ -38,19 +38,19 @@ RSpec.describe TradingPair, type: :model do
 
     describe ".current_month" do
       it "returns contracts expiring in the current month" do
-        expect(TradingPair.current_month).to contain_exactly(btc_current_month, eth_current_month)
+        expect(Contract.current_month).to contain_exactly(btc_current_month, eth_current_month)
       end
     end
 
     describe ".upcoming_month" do
       it "returns contracts expiring in the upcoming month" do
-        expect(TradingPair.upcoming_month).to contain_exactly(btc_upcoming_month, eth_upcoming_month)
+        expect(Contract.upcoming_month).to contain_exactly(btc_upcoming_month, eth_upcoming_month)
       end
     end
 
     describe ".not_expired" do
       it "returns contracts that have not expired" do
-        not_expired = TradingPair.not_expired
+        not_expired = Contract.not_expired
         expect(not_expired).to include(btc_current_month, eth_current_month, btc_upcoming_month, eth_upcoming_month)
         expect(not_expired).not_to include(expired_contract)
       end
@@ -61,7 +61,7 @@ RSpec.describe TradingPair, type: :model do
         # Mock Date.current to test expiring tomorrow scenario
         allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
 
-        tradeable = TradingPair.tradeable
+        tradeable = Contract.tradeable
         expect(tradeable).to include(btc_upcoming_month, eth_upcoming_month)
         expect(tradeable).not_to include(btc_current_month, eth_current_month, expired_contract)
       end
@@ -69,36 +69,36 @@ RSpec.describe TradingPair, type: :model do
 
     describe ".current_month_for_asset" do
       it "returns current month contracts for BTC" do
-        expect(TradingPair.current_month_for_asset("BTC")).to contain_exactly(btc_current_month)
+        expect(Contract.current_month_for_asset("BTC")).to contain_exactly(btc_current_month)
       end
 
       it "returns current month contracts for ETH" do
-        expect(TradingPair.current_month_for_asset("ETH")).to contain_exactly(eth_current_month)
+        expect(Contract.current_month_for_asset("ETH")).to contain_exactly(eth_current_month)
       end
 
       it "returns empty for assets with no current month contracts" do
-        expect(TradingPair.current_month_for_asset("DOGE")).to be_empty
+        expect(Contract.current_month_for_asset("DOGE")).to be_empty
       end
     end
 
     describe ".upcoming_month_for_asset" do
       it "returns upcoming month contracts for BTC" do
-        expect(TradingPair.upcoming_month_for_asset("BTC")).to contain_exactly(btc_upcoming_month)
+        expect(Contract.upcoming_month_for_asset("BTC")).to contain_exactly(btc_upcoming_month)
       end
 
       it "returns upcoming month contracts for ETH" do
-        expect(TradingPair.upcoming_month_for_asset("ETH")).to contain_exactly(eth_upcoming_month)
+        expect(Contract.upcoming_month_for_asset("ETH")).to contain_exactly(eth_upcoming_month)
       end
 
       it "returns empty for assets with no upcoming month contracts" do
-        expect(TradingPair.upcoming_month_for_asset("DOGE")).to be_empty
+        expect(Contract.upcoming_month_for_asset("DOGE")).to be_empty
       end
     end
 
     describe ".best_available_for_asset" do
       it "returns current month contract when available" do
-        expect(TradingPair.best_available_for_asset("BTC")).to eq(btc_current_month)
-        expect(TradingPair.best_available_for_asset("ETH")).to eq(eth_current_month)
+        expect(Contract.best_available_for_asset("BTC")).to eq(btc_current_month)
+        expect(Contract.best_available_for_asset("ETH")).to eq(eth_current_month)
       end
 
       context "when current month contracts are not tradeable" do
@@ -108,8 +108,8 @@ RSpec.describe TradingPair, type: :model do
         end
 
         it "returns upcoming month contract as fallback" do
-          expect(TradingPair.best_available_for_asset("BTC")).to eq(btc_upcoming_month)
-          expect(TradingPair.best_available_for_asset("ETH")).to eq(eth_upcoming_month)
+          expect(Contract.best_available_for_asset("BTC")).to eq(btc_upcoming_month)
+          expect(Contract.best_available_for_asset("ETH")).to eq(eth_upcoming_month)
         end
       end
     end
@@ -117,7 +117,7 @@ RSpec.describe TradingPair, type: :model do
 
   describe ".parse_contract_info" do
     it "parses BTC current month contract" do
-      info = TradingPair.parse_contract_info("BIT-29AUG25-CDE")
+      info = Contract.parse_contract_info("BIT-29AUG25-CDE")
       expect(info).to eq({
         base_currency: "BTC",
         quote_currency: "USD",
@@ -127,7 +127,7 @@ RSpec.describe TradingPair, type: :model do
     end
 
     it "parses ETH current month contract" do
-      info = TradingPair.parse_contract_info("ET-29AUG25-CDE")
+      info = Contract.parse_contract_info("ET-29AUG25-CDE")
       expect(info).to eq({
         base_currency: "ETH",
         quote_currency: "USD",
@@ -137,18 +137,18 @@ RSpec.describe TradingPair, type: :model do
     end
 
     it "returns nil for invalid format" do
-      expect(TradingPair.parse_contract_info("BTC-USD")).to be_nil
-      expect(TradingPair.parse_contract_info("invalid")).to be_nil
-      expect(TradingPair.parse_contract_info(nil)).to be_nil
+      expect(Contract.parse_contract_info("BTC-USD")).to be_nil
+      expect(Contract.parse_contract_info("invalid")).to be_nil
+      expect(Contract.parse_contract_info(nil)).to be_nil
     end
 
     it "handles different date formats" do
-      info = TradingPair.parse_contract_info("BIT-30SEP25-CDE")
+      info = Contract.parse_contract_info("BIT-30SEP25-CDE")
       expect(info[:expiration_date]).to eq(Date.new(2025, 9, 30))
     end
 
     it "parses OIL (NOL) futures contract" do
-      info = TradingPair.parse_contract_info("NOL-19JUN26-CDE")
+      info = Contract.parse_contract_info("NOL-19JUN26-CDE")
       expect(info).to eq({
         base_currency: "OIL",
         quote_currency: "USD",
@@ -159,9 +159,9 @@ RSpec.describe TradingPair, type: :model do
   end
 
   describe "instance methods" do
-    let(:current_month_contract) { TradingPair.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29)) }
-    let(:upcoming_month_contract) { TradingPair.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26)) }
-    let(:expired_contract) { TradingPair.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31)) }
+    let(:current_month_contract) { Contract.create!(product_id: "BIT-29AUG25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29)) }
+    let(:upcoming_month_contract) { Contract.create!(product_id: "BIT-26SEP25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 9, 26)) }
+    let(:expired_contract) { Contract.create!(product_id: "BIT-31JUL25-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2025, 7, 31)) }
 
     describe "#expired?" do
       it "returns false for current month contracts" do

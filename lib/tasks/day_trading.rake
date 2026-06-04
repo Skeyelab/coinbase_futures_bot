@@ -215,7 +215,7 @@ namespace :day_trading do
 
   desc "Show detailed position information"
   task details: :environment do
-    positions = Position.open_day_trading_positions.includes(:trading_pair)
+    positions = Position.open_day_trading_positions.includes(:contract)
 
     if positions.empty?
       puts "✅ No open day trading positions"
@@ -236,9 +236,9 @@ namespace :day_trading do
       puts "  Take Profit: #{position.take_profit}"
       puts "  Stop Loss: #{position.stop_loss}"
 
-      if position.trading_pair
-        puts "  Contract Type: #{position.trading_pair.contract_type}"
-        puts "  Expiration: #{position.trading_pair.expiration_date}"
+      if position.contract
+        puts "  Contract Type: #{position.contract.contract_type}"
+        puts "  Expiration: #{position.contract.expiration_date}"
       end
 
       puts "-" * 40

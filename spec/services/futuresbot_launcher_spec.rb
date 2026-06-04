@@ -72,7 +72,7 @@ RSpec.describe FuturesBotLauncher do
       let(:mock_futures) { instance_double(MarketData::CoinbaseFuturesSubscriber) }
 
       before do
-        create(:trading_pair, enabled: true, product_id: "BIT-29AUG25-CDE")
+        create(:contract, enabled: true, product_id: "BIT-29AUG25-CDE")
         allow(MarketData::CoinbaseSpotSubscriber).to receive(:new).and_return(mock_spot)
         allow(MarketData::CoinbaseFuturesSubscriber).to receive(:new).and_return(mock_futures)
         allow(mock_spot).to receive(:start)
@@ -116,7 +116,7 @@ RSpec.describe FuturesBotLauncher do
       end
 
       context "when no trading pairs are enabled" do
-        before { TradingPair.update_all(enabled: false) }
+        before { Contract.update_all(enabled: false) }
 
         it "logs a warning and skips subscription" do
           expect(logger).to receive(:warn).with(/No enabled trading pairs/)

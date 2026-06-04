@@ -84,14 +84,14 @@ namespace :realtime do
 
     Rails.logger.info("[RTS] Evaluating signals for #{symbol}...")
 
-    trading_pair = TradingPair.find_by(product_id: symbol)
-    if trading_pair.nil?
+    contract = Contract.find_by(product_id: symbol)
+    if contract.nil?
       Rails.logger.error("[RTS] Trading pair not found: #{symbol}")
       exit 1
     end
 
     evaluator = RealTimeSignalEvaluator.new(logger: Rails.logger)
-    evaluator.evaluate_pair(trading_pair)
+    evaluator.evaluate_pair(contract)
 
     Rails.logger.info("[RTS] Signal evaluation completed for #{symbol}.")
   end
@@ -160,7 +160,7 @@ namespace :realtime do
 
   def start_market_data_subscriptions
     # Get all enabled trading pairs
-    product_ids = TradingPair.enabled.pluck(:product_id)
+    product_ids = Contract.enabled.pluck(:product_id)
 
     if product_ids.empty?
       Rails.logger.warn("[RTS] No enabled trading pairs found. Skipping market data subscriptions.")

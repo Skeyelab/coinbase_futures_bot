@@ -4,7 +4,7 @@ class CalibrationJob < ApplicationJob
   queue_as :default
 
   def perform
-    TradingPair.enabled.find_each do |pair|
+    Contract.enabled.find_each do |pair|
       calibrate_pair(pair)
     end
   end
