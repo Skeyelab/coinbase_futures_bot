@@ -482,4 +482,78 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       expect(res["message"]).to match(/No open position/)
     end
   end
+
+  describe "Order persistence" do
+    let(:product_id) { "BIT-29AUG25-CDE" }
+
+    before do
+      allow(service).to receive(:get_current_market_price).and_return(50_000.0)
+      allow(TradingHalt).to receive(:assert_active!).and_return(true)
+    end
+
+    describe "#open_position persists an Order" do
+      it "creates an Order record linked to the new Position" do
+        mock_response = instance_double("Response", body: {"success" => true, "order_id" => "open-abc"}.to_json)
+        conn = service.instance_variable_get(:@conn)
+        allow(conn).to receive(:post).and_return(mock_response)
+
+        expect {
+          service.open_position(product_id: product_id, side: :buy, size: "1", day_trading: true)
+        }.to change(Order, :count).by(1)
+
+        order = Order.last
+        expect(order.contract_id).to eq(product_id)
+        expect(order.side).to eq("buy")
+        expect(order.status).to eq("filled")
+        expect(order.coinbase_order_id).to eq("open-abc")
+        expect(order.position).to be_present
+      end
+    end
+
+    describe "#close_position persists an Order" do
+      let!(:open_position) { create(:position, product_id: product_id, side: "LONG", status: "OPEN") }
+
+      it "creates a closing Order record" do
+        allow(service).to receive(:list_open_positions).and_return([
+          {"product_id" => product_id, "number_of_contracts" => "1", "side" => "LONG"}
+        ])
+        mock_response = instance_double("Response", body: {"success" => true, "order_id" => "close-xyz"}.to_json)
+        conn = service.instance_variable_get(:@conn)
+        allow(conn).to receive(:post).and_return(mock_response)
+
+        expect {
+          service.close_position(product_id: product_id, size: "1")
+        }.to change(Order, :count).by(1)
+
+        order = Order.last
+        expect(order.side).to eq("sell")
+        expect(order.status).to eq("filled")
+        expect(order.coinbase_order_id).to eq("close-xyz")
+        expect(order.position).to eq(open_position)
+      end
+    end
+
+    describe "#increase_position persists an Order" do
+      let!(:open_position) { create(:position, product_id: product_id, side: "LONG", status: "OPEN") }
+
+      it "creates an increase Order record" do
+        allow(service).to receive(:list_open_positions).and_return([
+          {"product_id" => product_id, "number_of_contracts" => "1", "side" => "LONG"}
+        ])
+        mock_response = instance_double("Response", body: {"success" => true, "order_id" => "increase-99"}.to_json)
+        conn = service.instance_variable_get(:@conn)
+        allow(conn).to receive(:post).and_return(mock_response)
+
+        expect {
+          service.increase_position(product_id: product_id, size: "1")
+        }.to change(Order, :count).by(1)
+
+        order = Order.last
+        expect(order.side).to eq("buy")
+        expect(order.status).to eq("filled")
+        expect(order.coinbase_order_id).to eq("increase-99")
+        expect(order.position).to eq(open_position)
+      end
+    end
+  end
 end

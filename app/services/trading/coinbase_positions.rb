@@ -416,7 +416,7 @@ module Trading
         end
       end
 
-      Position.create!(
+      position = Position.create!(
         product_id: product_id,
         side: position_side,
         size: size,
@@ -428,6 +428,20 @@ module Trading
         stop_loss: stop_loss,
         trailing_stop_enabled: ActiveModel::Type::Boolean.new.cast(ENV.fetch("TRAILING_STOP_ENABLED", "false")),
         trailing_stop_state: {}
+      )
+
+      persist_order(
+        position: position,
+        contract_id: product_id,
+        side: SideNormalizer.order(side) || "buy",
+        order_type: "market",
+        quantity: size,
+        target_price: entry_price,
+        fill_price: entry_price,
+        status: "filled",
+        placed_at: Time.current,
+        filled_at: Time.current,
+        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
       )
 
       @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")
@@ -442,6 +456,20 @@ module Trading
       return unless position
 
       close_price ||= position.entry_price
+
+      persist_order(
+        position: position,
+        contract_id: product_id,
+        side: position.long? ? "sell" : "buy",
+        order_type: "market",
+        quantity: size || position.size,
+        target_price: close_price,
+        fill_price: close_price,
+        status: "filled",
+        placed_at: Time.current,
+        filled_at: Time.current,
+        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
+      )
 
       # Close the position
       position.close_position!(close_price)
@@ -460,6 +488,20 @@ module Trading
       total_size = position.size + additional_size.to_f
       new_entry_price = ((position.size * position.entry_price) + (additional_size.to_f * additional_price)) / total_size
 
+      persist_order(
+        position: position,
+        contract_id: product_id,
+        side: position.long? ? "buy" : "sell",
+        order_type: "market",
+        quantity: additional_size,
+        target_price: additional_price,
+        fill_price: additional_price,
+        status: "filled",
+        placed_at: Time.current,
+        filled_at: Time.current,
+        coinbase_order_id: order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
+      )
+
       # Update the position
       position.update!(
         size: total_size,
@@ -470,6 +512,25 @@ module Trading
     rescue => e
       @logger.error("Failed to update local position record for increase: #{e.message}")
       # Don't fail the main operation if local record update fails
+    end
+
+    def persist_order(position:, contract_id:, side:, order_type:, quantity:, status:,
+      target_price: nil, fill_price: nil, placed_at: nil, filled_at: nil, coinbase_order_id: nil)
+      Order.create!(
+        position: position,
+        contract_id: contract_id,
+        side: side.to_s.downcase,
+        order_type: order_type,
+        quantity: quantity,
+        target_price: target_price,
+        fill_price: fill_price,
+        status: status,
+        placed_at: placed_at,
+        filled_at: filled_at,
+        coinbase_order_id: coinbase_order_id
+      )
+    rescue => e
+      @logger.error("Failed to persist Order record: #{e.message}")
     end
 
     # --- Auth helpers (Advanced Trade style signing) ---
