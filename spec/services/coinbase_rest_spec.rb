@@ -230,7 +230,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
                 product_id: product_id,
                 start_time: start_time,
                 end_time: end_time,
-                chunk_days: 1
+                chunk_hours: 24
               )
             end.to change { Candle.count }.by(2)
 
@@ -248,7 +248,7 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
                 product_id: product_id,
                 start_time: start_time,
                 end_time: end_time,
-                chunk_days: 1
+                chunk_hours: 24
               )
             end.not_to raise_error
 
