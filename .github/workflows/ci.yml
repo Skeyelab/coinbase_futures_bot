@@ -199,10 +199,10 @@ jobs:
           done
           echo "PostgreSQL is ready!"
 
-          # Ensure proper database setup for real testing
-          bin/rails db:create
-          bin/rails db:migrate
-          bin/rails db:test:prepare
+          # Create worker DBs manually (parallel_tests is dev-only gem, rake tasks unavailable in CI)
+          # Worker 1 uses the default DB; worker 2 gets a numbered suffix DB
+          bin/rails db:create db:migrate
+          TEST_ENV_NUMBER=2 bin/rails db:create db:migrate
           echo "Database setup complete"
 
       - name: Debug environment
@@ -231,22 +231,17 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true'
         timeout-minutes: 15
         env:
-          # Force single-process execution - disable parallel testing
-          PARALLEL_TESTS: "0"
-          PARALLEL_TEST_PROCESSES: "1"
-          # Disable test profiling and acceleration
+          PARALLEL_TEST_PROCESSES: "2"
+          PARALLEL_COVERAGE: "true"
           SAMPLE: ""
           RPROF: ""
           STACKPROF: ""
           TAG_PROF: ""
-          # Force real test execution
           FORCE_REAL_TESTS: "true"
-          # Disable any caching
           RAILS_CACHE_ID: "ci-$(date +%s)"
-          # Use VCR cassettes in CI but ensure real database testing
           VCR_RECORD_MODE: none
           CI: true
-          COVERAGE: true  # Enable SimpleCov for coverage reporting
+          COVERAGE: true
         run: |
           # Disable 'exit on error' for this block; we'll control exit codes manually
           set +e
@@ -258,14 +253,9 @@ jobs:
           echo "Ruby version: $(ruby --version)"
           echo "Bundle version: $(bundle --version)"
 
-          # Force fresh database setup - no caching shortcuts
-          echo "=== FORCING FRESH TEST ENVIRONMENT ==="
-          bin/rails db:drop db:create db:migrate RAILS_ENV=test
-
           # Verify test environment
           echo "=== TEST ENVIRONMENT VERIFICATION ==="
           echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
-          echo "Parallel tests disabled: $PARALLEL_TESTS"
           echo "Test processes: $PARALLEL_TEST_PROCESSES"
           echo "Test profiling disabled: $SAMPLE$RPROF$STACKPROF$TAG_PROF"
 
@@ -332,17 +322,11 @@ jobs:
             echo "Changed files don't have corresponding test files or no changes detected."
           fi
 
-          # Run tests with coverage enabled
-          echo "=== RUNNING FULL TEST SUITE WITH COVERAGE ==="
+          # Run full suite in parallel (2 workers on ubuntu-latest 2-vCPU runner)
+          echo "=== RUNNING FULL TEST SUITE IN PARALLEL (${PARALLEL_TEST_PROCESSES} workers) ==="
           echo "🧪 FULL SUITE STARTING: $(date)"
 
-          # Run RSpec with coverage - SimpleCov will be loaded via spec_helper.rb
-          bundle exec rspec \
-            --format documentation \
-            --format progress \
-            --backtrace \
-            --order random \
-            --seed $(date +%s)
+          bin/parallel_rspec
 
           TEST_EXIT_CODE=$?
           echo "🧪 FINISHED: $(date)"
