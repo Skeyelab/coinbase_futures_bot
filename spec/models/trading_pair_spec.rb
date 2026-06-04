@@ -146,6 +146,16 @@ RSpec.describe TradingPair, type: :model do
       info = TradingPair.parse_contract_info("BIT-30SEP25-CDE")
       expect(info[:expiration_date]).to eq(Date.new(2025, 9, 30))
     end
+
+    it "parses OIL (NOL) futures contract" do
+      info = TradingPair.parse_contract_info("NOL-19JUN26-CDE")
+      expect(info).to eq({
+        base_currency: "OIL",
+        quote_currency: "USD",
+        expiration_date: Date.new(2026, 6, 19),
+        contract_type: "CDE"
+      })
+    end
   end
 
   describe "instance methods" do

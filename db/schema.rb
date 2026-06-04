@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_27_161128) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_04_181941) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -261,8 +261,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_27_161128) do
     t.decimal "sl_target", precision: 10, scale: 6, default: "0.004", null: false
     t.decimal "tp_target", precision: 10, scale: 6, default: "0.006", null: false
     t.datetime "updated_at", null: false
-    t.index "lower(name)", name: "index_trading_profiles_on_lower_name", unique: true
-    t.index ["active"], name: "index_trading_profiles_one_active", unique: true, where: "active IS TRUE"
+    t.index "lower((name)::text)", name: "index_trading_profiles_on_lower_name", unique: true
+    t.index ["active"], name: "index_trading_profiles_one_active", unique: true, where: "(active IS TRUE)"
   end
 
   add_foreign_key "chat_messages", "chat_sessions"

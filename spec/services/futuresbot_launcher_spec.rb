@@ -4,7 +4,7 @@ require "rails_helper"
 
 RSpec.describe FuturesBotLauncher do
   let(:logger) { instance_double(Logger) }
-  let(:mock_tui) { instance_double(Cli::TuiDashboard) }
+  let(:mock_tui) { double("tui", start: nil) }
 
   before do
     allow(logger).to receive(:info)

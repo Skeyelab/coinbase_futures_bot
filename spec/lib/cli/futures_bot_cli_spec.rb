@@ -3,6 +3,7 @@
 require "rails_helper"
 require "thor"
 require "climate_control"
+require "tui"
 require_relative "../../../lib/cli/futures_bot_cli"
 
 RSpec.describe FuturesBotCli, type: :model do
@@ -31,36 +32,23 @@ RSpec.describe FuturesBotCli, type: :model do
         allow(startup_sync).to receive(:call).and_return(sync_result)
       end
 
-      it "delegates to TuiDashboard#start" do
-        mock_tui = instance_double(TuiDashboard)
-        expect(TuiDashboard).to receive(:new).with(refresh_interval: TuiDashboard::DEFAULT_REFRESH).and_return(mock_tui)
-        expect(mock_tui).to receive(:start)
+      it "runs Tui::App via Bubbletea" do
+        expect(Bubbletea).to receive(:run).with(instance_of(Tui::App), alt_screen: true)
         run_cli("dashboard")
       end
 
       it "syncs positions from Coinbase before starting the dashboard" do
-        mock_tui = instance_double(TuiDashboard)
-        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
-        allow(mock_tui).to receive(:start)
+        allow(Bubbletea).to receive(:run)
         expect(startup_sync).to receive(:call).ordered
-        expect(mock_tui).to receive(:start).ordered
+        expect(Bubbletea).to receive(:run).ordered
         run_cli("dashboard")
-      end
-
-      it "passes a custom --refresh interval through" do
-        mock_tui = instance_double(TuiDashboard)
-        expect(TuiDashboard).to receive(:new).with(refresh_interval: 10).and_return(mock_tui)
-        expect(mock_tui).to receive(:start)
-        run_cli("dashboard", "--refresh", "10")
       end
     end
 
     context "when FUTURESBOT_SKIP_POSITION_SYNC is set" do
       it "still delegates sync skipping to StartupPositionSync" do
-        mock_tui = instance_double(TuiDashboard)
+        allow(Bubbletea).to receive(:run)
         startup_sync = instance_double(StartupPositionSync)
-        allow(TuiDashboard).to receive(:new).and_return(mock_tui)
-        allow(mock_tui).to receive(:start)
         allow(StartupPositionSync).to receive(:new).and_return(startup_sync)
         allow(startup_sync).to receive(:call).and_return(StartupPositionSync::Result.new(status: :skipped))
 
@@ -86,7 +74,7 @@ RSpec.describe FuturesBotCli, type: :model do
     end
 
     it "creates a FuturesBotLauncher and calls start" do
-      expect(FuturesBotLauncher).to receive(:new).with(hash_including(tui_refresh: TuiDashboard::DEFAULT_REFRESH)).and_return(mock_launcher)
+      expect(FuturesBotLauncher).to receive(:new).with(hash_including(tui_refresh: 5)).and_return(mock_launcher)
       expect(mock_launcher).to receive(:start)
       run_cli("start")
     end

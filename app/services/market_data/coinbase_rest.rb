@@ -44,7 +44,7 @@ module MarketData
 
     def upsert_products
       products = list_products
-      futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET)-/ && !p["trading_disabled"] }
+      futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET|NOL)-/ && !p["trading_disabled"] }
 
       futures_products.each do |p|
         contract_info = TradingPair.parse_contract_info(p["product_id"])
