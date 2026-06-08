@@ -48,7 +48,7 @@ jobs:
           DOCS_ONLY=true
           while IFS= read -r file; do
             case "$file" in
-              README.md|SESSION_NOTES.md|AGENTS.md|CLAUDE.md|CONTEXT.md|docs/*|wiki/*|.github/**/*.md|.beads/*)
+              README.md|SESSION_NOTES.md|AGENTS.md|CLAUDE.md|CONTEXT.md|docs/*|wiki/*|.github/**/*.md)
                 ;;
               *)
                 DOCS_ONLY=false
