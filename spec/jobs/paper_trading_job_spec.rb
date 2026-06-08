@@ -463,7 +463,7 @@ RSpec.describe PaperTradingJob, type: :job do
         stub_hourly_candles(
           "BTC-USD" => btc_candles,
           "ETH-USD" => eth_candles,
-          default: []
+          :default => []
         )
 
         # Use real instances for integration testing
