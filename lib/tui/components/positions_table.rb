@@ -43,8 +43,7 @@ module Tui
 
       def build_rows
         @positions.map do |pos|
-          live_price = @live_prices[pos.product_id]&.price
-          pnl = pos.pnl || (live_price ? pos.calculate_pnl(live_price) : nil)
+          pnl = unrealized_pnl_for(pos)
           pnl_str = pnl ? format("%+.2f", pnl) : "N/A"
           [
             pos.id.to_s,
@@ -56,6 +55,13 @@ module Tui
             pnl_str
           ]
         end
+      end
+
+      def unrealized_pnl_for(position)
+        live_price = @live_prices[position.product_id]&.price
+        return position.unrealized_pnl_at(live_price) if live_price
+
+        position.pnl
       end
 
       def style_table

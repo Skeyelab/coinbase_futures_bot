@@ -6,6 +6,7 @@ require "bubbles"
 require "gum"
 
 require_relative "tui/data_loader"
+require_relative "tui/exchange_pnl_refresher"
 require_relative "tui/components/status_bar"
 require_relative "tui/components/positions_table"
 require_relative "tui/components/signals_table"

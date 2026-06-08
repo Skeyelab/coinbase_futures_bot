@@ -61,6 +61,40 @@ RSpec.describe Tui::Components::PositionsTable do
         expect(table.render).to include("BIT-26JUN26-CDE")
       end
     end
+
+    context "when stored pnl is zero but a live price is available" do
+      let(:position) do
+        create(:position,
+          product_id: "NOL-19JUN26-CDE",
+          side: "SHORT",
+          entry_price: 93.62,
+          size: 1,
+          pnl: 0.0)
+      end
+      let(:live_prices) do
+        {position.product_id => build(:tick, product_id: position.product_id, price: 93.41)}
+      end
+
+      subject(:table) { described_class.new([position], live_prices) }
+
+      before do
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("NOL-19JUN26-CDE").and_return(10)
+      end
+
+      it "shows live unrealized pnl instead of frozen zero" do
+        expect(table.render).to include("+2.10")
+      end
+    end
+
+    context "when no live price is available" do
+      let(:position) { create(:position, pnl: 1.3) }
+
+      subject(:table) { described_class.new([position], {}) }
+
+      it "shows stored unrealized pnl from the exchange sync" do
+        expect(table.render).to include("+1.30")
+      end
+    end
   end
 end
 
