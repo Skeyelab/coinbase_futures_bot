@@ -10,7 +10,7 @@ module Tui
         positions: "Positions",
         signals: "Signals",
         market: "Market",
-        health: "Health"
+        health: "Ops"
       }.freeze
 
       def initialize(layout)

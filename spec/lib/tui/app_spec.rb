@@ -25,7 +25,11 @@ RSpec.describe Tui::App do
     end
 
     it "includes tab bar labels" do
-      expect(app.view).to include("Overview").and include("Health")
+      expect(app.view).to include("Overview").and include("Ops")
+    end
+
+    it "shows operation hints in the footer" do
+      expect(app.view).to include("[?]menu").or include("[?]Menu")
     end
   end
 

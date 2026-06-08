@@ -51,31 +51,50 @@ module Tui
     private
 
     def handle_key(msg)
-      case msg.to_s
+      key = msg.to_s
+      case key
       when "q", "Q", "ctrl+c", "esc"
         [self, Bubbletea.quit]
-      when "r", "R"
+      when "1", "2", "3", "4", "5"
+        @layout = @layout.switch_to(key)
+        [self, nil]
+      when "?", "/"
+        [self, operation_picker_form]
+      else
+        dispatch_operation(key.downcase) || [self, nil]
+      end
+    end
+
+    def dispatch_operation(key)
+      entry = Tui::OperationsCatalog.find(key)
+      return nil unless entry
+      return nil unless operation_available?(entry)
+
+      case key
+      when "r"
         refresh_data
         [self, nil]
-      when "1", "2", "3", "4", "5"
-        @layout = @layout.switch_to(msg.to_s)
-        [self, nil]
-      when "t", "T"
-        [self, edit_take_profit_form]
-      when "s", "S"
-        [self, edit_stop_loss_form]
-      when "i", "I"
+      when "i"
         run_import_async
         [self, nil]
-      when "c", "C"
+      when "t"
+        [self, edit_take_profit_form]
+      when "s"
+        [self, edit_stop_loss_form]
+      when "c"
         [self, close_position_form]
-      when "o", "O"
+      when "o"
         [self, reconcile_form]
-      when "h", "H"
+      when "h"
         [self, halt_toggle_form]
-      else
+      when "m"
+        toggle_realtime_monitoring
         [self, nil]
       end
+    end
+
+    def operation_available?(entry)
+      entry.tabs == :all || Array(entry.tabs).include?(@layout.active_tab)
     end
 
     def schedule_tick
@@ -144,7 +163,14 @@ module Tui
     end
 
     def health_view
-      panel("Health", nil, Lipgloss::Style.new.foreground("240").render("  Eval, sentiment, and tick freshness — wired in #249"))
+      panel(
+        "Ops",
+        nil,
+        Tui::Components::HealthPanel.new(
+          data: @data,
+          rtm_status: RealtimeMonitoring::Session.current.status
+        ).render
+      )
     end
 
     def panel(title, count, content)
@@ -166,7 +192,10 @@ module Tui
 
     def footer_view
       dim = Lipgloss::Style.new.foreground("240")
-      dim.render("  [1-5] tabs [q]uit [r]efresh [t]p [s]l [i]mport [c]lose [o]reconcile [h]alt")
+      hints = Tui::OperationsCatalog.for_tab(@layout.active_tab).map do |entry|
+        "[#{entry.key}]#{entry.label.downcase.split.first}"
+      end
+      dim.render("  [1-5] tabs [q]uit #{hints.join(" ")}")
     end
 
     def flash_active?
@@ -227,6 +256,51 @@ module Tui
         },
         message: TickMessage.new
       )
+    end
+
+    def operation_picker_form
+      active_tab = @layout.active_tab
+      Bubbletea.exec(
+        -> {
+          key = Tui::Forms::OperationPicker.run(active_tab: active_tab)
+          next unless key
+
+          case key
+          when "r" then Tui::DataLoader.load
+          when "i"
+            PositionImportService.new.import_positions_from_coinbase
+          when "t"
+            id_str = Gum.input(header: "Edit take-profit", placeholder: "OPEN position id (blank=cancel)")
+            Tui::Forms::EditPositionTarget.run(field: :take_profit, id_str: id_str)
+          when "s"
+            id_str = Gum.input(header: "Edit stop-loss", placeholder: "OPEN position id (blank=cancel)")
+            Tui::Forms::EditPositionTarget.run(field: :stop_loss, id_str: id_str)
+          when "c"
+            id_str = Gum.input(header: "Close position", placeholder: "OPEN position id (blank=cancel)")
+            Tui::Forms::ClosePosition.run(id_str)
+          when "o"
+            Tui::Forms::Reconcile.run
+          when "h"
+            Tui::Forms::HaltToggle.run
+          when "m"
+            RealtimeMonitoring::Session.current.toggle!
+          end
+        },
+        message: TickMessage.new
+      )
+    end
+
+    def toggle_realtime_monitoring
+      Thread.new do
+        result = RealtimeMonitoring::Session.current.toggle!
+        if result[:success]
+          set_flash(:ok, result[:message])
+        else
+          set_flash(:error, result[:error])
+        end
+      rescue => e
+        set_flash(:error, "Real-time toggle failed: #{e.message}")
+      end
     end
 
     def edit_stop_loss_form

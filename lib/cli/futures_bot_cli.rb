@@ -37,6 +37,7 @@ module Cli
     desc "dashboard", "Launch the real-time full-screen TUI dashboard (keys: [i]mport, [c]lose, [o]reconcile)"
     def dashboard
       sync_startup_positions
+      at_exit { RealtimeMonitoring::Session.current.stop! }
       Bubbletea.run(Tui::App.new, alt_screen: true)
     end
 

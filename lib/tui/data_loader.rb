@@ -19,6 +19,7 @@ module Tui
         positions: Position.open.order(entry_time: :desc).limit(50).to_a,
         signals: SignalAlert.active.recent.order(alert_timestamp: :desc).limit(25).to_a,
         latest_tick_at: latest_tick_at,
+        latest_futures_tick_at: latest_futures_tick_at,
         last_eval_at: last_eval_at,
         live_prices: live_prices,
         futures_live_prices: futures_live_prices,
@@ -34,6 +35,10 @@ module Tui
       recent_ticks.each_with_object({}) do |tick, memo|
         memo[tick.product_id] ||= tick
       end
+    end
+
+    def self.latest_futures_tick_at
+      Tick.where("product_id LIKE ?", "%-CDE").maximum(:observed_at)
     end
 
     def self.split_live_prices(live_prices)
