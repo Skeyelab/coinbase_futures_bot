@@ -11,6 +11,7 @@
 # The caller owns the TUI instance so it can inject a custom one in tests.
 class FuturesBotLauncher
   THREAD_SHUTDOWN_TIMEOUT = 1
+  KNOWN_SPOT_PRODUCT_IDS = %w[BTC-USD ETH-USD].freeze
 
   attr_reader :spot_thread, :futures_thread, :signal_thread
 
@@ -80,10 +81,15 @@ class FuturesBotLauncher
       return
     end
 
-    spot_product_ids = contracts.filter_map do |pair|
+    spot_candidates = contracts.filter_map do |pair|
       asset = pair.underlying_asset.presence
       "#{asset}-USD" if asset
     end.uniq
+    spot_product_ids = spot_candidates & KNOWN_SPOT_PRODUCT_IDS
+    skipped_spot = spot_candidates - spot_product_ids
+    if skipped_spot.any?
+      @logger.info("[Launcher] Skipping spot subscription for unsupported products: #{skipped_spot.join(", ")}")
+    end
 
     on_ticker = build_tick_persister
 

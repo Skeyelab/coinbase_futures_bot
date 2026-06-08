@@ -115,6 +115,54 @@ RSpec.describe FuturesBotLauncher do
         )
       end
 
+      context "when only NOL contracts are enabled" do
+        before do
+          Contract.delete_all
+          create(:contract, enabled: true, product_id: "NOL-19JUN26-CDE", base_currency: "OIL")
+        end
+
+        it "does not start a spot subscriber" do
+          launcher.start
+          expect(MarketData::CoinbaseSpotSubscriber).not_to have_received(:new)
+          expect(launcher.spot_thread).to be_nil
+        end
+
+        it "logs skipped spot products" do
+          expect(logger).to receive(:info).with(/Skipping spot subscription for unsupported products: OIL-USD/)
+          launcher.start
+        end
+
+        it "still subscribes futures for NOL contracts" do
+          allow(Thread).to receive(:new).and_wrap_original do |original, &block|
+            block.call
+            original.call {}
+          end
+          launcher.start
+          expect(MarketData::CoinbaseFuturesSubscriber).to have_received(:new).with(
+            hash_including(product_ids: ["NOL-19JUN26-CDE"])
+          )
+        end
+      end
+
+      context "when BTC and NOL contracts are enabled" do
+        before do
+          Contract.delete_all
+          create(:contract, enabled: true, product_id: "BIT-29AUG25-CDE")
+          create(:contract, enabled: true, product_id: "NOL-19JUN26-CDE", base_currency: "OIL")
+        end
+
+        it "subscribes spot for BTC only" do
+          allow(Thread).to receive(:new).and_wrap_original do |original, &block|
+            block.call
+            original.call {}
+          end
+          launcher.start
+          expect(MarketData::CoinbaseSpotSubscriber).to have_received(:new).with(
+            hash_including(product_ids: ["BTC-USD"])
+          )
+        end
+      end
+
       context "when no trading pairs are enabled" do
         before { Contract.update_all(enabled: false) }
 
