@@ -44,10 +44,26 @@ RSpec.describe Tui::App do
   end
 
   describe "#update with s key" do
-    it "switches to signals tab" do
+    it "switches to signals tab when not on positions" do
       msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "s".codepoints)
       app.update(msg)
       expect(app.instance_variable_get(:@layout).active_tab).to eq(:signals)
+    end
+
+    it "opens stop-loss edit on positions tab" do
+      layout = app.instance_variable_get(:@layout).switch_to_tab(:positions)
+      app.instance_variable_set(:@layout, layout)
+      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "s".codepoints)
+      _, cmd = app.update(msg)
+      expect(cmd).to be_a(Bubbletea::ExecCommand)
+    end
+  end
+
+  describe "#update with t key" do
+    it "returns an ExecCommand for take-profit edit" do
+      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "t".codepoints)
+      _, cmd = app.update(msg)
+      expect(cmd).to be_a(Bubbletea::ExecCommand)
     end
   end
 

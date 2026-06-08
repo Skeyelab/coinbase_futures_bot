@@ -8,12 +8,14 @@ module Tui
     class PositionsTable
       COLUMNS = [
         {title: "ID", width: 6},
-        {title: "Product", width: 22},
+        {title: "Product", width: 18},
         {title: "Side", width: 6},
-        {title: "Entry", width: 11},
-        {title: "Size", width: 8},
+        {title: "Entry", width: 9},
+        {title: "Size", width: 6},
         {title: "Type", width: 5},
-        {title: "U.PnL", width: 12}
+        {title: "TP", width: 8},
+        {title: "SL", width: 9},
+        {title: "U.PnL", width: 10}
       ].freeze
 
       def initialize(positions, live_prices = {}, height: 10)
@@ -47,14 +49,27 @@ module Tui
           pnl_str = pnl ? format("%+.2f", pnl) : "N/A"
           [
             pos.id.to_s,
-            pos.product_id.to_s[0, 22],
+            pos.product_id.to_s[0, 18],
             pos.side.to_s,
             pos.entry_price&.round(2)&.to_s || "N/A",
-            pos.size.to_s[0, 8],
+            pos.size.to_s[0, 6],
             pos.day_trading? ? "Day" : "Swing",
+            format_target(pos.take_profit),
+            format_stop_loss(pos),
             pnl_str
           ]
         end
+      end
+
+      def format_target(value)
+        value ? format("%.2f", value) : "—"
+      end
+
+      def format_stop_loss(position)
+        return "—" unless position.stop_loss
+
+        label = format("%.2f", position.stop_loss)
+        position.trailing_stop_enabled? ? "#{label}T" : label
       end
 
       def unrealized_pnl_for(position)
