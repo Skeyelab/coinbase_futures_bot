@@ -49,7 +49,7 @@ The coinbase_futures_bot uses **PostgreSQL** as its primary database with a sche
 ```sql
 CREATE TABLE trading_pairs (
   id BIGSERIAL PRIMARY KEY,
-  product_id VARCHAR NOT NULL UNIQUE,           -- e.g., "BTC-USD", "BIT-29AUG25-CDE"
+  product_id VARCHAR NOT NULL UNIQUE,           -- e.g., "BTC-USD", "BIT-27JUN26-CDE"
   base_currency VARCHAR,                        -- e.g., "BTC", "ETH"
   quote_currency VARCHAR,                       -- e.g., "USD"
   status VARCHAR,                               -- e.g., "online", "offline"
@@ -88,7 +88,7 @@ TradingPair.tradeable                 # Safe to trade (not expiring soon)
 ```sql
 INSERT INTO trading_pairs VALUES
 (1, 'BTC-USD', 'BTC', 'USD', 'online', 0.00001, 0.01, 0.00001, true, NULL, NULL),
-(2, 'BIT-29AUG25-CDE', 'BTC', 'USD', 'online', 1, 0.01, 1, true, 'CDE', '2025-08-29');
+(2, 'BIT-27JUN26-CDE', 'BTC', 'USD', 'online', 1, 0.01, 1, true, 'CDE', '2026-06-27');
 ```
 
 ### 2. positions

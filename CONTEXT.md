@@ -9,7 +9,7 @@ The price spread between a futures Contract and the underlying spot price. Check
 A 0–100 score on a Signal representing combined certainty. Starts as a technical score (EMA alignment across timeframes, pattern clarity), then adjusted up or down by Sentiment. The Risk Profile defines a minimum threshold — Signals below it do not trigger entry.
 
 ### Contract
-A specific tradeable futures instrument on Coinbase, identified by product ID (e.g. `BIT-29AUG25-CDE` for BTC, `NOL-19JUN26-CDE` for crude oil). Covers both crypto and commodity underlyings. Carries an expiry date; the bot manages rollover before expiration. Maps to the `TradingPair` model (legacy name — industry term is Contract).
+A specific tradeable futures instrument on Coinbase, identified by product ID (e.g. `BIT-27JUN26-CDE` for BTC, `NOL-19JUN26-CDE` for crude oil). Covers both crypto and commodity underlyings. Carries an expiry date; the bot manages rollover before expiration. Maps to the `TradingPair` model (legacy name — industry term is Contract).
 
 ### Day Trade
 A Position tagged at entry as intraday — must be closed within 24 hours. The bot auto-closes these via `EndOfDayPositionClosureJob` to maintain compliance. A per-Position property; day trades and swing trades can coexist.

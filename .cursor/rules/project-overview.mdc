@@ -5,20 +5,22 @@ description: High-level overview of the Coinbase futures trading bot project to 
 
 # Project overview
 
-This is a Rails 7 API-only app that implements a Coinbase futures trading bot. It uses PostgreSQL for state and GoodJob for background processing.
+Rails 8 API-first app implementing a Coinbase futures trading bot. PostgreSQL for state, GoodJob for background processing. HTML UI routes exist for positions, chat, and the GoodJob dashboard.
 
-- Rails: 7.2.x (API-only)
-- Ruby: 3.2.4
+- Rails: 8.1.x (`Gemfile.lock`)
+- Ruby: 3.2.4 (`.ruby-version`)
 - DB: PostgreSQL via `ENV['DATABASE_URL']`
-- Jobs: Active Job with `:good_job` adapter, dashboard mounted at `/good_job` in development
+- Jobs: Active Job with `:good_job` adapter; dashboard at `/jobs` (basic auth outside local dev)
 
-Core services to implement:
-- Market data subscriber (ingest and normalize Coinbase futures feeds)
-- Signal generation (strategy logic)
-- Execution (order placement, risk controls, kill switch)
-- Reconciliation (positions, PnL, drift correction)
+Implemented subsystems (see `AGENTS.md` for detail):
+- Market data (REST + WebSocket subscribers, ticks, candles)
+- Signal generation (multi-timeframe strategies, realtime evaluator)
+- Execution and trading (Coinbase positions, day/swing managers, kill switch)
+- Reconciliation (position import/reconcile, PnL)
+- Operator surfaces (TUI `bin/futuresbot`, chat, positions web UI, Slack)
+- Observability (Sentry, health at `/up` and `/health`)
 
 Operational concerns:
-- Health checks at `/up`
-- Metrics and observability (to be added)
-- Safe rollout with branch protection and CI (RuboCop, Brakeman)
+- CI: StandardRB, Brakeman, bundler-audit, parallel RSpec
+- Issue tracking: GitHub Issues (primary)
+- Agent reference: `AGENTS.md` over stale wiki prose

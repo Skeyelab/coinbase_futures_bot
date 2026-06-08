@@ -7,7 +7,7 @@ This guide covers the development workflow, setup instructions, and best practic
 ## Prerequisites
 
 ### System Requirements
-- **Ruby**: 3.2.2 (managed via RVM)
+- **Ruby**: 3.2.4 (managed via RVM; see `.ruby-version`)
 - **PostgreSQL**: 13+ (local or remote)
 - **Git**: Latest version
 - **RVM**: Ruby Version Manager
@@ -28,7 +28,7 @@ cd coinbase_futures_bot
 ### 2. Ruby Environment Setup
 ```bash
 # Install Ruby version and create gemset
-rvm use ruby-3.2.2@coinbase_futures_bot --create
+rvm use ruby-3.2.4@coinbase_futures_bot --create
 
 # Install dependencies
 bundle install
@@ -159,7 +159,7 @@ bin/rails db:migrate:status
 #### Job Management
 ```bash
 # View GoodJob dashboard
-open http://localhost:3000/good_job
+open http://localhost:3000/jobs
 
 # Run specific job
 bin/rails console
@@ -609,7 +609,7 @@ Coinbase::Client.new.test_auth
 - [Configuration Guide](configuration.md)
 
 #### Development Team
-- Create issues in Linear (FuturesBot project)
+- Create issues in [GitHub Issues](https://github.com/Skeyelab/coinbase_futures_bot/issues) (optional: Linear FuturesBot project for planning)
 - Use GitHub Discussions for questions
 - Check existing documentation first
 

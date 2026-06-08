@@ -189,11 +189,17 @@ curl -X GET "http://localhost:3000/sentiment/aggregates?limit=5" | jq
 
 ## Development-Only Endpoints
 
-### GET /good_job (Development Only)
+### GET /jobs (GoodJob Dashboard)
+
+Mounted at `/jobs` (see `config/routes.rb`). Unauthenticated in local development; HTTP Basic auth elsewhere (`GOOD_JOB_USERNAME`, `GOOD_JOB_PASSWORD`).
+
+```
+http://localhost:3000/jobs
+```
 
 **Description:** GoodJob dashboard for monitoring background jobs.
 
-**Access:** Only available in development environment
+**Access:** Available in all environments; HTTP Basic auth required outside local development
 
 **Features:**
 - Job queue monitoring
@@ -203,7 +209,7 @@ curl -X GET "http://localhost:3000/sentiment/aggregates?limit=5" | jq
 
 **Example:**
 ```
-http://localhost:3000/good_job
+http://localhost:3000/jobs
 ```
 
 ### GET /boom (Development Only)

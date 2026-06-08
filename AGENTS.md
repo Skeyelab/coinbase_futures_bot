@@ -139,7 +139,7 @@
 
 ## Domain-specific notes agents usually miss
 
-- Futures contract handling is central. Many services assume monthly contract IDs like `BIT-29AUG25-CDE` / `ET-29AUG25-CDE`, not perpetuals.
+- Futures contract handling is central. Many services assume monthly contract IDs like `BIT-27JUN26-CDE` / `ET-27JUN26-CDE`, not perpetuals.
 - `Position#get_current_market_price` and related logic prefer recent `Tick` data, then recent `1m` candles, then give up. Many position-management features depend on that fallback chain.
 - `day_trading:*` Rake tasks include interactive confirmation paths; use `FORCE=true` for non-interactive operation where supported.
 - `realtime:signals` starts market data subscriptions and then schedules repeated evaluation via `RealTimeSignalJob.start_realtime_evaluation`.

@@ -66,7 +66,7 @@ Toggled with `p`.  Shows up to 15 most-recently opened positions:
 | Column | Description |
 |--------|-------------|
 | ID | Database ID |
-| Product | Futures or spot product ID (e.g. `BIT-29AUG25-CDE`) |
+| Product | Futures or spot product ID (e.g. `BIT-27JUN26-CDE`) |
 | Side | `LONG` (green) or `SHORT` (red) |
 | Entry | Entry price |
 | Size | Position size |

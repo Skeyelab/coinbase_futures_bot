@@ -2,7 +2,7 @@
 
 ## System Architecture
 
-The coinbase_futures_bot is a Rails 8.0 API-only application designed for automated cryptocurrency futures trading. The system follows a modular architecture with clear separation of concerns.
+The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes for positions/chat added on top) designed for automated cryptocurrency futures trading. The system follows a modular architecture with clear separation of concerns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -164,8 +164,8 @@ News APIs → Sentiment Events → Scoring → Aggregation → Signal Filtering
 ## Technology Stack
 
 ### Core Framework
-- **Rails 8.0.x**: API-only application framework
-- **Ruby 3.2.2**: Programming language
+- **Rails 8.1**: API-first application framework
+- **Ruby 3.2.4**: Programming language
 - **PostgreSQL**: Primary database
 
 ### Background Processing
@@ -221,4 +221,4 @@ News APIs → Sentiment Events → Scoring → Aggregation → Signal Filtering
 
 ## Important Notes
 
-**Current Month Futures Only**: The project exclusively handles current month futures contracts (e.g., BIT-29AUG25-CDE, ET-29AUG25-CDE). Perpetual contracts are not supported. The system includes automatic contract discovery, rollover management, and expiration handling for monthly futures.
+**Current Month Futures Only**: The project exclusively handles current month futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`). Perpetual contracts are not supported. The system includes automatic contract discovery, rollover management, and expiration handling for monthly futures.

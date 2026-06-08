@@ -507,7 +507,7 @@ bin/rake signals:generate
 
 ### GoodJob Dashboard
 
-**URL**: `http://localhost:3000/good_job` (development only)
+**URL**: `http://localhost:3000/jobs` (basic auth in non-local environments)
 
 **Features**:
 - Job queue monitoring

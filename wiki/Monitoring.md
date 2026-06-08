@@ -39,7 +39,7 @@ bundle exec good_job start
 Development dashboard:
 
 ```text
-http://localhost:3000/good_job
+http://localhost:3000/jobs
 ```
 
 Use it to inspect:

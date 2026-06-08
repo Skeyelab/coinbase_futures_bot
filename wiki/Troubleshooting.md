@@ -155,7 +155,7 @@ GoodJob::Job.where(finished_at: nil).where("created_at < ?", 1.hour.ago).destroy
 **Solutions:**
 ```bash
 # Check GoodJob dashboard
-open http://localhost:3000/good_job
+open http://localhost:3000/jobs
 
 # View recent job errors
 bin/rails console
