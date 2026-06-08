@@ -11,6 +11,19 @@ RSpec.describe CalibrationJob, type: :job do
   let(:mock_simulator) { instance_double(PaperTrading::ExchangeSimulator) }
   let(:mock_strategy) { instance_double(Strategy::Pullback1h) }
 
+  def stub_calibration_candles(symbol, candles)
+    symbol_scope = double("symbol_scope")
+    hourly_scope = double("hourly_scope")
+    filtered_scope = double("filtered_scope")
+    ordered_scope = double("ordered_scope")
+
+    allow(Candle).to receive(:for_symbol).with(symbol).and_return(symbol_scope)
+    allow(symbol_scope).to receive(:hourly).and_return(hourly_scope)
+    allow(hourly_scope).to receive(:where).with("timestamp >= ?", anything).and_return(filtered_scope)
+    allow(filtered_scope).to receive(:order).with(:timestamp).and_return(ordered_scope)
+    allow(ordered_scope).to receive(:to_a).and_return(candles)
+  end
+
   before do
     # Mock Rails logger to avoid noise in test output
     allow(Rails.logger).to receive(:info)
@@ -85,7 +98,7 @@ RSpec.describe CalibrationJob, type: :job do
       it "calls grid_search with retrieved candles" do
         # Mock the candle query to return exactly what we expect
         mock_candles = create_sample_candles(300)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :where, :order, :to_a).and_return(mock_candles)
+        stub_calibration_candles(enabled_pair.product_id, mock_candles)
 
         expect(job).to receive(:grid_search).with(mock_candles).and_return({
           tp_target: 0.006, sl_target: 0.004, pnl: 11_000.0
@@ -97,7 +110,7 @@ RSpec.describe CalibrationJob, type: :job do
       it "logs the best parameters found" do
         # Mock the candle query to return exactly what we expect
         mock_candles = create_sample_candles(300)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :where, :order, :to_a).and_return(mock_candles)
+        stub_calibration_candles(enabled_pair.product_id, mock_candles)
 
         best_params = {tp_target: 0.006, sl_target: 0.004, pnl: 11_500.0}
         allow(job).to receive(:grid_search).and_return(best_params)
@@ -141,7 +154,7 @@ RSpec.describe CalibrationJob, type: :job do
       it "processes exactly 300 candles" do
         # Mock the candle query to return exactly what we expect
         mock_candles = create_sample_candles(300)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :where, :order, :to_a).and_return(mock_candles)
+        stub_calibration_candles(enabled_pair.product_id, mock_candles)
 
         expect(job).to receive(:grid_search).with(mock_candles).and_return({
           tp_target: 0.004, sl_target: 0.003, pnl: 10_200.0
@@ -428,7 +441,7 @@ RSpec.describe CalibrationJob, type: :job do
           double("Candle", close: nil, low: 49_000, symbol: enabled_pair.product_id),
           double("Candle", close: 50_000, low: 49_000, symbol: enabled_pair.product_id)
         ]
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :where, :order, :to_a).and_return(corrupted_candles)
+        stub_calibration_candles(enabled_pair.product_id, corrupted_candles)
       end
 
       it "handles corrupted data gracefully" do

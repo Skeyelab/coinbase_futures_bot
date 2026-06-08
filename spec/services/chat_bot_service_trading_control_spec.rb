@@ -100,9 +100,6 @@ RSpec.describe ChatBotService, type: :service do
 
       before do
         allow(ai_service).to receive(:process_command).and_return(ai_response)
-        # Mock Position model
-        allow(Position).to receive_message_chain(:open, :day_trading).and_return([])
-        allow(Position).to receive_message_chain(:open, :swing_trading).and_return([])
       end
 
       it "executes emergency stop and returns detailed message" do
@@ -116,11 +113,8 @@ RSpec.describe ChatBotService, type: :service do
       end
 
       context "with open positions" do
-        let(:mock_position1) { instance_double(Position, product_id: "BTC-PERP") }
-        let(:mock_position2) { instance_double(Position, product_id: "ETH-PERP") }
-
         before do
-          allow(Position).to receive_message_chain(:open, :day_trading).and_return([mock_position1, mock_position2])
+          create_list(:position, 2, product_id: "BTC-USD")
         end
 
         it "counts positions to be closed" do
@@ -138,9 +132,6 @@ RSpec.describe ChatBotService, type: :service do
         allow(ai_service).to receive(:process_command).and_return(ai_response)
         allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "10000").and_return("25000")
         allow(ENV).to receive(:fetch).with("RISK_PER_TRADE_PERCENT", "2").and_return("1.5")
-        # Mock Position model
-        allow(Position).to receive_message_chain(:open, :day_trading).and_return([])
-        allow(Position).to receive_message_chain(:open, :swing_trading).and_return([])
       end
 
       it "returns position sizing information" do

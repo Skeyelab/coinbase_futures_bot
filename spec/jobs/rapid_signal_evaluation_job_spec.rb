@@ -14,6 +14,12 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
   let(:mock_positions_service) { instance_double(Trading::CoinbasePositions) }
   let(:mock_logger) { instance_double(ActiveSupport::Logger) }
 
+  def create_open_positions_for(asset, count)
+    count.times do |index|
+      create(:position, product_id: "#{asset}-USD-#{index}")
+    end
+  end
+
   before do
     allow(Rails).to receive(:logger).and_return(mock_logger)
     allow(mock_logger).to receive(:debug)
@@ -170,7 +176,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "executes high-confidence signals" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         expect(mock_positions_service).to receive(:open_position).with(
@@ -189,7 +194,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "creates position tracking record on successful execution" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         expect {
@@ -210,7 +214,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "logs successful signal execution" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
@@ -226,7 +229,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "sends position alert on successful execution" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
@@ -330,7 +332,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({
           success: false,
           error: "Insufficient funds"
@@ -357,7 +358,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_raise(StandardError, "API timeout")
 
         expect {
@@ -461,7 +461,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
@@ -492,7 +491,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         ]
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         signals.each_with_index do |signal, index|
@@ -517,7 +515,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         ]
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
 
         signals_with_confidence.each_with_index do |test_case, index|
           # Create a fresh job instance for each test case
@@ -559,7 +556,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
 
         # Test BTC max positions (2)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(2)
+        create_open_positions_for("BTC", 2)
 
         expect(mock_positions_service).not_to receive(:open_position)
 
@@ -582,7 +579,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(large_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
 
         expect(mock_positions_service).not_to receive(:open_position)
 
@@ -602,7 +598,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         assets_and_contracts.each do |test_data|
           allow(mock_contract_manager).to receive(:current_month_contract)
             .with(test_data[:asset]).and_return(test_data[:contract])
-          allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
           allow(mock_strategy).to receive(:signal).and_return({
             side: "LONG",
             quantity: 1,
@@ -637,7 +632,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(
@@ -667,7 +661,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(
@@ -699,7 +692,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         job.perform(
@@ -750,7 +742,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(threshold_signal)
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         expect(mock_positions_service).to receive(:open_position)
@@ -837,18 +828,16 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       end
 
       it "returns false when at max positions" do
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(2)
+        create_open_positions_for("BTC", 2)
         expect(job_instance.send(:should_execute_signal?, signal)).to be false
       end
 
       it "returns false for insufficient buying power" do
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         large_signal = signal.merge(quantity: 15)
         expect(job_instance.send(:should_execute_signal?, large_signal)).to be false
       end
 
       it "returns true for valid high confidence signals" do
-        allow(Position).to receive_message_chain(:open, :by_asset, :count).and_return(0)
         expect(job_instance.send(:should_execute_signal?, signal)).to be true
       end
     end

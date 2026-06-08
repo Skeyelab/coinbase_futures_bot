@@ -34,6 +34,21 @@ RSpec.describe PaperTradingJob, type: :job do
   let(:mock_simulator) { instance_double("PaperTrading::ExchangeSimulator") }
   let(:mock_strategy) { instance_double("Strategy::Pullback1h") }
 
+  def stub_hourly_candles(candles_by_symbol)
+    allow(Candle).to receive(:for_symbol) do |symbol|
+      candles = candles_by_symbol.fetch(symbol, candles_by_symbol.fetch(:default, []))
+      symbol_scope = double("symbol_scope")
+      hourly_scope = double("hourly_scope")
+      ordered_scope = double("ordered_scope")
+
+      allow(symbol_scope).to receive(:hourly).and_return(hourly_scope)
+      allow(hourly_scope).to receive(:order).with(:timestamp).and_return(ordered_scope)
+      allow(ordered_scope).to receive(:last).with(300).and_return(candles)
+
+      symbol_scope
+    end
+  end
+
   # Create sample candles for testing
   let(:sample_candles) do
     base_time = 1.day.ago
@@ -86,7 +101,7 @@ RSpec.describe PaperTradingJob, type: :job do
       it "processes all enabled trading pairs" do
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
 
         # Mock simulator methods
         allow(mock_simulator).to receive(:equity_usd).and_return(10_000.0)
@@ -115,7 +130,7 @@ RSpec.describe PaperTradingJob, type: :job do
       it "logs paper trading results for each pair" do
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
 
         allow(mock_simulator).to receive(:equity_usd).and_return(10_500.0)
         allow(mock_simulator).to receive(:place_limit)
@@ -133,7 +148,7 @@ RSpec.describe PaperTradingJob, type: :job do
       it "only processes enabled trading pairs" do
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
 
         allow(mock_simulator).to receive(:equity_usd).and_return(10_000.0)
         allow(mock_simulator).to receive(:place_limit)
@@ -167,7 +182,7 @@ RSpec.describe PaperTradingJob, type: :job do
 
     context "with sufficient candle data" do
       it "creates simulator with correct starting equity" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
         allow(mock_strategy).to receive(:signal).and_return(nil)
@@ -183,7 +198,7 @@ RSpec.describe PaperTradingJob, type: :job do
 
       it "uses custom starting equity from environment" do
         allow(ENV).to receive(:[]).with("PAPER_EQUITY_USD").and_return("25000")
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
         allow(mock_strategy).to receive(:signal).and_return(nil)
@@ -198,7 +213,7 @@ RSpec.describe PaperTradingJob, type: :job do
       end
 
       it "generates signal and places order when signal is valid" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
@@ -234,7 +249,7 @@ RSpec.describe PaperTradingJob, type: :job do
       end
 
       it "does not place order when signal is nil" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
         allow(mock_strategy).to receive(:signal).and_return(nil)
@@ -250,7 +265,7 @@ RSpec.describe PaperTradingJob, type: :job do
       end
 
       it "does not place order when quantity is zero or negative" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
@@ -274,7 +289,7 @@ RSpec.describe PaperTradingJob, type: :job do
       end
 
       it "processes next candle for simulation" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
         allow(mock_strategy).to receive(:signal).and_return(nil)
@@ -296,7 +311,7 @@ RSpec.describe PaperTradingJob, type: :job do
 
     context "with insufficient candle data" do
       it "returns early when less than 200 candles available" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(insufficient_candles)
+        stub_hourly_candles(default: insufficient_candles)
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
@@ -310,7 +325,7 @@ RSpec.describe PaperTradingJob, type: :job do
       end
 
       it "returns early when no candles available" do
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return([])
+        stub_hourly_candles(default: [])
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_return(mock_simulator)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
 
@@ -423,7 +438,7 @@ RSpec.describe PaperTradingJob, type: :job do
     context "with realistic trading simulation" do
       it "executes complete paper trading workflow" do
         # Setup realistic candles
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
 
         # Use real simulator and strategy instances for integration test
         real_simulator = PaperTrading::ExchangeSimulator.new(starting_equity_usd: 10_000.0)
@@ -445,16 +460,11 @@ RSpec.describe PaperTradingJob, type: :job do
         btc_candles = sample_candles.map { |c| c.dup.tap { |candle| candle.symbol = "BTC-USD" } }
         eth_candles = sample_candles.map { |c| c.dup.tap { |candle| candle.symbol = "ETH-USD" } }
 
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last) do |symbol|
-          case symbol
-          when "BTC-USD"
-            btc_candles
-          when "ETH-USD"
-            eth_candles
-          else
-            []
-          end
-        end
+        stub_hourly_candles(
+          "BTC-USD" => btc_candles,
+          "ETH-USD" => eth_candles,
+          :default => []
+        )
 
         # Use real instances for integration testing
         allow(PaperTrading::ExchangeSimulator).to receive(:new).and_call_original
@@ -483,7 +493,7 @@ RSpec.describe PaperTradingJob, type: :job do
           )
         end
 
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(volatile_candles)
+        stub_hourly_candles(default: volatile_candles)
 
         expect { described_class.perform_now }.not_to raise_error
       end
@@ -494,7 +504,7 @@ RSpec.describe PaperTradingJob, type: :job do
           candle.dup.tap { |c| c.volume = 10 }  # Very low volume
         end
 
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(low_volume_candles)
+        stub_hourly_candles(default: low_volume_candles)
 
         expect { described_class.perform_now }.not_to raise_error
       end
@@ -516,7 +526,7 @@ RSpec.describe PaperTradingJob, type: :job do
           )
         end
 
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(large_candle_set)
+        stub_hourly_candles(default: large_candle_set)
 
         start_time = Time.current
         expect { described_class.perform_now }.not_to raise_error
@@ -539,7 +549,7 @@ RSpec.describe PaperTradingJob, type: :job do
         allow(large_simulator).to receive(:orders).and_return(large_orders)
         allow(large_simulator).to receive(:fills).and_return(large_fills)
 
-        allow(Candle).to receive_message_chain(:for_symbol, :hourly, :order, :last).and_return(sample_candles)
+        stub_hourly_candles(default: sample_candles)
         allow(Strategy::Pullback1h).to receive(:new).and_return(mock_strategy)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
