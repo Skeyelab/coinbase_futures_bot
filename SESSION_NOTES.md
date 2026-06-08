@@ -26,6 +26,42 @@
 
 ### Session log
 
+#### 2026-06-08 03:05 UTC
+- Context: Worked GitHub issue `#179` to thin position-management jobs and move orchestration/alert branching into reusable workflow services.
+- Changes:
+  - Added `Trading::PositionManagement::*Workflow` services plus shared `WorkflowResult` / base helper under `app/services/trading/position_management/`.
+  - Refactored day-trading, end-of-day, swing-management, swing-risk, and contract-expiry jobs into thin wrappers that delegate to workflows and preserve queue/failure semantics.
+  - Moved behavioral coverage to new workflow service specs; reduced job specs to delegation/error-wrapper checks.
+- Commands run:
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/day_trading_workflow_spec.rb spec/jobs/day_trading_position_management_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/end_of_day_closure_workflow_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/swing_management_workflow_spec.rb spec/jobs/swing_position_management_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/swing_risk_monitoring_workflow_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/contract_expiry_monitoring_workflow_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/standardrb --fix app/jobs/day_trading_position_management_job.rb app/jobs/end_of_day_position_closure_job.rb app/jobs/swing_position_management_job.rb app/jobs/swing_risk_monitoring_job.rb app/jobs/contract_expiry_monitoring_job.rb app/services/trading/position_management spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb spec/jobs/swing_position_management_job_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb spec/services/trading/position_management`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb spec/jobs/swing_position_management_job_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb`
+- Files touched:
+  - `app/jobs/day_trading_position_management_job.rb`, `app/jobs/end_of_day_position_closure_job.rb`, `app/jobs/swing_position_management_job.rb`, `app/jobs/swing_risk_monitoring_job.rb`, `app/jobs/contract_expiry_monitoring_job.rb`
+  - `app/services/trading/position_management/*`
+  - `spec/jobs/day_trading_position_management_job_spec.rb`, `spec/jobs/end_of_day_position_closure_job_spec.rb`, `spec/jobs/swing_position_management_job_spec.rb`, `spec/jobs/swing_risk_monitoring_job_spec.rb`, `spec/jobs/contract_expiry_monitoring_job_spec.rb`
+  - `spec/services/trading/position_management/*`, `SESSION_NOTES.md`
+- Next steps:
+  - Review resulting workflow seams against adjacent CLI/rake entrypoints if you want to reuse them outside ActiveJob next.
+
+#### 2026-06-08 03:20 UTC
+- Context: Converted repository Conductor config from legacy `conductor.json` to the current shared `.conductor/settings.toml` format from Conductor docs.
+- Changes:
+  - Added `.conductor/settings.toml` with shared `setup` and `run` scripts.
+  - Updated the run script to bind Rails to `0.0.0.0` and honor `CONDUCTOR_PORT`.
+  - Set `scripts.run_mode = "nonconcurrent"` because the project currently shares fixed local DB names and bot/runtime resources.
+  - Removed legacy `conductor.json` to avoid split configuration.
+- Commands run:
+  - `python3 - <<'PY' ... tomllib.load('.conductor/settings.toml') ... PY`
+- Files touched:
+  - `.conductor/settings.toml`, `conductor.json`, `SESSION_NOTES.md`
+- Next steps:
+  - If you later make workspace DB/runtime resources fully isolated, reconsider `run_mode = "concurrent"`.
+
 #### 2026-06-08 02:10 UTC
 - Context: Removed the retired legacy issue-tracking integration and standardized the repo on GitHub issues only.
 - Changes:
