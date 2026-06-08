@@ -60,12 +60,10 @@ module Tui
       when "1", "2", "3", "4", "5"
         @layout = @layout.switch_to(msg.to_s)
         [self, nil]
-      when "p", "P", "left"
-        @layout = @layout.switch_to_tab(:positions)
-        [self, nil]
-      when "s", "S", "right"
-        @layout = @layout.switch_to_tab(:signals)
-        [self, nil]
+      when "t", "T"
+        [self, edit_take_profit_form]
+      when "s", "S"
+        [self, edit_stop_loss_form]
       when "i", "I"
         run_import_async
         [self, nil]
@@ -168,7 +166,7 @@ module Tui
 
     def footer_view
       dim = Lipgloss::Style.new.foreground("240")
-      dim.render("  [1-5] tabs [q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [h]alt")
+      dim.render("  [1-5] tabs [q]uit [r]efresh [t]p [s]l [i]mport [c]lose [o]reconcile [h]alt")
     end
 
     def flash_active?
@@ -216,6 +214,26 @@ module Tui
       Bubbletea.exec(
         -> {
           Tui::Forms::HaltToggle.run
+        },
+        message: TickMessage.new
+      )
+    end
+
+    def edit_take_profit_form
+      Bubbletea.exec(
+        -> {
+          id_str = Gum.input(header: "Edit take-profit", placeholder: "OPEN position id (blank=cancel)")
+          Tui::Forms::EditPositionTarget.run(field: :take_profit, id_str: id_str)
+        },
+        message: TickMessage.new
+      )
+    end
+
+    def edit_stop_loss_form
+      Bubbletea.exec(
+        -> {
+          id_str = Gum.input(header: "Edit stop-loss", placeholder: "OPEN position id (blank=cancel)")
+          Tui::Forms::EditPositionTarget.run(field: :stop_loss, id_str: id_str)
         },
         message: TickMessage.new
       )

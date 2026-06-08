@@ -35,19 +35,27 @@ RSpec.describe Tui::App do
     end
   end
 
-  describe "#update with p key" do
+  describe "#update with 2 key" do
     it "switches to positions tab" do
-      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "p".codepoints)
+      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "2".codepoints)
       app.update(msg)
       expect(app.instance_variable_get(:@layout).active_tab).to eq(:positions)
     end
   end
 
   describe "#update with s key" do
-    it "switches to signals tab" do
+    it "returns an ExecCommand for stop-loss edit" do
       msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "s".codepoints)
-      app.update(msg)
-      expect(app.instance_variable_get(:@layout).active_tab).to eq(:signals)
+      _, cmd = app.update(msg)
+      expect(cmd).to be_a(Bubbletea::ExecCommand)
+    end
+  end
+
+  describe "#update with t key" do
+    it "returns an ExecCommand for take-profit edit" do
+      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "t".codepoints)
+      _, cmd = app.update(msg)
+      expect(cmd).to be_a(Bubbletea::ExecCommand)
     end
   end
 

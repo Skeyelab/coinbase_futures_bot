@@ -60,6 +60,36 @@ RSpec.describe Tui::Components::PositionsTable do
       it "includes product id" do
         expect(table.render).to include("BIT-26JUN26-CDE")
       end
+
+      it "shows unset targets as em dash" do
+        expect(table.render).to include("—")
+      end
+    end
+
+    context "with take-profit and stop-loss targets" do
+      let(:position) do
+        create(:position, :with_tp_sl, product_id: "NOL-19JUN26-CDE", entry_price: 91.62)
+      end
+
+      subject(:table) { described_class.new([position], {}) }
+
+      it "shows formatted take-profit and stop-loss" do
+        rendered = table.render
+        expect(rendered).to include("51000.00")
+        expect(rendered).to include("49000.00")
+      end
+    end
+
+    context "with trailing stop enabled" do
+      let(:position) do
+        create(:position, stop_loss: 88.5, trailing_stop_enabled: true, entry_price: 91.62)
+      end
+
+      subject(:table) { described_class.new([position], {}) }
+
+      it "marks stop-loss with trailing badge" do
+        expect(table.render).to include("88.50T")
+      end
     end
 
     context "when stored pnl is zero but a live price is available" do
