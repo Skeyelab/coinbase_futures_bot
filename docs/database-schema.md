@@ -68,7 +68,7 @@ Stores metadata about trading instruments, including both spot and futures contr
 | Column | Type | Description | Constraints |
 |--------|------|-------------|-------------|
 | id | bigint | Primary key | NOT NULL, AUTO_INCREMENT |
-| product_id | string | Trading pair identifier (e.g., "BTC-USD", "BTC-29AUG25-CDE") | NOT NULL, UNIQUE |
+| product_id | string | Trading pair identifier (e.g., "BTC-USD", "BIT-27JUN26-CDE") | NOT NULL, UNIQUE |
 | base_currency | string | Base currency symbol (e.g., "BTC") | |
 | quote_currency | string | Quote currency symbol (e.g., "USD") | |
 | contract_type | string | Contract type for futures (e.g., "CDE") | |
@@ -143,7 +143,7 @@ Stores trading position information for both day trading and swing trading strat
 | Column | Type | Description | Constraints |
 |--------|------|-------------|-------------|
 | id | bigint | Primary key | NOT NULL, AUTO_INCREMENT |
-| product_id | string | Trading pair identifier (e.g., "BTC-USD", "BTC-29AUG25-CDE") | NOT NULL |
+| product_id | string | Trading pair identifier (e.g., "BTC-USD", "BIT-27JUN26-CDE") | NOT NULL |
 | side | string | Position side ("LONG" or "SHORT") | NOT NULL, inclusion: ["LONG", "SHORT"] |
 | size | decimal(20,10) | Position size in base currency | NOT NULL, > 0 |
 | entry_price | decimal(20,10) | Price at which position was opened | NOT NULL, > 0 |

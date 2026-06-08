@@ -13,7 +13,7 @@ The coinbase_futures_bot uses **GoodJob** as its background job processing syste
 │  • PostgreSQL-based job queue                                  │
 │  • Cron scheduling with sub-minute precision                   │
 │  • Job retry and error handling                                │
-│  • Dashboard UI at /good_job (development)                     │
+│  • Dashboard UI at /jobs (basic auth outside local dev)        │
 │  • Concurrent job processing                                   │
 └─────────────────────────────────────────────────────────────────┘
                                     │
@@ -522,7 +522,7 @@ Failed jobs are handled gracefully:
 
 ### Job Dashboard
 
-GoodJob provides a web dashboard at `/good_job` (development only):
+GoodJob provides a web dashboard at `/jobs` (see `config/routes.rb`). Unauthenticated in local development; HTTP Basic auth elsewhere via `GOOD_JOB_USERNAME` / `GOOD_JOB_PASSWORD`.
 
 - **Job Status**: View running, queued, and failed jobs
 - **Performance Metrics**: Job execution times and throughput

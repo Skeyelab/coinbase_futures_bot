@@ -2,7 +2,7 @@
 
 ## Overview
 
-The coinbase_futures_bot maintains a comprehensive test suite with **94 test files** covering all critical functionality. The testing strategy emphasizes reliability, maintainability, and fast execution with **RSpec** as the primary testing framework.
+The coinbase_futures_bot maintains a comprehensive test suite with **~109 spec files** and **~2,400 examples** covering critical functionality. The testing strategy emphasizes reliability, maintainability, and fast execution with **RSpec** as the primary testing framework. CI runs **`bin/parallel_rspec`**.
 
 ## Testing Framework Stack
 
@@ -652,10 +652,10 @@ bundle exec rspec --tag ~slow  # Exclude slow tests
 
 #### Parallel Test Execution
 ```bash
-# Run tests in parallel
-bundle exec parallel_rspec
+# Run tests in parallel (matches CI)
+bin/parallel_rspec
 
-# Run with specific number of processes
+# Or via bundle exec with explicit config
 bundle exec parallel_rspec -n 4
 
 # Run specific files in parallel
@@ -715,12 +715,13 @@ end
 
 ### Current Coverage Statistics
 
-Based on the test suite analysis:
+Based on the test suite analysis (run `bundle exec rspec --dry-run` for current counts):
 
-- **Total Test Files**: 94 test files
-- **Test Examples**: 141+ test examples
-- **Target Coverage**: 85% line coverage, 75% branch coverage
-- **Current Focus**: Critical business logic and API endpoints
+- **Total Test Files**: ~109 spec files
+- **Test Examples**: ~2,400 examples
+- **CI runner**: `bin/parallel_rspec`
+- **Local single-file debug**: `bundle exec rspec spec/path/to/file_spec.rb`
+- **Target Coverage**: 85% line coverage, 75% branch coverage (aspirational; see SimpleCov output)
 
 ### Coverage by Component
 

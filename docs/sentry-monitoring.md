@@ -658,7 +658,7 @@ end
 
 GoodJob dashboard shows errors that are also tracked in Sentry:
 
-- Development: `http://localhost:3000/good_job`
+- Development: `http://localhost:3000/jobs`
 - Sentry provides additional context and aggregation
 - Cross-reference job IDs between systems
 

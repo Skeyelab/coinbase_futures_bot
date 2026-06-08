@@ -2,7 +2,7 @@
 
 ## Overview
 
-The coinbase_futures_bot provides a comprehensive REST API for accessing trading signals, position data, sentiment analysis, and system health information. The API is built with Rails 8.0 and follows RESTful conventions with JSON responses.
+The coinbase_futures_bot provides a comprehensive REST API for accessing trading signals, position data, sentiment analysis, and system health information. The API is built with Rails 8.1 and follows RESTful conventions with JSON responses.
 
 ## Base URL
 

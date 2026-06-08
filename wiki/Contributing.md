@@ -497,15 +497,13 @@ Pull requests must meet these requirements before merging:
 
 ## Issue Tracking
 
-### 1. Linear Integration
+### GitHub Issues (primary)
 
-All issues are tracked in Linear under the **FuturesBot** project:
+Bug reports and feature requests: [GitHub Issues](https://github.com/Skeyelab/coinbase_futures_bot/issues)
 
-- **Project URL**: [FuturesBot Project](https://linear.app/ericdahl/project/futuresbot-c639185ec497/overview)
-- **Team**: FUT
-- **Labels**: bug, feature, enhancement, trading, risk, documentation
+### Linear (optional planning)
 
-### 2. Issue Creation Guidelines
+Some planning work may also appear in the **FuturesBot** Linear project: [FuturesBot Project](https://linear.app/ericdahl/project/futuresbot-c639185ec497/overview)
 
 #### Bug Reports
 ```markdown
@@ -527,7 +525,7 @@ What actually happened.
 ## Environment
 - OS: [e.g., macOS 12.0]
 - Ruby version: [e.g., 3.2.4]
-- Rails version: [e.g., 8.0.2]
+- Rails version: [e.g., 8.1.3]
 
 ## Additional Context
 Add any other context about the problem here.
@@ -739,7 +737,8 @@ git push upstream v1.2.3
 
 ### 2. Communication Channels
 - **GitHub Issues**: Bug reports and feature requests
-- **Linear**: Project management and issue tracking
+- **GitHub Issues**: Primary bug and feature tracking
+- **Linear**: Optional FuturesBot project planning
 - **Pull Request Comments**: Code-specific discussions
 - **Slack** (if configured): Real-time communication
 

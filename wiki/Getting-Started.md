@@ -252,7 +252,7 @@ The application will be available at:
 - **Web Interface**: http://localhost:3000
 - **API Health Check**: http://localhost:3000/up
 - **Extended Health**: http://localhost:3000/health
-- **GoodJob Dashboard**: http://localhost:3000/good_job (development only)
+- **GoodJob Dashboard**: http://localhost:3000/jobs (no auth in local dev; HTTP Basic auth in production)
 
 ### 2. Start Background Jobs
 
@@ -514,7 +514,7 @@ bundle update
 #### Job Processing Issues
 ```bash
 # Check GoodJob dashboard
-open http://localhost:3000/good_job
+open http://localhost:3000/jobs
 
 # Clear stuck jobs
 bin/rails console

@@ -157,7 +157,7 @@ Use rake for one-shot or scheduled operational flows:
 ```bash
 bin/rake realtime:signals
 bin/rake realtime:evaluate
-bin/rake "realtime:evaluate_symbol[BIT-29AUG25-CDE]"
+bin/rake "realtime:evaluate_symbol[BIT-27JUN26-CDE]"
 bin/rake realtime:stats
 bin/rake day_trading:manage
 bin/rake day_trading:pnl

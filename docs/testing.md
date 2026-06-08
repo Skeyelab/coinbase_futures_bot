@@ -150,7 +150,7 @@ end
 
 it 'identifies current month contracts' do
   august_contract = TradingPair.create!(
-    product_id: 'BIT-29AUG25-CDE',
+    product_id: 'BIT-27JUN26-CDE',
     expiration_date: Date.new(2025, 8, 29)
   )
   expect(august_contract.current_month?).to be true

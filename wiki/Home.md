@@ -26,7 +26,7 @@ Welcome to the documentation wiki for the **Coinbase Futures Bot**. This repo is
 
 ## Project Snapshot
 
-- **Runtime**: Ruby `3.2.4`, Rails `8.x`, PostgreSQL, GoodJob, RSpec, StandardRB, Brakeman
+- **Runtime**: Ruby `3.2.4`, Rails `8.1`, PostgreSQL, GoodJob, RSpec (~2,400 examples), StandardRB, Brakeman
 - **Trading model**: both day-trading and swing-trading positions exist
 - **Contract model**: repo is centered on expiring Coinbase futures contracts, not perpetuals
 - **Primary operator surfaces**: `bin/futuresbot`, `bin/rake`, `/positions`, `/signals/*`, `/health`, `/up`
@@ -43,6 +43,7 @@ Welcome to the documentation wiki for the **Coinbase Futures Bot**. This repo is
 ### Web / HTTP
 - `/up` - basic Rails health
 - `/health` - extended application health
+- `/jobs` - GoodJob dashboard (basic auth outside local dev)
 - `/positions` - server-rendered positions UI
 - `/signals/active`, `/signals/high_confidence`, `/signals/recent`, `/signals/stats`, `/signals/health`
 - `/api/positions`, `/api/positions/summary`, `/api/positions/exposure`
@@ -59,4 +60,4 @@ Welcome to the documentation wiki for the **Coinbase Futures Bot**. This repo is
 
 ---
 
-**Last Updated**: 2026-06-04
+**Last Updated**: 2026-06-08

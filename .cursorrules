@@ -10,7 +10,7 @@ This is the **coinbase_futures_bot** repository located at:
 - **Repository Name**: coinbase_futures_bot
 - **Owner**: Skeyelab
 - **Description**: Coinbase futures trading bot implementation
-- **Technology Stack**: Rails 7 API, PostgreSQL, GoodJob, Coinbase Advanced Trade API
+- **Technology Stack**: Rails 8 API, PostgreSQL, GoodJob, Coinbase Advanced Trade API
 
 ## Important Notes for Cursor Agents
 1. **ALWAYS** work within this specific repository context

@@ -75,7 +75,7 @@ With GoodJob running, the repo schedules day-trading automation through backgrou
 GoodJob dashboard in development:
 
 ```text
-http://localhost:3000/good_job
+http://localhost:3000/jobs
 ```
 
 ## Position and Exposure Views

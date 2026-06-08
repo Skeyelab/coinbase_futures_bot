@@ -74,7 +74,7 @@ curl -H "X-API-Key: $SIGNALS_API_KEY" http://localhost:3000/signals/active
 curl -H "X-API-Key: $SIGNALS_API_KEY" "http://localhost:3000/signals/high_confidence?threshold=80"
 curl -H "X-API-Key: $SIGNALS_API_KEY" "http://localhost:3000/signals/recent?hours=1"
 curl -H "X-API-Key: $SIGNALS_API_KEY" "http://localhost:3000/signals/stats?hours=24"
-curl -H "X-API-Key: $SIGNALS_API_KEY" "http://localhost:3000/signals?symbol=BIT-29AUG25-CDE&min_confidence=70"
+curl -H "X-API-Key: $SIGNALS_API_KEY" "http://localhost:3000/signals?symbol=BIT-27JUN26-CDE&min_confidence=70"
 ```
 
 Sentiment aggregates:
@@ -96,9 +96,9 @@ Evaluate one symbol / product id:
 
 ```bash
 curl -X POST -H "X-API-Key: $SIGNALS_API_KEY" \
-  "http://localhost:3000/signals/evaluate?symbol=BIT-29AUG25-CDE"
+  "http://localhost:3000/signals/evaluate?symbol=BIT-27JUN26-CDE"
 
-bin/rake "realtime:evaluate_symbol[BIT-29AUG25-CDE]"
+bin/rake "realtime:evaluate_symbol[BIT-27JUN26-CDE]"
 ```
 
 ### Market Data Tasks
