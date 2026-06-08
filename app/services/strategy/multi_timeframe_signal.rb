@@ -286,7 +286,8 @@ module Strategy
       return true unless enabled
 
       threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
-      z = latest_sentiment_z(symbol)
+      sentiment_symbol = Sentiment::ContractSymbolMapper.sentiment_symbol_for(symbol) || symbol
+      z = latest_sentiment_z(sentiment_symbol)
       return false if z.abs < threshold
 
       (side == :long && z > 0) || (side == :short && z < 0) ||
