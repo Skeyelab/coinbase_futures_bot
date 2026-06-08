@@ -55,28 +55,27 @@ namespace :real_time do
     puts "\nReal-time monitoring setup complete!"
   end
 
-  desc "Start real-time monitoring for BTC-USD and ETH-USD"
+  desc "Start real-time monitoring for enabled futures contracts (and BTC/ETH spot when configured)"
   task start: :environment do
-    puts "Starting real-time monitoring for BTC-USD and ETH-USD..."
+    futures_product_ids = MarketData::RealtimeSubscriptionCatalog.futures_product_ids
+    spot_product_ids = MarketData::RealtimeSubscriptionCatalog.spot_product_ids
 
-    # Verify pairs exist
-    unless Contract.find_by(product_id: "BTC-USD")&.enabled?
-      puts "ERROR: BTC-USD pair not found or not enabled. Run 'rake real_time:setup_pairs' first."
+    if futures_product_ids.empty? && spot_product_ids.empty?
+      puts "ERROR: No enabled futures contracts or supported spot pairs found."
+      puts "Enable contracts in the DB or open a position, then retry."
       exit 1
     end
 
-    unless Contract.find_by(product_id: "ETH-USD")&.enabled?
-      puts "ERROR: ETH-USD pair not found or not enabled. Run 'rake real_time:setup_pairs' first."
-      exit 1
-    end
+    puts "Starting real-time monitoring..."
+    puts "  Futures: #{futures_product_ids.join(", ").presence || "none"}"
+    puts "  Spot: #{spot_product_ids.join(", ").presence || "none"}"
 
-    # Start real-time monitoring job
     if ENV["INLINE"] == "1"
       puts "Starting inline real-time monitoring..."
-      RealTimeMonitoringJob.perform_now(product_ids: %w[BTC-USD ETH-USD])
+      RealTimeMonitoringJob.perform_now
     else
       puts "Enqueueing real-time monitoring job..."
-      RealTimeMonitoringJob.perform_later(product_ids: %w[BTC-USD ETH-USD])
+      RealTimeMonitoringJob.perform_later
       puts "✓ Real-time monitoring job enqueued"
     end
   end

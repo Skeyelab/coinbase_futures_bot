@@ -37,7 +37,7 @@ RSpec.describe Tui::Components::TabBar do
 
   describe "#render" do
     it "renders all five tabs" do
-      expect(bar.render).to include("Overview").and include("Health")
+      expect(bar.render).to include("Overview").and include("Ops")
     end
 
     it "includes tab number hints" do

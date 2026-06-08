@@ -127,8 +127,8 @@ RSpec.describe FuturesBotLauncher do
           expect(launcher.spot_thread).to be_nil
         end
 
-        it "logs skipped spot products" do
-          expect(logger).to receive(:info).with(/Skipping spot subscription for unsupported products: OIL-USD/)
+        it "logs futures-only market data startup" do
+          expect(logger).to receive(:info).with(/Starting futures market data subscriptions for: NOL-19JUN26-CDE/)
           launcher.start
         end
 
