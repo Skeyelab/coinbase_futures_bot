@@ -12,7 +12,13 @@ namespace :positions do
       puts "\u2705 Import complete!"
       puts "   📥 Imported: #{result[:imported]} new positions"
       puts "   🔄 Updated: #{result[:updated]} existing positions"
+      puts "   🔗 Reconciled: #{result[:reconciled]} closed-on-exchange"
       puts "   📊 Total on Coinbase: #{result[:total_coinbase]}"
+
+      if result[:reconcile_errors]&.any?
+        puts "   \u26A0\uFE0F  Reconcile errors:"
+        result[:reconcile_errors].each { |error| puts "      - #{error}" }
+      end
 
       if result[:errors].any?
         puts "   \u26A0\uFE0F  Errors:"

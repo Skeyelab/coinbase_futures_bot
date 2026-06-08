@@ -6,7 +6,11 @@ module Tui
   module Forms
     class Reconcile
       def self.run
-        confirmed = Gum.confirm("Close local OPEN rows missing from Coinbase?", affirmative: "Reconcile", negative: "Cancel")
+        confirmed = Gum.confirm(
+          "Close local OPEN rows missing from Coinbase? (Import [i] also auto-reconciles)",
+          affirmative: "Reconcile",
+          negative: "Cancel"
+        )
         return unless confirmed
 
         svc = PositionReconcileService.new

@@ -26,7 +26,12 @@ class StartupPositionSync
   end
 
   def success_message(result)
-    "Positions synced from Coinbase (#{result[:imported]} new, #{result[:updated]} updated, " \
-      "#{result[:total_coinbase]} on exchange)"
+    parts = [
+      "#{result[:imported]} new",
+      "#{result[:updated]} updated",
+      "#{result[:reconciled] || 0} reconciled",
+      "#{result[:total_coinbase]} on exchange"
+    ]
+    "Positions synced from Coinbase (#{parts.join(", ")})"
   end
 end
