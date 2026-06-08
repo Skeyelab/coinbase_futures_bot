@@ -15,9 +15,7 @@ module Tui
       @data = {}
       @flash = nil
       @flash_until = nil
-      @show_positions = true
-      @show_signals = true
-      @width = 120
+      @layout = Tui::Layout.new
     end
 
     def init
@@ -32,7 +30,7 @@ module Tui
         refresh_data
         [self, schedule_tick]
       when Bubbletea::WindowSizeMessage
-        @width = message.width
+        @layout = @layout.with_width(message.width)
         [self, nil]
       else
         [self, nil]
@@ -42,10 +40,9 @@ module Tui
     def view
       lines = []
       lines << header_view
+      lines << tab_bar_view
       lines << status_bar_view
-      lines << positions_view if @show_positions
-      lines << signals_view if @show_signals
-      lines << prices_view
+      lines << tab_content_view
       lines << flash_view if flash_active?
       lines << footer_view
       lines.compact.join("\n")
@@ -60,11 +57,14 @@ module Tui
       when "r", "R"
         refresh_data
         [self, nil]
+      when "1", "2", "3", "4", "5"
+        @layout = @layout.switch_to(msg.to_s)
+        [self, nil]
       when "p", "P", "left"
-        @show_positions = !@show_positions
+        @layout = @layout.switch_to_tab(:positions)
         [self, nil]
       when "s", "S", "right"
-        @show_signals = !@show_signals
+        @layout = @layout.switch_to_tab(:signals)
         [self, nil]
       when "i", "I"
         run_import_async
@@ -97,20 +97,60 @@ module Tui
       "#{title_style.render("🤖  FuturesBot")}  #{dim_style.render(ts)}"
     end
 
+    def tab_bar_view
+      Tui::Components::TabBar.new(@layout).render
+    end
+
     def status_bar_view
       Tui::Components::StatusBar.new(@data).render
     end
 
-    def positions_view
-      Tui::Components::PositionsTable.new(@data[:positions] || [], @data[:live_prices] || {}).render
+    def tab_content_view
+      case @layout.active_tab
+      when :overview then overview_view
+      when :positions then framed_positions_view
+      when :signals then framed_signals_view
+      when :market then framed_market_view
+      when :health then health_view
+      end
     end
 
-    def signals_view
-      Tui::Components::SignalsTable.new(@data[:signals] || []).render
+    def overview_view
+      positions = (@data[:positions] || []).first(3)
+      signals = (@data[:signals] || []).first(3)
+      sections = [
+        panel("Positions", positions.size, Tui::Components::PositionsTable.new(positions, @data[:live_prices] || {}, height: 5).render),
+        panel("Signals", signals.size, Tui::Components::SignalsTable.new(signals, height: 5).render),
+        panel("Market", (@data[:futures_live_prices] || []).size + (@data[:spot_live_prices] || []).size,
+          Tui::Components::PricesPanel.new(@data[:futures_live_prices] || [], @data[:spot_live_prices] || []).render)
+      ]
+      sections.join("\n")
     end
 
-    def prices_view
-      Tui::Components::PricesPanel.new(@data[:futures_live_prices] || [], @data[:spot_live_prices] || []).render
+    def framed_positions_view
+      positions = @data[:positions] || []
+      panel("Positions", positions.size,
+        Tui::Components::PositionsTable.new(positions, @data[:live_prices] || {}).render)
+    end
+
+    def framed_signals_view
+      signals = @data[:signals] || []
+      panel("Signals", signals.size, Tui::Components::SignalsTable.new(signals).render)
+    end
+
+    def framed_market_view
+      futures = @data[:futures_live_prices] || []
+      spot = @data[:spot_live_prices] || []
+      panel("Market", futures.size + spot.size,
+        Tui::Components::PricesPanel.new(futures, spot).render)
+    end
+
+    def health_view
+      panel("Health", nil, Lipgloss::Style.new.foreground("240").render("  Eval, sentiment, and tick freshness — wired in #249"))
+    end
+
+    def panel(title, count, content)
+      Tui::Components::PanelFrame.new(title: title, count: count, width: @layout.width - 2).render(content)
     end
 
     def flash_view
@@ -128,7 +168,7 @@ module Tui
 
     def footer_view
       dim = Lipgloss::Style.new.foreground("240")
-      dim.render("  [q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [h]alt")
+      dim.render("  [1-5] tabs [q]uit [r]efresh [p]os [s]igs [i]mport [c]lose [o]reconcile [h]alt")
     end
 
     def flash_active?

@@ -20,10 +20,10 @@ RSpec.describe Tui::App do
   end
 
   describe "#update with WindowSizeMessage" do
-    it "stores width" do
+    it "stores width on layout" do
       msg = Bubbletea::WindowSizeMessage.new(width: 160, height: 40)
       app.update(msg)
-      expect(app.instance_variable_get(:@width)).to eq(160)
+      expect(app.instance_variable_get(:@layout).width).to eq(160)
     end
   end
 
@@ -36,16 +36,26 @@ RSpec.describe Tui::App do
   end
 
   describe "#update with p key" do
-    it "toggles positions visibility" do
+    it "switches to positions tab" do
       msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "p".codepoints)
-      expect { app.update(msg) }.to change { app.instance_variable_get(:@show_positions) }.from(true).to(false)
+      app.update(msg)
+      expect(app.instance_variable_get(:@layout).active_tab).to eq(:positions)
     end
   end
 
   describe "#update with s key" do
-    it "toggles signals visibility" do
+    it "switches to signals tab" do
       msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "s".codepoints)
-      expect { app.update(msg) }.to change { app.instance_variable_get(:@show_signals) }.from(true).to(false)
+      app.update(msg)
+      expect(app.instance_variable_get(:@layout).active_tab).to eq(:signals)
+    end
+  end
+
+  describe "#update with tab number keys" do
+    it "switches to market tab on 4" do
+      msg = Bubbletea::KeyMessage.new(key_type: Bubbletea::KeyMessage::KEY_RUNES, runes: "4".codepoints)
+      app.update(msg)
+      expect(app.instance_variable_get(:@layout).active_tab).to eq(:market)
     end
   end
 

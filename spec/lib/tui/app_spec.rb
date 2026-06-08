@@ -23,6 +23,10 @@ RSpec.describe Tui::App do
     it "includes FuturesBot header" do
       expect(app.view).to include("FuturesBot")
     end
+
+    it "includes tab bar labels" do
+      expect(app.view).to include("Overview").and include("Health")
+    end
   end
 
   describe "#update with quit key" do
