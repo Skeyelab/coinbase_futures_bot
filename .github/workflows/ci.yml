@@ -325,6 +325,9 @@ jobs:
             coverage/
             coverage/.resultset.json
             coverage/index.html
+            tmp/rspec.xml
+            tmp/spec_summary.log
+            tmp/failing_specs.log
           retention-days: 30
 
       - name: Check coverage thresholds

@@ -26,6 +26,19 @@
 
 ### Session log
 
+#### 2026-06-08 03:45 UTC
+- Context: Improved RSpec CI output for PR `#229` so parallel runs stay compact in stdout while still producing machine-readable and rerun-friendly artifacts.
+- Changes:
+  - Added `RspecJunitFormatter`, `ParallelTests::RSpec::SummaryLogger`, and `ParallelTests::RSpec::FailuresLogger` outputs to `.rspec_parallel`.
+  - Updated CI artifact upload to include `tmp/rspec.xml`, `tmp/spec_summary.log`, and `tmp/failing_specs.log`.
+- Commands run:
+  - `PARALLEL_RSPEC_CONFIG=.parallel_rspec_config.ci ~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/parallel_rspec spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `ls -l tmp/rspec.xml tmp/spec_summary.log tmp/failing_specs.log`
+- Files touched:
+  - `.rspec_parallel`, `.github/workflows/ci.yml`, `SESSION_NOTES.md`
+- Next steps:
+  - If you want GitHub to surface JUnit results inline, wire `tmp/rspec.xml` into a test-report action next.
+
 #### 2026-06-08 03:35 UTC
 - Context: Tightened CI test splitting on PR `#229` after review showed duplicate changed-spec work and runtime balancing was configured but not actually fed by a runtime log.
 - Changes:
