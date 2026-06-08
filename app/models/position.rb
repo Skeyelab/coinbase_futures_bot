@@ -207,13 +207,14 @@ class Position < ApplicationRecord
     )
   end
 
-  def force_close!(close_price, reason = "Day trading closure", close_time = Time.current)
+  def force_close!(close_price, reason = "Day trading closure", close_time = Time.current, pnl: nil)
+    resolved_pnl = pnl.nil? ? calculate_pnl(close_price) : pnl
     update!(
       status: "CLOSED",
       close_time: close_time,
-      pnl: calculate_pnl(close_price)
+      pnl: resolved_pnl
     )
-    Rails.logger.info("Position #{id} force closed: #{reason} at #{close_price}")
+    Rails.logger.info("Position #{id} force closed: #{reason} at #{close_price} pnl=#{resolved_pnl}")
   end
 
   # Class methods

@@ -29,9 +29,9 @@ Current key bindings:
 - `r`, `R`: force refresh
 - `p`, `P`: toggle positions section
 - `s`, `S`: toggle signals section
-- `i`, `I`: import/sync positions from Coinbase
+- `i`, `I`: import/sync positions from Coinbase (also auto-reconciles ghost OPEN rows)
 - `c`, `C`: close an open position
-- `o`, `O`: reconcile local open rows missing from exchange
+- `o`, `O`: manual reconcile (import already auto-reconciles)
 - `h`, `H`: toggle trading halt state
 - `+`, `=` or Up arrow: faster refresh
 - `-` or Down arrow: slower refresh

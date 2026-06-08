@@ -13,13 +13,14 @@ RSpec.describe StartupPositionSync do
       allow(import_service).to receive(:import_positions_from_coinbase).and_return(
         imported: 1,
         updated: 2,
+        reconciled: 1,
         total_coinbase: 4
       )
 
       result = service.call
 
       expect(result.status).to eq(:ok)
-      expect(result.message).to eq("Positions synced from Coinbase (1 new, 2 updated, 4 on exchange)")
+      expect(result.message).to eq("Positions synced from Coinbase (1 new, 2 updated, 1 reconciled, 4 on exchange)")
     end
 
     it "skips when FUTURESBOT_SKIP_POSITION_SYNC is set" do

@@ -3,20 +3,18 @@
 # Marks local OPEN positions CLOSED when they no longer appear on Coinbase
 # futures positions (manual close on exchange, drift, etc.). Does not place orders.
 class PositionReconcileService
+  REASON = "Reconcile: closed on exchange"
+
   def initialize(coinbase_client: nil, logger: Rails.logger)
     @client = coinbase_client || Coinbase::Client.new(logger: logger)
     @logger = logger
   end
 
+  # @param exchange_rows [Array<Hash>, nil] optional Coinbase futures snapshot (avoids refetch)
   # @return [Hash] { closed_count: Integer, closed_ids: Array<Integer>, errors: Array<String> }
-  def reconcile!
-    auth = @client.test_auth
-    unless auth[:advanced_trade][:ok]
-      raise "Coinbase authentication failed: #{auth[:advanced_trade][:message]}"
-    end
-
-    rows = @client.futures_positions
-    open_keys = exchange_open_keys(rows)
+  def reconcile!(exchange_rows: nil)
+    rows = exchange_rows || fetch_exchange_rows
+    open_keys = self.class.exchange_open_keys(rows)
 
     closed_ids = []
     errors = []
@@ -25,8 +23,9 @@ class PositionReconcileService
       key = [position.product_id, position.side]
       next if open_keys.key?(key)
 
-      close_price = position.get_current_market_price || position.entry_price
-      position.force_close!(close_price, "Reconcile: absent from exchange")
+      close_price, market_price_used = resolve_close_price(position)
+      pnl = resolve_close_pnl(position, close_price, market_price_used: market_price_used)
+      position.force_close!(close_price, REASON, pnl: pnl)
       closed_ids << position.id
     rescue => e
       msg = "Position #{position.id}: #{e.message}"
@@ -39,17 +38,14 @@ class PositionReconcileService
     {closed_count: closed_ids.size, closed_ids: closed_ids, errors: errors}
   end
 
-  private
-
-  def exchange_open_keys(rows)
+  def self.exchange_open_keys(rows)
     keys = {}
     Array(rows).each do |cb|
       product_id = cb["product_id"]
       size = cb["number_of_contracts"].to_f
       next if size.zero? || product_id.blank?
 
-      side = cb["side"]&.upcase
-      position_side = normalized_side(side)
+      position_side = SideNormalizer.position(cb["side"]&.upcase)
       next unless position_side
 
       keys[[product_id, position_side]] = true
@@ -57,7 +53,32 @@ class PositionReconcileService
     keys
   end
 
-  def normalized_side(side)
-    SideNormalizer.position(side)
+  private
+
+  def fetch_exchange_rows
+    auth = @client.test_auth
+    unless auth[:advanced_trade][:ok]
+      raise "Coinbase authentication failed: #{auth[:advanced_trade][:message]}"
+    end
+
+    @client.futures_positions
+  end
+
+  def resolve_close_price(position)
+    market_price = position.get_current_market_price
+    return [market_price, true] if market_price
+
+    [position.entry_price, false]
+  end
+
+  def resolve_close_pnl(position, close_price, market_price_used:)
+    if market_price_used
+      pnl = position.unrealized_pnl_at(close_price)
+      return pnl if pnl
+    end
+
+    return position.pnl.round(2) if position.pnl.present?
+
+    position.calculate_pnl(close_price) || 0
   end
 end

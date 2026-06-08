@@ -43,12 +43,20 @@ class PositionImportService
         errors << error_msg
       end
 
+      reconcile_result = auto_reconcile(coinbase_positions)
+
       # Log summary
-      Rails.logger.info("[PIS] Import complete: #{imported_count} imported, #{updated_count} updated, #{errors.size} errors")
+      Rails.logger.info(
+        "[PIS] Import complete: #{imported_count} imported, #{updated_count} updated, " \
+        "#{reconcile_result[:closed_count]} reconciled, #{errors.size} errors"
+      )
 
       {
         imported: imported_count,
         updated: updated_count,
+        reconciled: reconcile_result[:closed_count],
+        reconciled_ids: reconcile_result[:closed_ids],
+        reconcile_errors: reconcile_result[:errors],
         errors: errors,
         total_coinbase: coinbase_positions.size
       }
@@ -137,6 +145,12 @@ class PositionImportService
   end
 
   private
+
+  def auto_reconcile(exchange_rows)
+    return {closed_count: 0, closed_ids: [], errors: []} if ENV["FUTURESBOT_SKIP_AUTO_RECONCILE"].present?
+
+    PositionReconcileService.new(coinbase_client: @coinbase_client).reconcile!(exchange_rows: exchange_rows)
+  end
 
   def determine_day_trading_status(product_id)
     # For now, assume all positions are day trading

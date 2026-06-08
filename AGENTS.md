@@ -88,7 +88,7 @@
   - Realtime evaluator rate-limits and deduplicates alerts before create
 - **Position sync/reconciliation**:
   - `PositionImportService` imports exchange positions into local `positions`
-  - `PositionReconcileService` closes local `OPEN` rows that are absent from Coinbase snapshots; it does not place orders
+  - `PositionReconcileService` closes local `OPEN` rows that are absent from Coinbase snapshots; it does not place orders. `PositionImportService` auto-reconciles after each import (disable with `FUTURESBOT_SKIP_AUTO_RECONCILE=1`). Reconcile PnL prefers contract-sized mark-to-market, then last synced exchange `pnl`.
 - **Chat/CLI**: `lib/cli/*`, `app/services/chat_bot_service.rb`, `app/controllers/api/chat_messages_controller.rb`
   - Thor CLI (`bin/futuresbot`) offers TUI, chat, status, positions, signals
   - Chat API and CLI both route through `ChatBotService`

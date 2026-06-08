@@ -144,7 +144,10 @@ module Tui
       Thread.new do
         svc = PositionImportService.new
         result = svc.import_positions_from_coinbase
-        set_flash(:ok, "Synced: #{result[:imported]} new, #{result[:updated]} updated")
+        reconciled = result[:reconciled].to_i
+        msg = "Synced: #{result[:imported]} new, #{result[:updated]} updated"
+        msg += ", #{reconciled} reconciled" if reconciled.positive?
+        set_flash(:ok, msg)
       rescue => e
         set_flash(:error, "Sync failed: #{e.message}")
       end
