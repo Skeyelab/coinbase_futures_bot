@@ -18,7 +18,20 @@ RSpec.describe Tui::Forms::EditPositionTarget do
 
     expect(Trading::PositionTargetUpdater).to have_received(:call).with(
       position: position,
-      take_profit: "105"
+      take_profit: 105.0
+    )
+  end
+
+  it "converts dollar take-profit input to price before updating" do
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
+    position.update!(entry_price: 100.0, product_id: "BIT-26JUN26-CDE")
+    allow(Gum).to receive(:input).and_return("$10")
+
+    described_class.run(field: :take_profit, id_str: position.id.to_s)
+
+    expect(Trading::PositionTargetUpdater).to have_received(:call).with(
+      position: position,
+      take_profit: 110.0
     )
   end
 

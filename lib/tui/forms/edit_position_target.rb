@@ -32,20 +32,36 @@ module Tui
         show_context(position)
         warn_trailing_stop(position) if @field == :stop_loss
 
-        raw_price = Gum.input(
+        raw_input = Gum.input(
           header: "New #{FIELD_LABELS.fetch(@field)} for ##{position.id}",
-          placeholder: "Price (blank=cancel)"
+          placeholder: "Price (92.62) or $ profit/loss ($10)"
         )
-        return if raw_price.to_s.strip.empty?
+        return if raw_input.to_s.strip.empty?
+
+        price, parse_error = Trading::DollarTargetPrice.resolve(
+          position: position,
+          field: @field,
+          raw_input: raw_input
+        )
+        if parse_error
+          Gum.log(parse_error, level: "error")
+          return
+        end
+
+        confirm_label = if raw_input.to_s.strip.start_with?("$")
+          "$#{raw_input.to_s.delete("$").strip} -> price #{format("%.2f", price)}"
+        else
+          format("%.2f", price)
+        end
 
         confirmed = Gum.confirm(
-          "Set #{FIELD_LABELS.fetch(@field)} to #{raw_price} for #{position.product_id} ##{position.id}?",
+          "Set #{FIELD_LABELS.fetch(@field)} to #{confirm_label} for #{position.product_id} ##{position.id}?",
           affirmative: "Save",
           negative: "Cancel"
         )
         return unless confirmed
 
-        result = Trading::PositionTargetUpdater.call(:position => position, @field => raw_price)
+        result = Trading::PositionTargetUpdater.call(:position => position, @field => price)
         if result[:success]
           Gum.log("#{FIELD_LABELS.fetch(@field).capitalize} updated (local DB only; no exchange order)", level: "info")
         else
