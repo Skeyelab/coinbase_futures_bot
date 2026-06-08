@@ -554,6 +554,20 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         expect(result).to be false
       end
 
+      it "resolves futures contract ids to sentiment symbols when gating" do
+        strategy = described_class.new
+        allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
+        allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.2")
+
+        SentimentAggregate.create!(
+          symbol: "OIL-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
+          avg_score: 0.2, z_score: 1.5
+        )
+
+        result = strategy.send(:sentiment_gate_allows?, symbol: "NOL-19JUN26-CDE", side: :long)
+        expect(result).to be true
+      end
+
       it "implements risk management overrides" do
         # Test position size limits override risk calculation
         strategy = described_class.new(max_position_size: 3)
