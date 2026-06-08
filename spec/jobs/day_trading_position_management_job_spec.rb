@@ -4,115 +4,49 @@ require "rails_helper"
 
 RSpec.describe DayTradingPositionManagementJob, type: :job do
   let(:job) { described_class.new }
-  let(:manager) { instance_double(Trading::DayTradingPositionManager) }
   let(:logger) { instance_double(ActiveSupport::Logger) }
+  let(:workflow) do
+    instance_double(
+      Trading::PositionManagement::DayTradingWorkflow,
+      call: result
+    )
+  end
+  let(:result) do
+    instance_double(
+      Trading::PositionManagement::WorkflowResult,
+      summary: "day_trading_position_management status=success"
+    )
+  end
 
   before do
-    allow(Trading::DayTradingPositionManager).to receive(:new).and_return(manager)
+    allow(Trading::PositionManagement::DayTradingWorkflow).to receive(:new).and_return(workflow)
     allow(Rails).to receive(:logger).and_return(logger)
     allow(logger).to receive(:info)
     allow(logger).to receive(:error)
-    allow(logger).to receive(:debug)
     allow(SlackNotificationService).to receive(:alert)
   end
 
   describe "#perform" do
-    it "executes the day trading position management workflow" do
-      allow(manager).to receive(:positions_need_closure?).and_return(false)
-      allow(manager).to receive(:positions_approaching_closure?).and_return(false)
-      allow(manager).to receive(:check_tp_sl_triggers).and_return([])
-      allow(manager).to receive(:get_position_summary).and_return({
-        open_count: 0,
-        positions_needing_closure: 0,
-        positions_approaching_closure: 0
-      })
-
-      job.perform
-    end
-
-    it "handles positions needing closure" do
-      allow(manager).to receive(:positions_need_closure?).and_return(true)
-      allow(manager).to receive(:close_expired_positions).and_return(2)
-      allow(manager).to receive(:positions_approaching_closure?).and_return(false)
-      allow(manager).to receive(:check_tp_sl_triggers).and_return([])
-      allow(manager).to receive(:get_position_summary).and_return({
-        open_count: 0,
-        positions_needing_closure: 0,
-        positions_approaching_closure: 0
-      })
-
-      expect(Rails.logger).to receive(:info).with(/Found positions needing immediate closure/)
-      expect(Rails.logger).to receive(:info).with(/Closed 2 expired positions/)
-
-      job.perform
-    end
-
-    it "handles positions approaching closure" do
-      allow(manager).to receive(:positions_need_closure?).and_return(false)
-      allow(manager).to receive(:positions_approaching_closure?).and_return(true)
-      allow(manager).to receive(:close_approaching_positions).and_return(1)
-      allow(manager).to receive(:check_tp_sl_triggers).and_return([])
-      allow(manager).to receive(:get_position_summary).and_return({
-        open_count: 0,
-        positions_needing_closure: 0,
-        positions_approaching_closure: 0
-      })
-
-      expect(Rails.logger).to receive(:info).with(/Found positions approaching closure time/)
-      expect(Rails.logger).to receive(:info).with(/Closed 1 approaching positions/)
-
-      job.perform
-    end
-
-    it "handles TP/SL triggers" do
-      trigger_info = {
-        position: instance_double(Position, id: 1, product_id: "BIT-29AUG25-CDE"),
-        trigger: "take_profit",
-        current_price: 51_000.0,
-        target_price: 50_000.0
-      }
-      allow(manager).to receive(:positions_need_closure?).and_return(false)
-      allow(manager).to receive(:positions_approaching_closure?).and_return(false)
-      allow(manager).to receive(:check_tp_sl_triggers).and_return([trigger_info])
-      allow(manager).to receive(:close_tp_sl_positions).and_return(1)
-      allow(manager).to receive(:get_position_summary).and_return({
-        open_count: 0,
-        positions_needing_closure: 0,
-        positions_approaching_closure: 0
-      })
-
-      expect(Rails.logger).to receive(:info).with(%r{Found 1 positions with triggered TP/SL})
-      expect(Rails.logger).to receive(:info).with(%r{Closed 1 TP/SL positions})
-
-      job.perform
-    end
-
-    it "logs completion message" do
-      allow(manager).to receive(:positions_need_closure?).and_return(false)
-      allow(manager).to receive(:positions_approaching_closure?).and_return(false)
-      allow(manager).to receive(:check_tp_sl_triggers).and_return([])
-      allow(manager).to receive(:get_position_summary).and_return({
-        open_count: 0,
-        positions_needing_closure: 0,
-        positions_approaching_closure: 0
-      })
-
+    it "delegates to workflow and logs result summary" do
+      expect(Trading::PositionManagement::DayTradingWorkflow).to receive(:new).with(logger: logger).and_return(workflow)
+      expect(workflow).to receive(:call).and_return(result)
+      expect(logger).to receive(:info).with("day_trading_position_management status=success")
       expect(Rails.logger).to receive(:info).with(/Completed day trading position management job/)
 
       job.perform
     end
 
     context "when errors occur" do
-      it "handles manager initialization errors gracefully" do
-        allow(Trading::DayTradingPositionManager).to receive(:new).and_raise(StandardError, "Manager error")
+      it "handles workflow initialization errors gracefully" do
+        allow(Trading::PositionManagement::DayTradingWorkflow).to receive(:new).and_raise(StandardError, "Manager error")
 
         expect(Rails.logger).to receive(:error).with("Day trading position management job failed: Manager error")
 
         expect { job.perform }.to raise_error(StandardError, "Manager error")
       end
 
-      it "handles individual method errors gracefully" do
-        allow(manager).to receive(:positions_need_closure?).and_raise(StandardError, "Check error")
+      it "handles workflow errors gracefully" do
+        allow(workflow).to receive(:call).and_raise(StandardError, "Check error")
 
         expect(Rails.logger).to receive(:error).with("Day trading position management job failed: Check error")
 

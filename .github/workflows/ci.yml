@@ -48,7 +48,7 @@ jobs:
           DOCS_ONLY=true
           while IFS= read -r file; do
             case "$file" in
-              README.md|SESSION_NOTES.md|AGENTS.md|CLAUDE.md|CONTEXT.md|docs/*|wiki/*|.github/**/*.md|.beads/*)
+              README.md|SESSION_NOTES.md|AGENTS.md|CLAUDE.md|CONTEXT.md|docs/*|wiki/*|.github/**/*.md)
                 ;;
               *)
                 DOCS_ONLY=false
@@ -135,34 +135,6 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for diff comparison
 
-      - name: Find changed files and test files
-        if: needs.changes.outputs.docs_only != 'true'
-        id: changed-files
-        run: |
-          echo "=== FINDING CHANGED FILES AND TEST FILES ==="
-
-          # Get the base branch (main or the target branch)
-          BASE_BRANCH=${GITHUB_BASE_REF:-main}
-          echo "Base branch: $BASE_BRANCH"
-
-          # Run the script to find changed files and test files
-          CHANGED_FILES_INFO=$(ruby scripts/get_changed_test_files.rb $BASE_BRANCH)
-          echo "Changed files info: $CHANGED_FILES_INFO"
-
-          # Parse JSON and set outputs
-          TEST_FILES=$(echo "$CHANGED_FILES_INFO" | ruby -rjson -e "puts JSON.parse(STDIN.read)['test_files'].join(' ')")
-          HAS_TEST_FILES=$(echo "$CHANGED_FILES_INFO" | ruby -rjson -e "puts JSON.parse(STDIN.read)['has_test_files']")
-          HAS_CHANGES=$(echo "$CHANGED_FILES_INFO" | ruby -rjson -e "puts JSON.parse(STDIN.read)['has_changes']")
-
-          echo "Test files to run: $TEST_FILES"
-          echo "Has test files: $HAS_TEST_FILES"
-          echo "Has changes: $HAS_CHANGES"
-
-          # Set outputs
-          echo "test-files=$TEST_FILES" >> $GITHUB_OUTPUT
-          echo "has-test-files=$HAS_TEST_FILES" >> $GITHUB_OUTPUT
-          echo "has-changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
-
       - uses: ruby/setup-ruby@v1
         if: needs.changes.outputs.docs_only != 'true'
         with:
@@ -230,7 +202,7 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true'
         timeout-minutes: 15
         env:
-          PARALLEL_TEST_PROCESSES: "2"
+          PARALLEL_RSPEC_CONFIG: .parallel_rspec_config.ci
           PARALLEL_COVERAGE: "true"
           SAMPLE: ""
           RPROF: ""
@@ -255,7 +227,7 @@ jobs:
           # Verify test environment
           echo "=== TEST ENVIRONMENT VERIFICATION ==="
           echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
-          echo "Test processes: $PARALLEL_TEST_PROCESSES"
+          echo "Parallel config: $PARALLEL_RSPEC_CONFIG"
           echo "Test profiling disabled: $SAMPLE$RPROF$STACKPROF$TAG_PROF"
 
           # Verify database connectivity with real operations
@@ -292,37 +264,8 @@ jobs:
             end
           "
 
-          # Run changed file tests first for fast feedback
-          if [ "${{ steps.changed-files.outputs.has-test-files }}" == "true" ]; then
-            echo "=== RUNNING CHANGED FILE TESTS FIRST ==="
-            echo "Test files: ${{ steps.changed-files.outputs.test-files }}"
-            echo "🧪 CHANGED FILES STARTING: $(date)"
-
-            # Run tests for changed files only (without coverage for speed)
-            bundle exec rspec ${{ steps.changed-files.outputs.test-files }} \
-              --format documentation \
-              --format progress \
-              --backtrace \
-              --order random \
-              --seed $(date +%s)
-
-            CHANGED_FILES_EXIT_CODE=$?
-            echo "🧪 CHANGED FILES FINISHED: $(date)"
-            echo "Changed files test exit code: $CHANGED_FILES_EXIT_CODE"
-
-            if [ $CHANGED_FILES_EXIT_CODE -ne 0 ]; then
-              echo "❌ Changed file tests failed - stopping here for fast feedback"
-              exit $CHANGED_FILES_EXIT_CODE
-            else
-              echo "✅ Changed file tests passed - proceeding with full test suite"
-            fi
-          else
-            echo "=== NO CHANGED FILE TESTS TO RUN ==="
-            echo "Changed files don't have corresponding test files or no changes detected."
-          fi
-
-          # Run full suite in parallel (2 workers on ubuntu-latest 2-vCPU runner)
-          echo "=== RUNNING FULL TEST SUITE IN PARALLEL (${PARALLEL_TEST_PROCESSES} workers) ==="
+          # Run full suite in parallel with explicit CI config and runtime-based balancing
+          echo "=== RUNNING FULL TEST SUITE IN PARALLEL ==="
           echo "🧪 FULL SUITE STARTING: $(date)"
 
           bin/parallel_rspec
@@ -382,6 +325,9 @@ jobs:
             coverage/
             coverage/.resultset.json
             coverage/index.html
+            tmp/rspec.xml
+            tmp/spec_summary.log
+            tmp/failing_specs.log
           retention-days: 30
 
       - name: Check coverage thresholds
@@ -487,19 +433,21 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true'
         run: |
           echo "=== COVERAGE BADGE GENERATION ==="
-          echo "Looking for coverage data in: coverage/coverage.json"
+          echo "Looking for coverage data under coverage/"
 
-          if [ -f "coverage/coverage.json" ]; then
-            echo "✅ Coverage data found"
+          COVERAGE_JSON=$(find coverage -type f -name coverage.json | head -n 1)
+
+          if [ -n "$COVERAGE_JSON" ]; then
+            echo "✅ Coverage data found at: $COVERAGE_JSON"
             # Extract line coverage percentage from SimpleCov JSON format
             LINE_COVERAGE=$(ruby -rjson -e "
-              data = JSON.parse(File.read('coverage/coverage.json'))
+              data = JSON.parse(File.read(ARGV[0]))
               if data['metrics'] && data['metrics']['covered_percent']
                 puts data['metrics']['covered_percent'].round(0)
               else
                 puts '0'
               end
-            ")
+            " "$COVERAGE_JSON")
 
             echo "Line coverage: ${LINE_COVERAGE}%"
 
@@ -525,7 +473,7 @@ jobs:
           else
             echo "❌ Coverage data not found"
             echo "Available files in coverage directory:"
-            ls -la coverage/ || echo "Coverage directory does not exist"
+            find coverage -maxdepth 3 -type f | sort || echo "Coverage directory does not exist"
             echo "This usually means the CI workflow didn't generate coverage data or the artifact name mismatch"
             exit 1
           fi

@@ -1,4 +1,17 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 [scripts]
-setup = "export DOPPLER_PROJECT=\"${DOPPLER_PROJECT:-coinbase-futures-bot}\"\nexport DOPPLER_CONFIG=\"${DOPPLER_CONFIG:-dev}\"\ndoppler setup --project \"$DOPPLER_PROJECT\" --config \"$DOPPLER_CONFIG\" --scope . --no-interactive\nbundle check || bundle install\nDATABASE_URL=\"${CONDUCTOR_SETUP_DATABASE_URL:-postgresql:///coinbase_futures_bot_development}\" TEST_DATABASE_URL=\"${CONDUCTOR_SETUP_TEST_DATABASE_URL:-postgresql:///coinbase_futures_bot_test}\" doppler run --project \"$DOPPLER_PROJECT\" --config \"$DOPPLER_CONFIG\" --preserve-env=\"DATABASE_URL,TEST_DATABASE_URL\" -- bin/rails db:prepare"
+setup = """
+export DOPPLER_PROJECT="${DOPPLER_PROJECT:-coinbase-futures-bot}"
+export DOPPLER_CONFIG="${DOPPLER_CONFIG:-dev}"
+doppler setup --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --scope . --no-interactive
+bundle check || bundle install
+DATABASE_URL="${CONDUCTOR_SETUP_DATABASE_URL:-postgresql:///coinbase_futures_bot_development}" TEST_DATABASE_URL="${CONDUCTOR_SETUP_TEST_DATABASE_URL:-postgresql:///coinbase_futures_bot_test}" doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" --preserve-env="DATABASE_URL,TEST_DATABASE_URL" -- bin/rails db:prepare
+"""
+run = """
+export DOPPLER_PROJECT="${DOPPLER_PROJECT:-coinbase-futures-bot}"
+export DOPPLER_CONFIG="${DOPPLER_CONFIG:-dev}"
+export PORT="${CONDUCTOR_PORT:-3000}"
+doppler run --project "$DOPPLER_PROJECT" --config "$DOPPLER_CONFIG" -- bin/rails server -b 0.0.0.0 -p "$PORT"
+"""
+run_mode = "nonconcurrent"

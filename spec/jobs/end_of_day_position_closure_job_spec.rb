@@ -4,11 +4,19 @@ require "rails_helper"
 
 RSpec.describe EndOfDayPositionClosureJob, type: :job do
   let(:job) { described_class.new }
-  let(:manager) { instance_double(Trading::DayTradingPositionManager) }
   let(:logger) { instance_double(ActiveSupport::Logger) }
+  let(:workflow) { instance_double(Trading::PositionManagement::EndOfDayClosureWorkflow, call: result) }
+  let(:result) do
+    instance_double(
+      Trading::PositionManagement::WorkflowResult,
+      summary: "end_of_day_position_closure status=success",
+      noop?: noop
+    )
+  end
+  let(:noop) { false }
 
   before do
-    allow(Trading::DayTradingPositionManager).to receive(:new).and_return(manager)
+    allow(Trading::PositionManagement::EndOfDayClosureWorkflow).to receive(:new).and_return(workflow)
     allow(Rails).to receive(:logger).and_return(logger)
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)
@@ -16,61 +24,33 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
   end
 
   describe "#perform" do
-    it "executes end-of-day position closure" do
-      summary = {open_count: 3, closed_count: 0}
-      allow(manager).to receive(:get_position_summary).and_return(summary)
-      allow(manager).to receive(:force_close_all_day_trading_positions).and_return(3)
-
+    it "delegates to workflow and logs result" do
       expect(logger).to receive(:info).with("Starting end-of-day position closure job")
-      expect(logger).to receive(:warn).with("Successfully closed 3 day trading positions at end of day")
+      expect(Trading::PositionManagement::EndOfDayClosureWorkflow).to receive(:new).with(logger: logger).and_return(workflow)
+      expect(workflow).to receive(:call).and_return(result)
+      expect(logger).to receive(:info).with("end_of_day_position_closure status=success")
       expect(logger).to receive(:info).with("Completed end-of-day position closure job")
 
       job.perform
     end
 
-    it "closes all open day trading positions" do
-      summary = {open_count: 2, closed_count: 0}
-      allow(manager).to receive(:get_position_summary).and_return(summary)
-      expect(manager).to receive(:force_close_all_day_trading_positions).and_return(2)
-
-      job.perform
-    end
-
-    it "handles case when no positions are closed" do
-      summary = {open_count: 0, closed_count: 0}
-      allow(manager).to receive(:get_position_summary).and_return(summary)
-
-      expect(logger).to receive(:info).with("No open day trading positions to close")
-      # Note: when no positions to close, the job returns early and doesn't log completion
-
-      job.perform
-    end
-
-    it "logs start and completion messages" do
-      summary = {open_count: 1, closed_count: 0}
-      allow(manager).to receive(:get_position_summary).and_return(summary)
-      allow(manager).to receive(:force_close_all_day_trading_positions).and_return(1)
-
-      expect(logger).to receive(:info).with("Starting end-of-day position closure job")
-      expect(logger).to receive(:warn).with("Successfully closed 1 day trading positions at end of day")
-      expect(logger).to receive(:info).with("Completed end-of-day position closure job")
-
+    it "skips completion log for noop result" do
+      allow(result).to receive(:noop?).and_return(true)
+      expect(logger).not_to receive(:info).with("Completed end-of-day position closure job")
       job.perform
     end
 
     context "when errors occur" do
-      it "handles manager initialization errors gracefully" do
-        allow(Trading::DayTradingPositionManager).to receive(:new).and_raise(StandardError, "Manager error")
+      it "handles workflow initialization errors gracefully" do
+        allow(Trading::PositionManagement::EndOfDayClosureWorkflow).to receive(:new).and_raise(StandardError, "Manager error")
 
         expect(logger).to receive(:error).with("End-of-day position closure job failed: Manager error")
 
         expect { job.perform }.to raise_error(StandardError, "Manager error")
       end
 
-      it "handles closure execution errors gracefully" do
-        summary = {open_count: 1, closed_count: 0}
-        allow(manager).to receive(:get_position_summary).and_return(summary)
-        allow(manager).to receive(:force_close_all_day_trading_positions).and_raise(StandardError, "Closure error")
+      it "handles workflow execution errors gracefully" do
+        allow(workflow).to receive(:call).and_raise(StandardError, "Closure error")
 
         expect(logger).to receive(:error).with("End-of-day position closure job failed: Closure error")
 
@@ -98,13 +78,8 @@ RSpec.describe EndOfDayPositionClosureJob, type: :job do
   end
 
   describe "integration with manager" do
-    it "calls manager methods in correct order" do
-      summary = {open_count: 1, closed_count: 0}
-      allow(manager).to receive(:get_position_summary).and_return(summary)
-      allow(manager).to receive(:force_close_all_day_trading_positions).and_return(1)
-
-      expect(manager).to receive(:get_position_summary).ordered.and_return(summary)
-      expect(manager).to receive(:force_close_all_day_trading_positions).ordered.and_return(1)
+    it "calls workflow once" do
+      expect(workflow).to receive(:call).once.and_return(result)
 
       job.perform
     end

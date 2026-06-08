@@ -10,10 +10,7 @@
 
 ## Learned Workspace Facts
 
-- This workspace uses `bd` (beads) as the primary issue tracker workflow.
-- Running `bd prime` is expected before active issue execution.
-- Beads dependency ordering is managed explicitly with `bd dep add`.
-- Issue planning often spans both GitHub issues and Beads dependencies.
+- This workspace uses GitHub issues as the only issue tracker workflow.
 - Guard + `guard-rspec` are wired for local RSpec-on-change (`bundle exec guard`); use a project `Guardfile` and pause Guard when you need an exclusive run (long single-process or CI-style).
 - When the shell default Ruby does not match `.ruby-version`, run commands through the project RVM gemset (quickstart: `ruby-3.2.4@coinbase_futures_bot`, e.g. `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec …`) so `bundle exec` and native gems stay consistent.
 
@@ -58,12 +55,12 @@
 - Day trading close workflow: `bin/rake day_trading:manage`
 - Kill switch: `bin/futuresbot halt [--reason "..."]` / `bin/futuresbot resume`
 
-### Beads issue tracker
+### GitHub issue tracker
 
-- List issues: `bd list` / `bd ready`
-- Sync with GitHub: `GITHUB_TOKEN="$(gh auth token)" bd github sync`
-  - Note: `bd config set github.token` is written to config.yaml but not read by `bd github sync` (bd bug); use the env var workaround above.
-- Push to Dolt remote: `bd dolt push` (no remote configured yet)
+- List open issues: `gh issue list --state open`
+- View an issue: `gh issue view <number>`
+- Create an issue: `gh issue create`
+- Comment or update state: `gh issue comment <number>` / `gh issue close <number>`
 
 ## High-value gotchas
 

@@ -1,0 +1,10 @@
+# CI overrides — keep worker count explicit on GitHub-hosted runners.
+
+processes: 2
+
+single:
+  - "spec/services/coinbase_rest_spec.rb"
+  - "spec/models/trading_pair_spec.rb"
+  - "spec/tasks/market_data_rake_spec.rb"
+
+group_by: runtime

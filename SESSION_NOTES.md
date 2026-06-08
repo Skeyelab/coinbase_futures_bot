@@ -26,6 +26,94 @@
 
 ### Session log
 
+#### 2026-06-08 03:55 UTC
+- Context: PR `#229` CI went red after RSpec artifact changes because the coverage badge job assumed `coverage/coverage.json`, but the downloaded artifact unpacked into a nested directory.
+- Changes:
+  - Updated the coverage badge step to discover `coverage.json` anywhere under `coverage/` instead of assuming a fixed path.
+  - Improved failure logging to print discovered files under `coverage/` for faster CI debugging if artifact layout changes again.
+- Commands run:
+  - `gh pr checks 229`
+  - `gh run view 27113825901 --log-failed`
+- Files touched:
+  - `.github/workflows/ci.yml`, `SESSION_NOTES.md`
+- Next steps:
+  - Re-run CI and compare test job duration across a few runs before claiming wall-clock improvement.
+
+#### 2026-06-08 03:45 UTC
+- Context: Improved RSpec CI output for PR `#229` so parallel runs stay compact in stdout while still producing machine-readable and rerun-friendly artifacts.
+- Changes:
+  - Added `RspecJunitFormatter`, `ParallelTests::RSpec::SummaryLogger`, and `ParallelTests::RSpec::FailuresLogger` outputs to `.rspec_parallel`.
+  - Updated CI artifact upload to include `tmp/rspec.xml`, `tmp/spec_summary.log`, and `tmp/failing_specs.log`.
+- Commands run:
+  - `PARALLEL_RSPEC_CONFIG=.parallel_rspec_config.ci ~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/parallel_rspec spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `ls -l tmp/rspec.xml tmp/spec_summary.log tmp/failing_specs.log`
+- Files touched:
+  - `.rspec_parallel`, `.github/workflows/ci.yml`, `SESSION_NOTES.md`
+- Next steps:
+  - If you want GitHub to surface JUnit results inline, wire `tmp/rspec.xml` into a test-report action next.
+
+#### 2026-06-08 03:35 UTC
+- Context: Tightened CI test splitting on PR `#229` after review showed duplicate changed-spec work and runtime balancing was configured but not actually fed by a runtime log.
+- Changes:
+  - Added `.parallel_rspec_config.ci` with explicit `processes: 2` and `group_by: runtime`.
+  - Updated `.rspec_parallel` to write `ParallelTests::RSpec::RuntimeLogger` output to `tmp/parallel_runtime_rspec.log`.
+  - Simplified GitHub Actions test job to run one full parallel suite with CI config instead of serial changed-spec prepass plus full-suite rerun.
+- Commands run:
+  - `ruby -e 'require "yaml"; p YAML.safe_load_file(".parallel_rspec_config.ci")'`
+  - `PARALLEL_RSPEC_CONFIG=.parallel_rspec_config.ci ~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/parallel_rspec spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `ls -l tmp/parallel_runtime_rspec.log && tail -n 5 tmp/parallel_runtime_rspec.log`
+- Files touched:
+  - `.github/workflows/ci.yml`, `.rspec_parallel`, `.parallel_rspec_config.ci`, `SESSION_NOTES.md`
+- Next steps:
+  - If CI wall time still tails, consider separate fast-fail changed-spec smoke job instead of putting it back into the main full-suite job.
+
+#### 2026-06-08 03:05 UTC
+- Context: Worked GitHub issue `#179` to thin position-management jobs and move orchestration/alert branching into reusable workflow services.
+- Changes:
+  - Added `Trading::PositionManagement::*Workflow` services plus shared `WorkflowResult` / base helper under `app/services/trading/position_management/`.
+  - Refactored day-trading, end-of-day, swing-management, swing-risk, and contract-expiry jobs into thin wrappers that delegate to workflows and preserve queue/failure semantics.
+  - Moved behavioral coverage to new workflow service specs; reduced job specs to delegation/error-wrapper checks.
+- Commands run:
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/day_trading_workflow_spec.rb spec/jobs/day_trading_position_management_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/end_of_day_closure_workflow_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/swing_management_workflow_spec.rb spec/jobs/swing_position_management_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/swing_risk_monitoring_workflow_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management/contract_expiry_monitoring_workflow_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/standardrb --fix app/jobs/day_trading_position_management_job.rb app/jobs/end_of_day_position_closure_job.rb app/jobs/swing_position_management_job.rb app/jobs/swing_risk_monitoring_job.rb app/jobs/contract_expiry_monitoring_job.rb app/services/trading/position_management spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb spec/jobs/swing_position_management_job_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb spec/services/trading/position_management`
+  - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/services/trading/position_management spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb spec/jobs/swing_position_management_job_spec.rb spec/jobs/swing_risk_monitoring_job_spec.rb spec/jobs/contract_expiry_monitoring_job_spec.rb`
+- Files touched:
+  - `app/jobs/day_trading_position_management_job.rb`, `app/jobs/end_of_day_position_closure_job.rb`, `app/jobs/swing_position_management_job.rb`, `app/jobs/swing_risk_monitoring_job.rb`, `app/jobs/contract_expiry_monitoring_job.rb`
+  - `app/services/trading/position_management/*`
+  - `spec/jobs/day_trading_position_management_job_spec.rb`, `spec/jobs/end_of_day_position_closure_job_spec.rb`, `spec/jobs/swing_position_management_job_spec.rb`, `spec/jobs/swing_risk_monitoring_job_spec.rb`, `spec/jobs/contract_expiry_monitoring_job_spec.rb`
+  - `spec/services/trading/position_management/*`, `SESSION_NOTES.md`
+- Next steps:
+  - Review resulting workflow seams against adjacent CLI/rake entrypoints if you want to reuse them outside ActiveJob next.
+
+#### 2026-06-08 03:20 UTC
+- Context: Converted repository Conductor config from legacy `conductor.json` to the current shared `.conductor/settings.toml` format from Conductor docs.
+- Changes:
+  - Added `.conductor/settings.toml` with shared `setup` and `run` scripts.
+  - Updated the run script to bind Rails to `0.0.0.0` and honor `CONDUCTOR_PORT`.
+  - Set `scripts.run_mode = "nonconcurrent"` because the project currently shares fixed local DB names and bot/runtime resources.
+  - Removed legacy `conductor.json` to avoid split configuration.
+- Commands run:
+  - `python3 - <<'PY' ... tomllib.load('.conductor/settings.toml') ... PY`
+- Files touched:
+  - `.conductor/settings.toml`, `conductor.json`, `SESSION_NOTES.md`
+- Next steps:
+  - If you later make workspace DB/runtime resources fully isolated, reconsider `run_mode = "concurrent"`.
+
+#### 2026-06-08 02:10 UTC
+- Context: Removed the retired legacy issue-tracking integration and standardized the repo on GitHub issues only.
+- Changes:
+  - Deleted tracked legacy issue-tracker config, issue data, and hook wrapper files.
+  - Removed legacy Claude session hooks and issue-tracker ignore rules.
+  - Updated `AGENTS.md` and CI docs-only filtering to reference GitHub issues only.
+- Files touched:
+  - `AGENTS.md`, `.claude/settings.json`, `.gitignore`, `.github/workflows/ci.yml`, `SESSION_NOTES.md`
+- Next steps:
+  - Use `gh issue *` commands exclusively for issue tracking.
+
 #### 2026-04-30 00:15 UTC
 - Context: `parallel_rspec` reported 4 failures (Sentry health breadcrumb + ChatMemory timeouts/savepoints).
 - Changes:
@@ -73,17 +161,17 @@
 - Changes:
   - `SignalAlert.normalize_side_value` delegates known sides to `SideNormalizer.signal`, keeps `unknown`, single path for `create_entry_signal!` / `normalized_entry_side`.
   - Merged `AGENTS.md` (main body + learned prefs); merged `SESSION_NOTES` session log (Apr‑29 entries then Apr‑27 block from main).
-  - Beads: kept branch `issues.jsonl`, took main `metadata.json` `project_id`; regenerated `Gemfile.lock` via `bundle install`.
+  - Reconciled issue-tracking metadata during the merge and regenerated `Gemfile.lock` via `bundle install`.
 - Commands run:
   - `bundle install` and `bundle exec rspec spec/models/signal_alert_spec.rb spec/services/side_normalizer_spec.rb spec/services/real_time_signal_evaluator_spec.rb` under `ruby-3.2.4@coinbase_futures_bot` (186 examples, 0 failures)
   - `bin/standardrb --fix app/models/signal_alert.rb`
 - Files touched:
-  - `app/models/signal_alert.rb`, `AGENTS.md`, `SESSION_NOTES.md`, `Gemfile.lock`, `.beads/issues.jsonl`, `.beads/metadata.json`
+  - `app/models/signal_alert.rb`, `AGENTS.md`, `SESSION_NOTES.md`, `Gemfile.lock`
 - Next steps:
   - `git commit` to complete merge; push branch; confirm PR #181 conflict-free.
 
 #### 2026-04-29 23:30 UTC
-- Context: Completed canonical long/short signal direction end-to-end (Beads `coinbase_futures_bot-1777499033010-23-ecaeb9da`).
+- Context: Completed canonical long/short signal direction end-to-end.
 - Changes:
   - Strategies (`MultiTimeframeSignal`, `Pullback1h`) emit `:long` / `:short` in order hashes; sentiment gate accepts long/short (legacy buy/sell still allowed).
   - `SignalAlert` validates `long`/`short`/`unknown` only and normalizes buy/sell (and symbol forms) before save; `create_entry_signal!` passes normalized side.
@@ -93,7 +181,7 @@
 - Commands run:
   - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec bin/standardrb --fix` (touched Ruby paths)
   - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/models/signal_alert_spec.rb spec/jobs/generate_signals_job_spec.rb spec/services/strategy/multi_timeframe_signal_spec.rb spec/services/real_time_signal_evaluator_spec.rb spec/jobs/paper_trading_job_spec.rb spec/jobs/calibration_job_spec.rb spec/jobs/rapid_signal_evaluation_job_spec.rb` (407 examples, 0 failures)
-  - `bd close coinbase_futures_bot-1777499033010-23-ecaeb9da --reason \"Strategies emit :long/:short; SignalAlert canonicalizes on save; simulator/Position boundaries use SignalSide; dedupe matches legacy buy/sell rows.\"`
+  - Closed the corresponding issue after confirming strategies emit `:long`/`:short`, `SignalAlert` canonicalizes on save, simulator/`Position` boundaries use `SignalSide`, and dedupe still matches legacy `buy`/`sell` rows.
 - Files touched:
   - `app/models/signal_alert.rb`, `app/services/strategy/multi_timeframe_signal.rb`, `app/services/strategy/pullback_1h.rb`, `app/services/real_time_signal_evaluator.rb`
   - `app/jobs/paper_trading_job.rb`, `app/jobs/calibration_job.rb`, `app/jobs/rapid_signal_evaluation_job.rb`
@@ -106,11 +194,11 @@
 - Changes:
   - Confirmed canonical `SignalController` route usage and removed duplicate `SignalsController` module.
   - Installed dependencies in `ruby-3.2.4@coinbase_futures_bot` and ran targeted signal request/controller specs successfully.
-  - Closed Beads issue `coinbase_futures_bot-1777499033810-30-4ea17473`; this unblocked follow-on issue `coinbase_futures_bot-1777499033010-23-ecaeb9da`.
+  - Closed the corresponding controller-cleanup issue; this unblocked the long/short normalization follow-up.
 - Commands run:
   - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle install`
   - `~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bundle exec rspec spec/requests/signal_controller_spec.rb spec/controllers/signal_controller_spec.rb`
-  - `bd close coinbase_futures_bot-1777499033810-30-4ea17473 --reason \"Removed duplicate SignalsController; canonical SignalController remains; signal request/controller specs passing.\" --suggest-next`
+  - Closed the corresponding issue after removing the duplicate `SignalsController`; the canonical controller remained and the signal request/controller specs passed.
 - Files touched:
   - `app/controllers/signals_controller.rb` (deleted)
   - `SESSION_NOTES.md` (updated)
@@ -142,19 +230,19 @@
 #### 2026-04-29 21:52 UTC
 - Context: Started P1 architecture issue to remove duplicate signal controller seam and keep one canonical signal API module.
 - Changes:
-  - Claimed Beads issue `coinbase_futures_bot-1777499033810-30-4ea17473` for controller seam consolidation.
+  - Claimed the corresponding controller-seam consolidation issue.
   - Deleted duplicate controller file `app/controllers/signals_controller.rb` (unreferenced duplicate of `SignalController`).
   - Verified routing already targets `controller: "signal"` in `config/routes.rb`, so no route changes required.
 - Commands run:
-  - `bd update coinbase_futures_bot-1777499033810-30-4ea17473 --claim`
+  - Claimed the corresponding issue before starting the controller cleanup.
   - `bundle exec rspec spec/requests/signal_controller_spec.rb spec/controllers/signal_controller_spec.rb` (failed: missing gems / wrong Ruby env)
-  - `bd dep add ...` (linked issue dependencies for sequencing work)
+  - Linked issue dependencies in the tracker for sequencing work.
 - Files touched:
   - `app/controllers/signals_controller.rb` (deleted)
   - `SESSION_NOTES.md` (updated)
 - Next steps:
   - Activate project Ruby/gemset (`ruby-3.2.4@coinbase_futures_bot`) and run targeted signal specs.
-  - If specs pass, close the Beads issue and commit/push.
+  - If specs pass, close the GitHub issue and commit/push.
 
 #### 2026-04-27 05:24 UTC
 - Context: Reduced mock-heavy realtime specs by replacing relation doubles with real records where cheap.
@@ -3595,5 +3683,3 @@
 - Next steps:
   - Integrate sentiment feature into live execution flow when confidence is validated.
   - Consider FinBERT/ONNX scorer and Reddit source.
-
-
