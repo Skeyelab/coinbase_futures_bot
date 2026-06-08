@@ -6,6 +6,11 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
   let(:logger) { instance_double(Logger) }
   let(:swing_manager) { instance_double(Trading::SwingPositionManager) }
 
+  def stub_delete_all(klass, result)
+    relation = instance_double(ActiveRecord::Relation, delete_all: result)
+    allow(klass).to receive(:where).and_return(relation)
+  end
+
   before do
     allow(Rails).to receive(:logger).and_return(logger)
     allow(logger).to receive(:info)
@@ -21,8 +26,8 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
       before do
         allow(swing_manager).to receive(:cleanup_old_positions).and_return(5)
         allow(swing_manager).to receive(:archive_completed_trades).and_return(3)
-        allow(Tick).to receive_message_chain(:where, :delete_all).and_return(100)
-        allow(SignalAlert).to receive_message_chain(:where, :delete_all).and_return(25)
+        stub_delete_all(Tick, 100)
+        stub_delete_all(SignalAlert, 25)
       end
 
       it "performs all cleanup operations successfully" do
@@ -70,8 +75,8 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
       before do
         allow(swing_manager).to receive(:cleanup_old_positions).and_raise(StandardError, error_message)
         allow(swing_manager).to receive(:archive_completed_trades).and_return(0)
-        allow(Tick).to receive_message_chain(:where, :delete_all).and_return(0)
-        allow(SignalAlert).to receive_message_chain(:where, :delete_all).and_return(0)
+        stub_delete_all(Tick, 0)
+        stub_delete_all(SignalAlert, 0)
       end
 
       it "continues with other operations despite errors" do
@@ -88,8 +93,8 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
 
       before do
         allow(Trading::SwingPositionManager).to receive(:new).and_raise(job_error)
-        allow(Tick).to receive_message_chain(:where, :delete_all)
-        allow(SignalAlert).to receive_message_chain(:where, :delete_all)
+        stub_delete_all(Tick, 0)
+        stub_delete_all(SignalAlert, 0)
 
         # Mock Sentry properly
         sentry_scope = double("sentry_scope")
@@ -120,8 +125,8 @@ RSpec.describe SwingPositionCleanupJob, type: :job do
       before do
         allow(swing_manager).to receive(:cleanup_old_positions).and_return(500)
         allow(swing_manager).to receive(:archive_completed_trades).and_return(300)
-        allow(Tick).to receive_message_chain(:where, :delete_all).and_return(1000)
-        allow(SignalAlert).to receive_message_chain(:where, :delete_all).and_return(200)
+        stub_delete_all(Tick, 1000)
+        stub_delete_all(SignalAlert, 200)
         allow(SlackNotificationService).to receive(:alert)
       end
 

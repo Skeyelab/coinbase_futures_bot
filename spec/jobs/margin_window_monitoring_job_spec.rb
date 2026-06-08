@@ -38,7 +38,6 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
           "initial_margin" => "2000.0",
           "liquidation_threshold" => "1000.0"
         })
-        allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([])
         allow(Rails.cache).to receive(:read).with("last_margin_window_type").and_return(nil)
         allow(Rails.cache).to receive(:write).with("last_margin_window_type", any_args)
         allow(SlackNotificationService).to receive(:alert)
@@ -170,11 +169,6 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
     end
 
     context "with swing positions and margin violations" do
-      let(:contract) { double("Contract", expiration_date: 1.month.from_now) }
-      let(:position) do
-        double("Position", id: 1, product_id: "BTC-USD-PERP", size: 10, entry_price: 50_000, calculate_pnl: 100.0,
-          side: "long", entry_time: Time.current, age_in_hours: 24.5, take_profit: 55_000, stop_loss: 45_000, contract: contract, hit_take_profit?: false, hit_stop_loss?: false)
-      end
       let(:balance_summary) do
         {
           total_usd_balance: 100_000.0,
@@ -195,8 +189,12 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
         allow(positions_service).to receive(:authenticated?).and_return(true)
         allow(advanced_trade_client).to receive(:get_current_margin_window).and_return(margin_window_data)
         allow(advanced_trade_client).to receive(:get_futures_balance_summary).and_return(balance_summary)
-        allow(Position).to receive_message_chain(:swing_trading, :open, :where, :includes).and_return([position])
-        allow(Position).to receive_message_chain(:swing_trading, :open, :includes).and_return([position])
+        create(:position,
+          :swing_trading,
+          product_id: "BTC-USD-PERP",
+          size: 10,
+          entry_price: 50_000,
+          entry_time: Time.current)
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", "0.2").and_return("0.2")
         allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
         allow(swing_manager).to receive(:check_swing_risk_limits).and_return({

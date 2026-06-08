@@ -243,7 +243,8 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
 
     context "with open positions for the asset" do
       before do
-        allow(Position).to receive_message_chain(:open, :by_asset).with(asset).and_return([position1, position2])
+        position1.update!(product_id: "BTC-USD")
+        position2.update!(product_id: "BTC-MAR25")
       end
 
       it "checks take profit and stop loss for each position" do
@@ -278,10 +279,6 @@ RSpec.describe RealTimeMonitoringJob, type: :job do
     end
 
     context "with no open positions" do
-      before do
-        allow(Position).to receive_message_chain(:open, :by_asset).with(asset).and_return([])
-      end
-
       it "does not perform position checks" do
         expect(job).not_to receive(:check_take_profit_stop_loss)
         expect(job).not_to receive(:check_day_trading_time_limits)

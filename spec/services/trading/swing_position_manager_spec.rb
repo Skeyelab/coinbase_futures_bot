@@ -69,12 +69,16 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     end
 
     it "uses default of 30 days if not specified" do
-      allow(Position).to receive_message_chain(:swing_trading, :closed,
-        :where).and_return(double(count: 0, each: [], delete_all: 0))
+      relation = double("relation", count: 0, each: [], delete_all: 0)
+      closed_scope = double("closed_scope")
+      swing_scope = double("swing_scope")
+      allow(Position).to receive(:swing_trading).and_return(swing_scope)
+      allow(swing_scope).to receive(:closed).and_return(closed_scope)
+      allow(closed_scope).to receive(:where).and_return(relation)
 
       manager.cleanup_old_positions
 
-      expect(Position.swing_trading.closed).to have_received(:where).with("close_time < ?",
+      expect(closed_scope).to have_received(:where).with("close_time < ?",
         be_within(1.second).of(30.days.ago))
     end
   end

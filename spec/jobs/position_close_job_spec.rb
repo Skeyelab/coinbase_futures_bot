@@ -7,6 +7,7 @@ RSpec.describe PositionCloseJob, type: :job do
   let(:logger) { instance_double(ActiveSupport::Logger) }
   let(:positions_service) { instance_double(Trading::CoinbasePositions) }
   let(:lifecycle) { instance_double(Trading::PositionLifecycle) }
+  let(:scheduled_job) { instance_double(ActiveJob::ConfiguredJob, perform_later: nil) }
 
   def success_result(close_price: 50_001.0)
     Trading::PositionLifecycle::Result.new(success: true, close_price: close_price, reason: nil, fallback: false)
@@ -23,6 +24,7 @@ RSpec.describe PositionCloseJob, type: :job do
     allow(logger).to receive(:error)
     allow(Trading::CoinbasePositions).to receive(:new).with(logger: logger).and_return(positions_service)
     allow(Trading::PositionLifecycle).to receive(:new).with(positions_service: positions_service, logger: logger).and_return(lifecycle)
+    allow(PositionCloseJob).to receive(:set).and_return(scheduled_job)
   end
 
   describe "#perform" do
@@ -91,7 +93,6 @@ RSpec.describe PositionCloseJob, type: :job do
         %w[stop_loss take_profit time_limit].each do |critical_reason|
           it "retries #{critical_reason} closure after failure" do
             expect(logger).to receive(:info).with("[PCJ] Retrying critical position closure")
-            allow(PositionCloseJob).to receive_message_chain(:set, :perform_later)
             described_class.perform_now(position_id: position.id, reason: critical_reason)
           end
         end
@@ -149,7 +150,6 @@ RSpec.describe PositionCloseJob, type: :job do
       context "with critical closure reasons" do
         it "retries critical closures after errors" do
           expect(logger).to receive(:info).with("[PCJ] Retrying critical position closure")
-          allow(PositionCloseJob).to receive_message_chain(:set, :perform_later)
           described_class.perform_now(position_id: position.id, reason: "stop_loss")
         end
       end
@@ -215,7 +215,6 @@ RSpec.describe PositionCloseJob, type: :job do
 
       it "handles emergency closure with retry logic when lifecycle fails" do
         allow(lifecycle).to receive(:close).and_return(failure_result)
-        allow(PositionCloseJob).to receive_message_chain(:set, :perform_later)
         expect(logger).to receive(:info).with("[PCJ] Retrying critical position closure")
         described_class.perform_now(position_id: emergency_position.id, reason: "time_limit")
       end
@@ -271,7 +270,6 @@ RSpec.describe PositionCloseJob, type: :job do
       it "schedules retry when lifecycle fails for critical close" do
         volatile_position = create(:position, size: 5.0)
         allow(lifecycle).to receive(:close).and_return(failure_result)
-        allow(PositionCloseJob).to receive_message_chain(:set, :perform_later)
         described_class.perform_now(position_id: volatile_position.id, reason: "stop_loss")
         expect(logger).to have_received(:info).with("[PCJ] Retrying critical position closure")
       end

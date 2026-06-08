@@ -288,7 +288,7 @@ RSpec.describe FuturesBotCli, type: :model do
       end
 
       it "handles 'sessions' command and returns true" do
-        allow(ChatSession).to receive_message_chain(:active, :recent, :limit).and_return([])
+        create(:chat_session, session_id: session_id)
         expect(cli.send(:handle_local_command, "sessions", bot, session_id)).to be true
       end
 
