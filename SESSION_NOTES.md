@@ -26,6 +26,21 @@
 
 ### Session log
 
+#### 2026-06-08 03:35 UTC
+- Context: Tightened CI test splitting on PR `#229` after review showed duplicate changed-spec work and runtime balancing was configured but not actually fed by a runtime log.
+- Changes:
+  - Added `.parallel_rspec_config.ci` with explicit `processes: 2` and `group_by: runtime`.
+  - Updated `.rspec_parallel` to write `ParallelTests::RSpec::RuntimeLogger` output to `tmp/parallel_runtime_rspec.log`.
+  - Simplified GitHub Actions test job to run one full parallel suite with CI config instead of serial changed-spec prepass plus full-suite rerun.
+- Commands run:
+  - `ruby -e 'require "yaml"; p YAML.safe_load_file(".parallel_rspec_config.ci")'`
+  - `PARALLEL_RSPEC_CONFIG=.parallel_rspec_config.ci ~/.rvm/bin/rvm 3.2.4@coinbase_futures_bot do bin/parallel_rspec spec/jobs/day_trading_position_management_job_spec.rb spec/jobs/end_of_day_position_closure_job_spec.rb`
+  - `ls -l tmp/parallel_runtime_rspec.log && tail -n 5 tmp/parallel_runtime_rspec.log`
+- Files touched:
+  - `.github/workflows/ci.yml`, `.rspec_parallel`, `.parallel_rspec_config.ci`, `SESSION_NOTES.md`
+- Next steps:
+  - If CI wall time still tails, consider separate fast-fail changed-spec smoke job instead of putting it back into the main full-suite job.
+
 #### 2026-06-08 03:05 UTC
 - Context: Worked GitHub issue `#179` to thin position-management jobs and move orchestration/alert branching into reusable workflow services.
 - Changes:
