@@ -44,8 +44,8 @@ module Tui
 
     def self.refresh_exchange_pnls_if_due
       return if Rails.cache.read(EXCHANGE_PNL_REFRESH_KEY)
+      return unless Tui::ExchangePnlRefresher.refresh!
 
-      Tui::ExchangePnlRefresher.refresh!
       Rails.cache.write(EXCHANGE_PNL_REFRESH_KEY, true, expires_in: EXCHANGE_PNL_REFRESH_INTERVAL)
     end
   end

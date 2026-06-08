@@ -31,9 +31,15 @@ RSpec.describe Tui::ExchangePnlRefresher do
     end
 
     it "updates open positions with computed unrealized pnl" do
-      described_class.refresh!(positions_service: positions_service)
+      expect(described_class.refresh!(positions_service: positions_service)).to be(true)
 
       expect(position.reload.pnl).to eq(1.6)
+    end
+
+    it "returns false when the exchange call fails" do
+      allow(positions_service).to receive(:list_open_positions).and_raise(Faraday::Error, "timeout")
+
+      expect(described_class.refresh!(positions_service: positions_service)).to be(false)
     end
   end
 end

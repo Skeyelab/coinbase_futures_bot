@@ -76,10 +76,7 @@ class PositionImportService
     return {action: :skipped, reason: "Unknown side: #{side}"} unless position_side
 
     # Try to find existing position by product_id and side
-    existing_position = Position.open
-      .where(product_id: product_id, side: position_side)
-      .order(:entry_time)
-      .last
+    existing_position = Position.open_latest_for(product_id: product_id, side: position_side)
 
     if existing_position
       # Update existing position

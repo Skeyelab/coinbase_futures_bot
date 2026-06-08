@@ -28,6 +28,10 @@ class Position < ApplicationRecord
   scope :open_swing_positions, -> { swing_trading.open }
   scope :trailing_stop_managed, -> { open.where(trailing_stop_enabled: true) }
 
+  def self.open_latest_for(product_id:, side:)
+    open.where(product_id: product_id, side: side).order(:entry_time).last
+  end
+
   # Contract expiry scopes
   scope :expiring_within_days, ->(days) {
     open.select { |p| p.days_until_expiry && p.days_until_expiry <= days }
