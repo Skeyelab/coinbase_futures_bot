@@ -64,7 +64,7 @@ class PositionImportService
     size = coinbase_position["number_of_contracts"].to_f
     side = coinbase_position["side"]&.upcase
     entry_price = coinbase_position["avg_entry_price"]&.to_f
-    unrealized_pnl = coinbase_position["unrealized_pnl"]&.to_f
+    unrealized_pnl = Trading::FuturesUnrealizedPnl.from_exchange_position(coinbase_position)
 
     # Skip if no size (closed position)
     return {action: :skipped, reason: "No size"} if size.zero?

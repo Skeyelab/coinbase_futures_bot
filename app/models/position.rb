@@ -145,6 +145,18 @@ class Position < ApplicationRecord
     end
   end
 
+  def unrealized_pnl_at(current_price)
+    return nil unless open? && current_price && entry_price
+
+    Trading::FuturesUnrealizedPnl.calculate(
+      side: side,
+      entry_price: entry_price,
+      current_price: current_price,
+      contracts: size,
+      contract_size: Trading::ContractSizeResolver.for_product(product_id)
+    )
+  end
+
   def pnl_percentage
     return nil unless closed? && entry_price && pnl
 

@@ -2,7 +2,11 @@
 
 module Tui
   class DataLoader
+    EXCHANGE_PNL_REFRESH_KEY = "tui:exchange_pnl_refresh"
+    EXCHANGE_PNL_REFRESH_INTERVAL = 30.seconds
+
     def self.load
+      refresh_exchange_pnls_if_due
       latest_tick_at = Tick.maximum(:observed_at)
       live_prices = latest_prices_by_product
       futures_live_prices, spot_live_prices = split_live_prices(live_prices)
@@ -36,6 +40,13 @@ module Tui
       futures = live_prices.values.select { |t| t.product_id.match?(/CDE$/i) }
       spot = live_prices.values.reject { |t| t.product_id.match?(/CDE$/i) }
       [futures, spot]
+    end
+
+    def self.refresh_exchange_pnls_if_due
+      return if Rails.cache.read(EXCHANGE_PNL_REFRESH_KEY)
+
+      Tui::ExchangePnlRefresher.refresh!
+      Rails.cache.write(EXCHANGE_PNL_REFRESH_KEY, true, expires_in: EXCHANGE_PNL_REFRESH_INTERVAL)
     end
   end
 end

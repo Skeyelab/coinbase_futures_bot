@@ -480,6 +480,25 @@ RSpec.describe Position, type: :model do
       end
     end
 
+    describe "#unrealized_pnl_at" do
+      it "returns dollar pnl for short positions using contract size" do
+        position.update!(product_id: "NOL-19JUN26-CDE", side: "SHORT", entry_price: 93.62, size: 1)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("NOL-19JUN26-CDE").and_return(10)
+
+        expect(position.unrealized_pnl_at(93.46)).to eq(1.6)
+      end
+
+      it "returns dollar pnl for long positions" do
+        position.update!(side: "LONG", entry_price: 50_000, size: 2)
+
+        expect(position.unrealized_pnl_at(51_000)).to eq(2_000.0)
+      end
+
+      it "returns nil when price is missing" do
+        expect(position.unrealized_pnl_at(nil)).to be_nil
+      end
+    end
+
     describe "#hit_take_profit?" do
       it "returns true when long position hits take profit" do
         position.update!(take_profit: 51000.0)
