@@ -6,6 +6,8 @@ module Trading
       return nil unless entry_price && current_price && contracts
 
       normalized_side = SideNormalizer.position(side) || side.to_s.upcase
+      return nil unless %w[LONG SHORT].include?(normalized_side)
+
       delta = if normalized_side == "LONG"
         current_price - entry_price
       else

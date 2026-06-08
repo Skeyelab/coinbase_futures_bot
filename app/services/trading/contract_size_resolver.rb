@@ -6,7 +6,7 @@ module Trading
     DEFAULT_CONTRACT_SIZE = 1
 
     def self.for_product(product_id, client: nil)
-      Rails.cache.fetch(cache_key(product_id), expires_in: CACHE_TTL) do
+      Rails.cache.fetch(cache_key(product_id), expires_in: CACHE_TTL, race_condition_ttl: 10.seconds) do
         fetch_from_api(product_id, client: client) || DEFAULT_CONTRACT_SIZE
       end
     end

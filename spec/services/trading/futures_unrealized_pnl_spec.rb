@@ -31,6 +31,10 @@ RSpec.describe Trading::FuturesUnrealizedPnl do
     it "returns nil when required inputs are missing" do
       expect(described_class.calculate(side: "LONG", entry_price: nil, current_price: 100, contracts: 1)).to be_nil
     end
+
+    it "returns nil for unknown sides" do
+      expect(described_class.calculate(side: "UNKNOWN", entry_price: 100, current_price: 101, contracts: 1)).to be_nil
+    end
   end
 
   describe ".from_exchange_position" do
