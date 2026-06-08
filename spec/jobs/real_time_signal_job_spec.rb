@@ -28,12 +28,11 @@ RSpec.describe RealTimeSignalJob, type: :job do
       job.perform
     end
 
-    it "writes last_eval_at to cache after performing" do
+    it "records last_eval_at durably after performing" do
       freeze_time do
         job.perform
 
-        cached = Rails.cache.read("real_time_signal_job.last_eval_at")
-        expect(cached).to eq(Time.current.utc)
+        expect(EvalTimestampStore.read).to eq(Time.current.utc)
       end
     end
 
