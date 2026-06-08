@@ -433,19 +433,21 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true'
         run: |
           echo "=== COVERAGE BADGE GENERATION ==="
-          echo "Looking for coverage data in: coverage/coverage.json"
+          echo "Looking for coverage data under coverage/"
 
-          if [ -f "coverage/coverage.json" ]; then
-            echo "✅ Coverage data found"
+          COVERAGE_JSON=$(find coverage -type f -name coverage.json | head -n 1)
+
+          if [ -n "$COVERAGE_JSON" ]; then
+            echo "✅ Coverage data found at: $COVERAGE_JSON"
             # Extract line coverage percentage from SimpleCov JSON format
             LINE_COVERAGE=$(ruby -rjson -e "
-              data = JSON.parse(File.read('coverage/coverage.json'))
+              data = JSON.parse(File.read(ARGV[0]))
               if data['metrics'] && data['metrics']['covered_percent']
                 puts data['metrics']['covered_percent'].round(0)
               else
                 puts '0'
               end
-            ")
+            " "$COVERAGE_JSON")
 
             echo "Line coverage: ${LINE_COVERAGE}%"
 
@@ -471,7 +473,7 @@ jobs:
           else
             echo "❌ Coverage data not found"
             echo "Available files in coverage directory:"
-            ls -la coverage/ || echo "Coverage directory does not exist"
+            find coverage -maxdepth 3 -type f | sort || echo "Coverage directory does not exist"
             echo "This usually means the CI workflow didn't generate coverage data or the artifact name mismatch"
             exit 1
           fi

@@ -26,6 +26,19 @@
 
 ### Session log
 
+#### 2026-06-08 03:55 UTC
+- Context: PR `#229` CI went red after RSpec artifact changes because the coverage badge job assumed `coverage/coverage.json`, but the downloaded artifact unpacked into a nested directory.
+- Changes:
+  - Updated the coverage badge step to discover `coverage.json` anywhere under `coverage/` instead of assuming a fixed path.
+  - Improved failure logging to print discovered files under `coverage/` for faster CI debugging if artifact layout changes again.
+- Commands run:
+  - `gh pr checks 229`
+  - `gh run view 27113825901 --log-failed`
+- Files touched:
+  - `.github/workflows/ci.yml`, `SESSION_NOTES.md`
+- Next steps:
+  - Re-run CI and compare test job duration across a few runs before claiming wall-clock improvement.
+
 #### 2026-06-08 03:45 UTC
 - Context: Improved RSpec CI output for PR `#229` so parallel runs stay compact in stdout while still producing machine-readable and rerun-friendly artifacts.
 - Changes:
