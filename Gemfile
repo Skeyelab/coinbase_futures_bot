@@ -67,7 +67,7 @@ group :test do
 
   # Code coverage analysis and reporting
   gem "simplecov", "~> 0.22", require: false
-  gem "simplecov-cobertura", "~> 3.1", require: false
+  gem "simplecov-cobertura", "~> 3.2", require: false
   gem "simplecov-json", "~> 0.2", require: false
 end
 
