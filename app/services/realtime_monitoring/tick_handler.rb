@@ -2,9 +2,13 @@
 
 module RealtimeMonitoring
   class TickHandler
-    def initialize(logger: Rails.logger, contract_manager: nil)
+    DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS = 60
+    DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS = 30
+
+    def initialize(logger: Rails.logger, contract_manager: nil, phased_limiter: nil)
       @logger = logger
       @contract_manager = contract_manager || MarketData::FuturesContractManager.new(logger: logger)
+      @phased_limiter = phased_limiter || PhasedRateLimiter.new
     end
 
     def process(ticker_data)
@@ -96,6 +100,8 @@ module RealtimeMonitoring
       upcoming_month_contract = @contract_manager.upcoming_month_contract(asset)
 
       [current_month_contract, upcoming_month_contract].compact.each do |contract_id|
+        next unless basis_monitor_due?(product_id, contract_id)
+
         FuturesBasisMonitoringJob.perform_later(
           spot_product_id: product_id,
           futures_product_id: contract_id,
@@ -104,22 +110,37 @@ module RealtimeMonitoring
       end
     end
 
+    def basis_monitor_due?(spot_product_id, futures_product_id)
+      @phased_limiter.due?(
+        key: "#{spot_product_id}:#{futures_product_id}",
+        interval_seconds: basis_monitor_interval_seconds,
+        cache_prefix: "futures_basis_monitor"
+      )
+    end
+
+    def basis_monitor_interval_seconds
+      seconds = ENV.fetch(
+        "FUTURES_BASIS_MONITOR_INTERVAL_SECONDS",
+        DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS
+      ).to_i
+      seconds.positive? ? seconds : DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS
+    end
+
     def evaluate_rapid_signals(product_id, price)
       asset = extract_asset_from_product_id(product_id)
       return unless asset
 
-      cache_key = "last_signal_eval_#{product_id}"
-      last_eval = Rails.cache.read(cache_key)
+      return unless @phased_limiter.due?(
+        key: product_id,
+        interval_seconds: rapid_signal_interval_seconds,
+        cache_prefix: "last_signal_eval"
+      )
 
-      if !last_eval || (Time.current - last_eval) > 30.seconds
-        Rails.cache.write(cache_key, Time.current, expires_in: 1.minute)
-
-        RapidSignalEvaluationJob.perform_later(
-          product_id: product_id,
-          current_price: price,
-          asset: asset
-        )
-      end
+      RapidSignalEvaluationJob.perform_later(
+        product_id: product_id,
+        current_price: price,
+        asset: asset
+      )
     end
 
     def should_evaluate_signals?(product_id, price)
@@ -138,6 +159,14 @@ module RealtimeMonitoring
 
       Rails.cache.write(last_price_key, price, expires_in: 5.minutes)
       significant_movement
+    end
+
+    def rapid_signal_interval_seconds
+      seconds = ENV.fetch(
+        "RAPID_SIGNAL_INTERVAL_SECONDS",
+        DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS
+      ).to_i
+      seconds.positive? ? seconds : DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS
     end
 
     def spot_relevant?(product_id)
