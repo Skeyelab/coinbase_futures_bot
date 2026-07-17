@@ -73,20 +73,19 @@ module Sentiment
 
     private
 
-    # Oil/energy news feeds. Verified active RSS sources for crude sentiment;
-    # each is polite at the existing fetch cadence and needs no API token.
-    OIL_FEEDS = [
-      {url: "https://oilprice.com/rss/main", source_name: "oilprice_rss"},
-      {url: "https://www.investing.com/rss/news_11.rss", source_name: "investing_commodities_rss"},
-      {url: "https://www.eia.gov/rss/todayinenergy.xml", source_name: "eia_today_in_energy_rss"}
-    ].freeze
-
+    # RSS feeds come from config/sentiment_sources.yml (via SourceConfig) so a
+    # new feed is a config edit, not a code change. The token-based crypto
+    # clients stay explicit as they have bespoke fetch logic.
     def build_clients
+      rss_clients = SourceConfig.default.rss_feeds.map do |feed|
+        GenericRssClient.new(**feed, logger: @logger)
+      end
+
       [
         CryptoPanicClient.new,
         CoindeskRssClient.new,
         CointelegraphRssClient.new,
-        *OIL_FEEDS.map { |feed| GenericRssClient.new(**feed, logger: @logger) }
+        *rss_clients
       ]
     end
   end

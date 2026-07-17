@@ -53,18 +53,14 @@ module Sentiment
       end.uniq
     end
 
-    # Symbol tagging keywords. "gas" is deliberately excluded — it false-positives
-    # heavily on natural gas and gasoline stories unrelated to crude.
-    SYMBOL_KEYWORDS = {
-      "BTC-USD" => /\b(BTC|BITCOIN)\b/,
-      "ETH-USD" => /\b(ETH|ETHEREUM)\b/,
-      "OIL-USD" => /\b(OIL|CRUDE|WTI|BRENT|OPEC|PETROLEUM|BARREL)\b/
-    }.freeze
-
-    # Extract trading-symbol mentions from text
+    # Extract trading-symbol mentions from text. Tagging keywords come from
+    # config/sentiment_sources.yml so a new symbol is a config edit. ("gas" is
+    # intentionally not a crude keyword there — it false-positives on natural
+    # gas and gasoline stories.)
     def extract_crypto_symbols(text)
-      text_upper = text.upcase
-      symbols = SYMBOL_KEYWORDS.filter_map { |symbol, pattern| symbol if text_upper.match?(pattern) }
+      symbols = SourceConfig.default.symbol_keywords.filter_map do |symbol, pattern|
+        symbol if pattern.match?(text)
+      end
 
       symbols.empty? ? [nil] : symbols.uniq
     end
