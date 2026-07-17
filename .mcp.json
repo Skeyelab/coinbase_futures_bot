@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "futuresbot": {
+      "command": "bin/futuresbot",
+      "args": ["mcp"]
+    }
+  }
+}

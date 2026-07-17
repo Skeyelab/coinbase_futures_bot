@@ -24,6 +24,16 @@ RSpec.describe FuturesBotCli, type: :model do
     $stdout = original
   end
 
+  describe "#mcp" do
+    it "runs the MCP stdio server" do
+      server = instance_double(Mcp::Server)
+      allow(Mcp::Server).to receive(:new).and_return(server)
+      expect(server).to receive(:run)
+
+      run_cli("mcp")
+    end
+  end
+
   describe "--json output" do
     it "status --json emits valid JSON with as_of and no ANSI codes" do
       out = capture_stdout { run_cli("status", "--json") }
