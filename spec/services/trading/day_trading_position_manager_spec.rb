@@ -287,6 +287,9 @@ RSpec.describe Trading::DayTradingPositionManager do
 
     context "with real price data from ticks" do
       before do
+        # contract_size 1 keeps the arithmetic explicit; total PnL is now
+        # contract_size-aware dollar math (see #234), not a fractional sum.
+        allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
         # Create ticks with profitable prices
         create(:tick, product_id: "BIT-29AUG25-CDE", price: 51_000.0, observed_at: 1.minute.ago)
         create(:tick, product_id: "ET-29AUG25-CDE", price: 2900.0, observed_at: 1.minute.ago)
@@ -294,15 +297,16 @@ RSpec.describe Trading::DayTradingPositionManager do
 
       it "calculates total PnL for all open day trading positions" do
         result = manager.calculate_total_pnl
-        # Expected PnL: (51000 - 50000) / 50000 * 1.0 = 0.02 = 2%
-        # Expected PnL: (3000 - 2900) / 3000 * 1.0 = 0.0333... = 3.33%
-        # Total: 2% + 3.33% = 5.33%
-        expect(result).to be_within(0.01).of(0.0533) # 5.33% as decimal
+        # Dollar PnL: (51000 - 50000) * 1 contract * 1 = 1000.0
+        # Dollar PnL: (3000 - 2900) * 1 contract * 1 =  100.0  (short)
+        # Total: 1100.0
+        expect(result).to be_within(0.01).of(1100.0)
       end
     end
 
     context "with candle data as fallback" do
       before do
+        allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
         # Create candles when ticks are not available
         create(:candle,
           symbol: "BIT-29AUG25-CDE",
@@ -318,10 +322,10 @@ RSpec.describe Trading::DayTradingPositionManager do
 
       it "calculates PnL using candle data" do
         result = manager.calculate_total_pnl
-        # Expected PnL: (49500 - 50000) / 50000 * 1.0 = -0.01 = -1%
-        # Expected PnL: (3000 - 3050) / 3000 * 1.0 = -0.0166... = -1.67%
-        # Total: -1% + (-1.67%) = -2.67%
-        expect(result).to be_within(0.01).of(-0.0267)
+        # Dollar PnL: (49500 - 50000) * 1 contract * 1 = -500.0
+        # Dollar PnL: (3000 - 3050) * 1 contract * 1 =  -50.0  (short)
+        # Total: -550.0
+        expect(result).to be_within(0.01).of(-550.0)
       end
     end
 
