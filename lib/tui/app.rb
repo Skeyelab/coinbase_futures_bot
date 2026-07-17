@@ -158,8 +158,11 @@ module Tui
     def framed_market_view
       futures = @data[:futures_live_prices] || []
       spot = @data[:spot_live_prices] || []
-      panel("Market", futures.size + spot.size,
-        Tui::Components::PricesPanel.new(futures, spot).render)
+      prices = Tui::Components::PricesPanel.new(futures, spot)
+      [
+        panel("Futures", futures.size, prices.futures_body),
+        panel("Spot", spot.size, prices.spot_body)
+      ].join("\n")
     end
 
     def health_view

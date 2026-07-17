@@ -78,6 +78,13 @@ RSpec.describe Tui::Components::PositionsTable do
       expect(table.render).to include("(0)")
     end
 
+    it "shows an actionable empty state mentioning the sync key" do
+      rendered = table.render
+
+      expect(rendered).to include("No open positions")
+      expect(rendered).to include("[i]")
+    end
+
     context "with positions" do
       let(:position) { create(:position, product_id: "BIT-26JUN26-CDE", side: "LONG", entry_price: 65000, size: 1) }
 
@@ -162,6 +169,13 @@ RSpec.describe Tui::Components::SignalsTable do
       expect(table.render).to include("Active Signals")
     end
 
+    it "shows an actionable empty state explaining evaluation must be running" do
+      rendered = table.render
+
+      expect(rendered).to include("No active signals")
+      expect(rendered).to match(/eval/i)
+    end
+
     context "with signals" do
       let(:signal) { create(:signal_alert, symbol: "BTC-USD", side: "long", confidence: 85) }
 
@@ -202,6 +216,36 @@ RSpec.describe Tui::Components::PricesPanel do
       it "marks live price" do
         expect(panel.render).to include("live")
       end
+    end
+  end
+
+  describe "#futures_body" do
+    let(:futures_tick) { create(:tick, product_id: "BIT-26JUN26-CDE", price: 65000, observed_at: 5.seconds.ago) }
+    let(:spot_tick) { create(:tick, product_id: "BTC-USD", price: 64000, observed_at: 5.seconds.ago) }
+
+    it "renders only futures ticks with freshness, without the section title or spot data" do
+      body = described_class.new([futures_tick], [spot_tick]).futures_body
+
+      expect(body).to include("BIT-26JUN26-CDE").and include("live")
+      expect(body).not_to include("BTC-USD")
+      expect(body).not_to include("Futures Prices")
+    end
+
+    it "shows an empty indicator when there are no futures ticks" do
+      expect(described_class.new([], []).futures_body).to include("no data")
+    end
+  end
+
+  describe "#spot_body" do
+    let(:futures_tick) { create(:tick, product_id: "BIT-26JUN26-CDE", price: 65000, observed_at: 5.seconds.ago) }
+    let(:spot_tick) { create(:tick, product_id: "BTC-USD", price: 64000, observed_at: 5.seconds.ago) }
+
+    it "renders only spot ticks without the section title or futures data" do
+      body = described_class.new([futures_tick], [spot_tick]).spot_body
+
+      expect(body).to include("BTC-USD")
+      expect(body).not_to include("BIT-26JUN26-CDE")
+      expect(body).not_to include("Spot Prices")
     end
   end
 end

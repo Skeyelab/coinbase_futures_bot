@@ -60,4 +60,15 @@ RSpec.describe Tui::App do
       expect(cmd).to be_nil
     end
   end
+
+  describe "market tab" do
+    it "renders futures and spot as separate framed panels" do
+      view = app.send(:framed_market_view)
+
+      expect(view).to include("Futures")
+      expect(view).to include("Spot")
+      # No longer a single combined "Market" frame — each is its own panel.
+      expect(view).not_to include("Market")
+    end
+  end
 end
