@@ -13,5 +13,9 @@ RSpec.describe Sentiment::MultiSourceAggregator, type: :service do
     it "includes an oil news source" do
       expect(names).to include("oilprice_rss")
     end
+
+    it "includes the EIA inventory source" do
+      expect(names).to include("eia_inventory")
+    end
   end
 end
