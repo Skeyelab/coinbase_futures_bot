@@ -37,6 +37,32 @@ RSpec.describe Tui::Components::StatusBar do
         expect(bar.render).to include("HALTED")
       end
     end
+
+    context "sentiment summary" do
+      def snapshot(symbols:, stale: false)
+        Sentiment::Snapshot::Result.new(symbols, Time.now, Time.now, [], stale)
+      end
+
+      def sym(name, z, count, window = "15m")
+        Sentiment::Snapshot::SymbolSnapshot.new(name, z, count, window, Time.now)
+      end
+
+      it "shows a one-liner for symbols that have data" do
+        data[:sentiment] = snapshot(symbols: [sym("OIL-USD", -0.4, 3)])
+
+        expect(bar.render).to include("OIL-USD").and include("z=-0.4").and include("3/15m")
+      end
+
+      it "flags stale sentiment" do
+        data[:sentiment] = snapshot(symbols: [sym("OIL-USD", -0.4, 3)], stale: true)
+
+        expect(bar.render).to match(/stale/i)
+      end
+
+      it "renders without sentiment data present" do
+        expect { bar.render }.not_to raise_error
+      end
+    end
   end
 end
 
