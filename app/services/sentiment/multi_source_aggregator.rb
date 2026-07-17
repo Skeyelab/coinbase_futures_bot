@@ -73,12 +73,20 @@ module Sentiment
 
     private
 
+    # Oil/energy news feeds. Verified active RSS sources for crude sentiment;
+    # each is polite at the existing fetch cadence and needs no API token.
+    OIL_FEEDS = [
+      {url: "https://oilprice.com/rss/main", source_name: "oilprice_rss"},
+      {url: "https://www.investing.com/rss/news_11.rss", source_name: "investing_commodities_rss"},
+      {url: "https://www.eia.gov/rss/todayinenergy.xml", source_name: "eia_today_in_energy_rss"}
+    ].freeze
+
     def build_clients
       [
         CryptoPanicClient.new,
         CoindeskRssClient.new,
-        CointelegraphRssClient.new
-        # Add more clients here as they're implemented
+        CointelegraphRssClient.new,
+        *OIL_FEEDS.map { |feed| GenericRssClient.new(**feed, logger: @logger) }
       ]
     end
   end
