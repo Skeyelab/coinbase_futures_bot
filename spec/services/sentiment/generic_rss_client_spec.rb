@@ -33,4 +33,16 @@ RSpec.describe Sentiment::GenericRssClient, type: :service do
     expect(results.map { |r| r[:symbol] }).to include("OIL-USD")
     expect(results.first[:source]).to eq("oilprice_rss")
   end
+
+  it "does not tag symbols outside the source's configured scope" do
+    # oilprice_rss is scoped to OIL-USD, so a passing bitcoin mention must not
+    # produce a BTC-USD event off an oil feed.
+    item = item_for("Crude rises as bitcoin miners chase cheap oil", "WTI up; bitcoin energy use in focus")
+
+    results = client.send(:normalize_rss_item, item)
+
+    symbols = results.map { |r| r[:symbol] }
+    expect(symbols).to include("OIL-USD")
+    expect(symbols).not_to include("BTC-USD")
+  end
 end

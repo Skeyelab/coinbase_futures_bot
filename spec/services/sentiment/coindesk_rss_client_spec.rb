@@ -17,12 +17,12 @@ RSpec.describe Sentiment::CoindeskRssClient, type: :service do
 
   it "emits a distinct raw_text_hash per symbol for a multi-symbol article" do
     client = described_class.new
-    item = item_for("Bitcoin and crude oil both rally", "BTC and WTI crude climb together")
+    item = item_for("Bitcoin and Ethereum both rally", "BTC and ETH climb together")
 
     results = client.send(:normalize_rss_item, item)
 
     symbols = results.map { |r| r[:symbol] }
-    expect(symbols).to include("BTC-USD", "OIL-USD")
+    expect(symbols).to include("BTC-USD", "ETH-USD")
     hashes = results.map { |r| r[:raw_text_hash] }
     expect(hashes.uniq.size).to eq(hashes.size)
   end

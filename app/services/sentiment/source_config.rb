@@ -28,6 +28,12 @@ module Sentiment
       (sources.dig(source_name, "weight") || 1.0).to_f
     end
 
+    # Symbols a source is allowed to tag. nil means unscoped (tag any symbol).
+    def symbols_for(source_name)
+      scope = sources.dig(source_name, "symbols")
+      scope.presence
+    end
+
     # Word-boundary matcher per symbol, built from its configured keywords, for
     # tagging article text. Case-insensitive.
     def symbol_keywords
