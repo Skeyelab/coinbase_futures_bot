@@ -79,7 +79,7 @@ gem "sentry-ruby"
 gem "jwt", "~> 3.2"
 
 # Slack integration for notifications and bot control
-gem "slack-ruby-client", "~> 3.1"
+gem "slack-ruby-client", "~> 3.2"
 
 # Pagination for API endpoints
 gem "kaminari", "~> 1.2"
