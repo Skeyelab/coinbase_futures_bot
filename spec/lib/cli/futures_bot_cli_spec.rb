@@ -15,6 +15,59 @@ RSpec.describe FuturesBotCli, type: :model do
     described_class.start(args)
   end
 
+  def capture_stdout
+    original = $stdout
+    $stdout = StringIO.new
+    yield
+    $stdout.string
+  ensure
+    $stdout = original
+  end
+
+  describe "--json output" do
+    it "status --json emits valid JSON with as_of and no ANSI codes" do
+      out = capture_stdout { run_cli("status", "--json") }
+
+      parsed = JSON.parse(out)
+      expect(parsed).to include("as_of", "halt", "positions", "dry_run")
+      expect(out).not_to match(/\e\[/)
+    end
+
+    it "positions --json emits a positions array" do
+      create(:position, product_id: "NOL-19JUN26-CDE")
+      out = capture_stdout { run_cli("positions", "--json") }
+
+      expect(JSON.parse(out)["positions"].first).to include("product_id" => "NOL-19JUN26-CDE")
+    end
+
+    it "signals --json emits a signals array" do
+      create(:signal_alert, symbol: "OIL-USD")
+      out = capture_stdout { run_cli("signals", "--json") }
+
+      expect(JSON.parse(out)["signals"].first).to include("symbol" => "OIL-USD")
+    end
+
+    it "halt_status --json emits the halt state" do
+      out = capture_stdout { run_cli("halt_status", "--json") }
+
+      expect(JSON.parse(out)).to include("active" => true, "halted" => false)
+    end
+
+    it "halt --json --reason echoes the resulting halt status" do
+      out = capture_stdout { run_cli("halt", "--json", "--reason", "CPI print") }
+
+      parsed = JSON.parse(out)
+      expect(parsed).to include("halted" => true, "reason" => "CPI print")
+      expect(DryRun.active?).to be false # unrelated state untouched
+    end
+
+    it "honors FUTURESBOT_JSON=1 without the flag" do
+      out = ClimateControl.modify(FUTURESBOT_JSON: "1") { capture_stdout { run_cli("status") } }
+
+      expect { JSON.parse(out) }.not_to raise_error
+    end
+  end
+
   # ── dashboard ────────────────────────────────────────────────────────────────
 
   describe "#dashboard" do
