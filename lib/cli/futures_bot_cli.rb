@@ -106,6 +106,7 @@ module Cli
       puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(signals)}"
       puts "  #{WHITE}Chat sessions:          #{RESET}#{sessions}"
       puts "─" * 40
+      print_paper_section
       print_sentiment_section
       puts "─" * 40
       puts "  #{WHITE}Status:#{RESET} #{GREEN}#{BOLD}operational#{RESET}"
@@ -236,6 +237,23 @@ module Cli
     end
 
     private
+
+    # Prints simulated (paper) account state for `status` when dry-run is active
+    # or paper positions exist: equity, realized/unrealized PnL, and open count.
+    def print_paper_section
+      account = PaperAccount.new
+      return unless DryRun.active? || account.any?
+
+      puts "  #{WHITE}Paper account:#{RESET} #{YELLOW}(simulated)#{RESET}"
+      puts "    Equity: $#{format("%.2f", account.equity)}  " \
+           "(realized #{format_signed(account.realized_pnl)}, unrealized #{format_signed(account.unrealized_pnl)})"
+      puts "    Open paper positions: #{account.open_positions.count}"
+      puts "─" * 40
+    end
+
+    def format_signed(amount)
+      format("%+.2f", amount)
+    end
 
     # Prints a sentiment pipeline summary for `status`: per enabled-contract
     # symbol z-score/count, plus last-event age and a stale/missing warning.
@@ -465,9 +483,10 @@ module Cli
 
     def format_position_row(pos)
       side_color = pos.long? ? GREEN : RED
+      product = pos.paper? ? "🧪#{pos.product_id}" : pos.product_id.to_s
       "  %-6s  %-20s  #{side_color}%-6s#{RESET}  %-12s  %-12s  %-10s" % [
         pos.id,
-        pos.product_id.to_s.truncate(20),
+        product.truncate(20),
         pos.side,
         pos.entry_price&.round(2) || "N/A",
         pos.size,

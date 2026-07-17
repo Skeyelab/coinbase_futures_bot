@@ -108,6 +108,20 @@ RSpec.describe Tui::Components::PositionsTable do
       it "shows unset targets as em dash" do
         expect(table.render).to include("—")
       end
+
+      it "does not mark a live position as paper" do
+        expect(table.render).not_to include("🧪")
+      end
+    end
+
+    context "with a paper (dry-run) position" do
+      let(:position) { create(:position, paper: true, product_id: "NOL-19JUN26-CDE", side: "LONG", entry_price: 91.62, size: 1) }
+
+      subject(:table) { described_class.new([position], {}) }
+
+      it "marks the row with a paper indicator" do
+        expect(table.render).to include("🧪")
+      end
     end
 
     context "with take-profit and stop-loss targets" do
