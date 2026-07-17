@@ -38,10 +38,14 @@ module Tui
       def render
         label = Lipgloss::Style.new.bold(true).foreground("14").render("  Open Positions")
         count = Lipgloss::Style.new.foreground("240").render("  (#{@positions.size})")
-        "#{label}#{count}\n#{@table.view}"
+        "#{label}#{count}\n#{@positions.empty? ? empty_state : @table.view}"
       end
 
       private
+
+      def empty_state
+        Lipgloss::Style.new.foreground("240").render("  No open positions — press [i] to sync from Coinbase")
+      end
 
       def build_rows
         @positions.map do |pos|

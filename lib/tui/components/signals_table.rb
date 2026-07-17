@@ -34,10 +34,14 @@ module Tui
       def render
         label = Lipgloss::Style.new.bold(true).foreground("14").render("  Active Signals")
         count = Lipgloss::Style.new.foreground("240").render("  (#{@signals.size})")
-        "#{label}#{count}\n#{@table.view}"
+        "#{label}#{count}\n#{@signals.empty? ? empty_state : @table.view}"
       end
 
       private
+
+      def empty_state
+        Lipgloss::Style.new.foreground("240").render("  No active signals — evaluation must be running (press [r] to refresh)")
+      end
 
       def build_rows
         @signals.map do |sig|

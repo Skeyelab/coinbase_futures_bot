@@ -17,12 +17,26 @@ module Tui
         lines.join("\n")
       end
 
+      # Section bodies without the inline title, for embedding in a PanelFrame
+      # that already supplies the title (Market tab's futures/spot subpanels).
+      def futures_body
+        section_body(@futures)
+      end
+
+      def spot_body
+        section_body(@spot)
+      end
+
       private
 
       def render_section(title, ticks)
         label = Lipgloss::Style.new.bold(true).foreground("14").render("  #{title}")
+        "#{label}\n#{section_body(ticks)}"
+      end
+
+      def section_body(ticks)
         if ticks.empty?
-          "#{label}\n  #{Lipgloss::Style.new.foreground("240").render("no data")}"
+          "  #{Lipgloss::Style.new.foreground("240").render("no data")}"
         else
           rows = ticks.map do |tick|
             age = tick.observed_at ? (Time.now - tick.observed_at).to_i : nil
@@ -36,7 +50,7 @@ module Tui
             price_style = (age && age < 15) ? Lipgloss::Style.new.foreground("10") : Lipgloss::Style.new.foreground("240")
             "  #{format("%-24s", tick.product_id)}  #{price_style.render(format("%12s", tick.price&.to_s || "N/A"))}  #{Lipgloss::Style.new.foreground("240").render(age_str)}"
           end
-          "#{label}\n#{rows.join("\n")}"
+          rows.join("\n")
         end
       end
     end
