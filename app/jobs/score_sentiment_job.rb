@@ -6,9 +6,9 @@ class ScoreSentimentJob < ApplicationJob
   BATCH_SIZE = 200
 
   def perform
-    scorer = Sentiment::SimpleLexiconScorer.new
+    scorers = Hash.new { |h, symbol| h[symbol] = Sentiment::SimpleLexiconScorer.for(symbol) }
     SentimentEvent.unscored.order(published_at: :asc).limit(BATCH_SIZE).find_each do |evt|
-      score, conf = scorer.score([evt.title, evt.meta.dig("summary")].compact.join(". "))
+      score, conf = scorers[evt.symbol].score(text_for(evt))
       if score
         evt.update_columns(score: score, confidence: conf, updated_at: Time.now.utc)
       else
@@ -17,5 +17,15 @@ class ScoreSentimentJob < ApplicationJob
     rescue => e
       Rails.logger.error("ScoreSentimentJob failed for event #{evt.id}: #{e.class} #{e.message}")
     end
+  end
+
+  private
+
+  # RSS clients store the article body under "description"; CryptoPanic uses
+  # "summary". Score whichever is present alongside the title so the body text
+  # contributes tokens, not just the headline.
+  def text_for(evt)
+    summary = evt.meta.dig("summary") || evt.meta.dig("description")
+    [evt.title, summary].compact.join(". ")
   end
 end

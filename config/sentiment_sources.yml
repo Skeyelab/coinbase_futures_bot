@@ -1,0 +1,51 @@
+# Sentiment source and symbol registry.
+#
+# Adding a tradable symbol or a news feed here is a config change — no code
+# edits across the tagging, scoring, and aggregation layers.
+#
+#   symbols.<SYMBOL>.keywords : words that tag an article with this symbol
+#   symbols.<SYMBOL>.lexicon  : which scoring lexicon to use (see SimpleLexiconScorer)
+#   sources.<name>.client     : "rss" (GenericRssClient) or a built-in client key
+#   sources.<name>.url        : feed URL (rss clients)
+#   sources.<name>.symbols    : symbols this source is allowed to tag (scope)
+#   sources.<name>.weight     : relative trust when aggregating (default 1.0)
+
+symbols:
+  BTC-USD:
+    keywords: [BTC, BITCOIN]
+    lexicon: crypto
+  ETH-USD:
+    keywords: [ETH, ETHEREUM]
+    lexicon: crypto
+  OIL-USD:
+    keywords: [OIL, CRUDE, WTI, BRENT, OPEC, PETROLEUM, BARREL]
+    lexicon: oil
+
+sources:
+  cryptopanic:
+    client: cryptopanic
+    symbols: [BTC-USD, ETH-USD]
+    weight: 1.0
+  coindesk_rss:
+    client: coindesk
+    symbols: [BTC-USD, ETH-USD]
+    weight: 1.0
+  cointelegraph_rss:
+    client: cointelegraph
+    symbols: [BTC-USD, ETH-USD]
+    weight: 1.0
+  oilprice_rss:
+    client: rss
+    url: https://oilprice.com/rss/main
+    symbols: [OIL-USD]
+    weight: 1.0
+  investing_commodities_rss:
+    client: rss
+    url: https://www.investing.com/rss/news_11.rss
+    symbols: [OIL-USD]
+    weight: 0.7
+  eia_today_in_energy_rss:
+    client: rss
+    url: https://www.eia.gov/rss/todayinenergy.xml
+    symbols: [OIL-USD]
+    weight: 1.0

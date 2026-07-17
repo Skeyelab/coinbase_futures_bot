@@ -36,9 +36,11 @@ module Sentiment
       Time.now.utc
     end
 
-    # Common method to generate content hash
-    def generate_content_hash(url, title)
-      Digest::SHA256.hexdigest([url, title].join("|"))
+    # Common method to generate content hash. Include the symbol so an article
+    # tagged with multiple symbols yields a distinct hash per symbol and both
+    # rows survive the (source, raw_text_hash) upsert dedup.
+    def generate_content_hash(url, title, symbol = nil)
+      Digest::SHA256.hexdigest([url, title, symbol].compact.join("|"))
     end
 
     # Common method to map currencies to trading symbols
@@ -51,14 +53,14 @@ module Sentiment
       end.uniq
     end
 
-    # Extract crypto mentions from text
+    # Extract trading-symbol mentions from text. Tagging keywords come from
+    # config/sentiment_sources.yml so a new symbol is a config edit. ("gas" is
+    # intentionally not a crude keyword there — it false-positives on natural
+    # gas and gasoline stories.)
     def extract_crypto_symbols(text)
-      symbols = []
-      text_upper = text.upcase
-
-      # Look for common crypto mentions
-      symbols << "BTC-USD" if text_upper.match?(/\b(BTC|BITCOIN)\b/)
-      symbols << "ETH-USD" if text_upper.match?(/\b(ETH|ETHEREUM)\b/)
+      symbols = SourceConfig.default.symbol_keywords.filter_map do |symbol, pattern|
+        symbol if pattern.match?(text)
+      end
 
       symbols.empty? ? [nil] : symbols.uniq
     end
