@@ -105,6 +105,8 @@ module Cli
       puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(signals)}"
       puts "  #{WHITE}Chat sessions:          #{RESET}#{sessions}"
       puts "─" * 40
+      print_sentiment_section
+      puts "─" * 40
       puts "  #{WHITE}Status:#{RESET} #{GREEN}#{BOLD}operational#{RESET}"
     end
 
@@ -207,6 +209,49 @@ module Cli
     end
 
     private
+
+    # Prints a sentiment pipeline summary for `status`: per enabled-contract
+    # symbol z-score/count, plus last-event age and a stale/missing warning.
+    # Read-only (Sentiment::Snapshot performs no writes).
+    def print_sentiment_section
+      snap = Sentiment::Snapshot.new.call
+      puts "  #{WHITE}Sentiment:#{RESET}"
+
+      if snap.symbols.empty? && snap.last_event_at.nil?
+        puts "    #{YELLOW}No sentiment data yet.#{RESET}"
+        return
+      end
+
+      snap.symbols.each do |s|
+        line = if s.z_score.nil?
+          "    #{s.symbol}: #{YELLOW}no data#{RESET}"
+        else
+          "    #{s.symbol}: z=#{format("%+.1f", s.z_score)} (#{s.event_count}/#{s.window})"
+        end
+        puts line
+      end
+
+      puts "    #{sentiment_freshness(snap)}"
+    end
+
+    def sentiment_freshness(snap)
+      if snap.last_event_at.nil?
+        "#{YELLOW}⚠ STALE — no sentiment events#{RESET}"
+      elsif snap.stale?
+        age = time_ago(snap.last_event_at)
+        "#{YELLOW}⚠ STALE — last event #{age} ago#{RESET}"
+      else
+        "Last event: #{time_ago(snap.last_event_at)} ago"
+      end
+    end
+
+    def time_ago(time)
+      seconds = (Time.current - time).to_i
+      return "#{seconds}s" if seconds < 60
+      return "#{seconds / 60}m" if seconds < 3600
+
+      "#{seconds / 3600}h"
+    end
 
     def sync_startup_positions
       result = StartupPositionSync.new.call
