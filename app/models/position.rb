@@ -200,15 +200,19 @@ class Position < ApplicationRecord
   end
 
   def close_position!(close_price, close_time = Time.current)
+    return if closed?
+
     update!(
       status: "CLOSED",
       close_time: close_time,
-      pnl: calculate_pnl(close_price)
+      pnl: unrealized_pnl_at(close_price)
     )
   end
 
   def force_close!(close_price, reason = "Day trading closure", close_time = Time.current, pnl: nil)
-    resolved_pnl = pnl.nil? ? calculate_pnl(close_price) : pnl
+    return if closed?
+
+    resolved_pnl = pnl.nil? ? unrealized_pnl_at(close_price) : pnl
     update!(
       status: "CLOSED",
       close_time: close_time,
