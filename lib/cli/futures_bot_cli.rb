@@ -246,6 +246,27 @@ module Cli
       puts "   As of : #{s[:as_of]}"
     end
 
+    # ─── sentiment ──────────────────────────────────────────────────────────────
+    desc "sentiment", "Show news sentiment (z-scores + recent headlines) for enabled-contract symbols"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def sentiment
+      return emit_json(OperatorSnapshot.new.sentiment) if json_mode?
+
+      data = OperatorSnapshot.new.sentiment
+      puts "#{BOLD}#{CYAN}📰  Sentiment#{RESET}"
+      puts "─" * 60
+      print_sentiment_section
+      puts "  #{WHITE}Recent headlines:#{RESET}"
+      if data[:recent_events].empty?
+        puts "    #{YELLOW}none#{RESET}"
+      else
+        data[:recent_events].first(6).each do |e|
+          score = e[:score].nil? ? "  ?  " : format("%+.2f", e[:score])
+          puts "    [#{score}] #{e[:source]}: #{e[:title].to_s[0, 60]}"
+        end
+      end
+    end
+
     # ─── mcp ────────────────────────────────────────────────────────────────────
     desc "mcp", "Run the MCP server (stdio JSON-RPC) exposing bot state and control tools to Claude Code"
     def mcp

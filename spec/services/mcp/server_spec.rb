@@ -38,8 +38,8 @@ RSpec.describe Mcp::Server do
       tools = request("tools/list")[:result][:tools]
       names = tools.map { |t| t[:name] }
 
-      expect(names).to include("get_status", "get_positions", "get_signals", "get_halt_status",
-        "halt_trading", "resume_trading", "close_position")
+      expect(names).to include("get_status", "get_positions", "get_signals", "get_sentiment",
+        "get_halt_status", "halt_trading", "resume_trading", "close_position")
       expect(tools.find { |t| t[:name] == "halt_trading" }[:inputSchema]).to be_present
     end
   end
@@ -49,6 +49,17 @@ RSpec.describe Mcp::Server do
       result = tool_call("get_status")
 
       expect(result[:data]).to include("as_of", "halt", "positions")
+    end
+
+    it "get_sentiment returns per-symbol scores and recent news" do
+      create(:contract, enabled: true, product_id: "NOL-19AUG26-CDE", base_currency: "OIL")
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: Time.current - 2.minutes,
+        raw_text_hash: "oil-1", title: "Oil rises 4%", score: 1.0)
+
+      result = tool_call("get_sentiment")
+
+      expect(result[:data]).to include("symbols", "recent_events", "sources")
+      expect(result[:data]["recent_events"].first).to include("title" => "Oil rises 4%")
     end
   end
 
