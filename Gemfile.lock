@@ -204,7 +204,7 @@ GEM
       prism (>= 1.3.0)
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
-    json (2.20.0)
+    json (2.21.1)
     jwt (3.2.0)
       base64
     kaminari (1.2.2)
@@ -433,7 +433,7 @@ GEM
       json
       simplecov
     simplecov_json_formatter (0.1.4)
-    slack-ruby-client (3.1.0)
+    slack-ruby-client (3.2.0)
       faraday (>= 2.0.1)
       faraday-mashify
       faraday-multipart
@@ -523,7 +523,7 @@ DEPENDENCIES
   simplecov (~> 0.22)
   simplecov-cobertura (~> 3.2)
   simplecov-json (~> 0.2)
-  slack-ruby-client (~> 3.1)
+  slack-ruby-client (~> 3.2)
   standard (>= 1.35.1)
   test-prof (~> 1.2)
   tzinfo-data
