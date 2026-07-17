@@ -6,6 +6,10 @@ on:
   push:
     branches: [ main ]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   RAILS_ENV: test
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/coinbase_futures_bot_test
@@ -147,18 +151,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpq-dev pkg-config postgresql-client
 
-      - name: Cache test database and artifacts
+      # Cache only the runtime-balance map used by parallel_rspec. VCR cassettes
+      # are committed to git, so caching them is redundant; spec/**/* in the key
+      # busted the cache on nearly every PR. A stable key keyed on Gemfile.lock
+      # keeps a recent balance map warm without needing an exact match.
+      - name: Cache parallel test runtime map
         if: needs.changes.outputs.docs_only != 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
-          path: |
-            tmp/
-            .rspec_status
-            spec/fixtures/vcr_cassettes/
-          key: ${{ runner.os }}-test-cache-${{ hashFiles('db/**/*', 'spec/**/*', 'Gemfile.lock') }}
+          path: tmp/parallel_runtime_rspec.log
+          key: ${{ runner.os }}-rspec-runtime-${{ hashFiles('Gemfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-test-cache-${{ hashFiles('Gemfile.lock') }}
-            ${{ runner.os }}-test-cache-
+            ${{ runner.os }}-rspec-runtime-
 
       - name: Prepare database (create + migrate)
         if: needs.changes.outputs.docs_only != 'true'
@@ -176,28 +180,6 @@ jobs:
           TEST_ENV_NUMBER=2 bin/rails db:create db:migrate
           echo "Database setup complete"
 
-      - name: Debug environment
-        if: needs.changes.outputs.docs_only != 'true'
-        run: |
-          echo "=== WORKFLOW CACHE TEST - If you see this, cache is refreshed! ==="
-          echo "Current timestamp: $(date +%s)"
-          echo "Workflow file hash: $(sha256sum .github/workflows/ci.yml | cut -d' ' -f1)"
-          echo "=== Environment Debug Info ==="
-          echo "RAILS_ENV: $RAILS_ENV"
-          echo "DATABASE_URL: $DATABASE_URL"
-          echo "COVERAGE: $COVERAGE"
-          echo "BUNDLE_GEMFILE: $BUNDLE_GEMFILE"
-          echo "GEM_HOME: $GEM_HOME"
-          echo "PATH: $PATH"
-          echo "Current working directory: $(pwd)"
-          echo "Directory contents:"
-          ls -la
-          echo "Rails version:"
-          bin/rails --version
-          echo "Database status:"
-          bin/rails db:version
-          echo "=== End Environment Debug ==="
-
       - name: Run tests with coverage
         if: needs.changes.outputs.docs_only != 'true'
         timeout-minutes: 15
@@ -209,111 +191,28 @@ jobs:
           STACKPROF: ""
           TAG_PROF: ""
           FORCE_REAL_TESTS: "true"
-          RAILS_CACHE_ID: "ci-$(date +%s)"
           VCR_RECORD_MODE: none
           CI: true
           COVERAGE: true
         run: |
-          # Disable 'exit on error' for this block; we'll control exit codes manually
+          # Control exit code manually so coverage checks still see a result.
           set +e
-          echo "=== STARTING TEST SUITE WITH COVERAGE ==="
-          echo "Database URL: $DATABASE_URL"
-          echo "Rails env: $RAILS_ENV"
-          echo "Coverage enabled: $COVERAGE"
-          echo "Current directory: $(pwd)"
-          echo "Ruby version: $(ruby --version)"
-          echo "Bundle version: $(bundle --version)"
-
-          # Verify test environment
-          echo "=== TEST ENVIRONMENT VERIFICATION ==="
-          echo "Test files found: $(find spec -name '*_spec.rb' | wc -l)"
-          echo "Parallel config: $PARALLEL_RSPEC_CONFIG"
-          echo "Test profiling disabled: $SAMPLE$RPROF$STACKPROF$TAG_PROF"
-
-          # Verify database connectivity with real operations
-          echo "=== VERIFYING REAL DATABASE OPERATIONS ==="
-          TEST_ENV_NUMBER=1 bin/rails runner "puts 'Database: ' + ActiveRecord::Base.connection.current_database"
-          TEST_ENV_NUMBER=1 bin/rails runner "puts 'Tables: ' + ActiveRecord::Base.connection.tables.join(', ')"
-
-          # Test real database operations
-          echo "=== TESTING REAL DATABASE OPERATIONS ==="
-          TEST_ENV_NUMBER=1 bin/rails runner "
-            begin
-              # Create a test record
-              test_pos = Position.create!(
-                product_id: 'CI-VERIFY-TEST',
-                side: 'LONG',
-                size: 1.0,
-                entry_price: 100.0,
-                entry_time: Time.current,
-                status: 'OPEN',
-                day_trading: true
-              )
-              puts '✅ Real Position creation verified (ID: ' + test_pos.id.to_s + ')'
-
-              # Verify it exists
-              found = Position.find_by(product_id: 'CI-VERIFY-TEST')
-              puts '✅ Real Position retrieval verified: ' + (found ? 'SUCCESS' : 'FAILED')
-
-              # Clean up
-              test_pos.destroy
-              puts '✅ Real Position deletion verified'
-            rescue => e
-              puts '❌ Real database operations failed: ' + e.message
-              exit 1
-            end
-          "
-
-          # Run full suite in parallel with explicit CI config and runtime-based balancing
-          echo "=== RUNNING FULL TEST SUITE IN PARALLEL ==="
-          echo "🧪 FULL SUITE STARTING: $(date)"
 
           bin/parallel_rspec
-
           TEST_EXIT_CODE=$?
-          echo "🧪 FINISHED: $(date)"
 
-          echo "=== TEST RESULTS ==="
-          echo "Test exit code: $TEST_EXIT_CODE"
-          echo "Tests completed"
-
-          # Check for coverage files
-          echo "=== CHECKING COVERAGE FILES ==="
           if [ -f "coverage/.resultset.json" ]; then
             echo "✅ Coverage file generated: coverage/.resultset.json"
-            echo "Coverage file size: $(ls -lh coverage/.resultset.json | awk '{print $5}')"
           else
             echo "❌ Coverage file not found"
           fi
 
-          if [ -f "coverage/index.html" ]; then
-            echo "✅ HTML coverage report generated: coverage/index.html"
-          else
-            echo "❌ HTML coverage report not found"
-          fi
-
-          # Check for background processes
-          echo "=== CHECKING FOR BACKGROUND PROCESSES ==="
-          set +x
-          ps aux | grep ruby || echo "No Ruby processes found"
-
-          # Check for database connections
-          echo "=== CHECKING FOR DATABASE CONNECTIONS ==="
-          bin/rails runner "puts ActiveRecord::Base.connection_pool.stat"
-
-          # Check for file descriptors
-          echo "=== CHECKING FOR FILE DESCRIPTORS ==="
-          lsof -p $$ 2>/dev/null | wc -l || echo "lsof not available"
-
-          # Check for errors in test output
-          echo "=== CHECKING FOR ERRORS IN TEST OUTPUT ==="
           if [ $TEST_EXIT_CODE -eq 0 ]; then
             echo "✅ Tests passed successfully"
           else
             echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
           fi
 
-          # Exit with test result code
           exit $TEST_EXIT_CODE
 
       - name: Upload coverage reports

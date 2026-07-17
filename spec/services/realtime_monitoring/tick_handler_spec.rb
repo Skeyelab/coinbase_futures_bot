@@ -68,4 +68,55 @@ RSpec.describe RealtimeMonitoring::TickHandler do
       expect(handler.send(:extract_asset_from_product_id, "NOL-19JUN26-CDE")).to eq("OIL")
     end
   end
+
+  describe "#update_futures_monitoring" do
+    let(:current_contract) { "BIT-31JUL26-CDE" }
+    let(:upcoming_contract) { "BIT-28AUG26-CDE" }
+
+    before do
+      allow(contract_manager).to receive(:current_month_contract).with("BTC").and_return(current_contract)
+      allow(contract_manager).to receive(:upcoming_month_contract).with("BTC").and_return(upcoming_contract)
+      allow(FuturesBasisMonitoringJob).to receive(:perform_later)
+    end
+
+    it "enqueues basis monitoring for each futures contract on first spot tick" do
+      handler.send(:update_futures_monitoring, "BTC-USD", 50_000.0)
+
+      expect(FuturesBasisMonitoringJob).to have_received(:perform_later).with(
+        spot_product_id: "BTC-USD",
+        futures_product_id: current_contract,
+        spot_price: 50_000.0
+      )
+      expect(FuturesBasisMonitoringJob).to have_received(:perform_later).with(
+        spot_product_id: "BTC-USD",
+        futures_product_id: upcoming_contract,
+        spot_price: 50_000.0
+      )
+    end
+
+    it "rate limits basis monitoring jobs per spot and futures contract pair" do
+      cache = {}
+      allow(Rails.cache).to receive(:read) { |key| cache[key] }
+      allow(Rails.cache).to receive(:write) { |key, value, **_opts| cache[key] = value }
+
+      handler.send(:update_futures_monitoring, "BTC-USD", 50_000.0)
+      handler.send(:update_futures_monitoring, "BTC-USD", 50_100.0)
+
+      expect(FuturesBasisMonitoringJob).to have_received(:perform_later).twice
+    end
+
+    it "enqueues again after the rate limit window expires" do
+      cache = {}
+      allow(Rails.cache).to receive(:read) { |key| cache[key] }
+      allow(Rails.cache).to receive(:write) { |key, value, **_opts| cache[key] = value }
+
+      handler.send(:update_futures_monitoring, "BTC-USD", 50_000.0)
+
+      travel 61.seconds do
+        handler.send(:update_futures_monitoring, "BTC-USD", 50_200.0)
+      end
+
+      expect(FuturesBasisMonitoringJob).to have_received(:perform_later).exactly(4).times
+    end
+  end
 end
