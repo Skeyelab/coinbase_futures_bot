@@ -126,6 +126,21 @@ RSpec.describe FuturesBotCli, type: :model do
       it "does not show DRY-RUN when running live" do
         expect { run_cli("status") }.not_to output(/DRY-RUN/).to_stdout
       end
+
+      it "shows a paper account section with equity when dry-run is active" do
+        DryRun.enable!
+        expect { run_cli("status") }.to output(/Paper account.*Equity/m).to_stdout
+      end
+
+      it "reflects realized paper PnL in equity" do
+        create(:position, paper: true, status: "CLOSED", pnl: 100.0, close_time: Time.current)
+        DryRun.enable!
+        expect { run_cli("status") }.to output(/10100/).to_stdout
+      end
+
+      it "omits the paper section when live and no paper positions exist" do
+        expect { run_cli("status") }.not_to output(/Paper account/).to_stdout
+      end
     end
   end
 
@@ -192,6 +207,14 @@ RSpec.describe FuturesBotCli, type: :model do
 
       it "shows 'No open positions found'" do
         expect { run_cli("positions") }.to output(/No open positions found/).to_stdout
+      end
+    end
+
+    context "with a paper (dry-run) position" do
+      before { create(:position, paper: true, product_id: "NOL-19JUN26-CDE") }
+
+      it "marks paper rows with an indicator" do
+        expect { run_cli("positions") }.to output(/🧪/).to_stdout
       end
     end
 

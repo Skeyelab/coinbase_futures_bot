@@ -47,13 +47,20 @@ module Tui
         Lipgloss::Style.new.foreground("240").render("  No open positions — press [i] to sync from Coinbase")
       end
 
+      # Paper (dry-run) positions are prefixed with a 🧪 marker so they are
+      # visually distinct from live positions in a mixed list.
+      def product_label(pos)
+        label = pos.paper? ? "🧪#{pos.product_id}" : pos.product_id.to_s
+        label[0, 18]
+      end
+
       def build_rows
         @positions.map do |pos|
           pnl = unrealized_pnl_for(pos)
           pnl_str = pnl ? format("%+.2f", pnl) : "N/A"
           [
             pos.id.to_s,
-            pos.product_id.to_s[0, 18],
+            product_label(pos),
             pos.side.to_s,
             pos.entry_price&.round(2)&.to_s || "N/A",
             pos.size.to_s[0, 6],
