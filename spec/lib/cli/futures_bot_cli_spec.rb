@@ -116,6 +116,26 @@ RSpec.describe FuturesBotCli, type: :model do
     it "shows operational status" do
       expect { run_cli("status") }.to output(/operational/).to_stdout
     end
+
+    context "sentiment section" do
+      it "includes a sentiment section" do
+        expect { run_cli("status") }.to output(/Sentiment/).to_stdout
+      end
+
+      it "shows the z-score for an enabled contract's symbol when data exists" do
+        create(:contract, enabled: true, product_id: "NOL-19JUN26-CDE", base_currency: "OIL")
+        SentimentAggregate.create!(symbol: "OIL-USD", window: "15m", window_end_at: Time.current - 5.minutes,
+          count: 3, avg_score: -0.2, z_score: -0.4)
+        SentimentEvent.create!(source: "coindesk", symbol: "OIL-USD", published_at: Time.current - 2.minutes,
+          raw_text_hash: "cli-oil-1", title: "crude selloff")
+
+        expect { run_cli("status") }.to output(/OIL-USD.*z=.*-0\.4.*3\/15m/m).to_stdout
+      end
+
+      it "shows a missing/stale state when there is no sentiment data" do
+        expect { run_cli("status") }.to output(/no sentiment data|stale/i).to_stdout
+      end
+    end
   end
 
   # ── positions ────────────────────────────────────────────────────────────────
