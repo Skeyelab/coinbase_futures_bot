@@ -138,15 +138,17 @@ class Position < ApplicationRecord
     end
   end
 
+  # Dollar unrealized PnL for an open position. Delegates to the single source
+  # of truth (Trading::FuturesUnrealizedPnl via #unrealized_pnl_at) so every
+  # caller gets contract_size-aware dollar math. Returns 0 (not nil) when the
+  # position is closed or no price is available, preserving the historical
+  # contract for callers that sum results.
+  #
+  # NOTE: this used to return a fractional value ((Δ/entry) * size) with no
+  # contract_size, which produced ~contract_size×-wrong dollar figures for
+  # futures like NOL (contract_size 10). See #234.
   def calculate_pnl(current_price)
-    return 0 unless open? && current_price
-    return 0 unless entry_price
-
-    if long?
-      ((current_price - entry_price) / entry_price) * size
-    else
-      ((entry_price - current_price) / entry_price) * size
-    end
+    unrealized_pnl_at(current_price) || 0
   end
 
   def unrealized_pnl_at(current_price)
