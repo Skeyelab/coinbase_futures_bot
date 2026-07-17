@@ -47,7 +47,7 @@ RSpec.describe ChatBotService, type: :service do
 
     before do
       allow(ai_service).to receive(:process_command).and_return(ai_response)
-      allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
+      allow(TradingHalt).to receive(:active?).and_return(true)
     end
 
     context "with valid input" do
@@ -96,7 +96,7 @@ RSpec.describe ChatBotService, type: :service do
   describe "command execution" do
     before do
       allow(ai_service).to receive(:process_command).and_return({content: "position query"})
-      allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
+      allow(TradingHalt).to receive(:active?).and_return(true)
     end
 
     describe "position queries" do

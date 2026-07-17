@@ -157,10 +157,13 @@ RSpec.configure do |config|
 
   # Test effectiveness validation
   config.before(:each) do |example|
-    # TradingHalt shares Rails.cache with legacy chat/trading keys; examples that
-    # pause trading must not leak `trading_active: false` into unrelated specs.
-    Rails.cache.delete(TradingHalt::CACHE_KEY_ACTIVE)
-    Rails.cache.delete(TradingHalt::CACHE_KEY_REASON)
+    # TradingHalt state is DB-backed (bot_runtime_stats); examples that pause
+    # trading must not leak `halted: true` into unrelated specs. Transactional
+    # fixtures roll most of this back, but clear explicitly for non-transactional
+    # examples and any leftover legacy cache keys.
+    BotRuntimeStat.where(key: TradingHalt::STORE_KEY).delete_all if ActiveRecord::Base.connection.data_source_exists?(:bot_runtime_stats)
+    Rails.cache.delete("trading_active")
+    Rails.cache.delete("trading_halt_reason")
 
     puts "\n🧪 Running: #{example.full_description}" unless ENV["TEST_ENV_NUMBER"]
     clear_enqueued_jobs

@@ -36,27 +36,27 @@ RSpec.describe ChatBotService, type: :service do
 
       context "when trading is currently inactive" do
         before do
-          Rails.cache.write("trading_active", false)
+          TradingHalt.halt!(reason: "test setup")
         end
 
         it "activates trading and returns success message" do
           result = service.process("start trading")
 
           expect(result).to include("✅ Trading has been activated")
-          expect(Rails.cache.read("trading_active")).to be(true)
+          expect(TradingHalt.active?).to be(true)
         end
       end
 
       context "when trading is already active" do
         before do
-          Rails.cache.write("trading_active", true)
+          TradingHalt.resume!
         end
 
         it "returns already active message" do
           result = service.process("start trading")
 
           expect(result).to include("Trading is already active")
-          expect(Rails.cache.read("trading_active")).to be(true)
+          expect(TradingHalt.active?).to be(true)
         end
       end
     end
@@ -70,27 +70,27 @@ RSpec.describe ChatBotService, type: :service do
 
       context "when trading is currently active" do
         before do
-          Rails.cache.write("trading_active", true)
+          TradingHalt.resume!
         end
 
         it "pauses trading and returns success message" do
           result = service.process("stop trading")
 
           expect(result).to include("⏸️ Trading has been paused")
-          expect(Rails.cache.read("trading_active")).to be(false)
+          expect(TradingHalt.active?).to be(false)
         end
       end
 
       context "when trading is already inactive" do
         before do
-          Rails.cache.write("trading_active", false)
+          TradingHalt.halt!(reason: "test setup")
         end
 
         it "returns already inactive message" do
           result = service.process("stop trading")
 
           expect(result).to include("Trading is already inactive")
-          expect(Rails.cache.read("trading_active")).to be(false)
+          expect(TradingHalt.active?).to be(false)
         end
       end
     end
@@ -108,8 +108,8 @@ RSpec.describe ChatBotService, type: :service do
         expect(result).to include("🚨 EMERGENCY STOP EXECUTED 🚨")
         expect(result).to include("Positions closed: 0")
         expect(result).to include("Orders cancelled: 0")
-        expect(Rails.cache.read("trading_active")).to be(false)
-        expect(Rails.cache.read("emergency_stop")).to be(true)
+        expect(TradingHalt.active?).to be(false)
+        expect(TradingHalt.status[:reason]).to include("emergency_stop")
       end
 
       context "with open positions" do
@@ -222,21 +222,21 @@ RSpec.describe ChatBotService, type: :service do
         expect(service.send(:trading_active?)).to be(true)
       end
 
-      it "returns cached status when set" do
+      it "returns the durable status when set" do
         service.send(:set_trading_status, false)
         expect(service.send(:trading_active?)).to be(false)
       end
     end
 
     describe "#set_trading_status" do
-      it "sets trading status in cache" do
+      it "persists trading status in the durable store" do
         service.send(:set_trading_status, false)
-        expect(Rails.cache.read("trading_active")).to be(false)
+        expect(TradingHalt.active?).to be(false)
       end
 
-      it "sets emergency flag when specified" do
+      it "records an emergency reason when specified" do
         service.send(:set_trading_status, false, emergency: true)
-        expect(Rails.cache.read("emergency_stop")).to be(true)
+        expect(TradingHalt.status[:reason]).to include("emergency_stop")
       end
     end
   end

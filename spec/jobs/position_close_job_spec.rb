@@ -18,6 +18,7 @@ RSpec.describe PositionCloseJob, type: :job do
   end
 
   before do
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
     allow(Rails).to receive(:logger).and_return(logger)
     allow(logger).to receive(:info)
     allow(logger).to receive(:warn)

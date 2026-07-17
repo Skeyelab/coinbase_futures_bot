@@ -713,15 +713,18 @@ class SlackCommandHandler
     end
 
     def set_trading_status(active, emergency: false)
-      # This would set a flag in Redis or database to control trading
-      # For now, we'll use Rails cache
-      Rails.cache.write("trading_active", active)
-      Rails.cache.write("emergency_stop", emergency) if emergency
+      # Delegate to TradingHalt so the state is durable and shared across every
+      # process (a Slack "stop" must reach the running bot).
+      if active
+        TradingHalt.resume!
+      else
+        TradingHalt.halt!(reason: emergency ? "emergency_stop (slack)" : "slack stop")
+      end
       Rails.logger.info("[SlackCommand] Trading status set to: #{active ? "active" : "inactive"}#{" (EMERGENCY)" if emergency}")
     end
 
     def trading_active?
-      Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+      TradingHalt.active?
     end
 
     def database_connected?
