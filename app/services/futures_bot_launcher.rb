@@ -11,25 +11,30 @@
 # The caller owns the TUI instance so it can inject a custom one in tests.
 class FuturesBotLauncher
   THREAD_SHUTDOWN_TIMEOUT = 1
-  attr_reader :spot_thread, :futures_thread, :signal_thread
+  attr_reader :spot_thread, :futures_thread, :signal_thread, :sentiment_thread
 
   def initialize(
     logger: Rails.logger,
     tui: nil,
     tui_refresh: nil,
     signal_interval: ENV.fetch("REALTIME_SIGNAL_EVALUATION_INTERVAL", "30").to_i,
+    sentiment_interval: ENV.fetch("SENTIMENT_PIPELINE_INTERVAL_SECONDS", "120").to_i,
     skip_market_data: ENV["FUTURESBOT_SKIP_MARKET_DATA"].present?,
-    skip_signal_runner: ENV["FUTURESBOT_SKIP_SIGNAL_RUNNER"].present?
+    skip_signal_runner: ENV["FUTURESBOT_SKIP_SIGNAL_RUNNER"].present?,
+    skip_sentiment_pipeline: ENV["FUTURESBOT_SKIP_SENTIMENT_PIPELINE"].present?
   )
     @logger = logger
     @tui = tui || :bubbletea
     @tui_refresh = tui_refresh
     @signal_interval = signal_interval
+    @sentiment_interval = sentiment_interval
     @skip_market_data = skip_market_data
     @skip_signal_runner = skip_signal_runner
+    @skip_sentiment_pipeline = skip_sentiment_pipeline
     @spot_thread = nil
     @futures_thread = nil
     @signal_thread = nil
+    @sentiment_thread = nil
     @spot_subscriber = nil
     @futures_subscriber = nil
     @shutdown_requested = false
@@ -42,6 +47,7 @@ class FuturesBotLauncher
 
     start_market_data unless @skip_market_data
     start_signal_runner unless @skip_signal_runner
+    start_sentiment_pipeline unless @skip_sentiment_pipeline
 
     @logger.info("[Launcher] Launching TUI dashboard...")
     if @tui == :bubbletea
@@ -64,6 +70,7 @@ class FuturesBotLauncher
     stop_thread(@spot_thread, label: "spot subscriber")
     stop_thread(@futures_thread, label: "futures subscriber")
     stop_thread(@signal_thread, label: "signal runner")
+    stop_thread(@sentiment_thread, label: "sentiment pipeline")
 
     @logger.info("[Launcher] Shutdown complete.")
   end
@@ -134,6 +141,26 @@ class FuturesBotLauncher
       end
     rescue => e
       @logger.error("[Launcher] Signal runner error: #{e.class}: #{e.message}")
+    end
+  end
+
+  def start_sentiment_pipeline
+    runner = Sentiment::PipelineRunner.new(
+      logger: @logger,
+      interval_seconds: @sentiment_interval
+    )
+
+    @sentiment_thread = Thread.new do
+      @logger.info("[Launcher] Sentiment pipeline starting (interval=#{@sentiment_interval}s)...")
+      runner.start!
+      loop do
+        sleep 1
+        break if @shutdown_requested
+
+        runner.tick(now: Time.current.utc)
+      end
+    rescue => e
+      @logger.error("[Launcher] Sentiment pipeline error: #{e.class}: #{e.message}")
     end
   end
 
