@@ -49,3 +49,9 @@ sources:
     url: https://www.eia.gov/rss/todayinenergy.xml
     symbols: [OIL-USD]
     weight: 1.0
+  # Numeric fundamental (weekly crude build/draw), built explicitly by
+  # EiaInventoryClient — not an rss feed. Needs ENV["EIA_API_KEY"].
+  eia_inventory:
+    client: eia
+    symbols: [OIL-USD]
+    weight: 1.5

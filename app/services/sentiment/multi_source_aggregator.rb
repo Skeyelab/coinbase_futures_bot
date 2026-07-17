@@ -85,6 +85,7 @@ module Sentiment
         CryptoPanicClient.new,
         CoindeskRssClient.new,
         CointelegraphRssClient.new,
+        EiaInventoryClient.new(logger: @logger),
         *rss_clients
       ]
     end
