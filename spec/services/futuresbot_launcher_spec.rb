@@ -18,7 +18,8 @@ RSpec.describe FuturesBotLauncher do
       logger: logger,
       tui: mock_tui,
       skip_market_data: true,
-      skip_signal_runner: true
+      skip_signal_runner: true,
+      skip_sentiment_pipeline: true
     )
   end
 
@@ -45,6 +46,20 @@ RSpec.describe FuturesBotLauncher do
       ClimateControl.modify(REALTIME_SIGNAL_EVALUATION_INTERVAL: "45") do
         l = described_class.new(logger: logger, tui: mock_tui)
         expect(l.instance_variable_get(:@signal_interval)).to eq(45)
+      end
+    end
+
+    it "defaults skip_sentiment_pipeline from env var" do
+      ClimateControl.modify(FUTURESBOT_SKIP_SENTIMENT_PIPELINE: "1") do
+        l = described_class.new(logger: logger, tui: mock_tui)
+        expect(l.instance_variable_get(:@skip_sentiment_pipeline)).to be true
+      end
+    end
+
+    it "reads sentiment interval from env var" do
+      ClimateControl.modify(SENTIMENT_PIPELINE_INTERVAL_SECONDS: "300") do
+        l = described_class.new(logger: logger, tui: mock_tui)
+        expect(l.instance_variable_get(:@sentiment_interval)).to eq(300)
       end
     end
   end
@@ -86,7 +101,8 @@ RSpec.describe FuturesBotLauncher do
           logger: logger,
           tui: mock_tui,
           skip_market_data: false,
-          skip_signal_runner: true
+          skip_signal_runner: true,
+          skip_sentiment_pipeline: true
         )
       end
 
@@ -189,6 +205,7 @@ RSpec.describe FuturesBotLauncher do
           tui: mock_tui,
           skip_market_data: true,
           skip_signal_runner: false,
+          skip_sentiment_pipeline: true,
           signal_interval: 30
         )
       end
@@ -205,6 +222,39 @@ RSpec.describe FuturesBotLauncher do
         launcher.start
       end
     end
+
+    context "when sentiment pipeline is not skipped" do
+      let(:mock_runner) { instance_double(Sentiment::PipelineRunner) }
+
+      before do
+        allow(Sentiment::PipelineRunner).to receive(:new).and_return(mock_runner)
+        allow(mock_runner).to receive(:start!)
+        allow(mock_runner).to receive(:tick)
+      end
+
+      subject(:launcher) do
+        described_class.new(
+          logger: logger,
+          tui: mock_tui,
+          skip_market_data: true,
+          skip_signal_runner: true,
+          skip_sentiment_pipeline: false,
+          sentiment_interval: 300
+        )
+      end
+
+      it "spawns a sentiment pipeline thread" do
+        launcher.start
+        expect(launcher.sentiment_thread).to be_a(Thread)
+      end
+
+      it "passes the sentiment interval to the runner" do
+        expect(Sentiment::PipelineRunner).to receive(:new).with(
+          hash_including(interval_seconds: 300)
+        ).and_return(mock_runner)
+        launcher.start
+      end
+    end
   end
 
   describe "#shutdown" do
@@ -217,6 +267,13 @@ RSpec.describe FuturesBotLauncher do
 
     it "tolerates nil threads" do
       expect { launcher.shutdown }.not_to raise_error
+    end
+
+    it "stops the sentiment pipeline thread" do
+      t = Thread.new { sleep 60 }
+      launcher.instance_variable_set(:@sentiment_thread, t)
+      launcher.shutdown
+      expect(t.alive?).to be false
     end
 
     it "stops subscribers cooperatively before killing threads" do
