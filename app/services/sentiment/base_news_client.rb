@@ -56,9 +56,15 @@ module Sentiment
     # Extract trading-symbol mentions from text. Tagging keywords come from
     # config/sentiment_sources.yml so a new symbol is a config edit. ("gas" is
     # intentionally not a crude keyword there — it false-positives on natural
-    # gas and gasoline stories.)
+    # gas and gasoline stories.) Results are restricted to the source's declared
+    # symbol scope so an oil feed doesn't tag BTC off a passing mention.
     def extract_crypto_symbols(text)
-      symbols = SourceConfig.default.symbol_keywords.filter_map do |symbol, pattern|
+      config = SourceConfig.default
+      scope = config.symbols_for(source_name)
+
+      symbols = config.symbol_keywords.filter_map do |symbol, pattern|
+        next if scope && !scope.include?(symbol)
+
         symbol if pattern.match?(text)
       end
 

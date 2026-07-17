@@ -23,6 +23,16 @@ RSpec.describe Sentiment::SourceConfig do
 
   subject(:config) { described_class.new(YAML.safe_load(yaml)) }
 
+  describe "#symbols_for" do
+    it "returns the source's declared symbol scope" do
+      expect(config.symbols_for("oilprice_rss")).to eq(["OIL-USD"])
+    end
+
+    it "returns nil when a source declares no scope (tags any symbol)" do
+      expect(config.symbols_for("cryptopanic")).to be_nil
+    end
+  end
+
   describe "#rss_feeds" do
     it "returns only the rss-client sources with url and source name" do
       feeds = config.rss_feeds
