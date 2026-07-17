@@ -92,7 +92,10 @@ module Cli
 
     # ─── status ─────────────────────────────────────────────────────────────────
     desc "status", "Show the current bot and system status"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def status
+      return emit_json(OperatorSnapshot.new.status) if json_mode?
+
       day_pos = Position.open.day_trading.count
       swing_pos = Position.open.swing_trading.count
       signals = SignalAlert.active.count
@@ -118,7 +121,10 @@ module Cli
       desc: "Filter by type: day | swing"
     method_option :limit, aliases: "-n", type: :numeric, default: 20,
       desc: "Maximum number of positions to display"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def positions
+      return emit_json(OperatorSnapshot.new.positions) if json_mode?
+
       scope = Position.open
       scope = scope.day_trading if options[:type] == "day"
       scope = scope.swing_trading if options[:type] == "swing"
@@ -144,7 +150,10 @@ module Cli
       desc: "Maximum number of signals to display"
     method_option :min_confidence, aliases: "-c", type: :numeric, default: 0,
       desc: "Minimum confidence threshold (0-100)"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def signals
+      return emit_json(OperatorSnapshot.new.signals) if json_mode?
+
       scope = SignalAlert.active.recent
       scope = scope.high_confidence(options[:min_confidence]) if options[:min_confidence] > 0
       rows = scope.order(alert_timestamp: :desc).limit(options[:limit]).to_a
@@ -174,8 +183,11 @@ module Cli
     # ─── halt ───────────────────────────────────────────────────────────────────
     desc "halt", "Halt all trading immediately (kill switch)"
     method_option :reason, aliases: "-r", type: :string, desc: "Reason for the halt"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def halt
       status = TradingHalt.halt!(reason: options[:reason])
+      return emit_json(status) if json_mode?
+
       puts "#{RED}#{BOLD}🔴 Trading HALTED#{RESET}"
       puts "   Reason : #{status[:reason] || "(none)"}"
       puts "   As of  : #{status[:as_of]}"
@@ -183,15 +195,21 @@ module Cli
 
     # ─── resume ─────────────────────────────────────────────────────────────────
     desc "resume", "Resume trading after a halt"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def resume
       status = TradingHalt.resume!
+      return emit_json(status) if json_mode?
+
       puts "#{GREEN}#{BOLD}🟢 Trading RESUMED#{RESET}"
       puts "   As of : #{status[:as_of]}"
     end
 
     # ─── halt_status ────────────────────────────────────────────────────────────
     desc "halt_status", "Show current trading halt / kill-switch status"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def halt_status
+      return emit_json(OperatorSnapshot.new.halt_status) if json_mode?
+
       s = TradingHalt.status
       if s[:active]
         puts "#{GREEN}#{BOLD}🟢 Trading is ACTIVE#{RESET}"
@@ -237,6 +255,17 @@ module Cli
     end
 
     private
+
+    # True when JSON output is requested via the --json flag or FUTURESBOT_JSON.
+    def json_mode?
+      options[:json] || ENV["FUTURESBOT_JSON"].present?
+    end
+
+    # Emit a single JSON document to stdout with no ANSI codes, for machine
+    # consumers (the /futuresbot skill and MCP server).
+    def emit_json(data)
+      puts JSON.generate(data)
+    end
 
     # Prints simulated (paper) account state for `status` when dry-run is active
     # or paper positions exist: equity, realized/unrealized PnL, and open count.
