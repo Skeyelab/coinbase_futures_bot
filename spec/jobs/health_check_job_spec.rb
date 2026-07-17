@@ -380,10 +380,13 @@ RSpec.describe HealthCheckJob, type: :job do
   end
 
   describe "#check_trading_status" do
-    it "returns cached trading active status" do
-      expect(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
-
+    it "returns the durable TradingHalt state (active by default)" do
       expect(job.send(:check_trading_status)).to be true
+    end
+
+    it "reflects a halt from the durable store" do
+      TradingHalt.halt!(reason: "test")
+      expect(job.send(:check_trading_status)).to be false
     end
   end
 

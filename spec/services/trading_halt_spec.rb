@@ -3,14 +3,15 @@
 require "rails_helper"
 
 RSpec.describe TradingHalt do
-  let(:cache) { ActiveSupport::Cache::MemoryStore.new }
   let(:logger) { instance_double(Logger, warn: true, info: true) }
-  let(:halt) { described_class.new(logger: logger, cache: cache) }
+  let(:halt) { described_class.new(logger: logger) }
 
-  before { cache.clear }
+  # The store is DB-backed (bot_runtime_stats). Clear the cache in each example
+  # to prove the cache is NOT the source of truth for halt state.
+  before { Rails.cache.clear }
 
   describe "#active?" do
-    it "returns true when no cache entry exists (default-on)" do
+    it "returns true when no record exists (default-on)" do
       expect(halt.active?).to be true
     end
 
@@ -26,11 +27,46 @@ RSpec.describe TradingHalt do
     end
   end
 
-  describe "#halted?" do
-    it "is the inverse of active?" do
-      expect(halt.halted?).to be false
-      halt.halt!
-      expect(halt.halted?).to be true
+  describe "cross-process durability (the #289 fix)" do
+    it "a halt from one instance is visible to a separately constructed instance" do
+      described_class.new(logger: logger).halt!(reason: "cpi print")
+
+      fresh = described_class.new(logger: logger)
+      expect(fresh.halted?).to be true
+      expect(fresh.status[:reason]).to eq("cpi print")
+    end
+
+    it "remains halted after the cache is cleared (state is not cache-backed)" do
+      halt.halt!(reason: "durability")
+      Rails.cache.clear
+
+      expect(described_class.new(logger: logger).halted?).to be true
+    end
+
+    it "persists the halt in bot_runtime_stats so it survives a process restart" do
+      halt.halt!(reason: "restart-proof")
+      # Simulate a fresh boot: nothing in memory/cache, only the DB row remains.
+      Rails.cache.clear
+      expect(BotRuntimeStat.find_by(key: described_class::STORE_KEY)).to be_present
+      expect(described_class.active?).to be false
+    end
+  end
+
+  describe "TTL auto-expiry" do
+    it "auto-resumes once the halt is older than the TTL" do
+      halt.halt!(reason: "stale")
+      BotRuntimeStat.find_by(key: described_class::STORE_KEY)
+        .update!(recorded_at: (described_class::DEFAULT_TTL_HOURS + 1).hours.ago)
+
+      expect(halt.active?).to be true
+    end
+
+    it "stays halted while within the TTL window" do
+      halt.halt!(reason: "fresh")
+      BotRuntimeStat.find_by(key: described_class::STORE_KEY)
+        .update!(recorded_at: 1.hour.ago)
+
+      expect(halt.active?).to be false
     end
   end
 
@@ -78,39 +114,31 @@ RSpec.describe TradingHalt do
 
   describe ".assert_active!" do
     it "does nothing when trading is active" do
-      allow(described_class).to receive(:active?).and_return(true)
       expect { described_class.assert_active! }.not_to raise_error
     end
 
     it "raises HaltedError when trading is halted" do
-      allow(described_class).to receive(:active?).and_return(false)
-      allow(Rails.cache).to receive(:read).with(described_class::CACHE_KEY_REASON).and_return(nil)
+      described_class.halt!
       expect { described_class.assert_active! }.to raise_error(described_class::HaltedError, /Trading is halted/)
     end
 
     it "includes the reason in the error message" do
-      allow(described_class).to receive(:active?).and_return(false)
-      allow(Rails.cache).to receive(:read).with(described_class::CACHE_KEY_REASON).and_return("margin call")
+      described_class.halt!(reason: "margin call")
       expect { described_class.assert_active! }.to raise_error(described_class::HaltedError, /margin call/)
     end
 
     it "includes the context in the error message" do
-      allow(described_class).to receive(:active?).and_return(false)
-      allow(Rails.cache).to receive(:read).with(described_class::CACHE_KEY_REASON).and_return(nil)
+      described_class.halt!
       expect { described_class.assert_active!(context: "MyService#place_order") }
         .to raise_error(described_class::HaltedError, /MyService#place_order/)
     end
   end
 
   describe "class-level helpers" do
-    before do
-      allow(Rails.cache).to receive(:read).and_call_original
-      allow(Rails.cache).to receive(:write).and_call_original
-      allow(Rails.cache).to receive(:delete).and_call_original
-    end
-
     it ".active? delegates to instance" do
-      expect(described_class.active?).to be(true).or be(false)
+      expect(described_class.active?).to be true
+      described_class.halt!
+      expect(described_class.active?).to be false
     end
 
     it ".halted? is the inverse of .active?" do
