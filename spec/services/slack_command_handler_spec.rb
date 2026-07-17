@@ -796,18 +796,17 @@ RSpec.describe SlackCommandHandler, type: :service do
   describe "trading control methods" do
     describe ".set_trading_status" do
       before do
-        allow(Rails.cache).to receive(:write)
         allow(Rails.logger).to receive(:info)
       end
 
-      it "writes trading status to cache" do
-        expect(Rails.cache).to receive(:write).with("trading_active", true)
-        described_class.send(:set_trading_status, true)
+      it "persists trading status to the durable store" do
+        described_class.send(:set_trading_status, false)
+        expect(TradingHalt.active?).to be false
       end
 
-      it "writes emergency stop flag when emergency is true" do
-        expect(Rails.cache).to receive(:write).with("emergency_stop", true)
+      it "records an emergency reason when emergency is true" do
         described_class.send(:set_trading_status, false, emergency: true)
+        expect(TradingHalt.status[:reason]).to include("emergency_stop")
       end
 
       it "logs the status change" do
@@ -817,13 +816,12 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
 
     describe ".trading_active?" do
-      it "reads from cache with fallback" do
-        allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
+      it "reflects the durable TradingHalt state" do
+        TradingHalt.resume!
         expect(described_class.send(:trading_active?)).to be true
       end
 
       it "returns true as default if not set" do
-        allow(Rails.cache).to receive(:fetch).and_return(true)
         expect(described_class.send(:trading_active?)).to be true
       end
     end

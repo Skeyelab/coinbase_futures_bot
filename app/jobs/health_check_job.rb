@@ -208,8 +208,9 @@ class HealthCheckJob < ApplicationJob
   end
 
   def check_trading_status
-    # Check if trading is active (not paused)
-    Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+    # Check if trading is active (not paused) via the durable, cross-process
+    # kill-switch store rather than a per-process cache key.
+    TradingHalt.active?
   end
 
   def check_recent_signals
