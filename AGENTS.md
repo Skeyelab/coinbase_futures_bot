@@ -47,7 +47,8 @@
 
 ### Useful runtime entrypoints
 
-- Thor CLI/TUI dashboard: `bin/futuresbot dashboard`
+- Thor CLI/TUI dashboard: `bin/futuresbot dashboard` (tab-based: `1` Overview, `2` Positions, `3` Signals, `4` Market, `5` Health/Ops; a persistent system strip shows halt state, `Eval: Ns ago` from the durable store, and a sentiment one-liner)
+- Full session (dashboard + market data + signal + sentiment collection): `bin/futuresbot start`
 - Chat CLI: `bin/futuresbot chat`
 - Realtime signal loop: `bin/rake realtime:signals`
 - One-shot realtime evaluation: `bin/rake realtime:evaluate`
@@ -68,6 +69,7 @@
 - `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` to `.parallel_rspec_config.local` and reuses `bin/parallel_rspec` (no file copying).
 - The UI credentials used by the positions web UI are `POSITIONS_UI_USERNAME` and `POSITIONS_UI_PASSWORD` (`app/controllers/positions_controller.rb`), while `.env.example` documents different names under “API Authentication”. Trust controller code, not the example text.
 - `bin/futuresbot dashboard` and `bin/futuresbot chat` both sync positions from Coinbase on startup unless `FUTURESBOT_SKIP_POSITION_SYNC` is set.
+- Sentiment collection runs inside `bin/futuresbot start` (not `dashboard`) via `Sentiment::PipelineRunner` (fetch→score→aggregate in-process); disable with `FUTURESBOT_SKIP_SENTIMENT_PIPELINE=1`, tune cadence with `SENTIMENT_PIPELINE_INTERVAL_SECONDS` (default 120). A deployed Rails app runs the same jobs via GoodJob cron instead. Verify it is flowing with `bin/futuresbot status` → the Sentiment section shows a per-symbol z-score and a recent `Last event` age (not `No sentiment data yet` / `⚠ STALE`). NOL/OIL contracts map to the `OIL-USD` sentiment symbol (`Sentiment::ContractSymbolMapper`); run `bin/rake market_data:upsert_futures_products` first so enabled contracts resolve. Relevant env: `SENTIMENT_ENABLE`, `SENTIMENT_STALE_THRESHOLD_MINUTES` (default 30).
 - The repository’s `.env.example` contains credential-like Coinbase values. Treat that file as shape/examples only; never reuse or commit secrets from it.
 - CI runs lint and Brakeman first, then tests. CI forces single-process RSpec execution even though local parallel test helpers exist.
 - VCR is strict: real HTTP is blocked without a cassette (`spec/support/vcr.rb` sets `allow_http_connections_when_no_cassette = false`). CI record mode is effectively `none`.
