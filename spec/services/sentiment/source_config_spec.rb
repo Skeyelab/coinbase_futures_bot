@@ -39,10 +39,24 @@ RSpec.describe Sentiment::SourceConfig do
     end
   end
 
+  describe "#weight_for" do
+    it "returns the configured source weight" do
+      expect(config.weight_for("oilprice_rss")).to eq(1.0)
+    end
+
+    it "defaults to 1.0 for an unknown source" do
+      expect(config.weight_for("mystery_feed")).to eq(1.0)
+    end
+  end
+
   describe ".default" do
     it "loads the shipped config/sentiment_sources.yml" do
       feeds = described_class.default.rss_feeds
       expect(feeds.map { |f| f[:source_name] }).to include("oilprice_rss", "eia_today_in_energy_rss")
+    end
+
+    it "reads a lower weight for the mixed-commodity feed" do
+      expect(described_class.default.weight_for("investing_commodities_rss")).to eq(0.7)
     end
   end
 end

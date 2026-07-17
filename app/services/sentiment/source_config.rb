@@ -23,6 +23,11 @@ module Sentiment
       @data["symbols"] || {}
     end
 
+    # Relative trust for a source when aggregating; unknown sources default to 1.0.
+    def weight_for(source_name)
+      (sources.dig(source_name, "weight") || 1.0).to_f
+    end
+
     # Word-boundary matcher per symbol, built from its configured keywords, for
     # tagging article text. Case-insensitive.
     def symbol_keywords

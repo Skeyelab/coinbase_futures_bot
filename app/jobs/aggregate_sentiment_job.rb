@@ -23,6 +23,20 @@ class AggregateSentimentJob < ApplicationJob
     enabled.presence || DEFAULT_SYMBOLS
   end
 
+  # Confidence- and source-trust-weighted mean of scores in the window:
+  # Σ(weightᵢ·confᵢ·scoreᵢ) / Σ(weightᵢ·confᵢ). Falls back to the plain avg when
+  # there is no weight to distribute (all confidences zero, or no scored events).
+  def weighted_score(scored_events, config:, fallback:)
+    num = 0.0
+    den = 0.0
+    scored_events.each do |evt|
+      w = config.weight_for(evt.source) * (evt.confidence || 0.0)
+      num += w * evt.score
+      den += w
+    end
+    (den > 0) ? num / den : fallback
+  end
+
   def aggregate_window(window, symbols:, now:)
     length = case window
     when "5m" then 5.minutes
@@ -34,14 +48,14 @@ class AggregateSentimentJob < ApplicationJob
     window_end = Time.at((now.to_i / length) * length).utc
     window_start = window_end - length
 
+    config = Sentiment::SourceConfig.default
+
     symbols.each do |sym|
       events = SentimentEvent.where(symbol: sym).where(published_at: window_start...window_end)
       count = events.count
-      avg = if count > 0
-        events.where.not(score: nil).average(:score)&.to_f || 0.0
-      else
-        0.0
-      end
+      scored = events.where.not(score: nil)
+      avg = (count > 0) ? (scored.average(:score)&.to_f || 0.0) : 0.0
+      weighted = weighted_score(scored, config: config, fallback: avg)
 
       # Simple z-score proxy using rolling past N windows. Empty windows are
       # excluded: for low-volume symbols (e.g. OIL) most windows have no events,
@@ -63,7 +77,7 @@ class AggregateSentimentJob < ApplicationJob
         window_end_at: window_end,
         count: count,
         avg_score: avg.round(4),
-        weighted_score: avg.round(4),
+        weighted_score: weighted.round(4),
         z_score: z.round(4),
         meta: {window_start: window_start},
         created_at: Time.now.utc,
