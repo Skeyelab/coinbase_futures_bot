@@ -16,6 +16,33 @@ RSpec.describe Sentiment::SimpleLexiconScorer do
         score, = scorer.score("US crude oil inventory build larger than expected")
         expect(score).to be < 0
       end
+
+      # Real headlines that previously scored 0.0 (neutral) despite being clearly
+      # bullish for crude — geopolitical supply risk and price-up language.
+      it "scores geopolitical supply-risk headlines as bullish" do
+        score, = scorer.score("Oil settles up on renewed US-Iran hostilities and threat of Red Sea closure")
+        expect(score).to be > 0
+      end
+
+      it "scores a weekly-gain / risk-premium headline as bullish" do
+        score, = scorer.score("Geopolitical Risk Premium Returns as Crude Posts Biggest Weekly Gain in Months")
+        expect(score).to be > 0
+      end
+
+      it "scores plain price-up language as bullish" do
+        score, = scorer.score("Oil rises and climbs to weekly gain")
+        expect(score).to be > 0
+      end
+
+      it "scores plain price-down language as bearish" do
+        score, = scorer.score("Oil falls and drops on ceasefire hopes")
+        expect(score).to be < 0
+      end
+
+      it "stays neutral on a non-directional oil headline" do
+        score, = scorer.score("BP and ConocoPhillips partner in Iraq oilfield")
+        expect(score).to eq(0.0)
+      end
     end
 
     context "unknown symbol" do
