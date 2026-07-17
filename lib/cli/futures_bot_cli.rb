@@ -246,6 +246,12 @@ module Cli
       puts "   As of : #{s[:as_of]}"
     end
 
+    # ─── mcp ────────────────────────────────────────────────────────────────────
+    desc "mcp", "Run the MCP server (stdio JSON-RPC) exposing bot state and control tools to Claude Code"
+    def mcp
+      Mcp::Server.new.run
+    end
+
     # ─── version ────────────────────────────────────────────────────────────────
     desc "version", "Show FuturesBot version information"
     def version
