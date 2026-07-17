@@ -542,7 +542,33 @@ RSpec.describe Position, type: :model do
 
         expect(position.status).to eq("CLOSED")
         expect(position.close_time).to be_within(1.second).of(close_time)
-        expect(position.pnl).to eq(0.04) # (51000 - 50000) / 50000 * 2
+        expect(position.pnl).to eq(2000.0) # (51000 - 50000) * 2 contracts * contract_size 1
+      end
+
+      it "persists dollar unrealized PnL for contract-sized products" do
+        position.update!(product_id: "NOL-19JUN26-CDE", side: "SHORT", entry_price: 93.62, size: 1)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("NOL-19JUN26-CDE").and_return(10)
+
+        position.close_position!(93.46)
+
+        # (93.62 - 93.46) * 1 contract * 10 contract_size = $1.60
+        expect(position.pnl).to eq(1.6)
+      end
+
+      it "records nil pnl when close price is unavailable" do
+        position.close_position!(nil)
+
+        expect(position.status).to eq("CLOSED")
+        expect(position.pnl).to be_nil
+      end
+
+      it "does not overwrite pnl when position is already closed" do
+        position.close_position!(51000.0)
+        expect(position.pnl).to eq(2000.0)
+
+        position.close_position!(52000.0)
+
+        expect(position.pnl).to eq(2000.0)
       end
     end
 
@@ -554,7 +580,26 @@ RSpec.describe Position, type: :model do
         position.force_close!(close_price, reason)
 
         expect(position.status).to eq("CLOSED")
-        expect(position.pnl).to eq(0.04)
+        expect(position.pnl).to eq(2000.0) # (51000 - 50000) * 2 contracts * contract_size 1
+      end
+
+      it "persists dollar unrealized PnL for contract-sized products when no pnl given" do
+        position.update!(product_id: "NOL-19JUN26-CDE", side: "SHORT", entry_price: 93.62, size: 1)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("NOL-19JUN26-CDE").and_return(10)
+
+        position.force_close!(93.46, "TP hit")
+
+        # (93.62 - 93.46) * 1 contract * 10 contract_size = $1.60
+        expect(position.pnl).to eq(1.6)
+      end
+
+      it "does not overwrite pnl when position is already closed" do
+        position.force_close!(51000.0, "TP hit")
+        expect(position.pnl).to eq(2000.0)
+
+        position.force_close!(52000.0, "Duplicate close")
+
+        expect(position.pnl).to eq(2000.0)
       end
     end
   end
