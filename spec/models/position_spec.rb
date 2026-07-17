@@ -453,30 +453,33 @@ RSpec.describe Position, type: :model do
     end
 
     describe "#calculate_pnl" do
-      it "calculates PnL for long positions" do
-        # Long position: (current_price - entry_price) / entry_price * size
-        # (51000 - 50000) / 50000 * 2 = 0.04
-        pnl = position.calculate_pnl(51000.0)
-        expect(pnl).to eq(0.04)
+      it "returns dollar unrealized PnL for long positions (contract_size aware)" do
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("BIT-29AUG25-CDE").and_return(1)
+        # (51000 - 50000) * 2 contracts * contract_size 1 = 2000.0
+        expect(position.calculate_pnl(51000.0)).to eq(2000.0)
       end
 
-      it "calculates PnL for short positions" do
+      it "returns dollar unrealized PnL for short positions (contract_size aware)" do
         position.update!(side: "SHORT")
-        # Short position: (entry_price - current_price) / entry_price * size
-        # (49000 - 50000) / 50000 * 2 = 0.04
-        pnl = position.calculate_pnl(49000.0)
-        expect(pnl).to eq(0.04)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("BIT-29AUG25-CDE").and_return(1)
+        # (50000 - 49000) * 2 contracts * contract_size 1 = 2000.0
+        expect(position.calculate_pnl(49000.0)).to eq(2000.0)
+      end
+
+      it "uses contract_size for NOL-style futures (contract_size != 1)" do
+        position.update!(product_id: "NOL-19JUN26-CDE", side: "SHORT", entry_price: 93.62, size: 1)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with("NOL-19JUN26-CDE").and_return(10)
+        # (93.62 - 93.46) * 1 contract * contract_size 10 = 1.60
+        expect(position.calculate_pnl(93.46)).to eq(1.6)
       end
 
       it "returns 0 for closed positions" do
         position.update!(status: "CLOSED")
-        pnl = position.calculate_pnl(51000.0)
-        expect(pnl).to eq(0)
+        expect(position.calculate_pnl(51000.0)).to eq(0)
       end
 
       it "returns 0 when no current price" do
-        pnl = position.calculate_pnl(nil)
-        expect(pnl).to eq(0)
+        expect(position.calculate_pnl(nil)).to eq(0)
       end
     end
 
