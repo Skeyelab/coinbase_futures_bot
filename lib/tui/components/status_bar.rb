@@ -23,6 +23,7 @@ module Tui
         dim = Lipgloss::Style.new.foreground("240")
 
         parts = [
+          dry_run_label(d[:dry_run]),
           halt_label,
           dim.render("Day: #{d[:day_pos_count] || 0}  Swing: #{d[:swing_pos_count] || 0}  Signals: #{d[:signal_count] || 0}"),
           dim.render("Eval: #{eval_label(eval_at)}"),
@@ -33,6 +34,12 @@ module Tui
       end
 
       private
+
+      def dry_run_label(active)
+        return nil unless active
+
+        Lipgloss::Style.new.bold(true).foreground("11").render("  🧪 DRY-RUN")
+      end
 
       def eval_label(last_eval_at)
         return "never" unless last_eval_at

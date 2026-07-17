@@ -38,6 +38,17 @@ RSpec.describe Tui::Components::StatusBar do
       end
     end
 
+    context "dry-run" do
+      it "shows a DRY-RUN badge when dry-run is active" do
+        data[:dry_run] = true
+        expect(bar.render).to include("DRY-RUN")
+      end
+
+      it "omits the badge when running live" do
+        expect(bar.render).not_to include("DRY-RUN")
+      end
+    end
+
     context "sentiment summary" do
       def snapshot(symbols:, stale: false)
         Sentiment::Snapshot::Result.new(symbols, Time.now, Time.now, [], stale)

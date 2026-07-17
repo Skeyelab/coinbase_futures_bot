@@ -106,11 +106,10 @@ module Trading
       TradingHalt.assert_active!(context: "CoinbasePositions#open_position")
       # Use configuration default if not specified
       day_trading = Rails.application.config.default_day_trading if day_trading.nil?
-      raise "Authentication required" unless @authenticated
+      raise "Authentication required" unless @authenticated || DryRun.active?
 
       order_body = build_order_body(product_id: product_id, side: side, size: size, type: type, price: price)
-      resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      result = JSON.parse(resp.body)
+      result = submit_order(order_body, product_id: product_id, side: side, size: size, price: price)
 
       # If order was successful, create local Position record
       if result["success"] || result["order_id"]
@@ -122,7 +121,8 @@ module Trading
           day_trading: day_trading,
           take_profit: take_profit,
           stop_loss: stop_loss,
-          order_result: result
+          order_result: result,
+          paper: DryRun.active?
         )
       end
 
@@ -134,7 +134,7 @@ module Trading
     # Returns order result hash
     def close_position(product_id:, size: nil)
       TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
-      raise "Authentication required" unless @authenticated
+      raise "Authentication required" unless @authenticated || DryRun.active?
 
       # If explicit size provided, still infer side from current position when possible,
       # but avoid failing if positions cannot be fetched (e.g., in tests)
@@ -165,8 +165,7 @@ module Trading
 
       @logger.info("Order body: #{order_body.inspect}")
 
-      resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      result = JSON.parse(resp.body)
+      result = submit_order(order_body, product_id: product_id, side: close_side, size: pos_size)
 
       # If order was successful, update local Position record
       if result["success"] || result["order_id"]
@@ -185,7 +184,7 @@ module Trading
     # Returns order result hash
     def increase_position(product_id:, size:)
       TradingHalt.assert_active!(context: "CoinbasePositions#increase_position")
-      raise "Authentication required" unless @authenticated
+      raise "Authentication required" unless @authenticated || DryRun.active?
 
       # Get the current position to determine the side
       positions = list_open_positions(product_id: product_id)
@@ -215,8 +214,7 @@ module Trading
 
       @logger.info("Order body: #{order_body.inspect}")
 
-      resp = authenticated_post("/api/v3/brokerage/orders", order_body)
-      result = JSON.parse(resp.body)
+      result = submit_order(order_body, product_id: product_id, side: increase_side, size: size)
 
       # If order was successful, update local Position record
       if result["success"] || result["order_id"]
@@ -229,6 +227,41 @@ module Trading
       end
 
       result
+    end
+
+    # Single order-placement chokepoint. In dry-run mode the order is routed to
+    # the paper simulator and NEVER reaches Coinbase; otherwise it hits the live
+    # brokerage endpoint. Every order-placing method (open/close/increase) goes
+    # through here so the dry-run guarantee holds at one boundary.
+    def submit_order(order_body, product_id:, side:, size:, price: nil)
+      return simulate_order(product_id: product_id, side: side, size: size, price: price) if DryRun.active?
+
+      resp = authenticated_post("/api/v3/brokerage/orders", order_body)
+      JSON.parse(resp.body)
+    end
+
+    # Routes an order through PaperTrading::ExchangeSimulator using the real
+    # market price instead of Coinbase. Full simulated fill/equity accounting is
+    # a follow-up (#300 PR2); for now this guarantees no order reaches the
+    # exchange and returns a dry-run result so the caller persists a
+    # paper-labeled Position.
+    def simulate_order(product_id:, side:, size:, price: nil)
+      fill_price = price || get_current_market_price(product_id)
+      order_id = PaperTrading::ExchangeSimulator.new.place_limit(
+        symbol: product_id,
+        side: simulator_side(side),
+        price: fill_price,
+        quantity: size.to_f
+      )
+      @logger.warn("[DryRun] Simulated order #{order_id}: #{side} #{size} #{product_id} @ #{fill_price} (no Coinbase order placed)")
+      {"success" => true, "order_id" => "DRY-RUN-#{order_id}", "dry_run" => true, "price" => fill_price}
+    end
+
+    def simulator_side(side)
+      normalized = side.to_s.downcase
+      return :sell if %w[sell short].include?(normalized)
+
+      :buy
     end
 
     # Get current market price for a product
@@ -398,7 +431,7 @@ module Trading
     # --- Local Position Record Management ---
 
     def create_local_position_record(product_id:, side:, size:, entry_price:, day_trading:, take_profit:, stop_loss:,
-      order_result:)
+      order_result:, paper: false)
       position_side = SideNormalizer.position(side) || "LONG"
 
       # Calculate take profit and stop loss if not provided
@@ -430,6 +463,7 @@ module Trading
         day_trading: day_trading,
         take_profit: take_profit,
         stop_loss: stop_loss,
+        paper: paper,
         trailing_stop_enabled: ActiveModel::Type::Boolean.new.cast(ENV.fetch("TRAILING_STOP_ENABLED", "false")),
         trailing_stop_state: {}
       )
