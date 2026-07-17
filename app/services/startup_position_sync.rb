@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class StartupPositionSync
-  Result = Struct.new(:status, :message, keyword_init: true)
+  Result = Struct.new(:status, :message)
 
   def initialize(import_service: PositionImportService.new, logger: Rails.logger, env: ENV)
     @import_service = import_service

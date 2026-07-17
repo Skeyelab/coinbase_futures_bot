@@ -2,7 +2,7 @@
 
 module Trading
   module PositionManagement
-    WorkflowResult = Struct.new(:workflow, :status, :summary, :details, keyword_init: true) do
+    WorkflowResult = Struct.new(:workflow, :status, :summary, :details) do
       def success?
         %i[success noop].include?(status)
       end

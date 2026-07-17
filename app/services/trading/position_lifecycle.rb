@@ -2,7 +2,7 @@
 
 module Trading
   class PositionLifecycle
-    Result = Struct.new(:success, :close_price, :reason, :fallback, keyword_init: true) do
+    Result = Struct.new(:success, :close_price, :reason, :fallback) do
       def success? = success
     end
 
