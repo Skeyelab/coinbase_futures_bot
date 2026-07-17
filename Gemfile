@@ -60,7 +60,7 @@ group :test do
   gem "webmock"
 
   # Test profiling and optimization
-  gem "test-prof", "~> 1.2", require: false
+  gem "test-prof", "~> 1.6", require: false
 
   # JUnit XML output for CI systems
   gem "rspec_junit_formatter", "~> 0.6"
