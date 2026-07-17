@@ -18,7 +18,7 @@ RSpec.describe SlackCommandHandler do
       let(:params) { {command: "/bot-status", user_id: authorized_user_id} }
 
       before do
-        allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
+        allow(TradingHalt).to receive(:active?).and_return(true)
 
         # Create comprehensive GoodJob mock
         good_job_relation = double("GoodJobRelation")
@@ -169,7 +169,7 @@ RSpec.describe SlackCommandHandler do
     let!(:swing_position) { create(:position, day_trading: false, status: "OPEN") }
 
     before do
-      allow(Rails.cache).to receive(:fetch).with("trading_active", expires_in: 1.hour).and_return(true)
+      allow(TradingHalt).to receive(:active?).and_return(true)
 
       # Create comprehensive GoodJob mock
       good_job_relation = double("GoodJobRelation")

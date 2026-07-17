@@ -106,7 +106,6 @@ module Sentiment
       published_at = parse_timestamp(pub_date)
       content_text = "#{title} #{description}"
       symbols = extract_crypto_symbols(content_text)
-      raw_text_hash = generate_content_hash(url, title)
 
       symbols.map do |symbol|
         {
@@ -115,7 +114,7 @@ module Sentiment
           url: url.presence,
           title: title.presence,
           published_at: published_at,
-          raw_text_hash: raw_text_hash,
+          raw_text_hash: generate_content_hash(url, title, symbol),
           meta: {
             description: description,
             pub_date_original: pub_date,

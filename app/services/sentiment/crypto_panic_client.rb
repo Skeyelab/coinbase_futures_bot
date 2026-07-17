@@ -181,8 +181,6 @@ module Sentiment
       symbols = map_currencies_to_symbols(currencies)
       symbols = [nil] if symbols.empty?
 
-      raw_text_hash = Digest::SHA256.hexdigest([url, title].join("|"))
-
       symbols.map do |sym|
         {
           source: "cryptopanic",
@@ -190,7 +188,7 @@ module Sentiment
           url: url.presence,
           title: title.presence,
           published_at: published_at,
-          raw_text_hash: raw_text_hash,
+          raw_text_hash: generate_content_hash(url, title, sym),
           meta: {
             votes: votes,
             currencies: currencies,
