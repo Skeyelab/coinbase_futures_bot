@@ -29,9 +29,13 @@ module Sentiment
 
     protected
 
-    # Common method to normalize timestamps
+    # Normalize a feed timestamp to UTC. Uses an explicit UTC zone rather than
+    # Time.parse, which interprets a timezone-less string in the SERVER's local
+    # zone — on a non-UTC machine that shifts every article hours away from real
+    # time, so it never lands in AggregateSentimentJob's UTC windows and
+    # sentiment silently reads empty. Explicit offsets in the string are honored.
     def parse_timestamp(timestamp_str)
-      Time.parse(timestamp_str)
+      Time.find_zone("UTC").parse(timestamp_str.to_s)&.utc || Time.now.utc
     rescue
       Time.now.utc
     end
