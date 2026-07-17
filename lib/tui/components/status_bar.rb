@@ -25,10 +25,11 @@ module Tui
         parts = [
           halt_label,
           dim.render("Day: #{d[:day_pos_count] || 0}  Swing: #{d[:swing_pos_count] || 0}  Signals: #{d[:signal_count] || 0}"),
-          dim.render("Eval: #{eval_label(eval_at)}")
+          dim.render("Eval: #{eval_label(eval_at)}"),
+          sentiment_part(d[:sentiment])
         ]
 
-        parts.join("  ")
+        parts.compact.join("  ")
       end
 
       private
@@ -41,6 +42,27 @@ module Tui
           "#{age}s ago"
         else
           "#{age / 60}m ago"
+        end
+      end
+
+      # Renders a compact per-symbol summary (e.g. "OIL-USD z=-0.4 (3/15m)").
+      # Stale pipelines are dimmed with a warning marker; symbols without an
+      # aggregate yet are skipped so the strip stays terse.
+      def sentiment_part(snapshot)
+        return nil if snapshot.nil?
+
+        summaries = snapshot.symbols.filter_map do |s|
+          next if s.z_score.nil?
+
+          "#{s.symbol} z=#{format("%.1f", s.z_score)} (#{s.event_count}/#{s.window})"
+        end
+        return nil if summaries.empty?
+
+        text = summaries.join("  ")
+        if snapshot.stale?
+          Lipgloss::Style.new.foreground("11").render("⚠ #{text} (stale)")
+        else
+          Lipgloss::Style.new.foreground("240").render(text)
         end
       end
     end
