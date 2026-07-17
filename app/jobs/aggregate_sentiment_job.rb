@@ -4,16 +4,26 @@ class AggregateSentimentJob < ApplicationJob
   queue_as :default
 
   WINDOWS = %w[5m 15m 1h].freeze
+  DEFAULT_SYMBOLS = %w[BTC-USD ETH-USD].freeze
 
   def perform(now: Time.now.utc)
+    symbols = resolve_symbols
     WINDOWS.each do |win|
-      aggregate_window(win, now: now)
+      aggregate_window(win, symbols: symbols, now: now)
     end
   end
 
   private
 
-  def aggregate_window(window, now:)
+  # Symbols enabled for trading drive which sentiment aggregates we build,
+  # so adding a contract (crypto or commodity) needs no code change here.
+  # Falls back to the crypto defaults when no contracts are enabled.
+  def resolve_symbols
+    enabled = Sentiment::ContractSymbolMapper.sentiment_symbols_for_enabled_contracts
+    enabled.presence || DEFAULT_SYMBOLS
+  end
+
+  def aggregate_window(window, symbols:, now:)
     length = case window
     when "5m" then 5.minutes
     when "15m" then 15.minutes
@@ -24,7 +34,7 @@ class AggregateSentimentJob < ApplicationJob
     window_end = Time.at((now.to_i / length) * length).utc
     window_start = window_end - length
 
-    %w[BTC-USD ETH-USD].each do |sym|
+    symbols.each do |sym|
       events = SentimentEvent.where(symbol: sym).where(published_at: window_start...window_end)
       count = events.count
       avg = if count > 0
@@ -33,9 +43,12 @@ class AggregateSentimentJob < ApplicationJob
         0.0
       end
 
-      # Simple z-score proxy using rolling past N windows
+      # Simple z-score proxy using rolling past N windows. Empty windows are
+      # excluded: for low-volume symbols (e.g. OIL) most windows have no events,
+      # and letting their zero avg_score into the baseline collapses the stddev
+      # so a single scored article produces an explosive, meaningless z-spike.
       past = SentimentAggregate.where(symbol: sym, window: window).where("window_end_at < ?",
-        window_end).order(window_end_at: :desc).limit(50)
+        window_end).where("count > 0").order(window_end_at: :desc).limit(50)
       mu = past.average(:avg_score)&.to_f || 0.0
       sigma = Math.sqrt(past.average("POWER(avg_score - #{mu}, 2)")&.to_f || 0.0)
       z = if sigma > 0
