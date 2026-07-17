@@ -7,74 +7,44 @@ require "digest"
 require "time"
 
 module Sentiment
-  class CoindeskRssClient < BaseNewsClient
-    RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+  # RSS news client parameterized by feed URL and source name. Lets a new feed
+  # (crypto or commodity) be added as configuration rather than a new class.
+  class GenericRssClient < BaseNewsClient
+    attr_reader :source_name
 
-    def initialize(rss_url: ENV["COINDESK_RSS_URL"], logger: Rails.logger)
+    def initialize(url:, source_name:, logger: Rails.logger)
       super(logger: logger)
-      @rss_url = rss_url.presence || RSS_URL
+      @rss_url = url
+      @source_name = source_name
     end
 
     def enabled?
-      # RSS feeds don't need tokens, always enabled
-      true
-    end
-
-    def source_name
-      "coindesk_rss"
+      @rss_url.present?
     end
 
     def fetch_recent(max_pages: 2)
-      @logger.debug("CoinDesk RSS: Fetching from #{@rss_url}")
-
       response = fetch_with_redirects(@rss_url)
 
       unless response.is_a?(Net::HTTPSuccess)
-        @logger.error("CoinDesk RSS: HTTP error #{response.code}: #{response.message}")
-        @logger.debug("CoinDesk RSS: Response body: #{response.body[0..500]}")
+        @logger.error("#{@source_name}: HTTP error #{response.code}: #{response.message}")
         return []
       end
 
-      @logger.debug("CoinDesk RSS: Response length: #{response.body.length}")
-      @logger.debug("CoinDesk RSS: Content type: #{response.content_type}")
-
       doc = REXML::Document.new(response.body)
       items = []
-
-      # Parse RSS items
-      item_count = 0
       doc.elements.each("rss/channel/item") do |item|
-        item_count += 1
         normalized = normalize_rss_item(item)
         items.concat(normalized) if normalized.any?
       end
 
-      @logger.debug("CoinDesk RSS: Found #{item_count} XML items, normalized to #{items.size} events")
-
-      @logger.info("CoinDesk RSS: Successfully fetched #{items.size} items")
-
-      # Track successful data fetching
-      SentryHelper.add_breadcrumb(
-        message: "CoinDesk RSS data fetched successfully",
-        category: "sentiment",
-        level: "info",
-        data: {
-          service: "coindesk_rss",
-          events_count: items.size
-        }
-      )
-
+      @logger.info("#{@source_name}: fetched #{items.size} events")
       items
-    rescue Net::HTTPError => e
-      @logger.error("CoinDesk RSS HTTP error: #{e.class} #{e.message}")
-      handle_error(e, "http_error")
-      []
     rescue REXML::ParseException => e
-      @logger.error("CoinDesk RSS XML parse error: #{e.message}")
+      @logger.error("#{@source_name} XML parse error: #{e.message}")
       handle_error(e, "xml_parse_error")
       []
     rescue => e
-      @logger.error("CoinDesk RSS fetch failed: #{e.class} #{e.message}")
+      @logger.error("#{@source_name} fetch failed: #{e.class} #{e.message}")
       handle_error(e, "unexpected_error")
       []
     end
@@ -96,9 +66,7 @@ module Sentiment
       case response
       when Net::HTTPRedirection
         location = response["location"]
-        # Handle relative redirects
         location = URI.join(uri.to_s, location).to_s if location.start_with?("/")
-        @logger.debug("CoinDesk RSS: Following redirect to #{location}")
         fetch_with_redirects(location, limit - 1)
       else
         response
@@ -117,7 +85,7 @@ module Sentiment
 
       symbols.map do |symbol|
         {
-          source: source_name,
+          source: @source_name,
           symbol: symbol,
           url: url.presence,
           title: title.presence,
@@ -134,14 +102,10 @@ module Sentiment
 
     def handle_error(exception, error_type)
       Sentry.with_scope do |scope|
-        scope.set_tag("service", "coindesk_rss")
+        scope.set_tag("service", @source_name)
         scope.set_tag("operation", "fetch_recent")
         scope.set_tag("error_type", error_type)
-
-        scope.set_context("api_call", {
-          rss_url: @rss_url
-        })
-
+        scope.set_context("api_call", {rss_url: @rss_url})
         Sentry.capture_exception(exception)
       end
     end

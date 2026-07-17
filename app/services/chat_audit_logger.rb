@@ -40,8 +40,8 @@ class ChatAuditLogger
           user_input: sanitize_input(user_input),
           result_status: result.dig(:data, :status),
           result_message: result.dig(:data, :message),
-          trading_active_before: Rails.cache.read("trading_active"),
-          trading_active_after: action_changes_trading_status?(action) ? !Rails.cache.read("trading_active") : Rails.cache.read("trading_active"),
+          trading_active_before: (trading_active_now = TradingHalt.active?),
+          trading_active_after: action_changes_trading_status?(action) ? !trading_active_now : trading_active_now,
           user_context: user_context,
           risk_level: determine_risk_level(action)
         }

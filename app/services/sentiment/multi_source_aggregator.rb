@@ -73,12 +73,20 @@ module Sentiment
 
     private
 
+    # RSS feeds come from config/sentiment_sources.yml (via SourceConfig) so a
+    # new feed is a config edit, not a code change. The token-based crypto
+    # clients stay explicit as they have bespoke fetch logic.
     def build_clients
+      rss_clients = SourceConfig.default.rss_feeds.map do |feed|
+        GenericRssClient.new(**feed, logger: @logger)
+      end
+
       [
         CryptoPanicClient.new,
         CoindeskRssClient.new,
-        CointelegraphRssClient.new
-        # Add more clients here as they're implemented
+        CointelegraphRssClient.new,
+        EiaInventoryClient.new(logger: @logger),
+        *rss_clients
       ]
     end
   end

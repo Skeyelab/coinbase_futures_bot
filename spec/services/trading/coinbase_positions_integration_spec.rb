@@ -105,7 +105,8 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
       service.close_position(product_id: product_id, size: 1.0)
 
       position.reload
-      expected_pnl = ((51_000.0 - 50_000.0) / 50_000.0) * 1.0
+      # Dollar unrealized: (51000 - 50000) * 1 contract * contract_size 1
+      expected_pnl = (51_000.0 - 50_000.0) * 1.0
       expect(position.pnl).to be_within(0.01).of(expected_pnl)
     end
   end

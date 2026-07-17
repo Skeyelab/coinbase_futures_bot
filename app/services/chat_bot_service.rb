@@ -661,15 +661,20 @@ class ChatBotService
   end
 
   def set_trading_status(active, emergency: false)
-    Rails.cache.write("trading_active", active)
-    Rails.cache.write("emergency_stop", emergency) if emergency
+    # Delegate to TradingHalt so the state is durable and shared across every
+    # process (a chat "stop" must reach the running bot in another terminal).
+    if active
+      TradingHalt.resume!
+    else
+      TradingHalt.halt!(reason: emergency ? "emergency_stop (chat)" : "chat stop")
+    end
     Rails.logger.info("[ChatBot] Trading status set to: #{active ? "active" : "inactive"}#{if emergency
                                                                                              " (EMERGENCY)"
                                                                                            end}")
   end
 
   def trading_active?
-    Rails.cache.fetch("trading_active", expires_in: 1.hour) { true }
+    TradingHalt.active?
   end
 
   def execute_emergency_stop_internal
