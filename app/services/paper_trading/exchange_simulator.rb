@@ -2,8 +2,7 @@
 
 module PaperTrading
   class ExchangeSimulator
-    Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
-      keyword_init: true)
+    Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl)
 
     attr_reader :orders, :fills, :equity_usd
 
