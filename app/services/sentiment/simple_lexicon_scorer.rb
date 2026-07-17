@@ -20,12 +20,18 @@ module Sentiment
       production_cut output_cut supply_cut inventory_draw stock_draw crude_draw
       supply_disruption outage sanctions embargo escalation conflict
       demand_growth rally surge jumps soars spikes
+      gains gain rises rise climbs climb rebound rebounds rallies higher soar
+      weekly_gain settles_up hostilities tensions tension unrest disruption
+      blockade shortage undersupply tightens risk_premium geopolitical_risk
+      supply_risk red_sea us_iran
     ].freeze
 
     OIL_NEGATIVE = %w[
       production_increase output_hike inventory_build stock_build crude_build
       oversupply glut surplus ceasefire de_escalation demand_destruction
       weak_demand recession plunges slides tumbles slumps
+      falls fall drops drop declines decline sinks sink lower weakens
+      weekly_loss settles_down truce output_increase slowdown slows
     ].freeze
 
     LEXICONS = {
