@@ -24,6 +24,8 @@ module Mcp
        inputSchema: {type: "object", properties: {}}},
       {name: "get_signals", description: "Active trading signals (symbol, side, confidence, strategy, timestamp).",
        inputSchema: {type: "object", properties: {}}},
+      {name: "get_sentiment", description: "Sentiment per enabled-contract symbol (z-score, event count, window), pipeline freshness, source health, and recent news headlines with scores.",
+       inputSchema: {type: "object", properties: {}}},
       {name: "get_halt_status", description: "Trading halt / kill-switch state (active, halted, reason).",
        inputSchema: {type: "object", properties: {}}},
       {name: "halt_trading", description: "Halt trading (kill switch). Stops signal generation; places no orders.",
@@ -85,6 +87,7 @@ module Mcp
       when "get_status" then tool_result(id, OperatorSnapshot.new.status)
       when "get_positions" then tool_result(id, OperatorSnapshot.new.positions)
       when "get_signals" then tool_result(id, OperatorSnapshot.new.signals)
+      when "get_sentiment" then tool_result(id, OperatorSnapshot.new.sentiment)
       when "get_halt_status" then tool_result(id, OperatorSnapshot.new.halt_status)
       when "halt_trading" then tool_result(id, TradingHalt.halt!(reason: args["reason"]))
       when "resume_trading" then tool_result(id, TradingHalt.resume!)

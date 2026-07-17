@@ -44,7 +44,45 @@ class OperatorSnapshot
     {as_of: iso(@now)}.merge(TradingHalt.status.slice(:active, :halted, :reason))
   end
 
+  def sentiment
+    snap = Sentiment::Snapshot.new(now: @now).call
+    symbols = snap.symbols.map(&:symbol)
+
+    {
+      as_of: iso(@now),
+      stale: snap.stale?,
+      last_event_at: iso(snap.last_event_at),
+      last_aggregate_at: iso(snap.last_aggregate_at),
+      symbols: snap.symbols.map { |s| sentiment_symbol_row(s) },
+      sources: snap.sources,
+      recent_events: recent_sentiment_events(symbols)
+    }
+  end
+
   private
+
+  def sentiment_symbol_row(symbol)
+    {
+      symbol: symbol.symbol,
+      z_score: symbol.z_score,
+      event_count: symbol.event_count,
+      window: symbol.window,
+      window_end_at: iso(symbol.window_end_at)
+    }
+  end
+
+  def recent_sentiment_events(symbols, limit: 8)
+    scope = symbols.present? ? SentimentEvent.where(symbol: symbols) : SentimentEvent.all
+    scope.order(published_at: :desc).limit(limit).map do |event|
+      {
+        published_at: iso(event.published_at),
+        source: event.source,
+        symbol: event.symbol,
+        title: event.title,
+        score: event.score&.to_f
+      }
+    end
+  end
 
   def position_row(position)
     price = RecentMarketPrice.for_product(position.product_id)

@@ -57,6 +57,17 @@ RSpec.describe FuturesBotCli, type: :model do
       expect(JSON.parse(out)["signals"].first).to include("symbol" => "OIL-USD")
     end
 
+    it "sentiment --json emits a sentiment document with recent events" do
+      create(:contract, enabled: true, product_id: "NOL-19AUG26-CDE", base_currency: "OIL")
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: Time.current,
+        raw_text_hash: "cli-oil-news", title: "Oil up 4%", score: 1.0)
+      out = capture_stdout { run_cli("sentiment", "--json") }
+
+      parsed = JSON.parse(out)
+      expect(parsed).to include("symbols", "recent_events", "sources")
+      expect(parsed["recent_events"].first).to include("title" => "Oil up 4%")
+    end
+
     it "halt_status --json emits the halt state" do
       out = capture_stdout { run_cli("halt_status", "--json") }
 

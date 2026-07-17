@@ -53,6 +53,28 @@ RSpec.describe OperatorSnapshot do
     end
   end
 
+  describe "#sentiment" do
+    it "returns per-symbol z-scores, pipeline meta, sources, and recent news events" do
+      create(:contract, enabled: true, product_id: "NOL-19AUG26-CDE", base_currency: "OIL")
+      SentimentAggregate.create!(symbol: "OIL-USD", window: "15m", window_end_at: now - 5.minutes,
+        count: 3, avg_score: 0.4, z_score: 0.9)
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: now - 2.minutes,
+        raw_text_hash: "oil-news-1", title: "Oil rises 4% on US-Iran escalation", score: 1.0)
+
+      result = snapshot.sentiment
+
+      expect(result[:as_of]).to eq("2026-07-17T18:00:00Z")
+      expect(result[:stale]).to be(false)
+      expect(result[:symbols].first).to include(symbol: "OIL-USD", z_score: 0.9, event_count: 3, window: "15m")
+      expect(result[:sources]).to be_an(Array)
+
+      event = result[:recent_events].first
+      expect(event).to include(symbol: "OIL-USD", source: "oilprice_rss", score: 1.0)
+      expect(event[:title]).to eq("Oil rises 4% on US-Iran escalation")
+      expect(event[:published_at]).to eq("2026-07-17T17:58:00Z")
+    end
+  end
+
   describe "#signals" do
     it "returns snake_case signal rows with an ISO-8601 timestamp" do
       create(:signal_alert, symbol: "OIL-USD", side: "long", confidence: 82, strategy_name: "trend",
