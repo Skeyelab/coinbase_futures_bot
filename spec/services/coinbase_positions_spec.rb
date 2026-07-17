@@ -556,4 +556,68 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       end
     end
   end
+
+  describe "dry-run mode" do
+    before do
+      DryRun.enable!
+      allow(service).to receive(:get_current_market_price).and_return(50_000.0)
+    end
+
+    it "never sends an order to Coinbase on open_position" do
+      expect(service).not_to receive(:authenticated_post)
+
+      service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+    end
+
+    it "persists a paper-labeled Position on a simulated entry" do
+      expect {
+        service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market, day_trading: true)
+      }.to change(Position.where(paper: true), :count).by(1)
+    end
+
+    it "returns a result flagged as a dry run" do
+      result = service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+
+      expect(result["dry_run"]).to be true
+      expect(result["success"]).to be true
+    end
+
+    it "opens without live authentication" do
+      service.instance_variable_set(:@authenticated, false)
+
+      expect {
+        service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+      }.not_to raise_error
+    end
+
+    it "never sends an order to Coinbase on close_position" do
+      allow(service).to receive(:list_open_positions).and_return([
+        {"product_id" => "BIT-29AUG25-CDE", "side" => "LONG", "number_of_contracts" => "1"}
+      ])
+      expect(service).not_to receive(:authenticated_post)
+
+      service.close_position(product_id: "BIT-29AUG25-CDE", size: 1)
+    end
+
+    it "never sends an order to Coinbase on increase_position" do
+      allow(service).to receive(:list_open_positions).and_return([
+        {"product_id" => "BIT-29AUG25-CDE", "side" => "LONG", "number_of_contracts" => "1"}
+      ])
+      expect(service).not_to receive(:authenticated_post)
+
+      service.increase_position(product_id: "BIT-29AUG25-CDE", size: 1)
+    end
+  end
+
+  describe "live mode (dry-run off)" do
+    it "sends the order to Coinbase" do
+      allow(service).to receive(:get_current_market_price).and_return(50_000.0)
+      fake_response = instance_double(Faraday::Response, body: {"success" => true, "order_id" => "live-1"}.to_json)
+      allow(service).to receive(:authenticated_post).and_return(fake_response)
+
+      expect(service).to receive(:authenticated_post)
+
+      service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+    end
+  end
 end

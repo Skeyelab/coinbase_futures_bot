@@ -100,6 +100,7 @@ module Cli
 
       puts "#{BOLD}#{CYAN}📊  FuturesBot Status#{RESET}"
       puts "─" * 40
+      puts "  #{YELLOW}#{BOLD}🧪 DRY-RUN — simulated orders, nothing sent to Coinbase#{RESET}" if DryRun.active?
       puts "  #{WHITE}Day-trading positions:  #{RESET}#{colorize_count(day_pos)}"
       puts "  #{WHITE}Swing positions:        #{RESET}#{colorize_count(swing_pos)}"
       puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(signals)}"
@@ -198,6 +199,32 @@ module Cli
         puts "   Reason : #{s[:reason] || "(none)"}"
       end
       puts "   As of  : #{s[:as_of]}"
+    end
+
+    # ─── dry_run_on ─────────────────────────────────────────────────────────────
+    desc "dry_run_on", "Enable dry-run mode (simulate orders; nothing is sent to Coinbase)"
+    def dry_run_on
+      DryRun.enable!
+      puts "#{YELLOW}#{BOLD}🧪 DRY-RUN enabled#{RESET} — orders are simulated; nothing is sent to Coinbase."
+    end
+
+    # ─── dry_run_off ────────────────────────────────────────────────────────────
+    desc "dry_run_off", "Disable dry-run mode (restore live execution)"
+    def dry_run_off
+      DryRun.disable!
+      puts "#{GREEN}#{BOLD}🟢 DRY-RUN disabled#{RESET} — LIVE execution restored."
+    end
+
+    # ─── dry_run_status ─────────────────────────────────────────────────────────
+    desc "dry_run_status", "Show whether dry-run (simulated order) mode is active"
+    def dry_run_status
+      s = DryRun.status
+      if s[:active]
+        puts "#{YELLOW}#{BOLD}🧪 DRY-RUN is ACTIVE#{RESET} — orders are simulated, not sent to Coinbase."
+      else
+        puts "#{GREEN}#{BOLD}🟢 LIVE execution#{RESET} — dry-run is off."
+      end
+      puts "   As of : #{s[:as_of]}"
     end
 
     # ─── version ────────────────────────────────────────────────────────────────

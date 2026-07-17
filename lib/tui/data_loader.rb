@@ -25,6 +25,7 @@ module Tui
         futures_live_prices: futures_live_prices,
         spot_live_prices: spot_live_prices,
         halt_active: TradingHalt.halted?,
+        dry_run: DryRun.active?,
         sentiment: Sentiment::Snapshot.new.call,
         enabled_contract_count: Contract.enabled.count,
         refreshed_at: Time.now

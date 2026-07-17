@@ -117,6 +117,35 @@ RSpec.describe FuturesBotCli, type: :model do
       expect { run_cli("status") }.to output(/operational/).to_stdout
     end
 
+    context "dry-run mode" do
+      it "shows a DRY-RUN indicator when dry-run is active" do
+        DryRun.enable!
+        expect { run_cli("status") }.to output(/DRY-RUN/).to_stdout
+      end
+
+      it "does not show DRY-RUN when running live" do
+        expect { run_cli("status") }.not_to output(/DRY-RUN/).to_stdout
+      end
+    end
+  end
+
+  describe "dry-run toggle commands" do
+    it "enables dry-run with dry_run_on" do
+      expect { run_cli("dry_run_on") }.to output(/DRY-RUN/).to_stdout
+      expect(DryRun.active?).to be true
+    end
+
+    it "disables dry-run with dry_run_off" do
+      DryRun.enable!
+      expect { run_cli("dry_run_off") }.to output(/LIVE/).to_stdout
+      expect(DryRun.active?).to be false
+    end
+
+    it "reports state with dry_run_status" do
+      DryRun.enable!
+      expect { run_cli("dry_run_status") }.to output(/DRY-RUN is ACTIVE/).to_stdout
+    end
+
     context "sentiment section" do
       it "includes a sentiment section" do
         expect { run_cli("status") }.to output(/Sentiment/).to_stdout

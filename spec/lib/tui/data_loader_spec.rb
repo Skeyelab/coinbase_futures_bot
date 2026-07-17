@@ -39,5 +39,16 @@ RSpec.describe Tui::DataLoader do
     ensure
       Rails.cache = original_cache
     end
+
+    it "includes the dry-run flag" do
+      original_cache = Rails.cache
+      Rails.cache = ActiveSupport::Cache::NullStore.new
+      allow(Tui::ExchangePnlRefresher).to receive(:refresh!).and_return(false)
+      DryRun.enable!
+
+      expect(described_class.load[:dry_run]).to be true
+    ensure
+      Rails.cache = original_cache
+    end
   end
 end
