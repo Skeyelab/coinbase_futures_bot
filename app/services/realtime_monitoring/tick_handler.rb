@@ -4,6 +4,7 @@ module RealtimeMonitoring
   class TickHandler
     DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS = 60
     DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS = 30
+    MARKET_DATA_HEARTBEAT_INTERVAL_SECONDS = 5
 
     def initialize(logger: Rails.logger, contract_manager: nil, phased_limiter: nil)
       @logger = logger
@@ -21,12 +22,26 @@ module RealtimeMonitoring
       @logger.debug("[RTM] #{product_id}: $#{price} at #{timestamp}")
 
       create_tick_record(product_id, price, timestamp)
+      beat_market_data_heartbeat
       check_position_alerts(product_id, price)
       update_futures_monitoring(product_id, price) if spot_relevant?(product_id)
       evaluate_rapid_signals(product_id, price) if should_evaluate_signals?(product_id, price)
     end
 
     private
+
+    # Beat the market-data liveness heartbeat so a silently-dead WebSocket feed
+    # (dropped connection, no ticker messages) becomes observable — the loop
+    # can't price positions without fresh ticks. Throttled in-memory (this
+    # handler is a single long-lived instance shared by both subscribers) so a
+    # high tick rate doesn't turn into a DB write per tick.
+    def beat_market_data_heartbeat(now = Time.current)
+      return if @last_market_data_beat_at &&
+        now - @last_market_data_beat_at < MARKET_DATA_HEARTBEAT_INTERVAL_SECONDS
+
+      Heartbeat.beat!("market_data", now: now)
+      @last_market_data_beat_at = now
+    end
 
     def create_tick_record(product_id, price, timestamp)
       Tick.create!(

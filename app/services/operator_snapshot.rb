@@ -22,6 +22,7 @@ class OperatorSnapshot
       },
       signals: {active: SignalAlert.active.count},
       loop: Heartbeat.status("realtime_signal", now: @now),
+      market_data: Heartbeat.status("market_data", now: @now),
       eval: eval_info,
       paper: paper_info
     }

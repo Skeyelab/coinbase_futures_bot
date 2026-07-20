@@ -27,6 +27,7 @@ module Tui
         halt_active: TradingHalt.halted?,
         dry_run: DryRun.active?,
         loop_heartbeat: Heartbeat.status("realtime_signal"),
+        market_data_heartbeat: Heartbeat.status("market_data"),
         sentiment: Sentiment::Snapshot.new.call,
         enabled_contract_count: Contract.enabled.count,
         refreshed_at: Time.now

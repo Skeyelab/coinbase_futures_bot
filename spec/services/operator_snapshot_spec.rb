@@ -42,6 +42,16 @@ RSpec.describe OperatorSnapshot do
       expect(snapshot.status[:loop][:stale]).to be(true)
     end
 
+    it "reports the market-data WS feed heartbeat" do
+      Heartbeat.beat!("market_data", now: now - 10)
+
+      expect(snapshot.status[:market_data]).to include(
+        last_beat_at: "2026-07-17T17:59:50Z",
+        age_seconds: 10,
+        stale: false
+      )
+    end
+
     it "serializes cleanly to JSON with no ANSI escape codes" do
       json = JSON.generate(snapshot.status)
 

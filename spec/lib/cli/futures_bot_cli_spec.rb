@@ -191,6 +191,10 @@ RSpec.describe FuturesBotCli, type: :model do
       expect { run_cli("status") }.to output(/Realtime loop/).to_stdout
     end
 
+    it "shows the market-data feed liveness" do
+      expect { run_cli("status") }.to output(/Market data/).to_stdout
+    end
+
     it "flags the loop as stale when it has not been beating" do
       expect { run_cli("status") }.to output(/STALE/).to_stdout
     end

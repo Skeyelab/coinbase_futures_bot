@@ -53,6 +53,19 @@ RSpec.describe Tui::DataLoader do
       Rails.cache = original_cache
     end
 
+    it "includes the market-data WS feed heartbeat" do
+      original_cache = Rails.cache
+      Rails.cache = ActiveSupport::Cache::NullStore.new
+      allow(Tui::ExchangePnlRefresher).to receive(:refresh!).and_return(false)
+      Heartbeat.beat!("market_data")
+
+      md = described_class.load[:market_data_heartbeat]
+
+      expect(md).to include(name: "market_data", stale: false)
+    ensure
+      Rails.cache = original_cache
+    end
+
     it "includes the dry-run flag" do
       original_cache = Rails.cache
       Rails.cache = ActiveSupport::Cache::NullStore.new
