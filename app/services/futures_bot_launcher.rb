@@ -45,6 +45,8 @@ class FuturesBotLauncher
     @shutdown_requested = false
     @logger.info("[Launcher] Starting FuturesBot...")
 
+    enforce_execution_safety
+
     start_market_data unless @skip_market_data
     start_signal_runner unless @skip_signal_runner
     start_sentiment_pipeline unless @skip_sentiment_pipeline
@@ -76,6 +78,20 @@ class FuturesBotLauncher
   end
 
   private
+
+  # Fail-safe execution default: a fresh or unconfigured launch must never send
+  # real orders to Coinbase. Live trading is opt-in only — the operator must set
+  # LIVE_TRADING_CONFIRMED=1 *and* have dry-run disabled. Absent that explicit
+  # confirmation, force DRY-RUN before any subsystem (and thus any order flow)
+  # starts, so "start the bot" defaults to paper. See DryRun.
+  def enforce_execution_safety
+    return if ENV["LIVE_TRADING_CONFIRMED"] == "1"
+    return if DryRun.active?
+
+    @logger.warn("[Launcher] Live trading not confirmed — forcing DRY-RUN. " \
+                 "Set LIVE_TRADING_CONFIRMED=1 and disable dry-run to trade live.")
+    DryRun.enable!(logger: @logger)
+  end
 
   def start_market_data
     futures_product_ids = MarketData::RealtimeSubscriptionCatalog.futures_product_ids
