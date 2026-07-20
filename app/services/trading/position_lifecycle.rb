@@ -22,9 +22,12 @@ module Trading
         @logger.info("Closed position #{position.id} via API at #{current_price}: #{reason}")
         Result.new(success: true, close_price: current_price, reason: reason, fallback: false)
       else
-        @logger.warn("API close failed for position #{position.id}, using local fallback")
-        position.force_close!(current_price, reason)
-        Result.new(success: true, close_price: current_price, reason: reason, fallback: true)
+        # Do NOT mark the DB position CLOSED here. The exchange close failed, so
+        # real exposure likely remains; faking success created a "phantom-flat"
+        # position the bot believed it was out of. Fail loud and leave it OPEN so
+        # the caller retries/alerts instead of trading blind.
+        @logger.error("API close failed for position #{position.id}; leaving OPEN to avoid phantom-flat: #{reason}")
+        Result.new(success: false, close_price: nil, reason: reason, fallback: false)
       end
     end
 

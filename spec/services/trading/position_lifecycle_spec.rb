@@ -40,24 +40,28 @@ RSpec.describe Trading::PositionLifecycle do
       end
     end
 
+    # A failed exchange close must NOT be reported as success and must NOT mark
+    # the DB position CLOSED. Doing so creates a "phantom-flat" position: the bot
+    # believes it is out while real exposure remains on the exchange. Fail loud so
+    # callers retry/alert instead of trading blind. See fail-loud-close.
     context "API bad response" do
       before do
         allow(positions_service).to receive(:close_position).and_return({"error" => "insufficient funds"})
       end
 
-      it "still succeeds via fallback" do
+      it "reports failure (does not fake success)" do
         result = lifecycle.close(position, reason: "Day trading closure")
-        expect(result).to be_success
+        expect(result).not_to be_success
       end
 
-      it "marks result as fallback" do
-        result = lifecycle.close(position, reason: "Day trading closure")
-        expect(result.fallback).to be true
-      end
-
-      it "closes position locally" do
+      it "leaves the position OPEN so exposure is not hidden" do
         lifecycle.close(position, reason: "Day trading closure")
-        expect(position.reload.status).to eq("CLOSED")
+        expect(position.reload.status).to eq("OPEN")
+      end
+
+      it "logs an error" do
+        expect(logger).to receive(:error).with(/close failed/i)
+        lifecycle.close(position, reason: "Day trading closure")
       end
     end
 
@@ -66,19 +70,14 @@ RSpec.describe Trading::PositionLifecycle do
         allow(positions_service).to receive(:close_position).and_raise(StandardError, "network timeout")
       end
 
-      it "still succeeds via fallback" do
+      it "reports failure (does not fake success)" do
         result = lifecycle.close(position, reason: "Day trading closure")
-        expect(result).to be_success
+        expect(result).not_to be_success
       end
 
-      it "marks result as fallback" do
-        result = lifecycle.close(position, reason: "Day trading closure")
-        expect(result.fallback).to be true
-      end
-
-      it "closes position locally" do
+      it "leaves the position OPEN so exposure is not hidden" do
         lifecycle.close(position, reason: "Day trading closure")
-        expect(position.reload.status).to eq("CLOSED")
+        expect(position.reload.status).to eq("OPEN")
       end
     end
 
