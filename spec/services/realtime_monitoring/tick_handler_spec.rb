@@ -33,6 +33,34 @@ RSpec.describe RealtimeMonitoring::TickHandler do
 
       handler.process("product_id" => "BTC-USD", "price" => "0", "time" => "2024-01-01T12:00:00Z")
     end
+
+    describe "market-data liveness heartbeat" do
+      before do
+        allow(handler).to receive(:check_position_alerts)
+        allow(handler).to receive(:spot_relevant?).and_return(false)
+        allow(handler).to receive(:should_evaluate_signals?).and_return(false)
+      end
+
+      it "beats the market_data heartbeat on a valid tick so a dead WS feed is detectable" do
+        expect(Heartbeat.status("market_data")[:stale]).to be(true)
+
+        handler.process(ticker_data)
+
+        expect(Heartbeat.status("market_data")[:stale]).to be(false)
+      end
+
+      it "does not beat on invalid ticker data" do
+        handler.process("product_id" => "BTC-USD", "price" => "0", "time" => ticker_data["time"])
+
+        expect(Heartbeat.status("market_data")[:last_beat_at]).to be_nil
+      end
+
+      it "throttles beats so it does not write once per tick" do
+        expect(Heartbeat).to receive(:beat!).with("market_data", anything).once
+
+        3.times { handler.process(ticker_data) }
+      end
+    end
   end
 
   describe "#check_position_alerts" do

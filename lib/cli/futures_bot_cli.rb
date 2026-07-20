@@ -108,7 +108,8 @@ module Cli
       puts "  #{WHITE}Swing positions:        #{RESET}#{colorize_count(swing_pos)}"
       puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(signals)}"
       puts "  #{WHITE}Chat sessions:          #{RESET}#{sessions}"
-      puts "  #{WHITE}Realtime loop:          #{RESET}#{format_loop_liveness}"
+      puts "  #{WHITE}Realtime loop:          #{RESET}#{format_liveness("realtime_signal")}"
+      puts "  #{WHITE}Market data:            #{RESET}#{format_liveness("market_data")}"
       puts "─" * 40
       print_paper_section
       print_sentiment_section
@@ -533,8 +534,8 @@ module Cli
       (count > 0) ? "#{GREEN}#{BOLD}#{count}#{RESET}" : "#{WHITE}#{count}#{RESET}"
     end
 
-    def format_loop_liveness
-      hb = Heartbeat.status("realtime_signal")
+    def format_liveness(name)
+      hb = Heartbeat.status(name)
       if hb[:stale]
         age = hb[:age_seconds] ? "#{hb[:age_seconds]}s ago" : "never"
         "#{RED}#{BOLD}⚠ STALE#{RESET} #{WHITE}(last beat #{age} — is the bot running?)#{RESET}"
