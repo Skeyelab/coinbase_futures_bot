@@ -16,6 +16,18 @@ RSpec.describe RealtimeSignalRunner do
     end
   end
 
+  describe "liveness heartbeat" do
+    it "records a fresh heartbeat when it runs an evaluation, so a dead loop is detectable" do
+      allow(job_class).to receive(:perform_now)
+
+      expect(Heartbeat.status("realtime_signal")[:stale]).to be(true)
+
+      runner.start!
+
+      expect(Heartbeat.status("realtime_signal")[:stale]).to be(false)
+    end
+  end
+
   describe "#tick" do
     it "does nothing before the interval elapses" do
       travel_to(Time.current) do

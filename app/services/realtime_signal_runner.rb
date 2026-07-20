@@ -24,5 +24,6 @@ class RealtimeSignalRunner
   def run_once(now)
     @job_class.perform_now
     @last_run_at = now
+    Heartbeat.beat!("realtime_signal", now: now)
   end
 end
