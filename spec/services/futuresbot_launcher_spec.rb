@@ -82,6 +82,27 @@ RSpec.describe FuturesBotLauncher do
       expect { launcher.start }.to raise_error(StandardError, "boom")
     end
 
+    # Fail-safe: a fresh/unconfigured launch must never send real orders to
+    # Coinbase. Live trading requires an explicit opt-in; otherwise the launcher
+    # forces DRY-RUN before any subsystem starts.
+    context "execution safety gate" do
+      it "forces dry-run when live trading is not explicitly confirmed" do
+        DryRun.disable!
+        ClimateControl.modify(LIVE_TRADING_CONFIRMED: nil) do
+          launcher.start
+        end
+        expect(DryRun.active?).to be true
+      end
+
+      it "stays live when LIVE_TRADING_CONFIRMED=1" do
+        DryRun.disable!
+        ClimateControl.modify(LIVE_TRADING_CONFIRMED: "1") do
+          launcher.start
+        end
+        expect(DryRun.active?).to be false
+      end
+    end
+
     context "when market data is not skipped" do
       let(:mock_spot) { instance_double(MarketData::CoinbaseSpotSubscriber) }
       let(:mock_futures) { instance_double(MarketData::CoinbaseFuturesSubscriber) }
