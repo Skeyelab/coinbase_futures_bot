@@ -21,6 +21,7 @@ class OperatorSnapshot
         open_total: Position.open.count
       },
       signals: {active: SignalAlert.active.count},
+      loop: Heartbeat.status("realtime_signal", now: @now),
       eval: eval_info,
       paper: paper_info
     }

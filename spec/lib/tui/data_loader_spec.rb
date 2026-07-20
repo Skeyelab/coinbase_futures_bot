@@ -40,6 +40,19 @@ RSpec.describe Tui::DataLoader do
       Rails.cache = original_cache
     end
 
+    it "includes the realtime loop heartbeat so a dead loop is visible in the TUI" do
+      original_cache = Rails.cache
+      Rails.cache = ActiveSupport::Cache::NullStore.new
+      allow(Tui::ExchangePnlRefresher).to receive(:refresh!).and_return(false)
+      Heartbeat.beat!("realtime_signal")
+
+      loop_hb = described_class.load[:loop_heartbeat]
+
+      expect(loop_hb).to include(name: "realtime_signal", stale: false)
+    ensure
+      Rails.cache = original_cache
+    end
+
     it "includes the dry-run flag" do
       original_cache = Rails.cache
       Rails.cache = ActiveSupport::Cache::NullStore.new
