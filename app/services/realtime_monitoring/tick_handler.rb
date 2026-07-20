@@ -40,9 +40,34 @@ module RealtimeMonitoring
 
     def check_position_alerts(product_id, price)
       positions_for_tick(product_id).find_each do |position|
+        # Dollar-PnL exit ($20-50 target + hard dollar stop) takes precedence for
+        # day-trading positions; if it closes, skip the bps threshold checks.
+        next if check_dollar_pnl_exit(position, price)
+
         check_take_profit_stop_loss(position, price)
         check_day_trading_time_limits(position)
       end
+    end
+
+    # Close a day-trading position on its unrealized dollar PnL: at the configured
+    # profit target ($20-50) or the hard dollar stop-loss. Uses the contract-size-
+    # aware Position#unrealized_pnl_at so the dollars are real (not a bps proxy).
+    # Returns true if it triggered a close. Inert unless DOLLAR_*_USD is configured.
+    def check_dollar_pnl_exit(position, current_price)
+      return false unless position.day_trading?
+      return false unless dollar_exit_policy.enabled?
+
+      reason = dollar_exit_policy.exit_reason(position.unrealized_pnl_at(current_price))
+      return false unless reason
+
+      pnl = position.unrealized_pnl_at(current_price)
+      @logger.info("[RTM] #{reason} for #{position.product_id} at $#{current_price} (unrealized $#{pnl.round(2)}) — closing")
+      trigger_position_close(position, reason.to_s)
+      true
+    end
+
+    def dollar_exit_policy
+      @dollar_exit_policy ||= Trading::DollarExitPolicy.from_env
     end
 
     def positions_for_tick(product_id)

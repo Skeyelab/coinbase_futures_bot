@@ -63,6 +63,61 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  describe "#check_dollar_pnl_exit (dollar-target + hard stop)" do
+    let(:product_id) { "NOL-19JUN26-CDE" }
+
+    def day_position
+      create(:position, day_trading: true, side: "LONG", entry_price: 100.0, size: 1, product_id: product_id)
+    end
+
+    before do
+      allow(handler).to receive(:trigger_position_close)
+      # contract_size 10 → $ per $1 move per contract = 10
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with(product_id).and_return(10)
+    end
+
+    context "with dollar thresholds configured" do
+      around do |ex|
+        ClimateControl.modify(DOLLAR_PROFIT_TARGET_USD: "30", DOLLAR_STOP_LOSS_USD: "25") { ex.run }
+      end
+
+      it "closes at the profit target (price 104 → +$40 ≥ $30)" do
+        position = day_position
+        expect(handler).to receive(:trigger_position_close).with(position, "dollar_target")
+
+        expect(handler.send(:check_dollar_pnl_exit, position, 104.0)).to be(true)
+      end
+
+      it "closes at the hard dollar stop (price 97 → -$30 ≤ -$25)" do
+        position = day_position
+        expect(handler).to receive(:trigger_position_close).with(position, "dollar_stop_loss")
+
+        expect(handler.send(:check_dollar_pnl_exit, position, 97.0)).to be(true)
+      end
+
+      it "does nothing inside the dollar band (price 101 → +$10)" do
+        position = day_position
+        expect(handler).not_to receive(:trigger_position_close)
+
+        expect(handler.send(:check_dollar_pnl_exit, position, 101.0)).to be(false)
+      end
+
+      it "ignores swing (non-day-trading) positions" do
+        position = create(:position, day_trading: false, side: "LONG", entry_price: 100.0, size: 1, product_id: product_id)
+        expect(handler).not_to receive(:trigger_position_close)
+
+        expect(handler.send(:check_dollar_pnl_exit, position, 200.0)).to be(false)
+      end
+    end
+
+    it "is inert when no dollar thresholds are configured" do
+      position = day_position
+      expect(handler).not_to receive(:trigger_position_close)
+
+      expect(handler.send(:check_dollar_pnl_exit, position, 200.0)).to be(false)
+    end
+  end
+
   describe "#extract_asset_from_product_id" do
     it "extracts OIL from NOL futures contracts" do
       expect(handler.send(:extract_asset_from_product_id, "NOL-19JUN26-CDE")).to eq("OIL")
