@@ -26,7 +26,10 @@ class SignalAlert < ApplicationRecord
   scope :by_strategy, ->(strategy_name) { where(strategy_name: strategy_name) }
   scope :by_side, ->(side) { where(side: side) }
   scope :high_confidence, ->(threshold = 70) { where("confidence >= ?", threshold) }
-  scope :recent, ->(hours = 24) { where("alert_timestamp >= ?", hours.hours.ago) }
+  # `as_of` anchors the recency window on an explicit clock so callers that run
+  # against an injected time (e.g. OperatorSnapshot) get deterministic results
+  # instead of leaking the real wall clock. Defaults to now for every other caller.
+  scope :recent, ->(hours = 24, as_of: Time.current) { where("alert_timestamp >= ?", as_of - hours.hours) }
   scope :expiring_soon, ->(minutes = 60) { where("expires_at <= ?", minutes.minutes.from_now) }
   scope :entry_signals, -> { where(signal_type: "entry") }
   scope :exit_signals, -> { where(signal_type: %w[exit stop_loss take_profit]) }

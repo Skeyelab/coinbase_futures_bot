@@ -36,7 +36,7 @@ class OperatorSnapshot
   def signals
     {
       as_of: iso(@now),
-      signals: SignalAlert.active.recent.order(alert_timestamp: :desc).limit(25).map { |s| signal_row(s) }
+      signals: SignalAlert.active.recent(24, as_of: @now).order(alert_timestamp: :desc).limit(25).map { |s| signal_row(s) }
     }
   end
 
