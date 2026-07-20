@@ -3,7 +3,7 @@
 class PositionCloseJob < ApplicationJob
   queue_as :critical
 
-  CRITICAL_REASONS = %w[stop_loss take_profit time_limit].freeze
+  CRITICAL_REASONS = %w[stop_loss take_profit time_limit dollar_target dollar_stop_loss].freeze
 
   def perform(position_id:, reason:, priority: "normal")
     @reason = reason

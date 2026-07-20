@@ -91,7 +91,7 @@ RSpec.describe PositionCloseJob, type: :job do
       end
 
       context "with critical closure reasons" do
-        %w[stop_loss take_profit time_limit].each do |critical_reason|
+        %w[stop_loss take_profit time_limit dollar_target dollar_stop_loss].each do |critical_reason|
           it "retries #{critical_reason} closure after failure" do
             expect(logger).to receive(:info).with("[PCJ] Retrying critical position closure")
             described_class.perform_now(position_id: position.id, reason: critical_reason)
