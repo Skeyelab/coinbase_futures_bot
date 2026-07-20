@@ -24,6 +24,24 @@ RSpec.describe OperatorSnapshot do
       expect(result[:signals]).to eq({active: 1})
     end
 
+    it "reports the realtime loop heartbeat with staleness relative to now" do
+      Heartbeat.beat!("realtime_signal", now: now - 20)
+
+      result = snapshot.status
+
+      expect(result[:loop]).to include(
+        last_beat_at: "2026-07-17T17:59:40Z",
+        age_seconds: 20,
+        stale: false
+      )
+    end
+
+    it "flags the loop stale when it has not beaten within the window" do
+      Heartbeat.beat!("realtime_signal", now: now - 300)
+
+      expect(snapshot.status[:loop][:stale]).to be(true)
+    end
+
     it "serializes cleanly to JSON with no ANSI escape codes" do
       json = JSON.generate(snapshot.status)
 
