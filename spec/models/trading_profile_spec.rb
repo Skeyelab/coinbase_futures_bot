@@ -92,6 +92,43 @@ RSpec.describe TradingProfile do
     end
   end
 
+  # ── Per-symbol calibration profiles (issue #299) ─────────────────────────────
+
+  describe "per-symbol profiles" do
+    it ".effective(symbol:) prefers the symbol's active profile over the global one" do
+      global = create(:trading_profile, :active, name: "global")
+      btc = create(:trading_profile, name: "btc-cal", symbol: "BTC-USD", active: true)
+
+      expect(described_class.effective(symbol: "BTC-USD")).to eq(btc)
+      expect(described_class.effective(symbol: "ETH-USD")).to eq(global)
+      expect(described_class.effective).to eq(global)
+    end
+
+    it ".effective(symbol:) falls back to env defaults when nothing is active" do
+      expect(described_class.effective(symbol: "BTC-USD")).to be_readonly
+    end
+
+    it "activate! only deactivates profiles for the same symbol" do
+      global = create(:trading_profile, :active, name: "global")
+      btc_v1 = create(:trading_profile, name: "btc-v1", symbol: "BTC-USD", active: true)
+      btc_v2 = create(:trading_profile, name: "btc-v2", symbol: "BTC-USD")
+
+      btc_v2.activate!
+
+      expect(btc_v1.reload.active).to be false
+      expect(btc_v2.reload.active).to be true
+      expect(global.reload.active).to be true
+    end
+
+    it "enforces at most one active profile per symbol at the DB level" do
+      create(:trading_profile, name: "btc-v1", symbol: "BTC-USD", active: true)
+
+      expect do
+        create(:trading_profile, name: "btc-v2", symbol: "BTC-USD", active: true)
+      end.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+  end
+
   # ── .effective ────────────────────────────────────────────────────────────────
 
   describe ".effective" do

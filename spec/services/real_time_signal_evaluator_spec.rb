@@ -13,6 +13,45 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
     allow(logger).to receive(:error)
   end
 
+  describe "per-symbol calibrated profiles (issue #299)" do
+    let(:contract) { instance_double(Contract, product_id: "BIT-29AUG25-CDE") }
+
+    before do
+      allow(evaluator).to receive(:resolve_symbol).and_return("BIT-29AUG25-CDE")
+      allow(evaluator).to receive(:has_sufficient_data?).and_return(true)
+    end
+
+    it "evaluates a symbol with its calibrated profile's params instead of the global profile" do
+      create(:trading_profile, :active, name: "global", tp_target: 0.006)
+      create(:trading_profile, name: "cal-btc", symbol: "BIT-29AUG25-CDE", active: true,
+        tp_target: 0.011, sl_target: 0.005)
+
+      captured = nil
+      allow_any_instance_of(Strategy::MultiTimeframeSignal).to receive(:signal) do |strat, **|
+        captured = strat.instance_variable_get(:@config)[:tp_target]
+        nil
+      end
+
+      evaluator.evaluate_pair(contract)
+
+      expect(captured).to eq(0.011)
+    end
+
+    it "falls back to the global profile when the symbol has no calibrated profile" do
+      create(:trading_profile, :active, name: "global", tp_target: 0.006)
+
+      captured = nil
+      allow_any_instance_of(Strategy::MultiTimeframeSignal).to receive(:signal) do |strat, **|
+        captured = strat.instance_variable_get(:@config)[:tp_target]
+        nil
+      end
+
+      evaluator.evaluate_pair(contract)
+
+      expect(captured).to eq(0.006)
+    end
+  end
+
   describe "#initialize" do
     it "initializes with provided logger" do
       expect(evaluator.logger).to eq(logger)

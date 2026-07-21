@@ -39,15 +39,18 @@ class TradingProfile < ApplicationRecord
 
   # ── Class methods ─────────────────────────────────────────────────────────────
 
-  # Returns the active TradingProfile, or nil if none is set.
-  def self.active_profile
-    find_by(active: true)
+  # Returns the active TradingProfile for a symbol (nil symbol = the global
+  # profile), or nil if none is set.
+  def self.active_profile(symbol = nil)
+    find_by(active: true, symbol: symbol)
   end
 
-  # Returns a read-only value object with effective settings:
-  # active profile if one exists, otherwise env-var / hard-coded defaults.
-  def self.effective
-    active_profile || default_profile
+  # Returns a read-only value object with effective settings: the symbol's
+  # active (calibrated) profile if one exists, else the active global
+  # profile, else env-var / hard-coded defaults. Issue #299: calibration
+  # writes per-symbol profiles that the live path reads through here.
+  def self.effective(symbol: nil)
+    (symbol && active_profile(symbol)) || active_profile || default_profile
   end
 
   # Build an unsaved, read-only record with env-var / hard-coded defaults.
@@ -68,11 +71,12 @@ class TradingProfile < ApplicationRecord
 
   # ── Instance methods ──────────────────────────────────────────────────────────
 
-  # Make this profile active, deactivating any currently active profile.
-  # Wrapped in a transaction so the swap is atomic.
+  # Make this profile active, deactivating any currently active profile FOR
+  # THE SAME SYMBOL (nil symbol = the global slot). Wrapped in a transaction
+  # so the swap is atomic.
   def activate!
     transaction do
-      self.class.where(active: true).where.not(id: id).update_all(active: false)
+      self.class.where(active: true, symbol: symbol).where.not(id: id).update_all(active: false)
       update!(active: true)
     end
     self
