@@ -148,13 +148,14 @@ class FetchCandlesJob < ApplicationJob
     # Choose the later of (last known + 1h) and (backfill_days ago)
     start_time = fetch_start_time(pair.product_id, "1h", 1.hour, backfill_days.to_i.days.ago)
 
-    # Use chunked fetching for large date ranges to avoid API limits
-    if backfill_days.to_i > 30
+    # Chunk at 14 days (336 candles) — the API truncates responses over ~350
+    # candles, which silently capped 1h history at ~168 candles (issue #368).
+    if Time.now.utc - start_time > 14.days
       rest.upsert_1h_candles_chunked(
         product_id: pair.product_id,
         start_time: start_time,
         end_time: Time.now.utc,
-        chunk_days: 30
+        chunk_days: 14
       )
     else
       rest.upsert_1h_candles(

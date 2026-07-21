@@ -91,6 +91,16 @@ RSpec.describe FetchCandlesJob, type: :job do
       expect(mock_rest).not_to have_received(:upsert_5m_candles_chunked)
     end
 
+    it "chunks deep 1h backfills at 14 days so requests stay under the ~350-candle API cap (issue #368)" do
+      # 30-day chunks = 720 hourly candles/request; the API truncates to ~350,
+      # which capped 1h history at ~168 candles on exo-mini.
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_1h_candles_chunked).with(
+        hash_including(chunk_days: 14, start_time: satisfy { |t| t <= 59.days.ago })
+      )
+    end
+
     it "fills BACKWARD when existing history is shallower than backfill_days" do
       # The first #342 fix only helped cold starts: with any recent candle,
       # start anchored to (last + step) and deep history was never fetched.
