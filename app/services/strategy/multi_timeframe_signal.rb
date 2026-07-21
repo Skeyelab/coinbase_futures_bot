@@ -26,7 +26,8 @@ module Strategy
       # Futures-specific settings
       contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD)
       max_position_size: 5, # Maximum contracts to open
-      min_position_size: 1 # Minimum contracts to open
+      min_position_size: 1, # Minimum contracts to open
+      resolve_symbols: true # false in backtests: use the symbol as-is, no contract lookup
     }.freeze
 
     def initialize(config = {})
@@ -34,9 +35,12 @@ module Strategy
     end
 
     # Decide on a potential entry.
+    # as_of bounds all candle reads for event-driven replay (issue #298);
+    # nil means live behavior (latest data).
     # Returns:
     #   { side: :long | :short, price:, quantity:, tp:, sl:, confidence: } or nil
-    def signal(symbol:, equity_usd: 10_000.0)
+    def signal(symbol:, equity_usd: 10_000.0, as_of: nil)
+      @as_of = as_of
       # Support current month contracts only
       # For current month contracts, use the symbol directly
       # For asset symbols (BTC, ETH), find the current month contract
@@ -44,10 +48,10 @@ module Strategy
 
       return nil unless @current_symbol
 
-      candles_1h = Candle.for_symbol(@current_symbol).hourly.order(:timestamp).last(@config[:min_1h_candles])
-      candles_15m = Candle.for_symbol(@current_symbol).fifteen_minute.order(:timestamp).last(@config[:min_15m_candles])
-      candles_5m = Candle.for_symbol(@current_symbol).five_minute.order(:timestamp).last(@config[:min_5m_candles])
-      candles_1m = Candle.for_symbol(@current_symbol).one_minute.order(:timestamp).last(@config[:min_1m_candles])
+      candles_1h = candle_scope(:hourly).last(@config[:min_1h_candles])
+      candles_15m = candle_scope(:fifteen_minute).last(@config[:min_15m_candles])
+      candles_5m = candle_scope(:five_minute).last(@config[:min_5m_candles])
+      candles_1m = candle_scope(:one_minute).last(@config[:min_1m_candles])
 
       return nil if candles_1h.size < @config[:min_1h_candles]
       return nil if candles_15m.size < @config[:min_15m_candles]
@@ -126,6 +130,12 @@ module Strategy
     end
 
     private
+
+    def candle_scope(timeframe)
+      scope = Candle.for_symbol(@current_symbol).public_send(timeframe).order(:timestamp)
+      scope = scope.where(timestamp: ..@as_of) if @as_of
+      scope
+    end
 
     def confirm_trend_alignment(trend, ema15, ema5, ema1, last_15m, last_5m, last_1m)
       # Ensure all timeframes are aligned with the dominant trend
@@ -232,7 +242,7 @@ module Strategy
 
     def volume_confidence_score
       # Get recent 5m candles for volume analysis (better for day trading)
-      recent_candles = Candle.for_symbol(@current_symbol).five_minute.order(:timestamp).last(10)
+      recent_candles = candle_scope(:five_minute).last(10)
       return 0 if recent_candles.size < 10
 
       volumes = recent_candles.map { |c| c.volume.to_f }
@@ -253,7 +263,7 @@ module Strategy
 
     def momentum_confidence_score
       # Get recent 5m closes for momentum analysis (better for day trading)
-      recent_candles = Candle.for_symbol(@current_symbol).five_minute.order(:timestamp).last(8)
+      recent_candles = candle_scope(:five_minute).last(8)
       return 0 if recent_candles.size < 8
 
       closes = recent_candles.map { |c| c.close.to_f }
@@ -269,7 +279,9 @@ module Strategy
     end
 
     def latest_sentiment_z(symbol, window: "15m")
-      rec = SentimentAggregate.where(symbol: symbol, window: window).order(window_end_at: :desc).first
+      scope = SentimentAggregate.where(symbol: symbol, window: window)
+      scope = scope.where(window_end_at: ..@as_of) if @as_of # no future leak in replay
+      rec = scope.order(window_end_at: :desc).first
       rec&.z_score&.to_f || 0.0
     end
 
@@ -291,6 +303,7 @@ module Strategy
     # If given a specific contract symbol, use it directly
     def resolve_trading_symbol(symbol)
       return nil unless symbol
+      return symbol unless @config[:resolve_symbols]
 
       # If it's already a specific contract (contains date pattern), use it
       return symbol if symbol.match?(/\d{2}[A-Z]{3}\d{2}/)

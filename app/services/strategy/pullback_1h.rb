@@ -55,35 +55,6 @@ module Strategy
       }
     end
 
-    # Backtest the strategy over available data
-    def backtest(candles:, symbol:, equity_usd: 1000.0)
-      return nil if candles.size < @config[:min_candles]
-
-      results = []
-      current_equity = equity_usd
-
-      # Test strategy on each candle after minimum required
-      (@config[:min_candles]..candles.size - 1).each do |i|
-        test_candles = candles[0..i]
-        signal = signal(candles: test_candles, symbol: symbol, equity_usd: current_equity)
-
-        if signal
-          # Simulate trade execution
-          trade_result = simulate_trade(signal, test_candles.last, current_equity)
-          results << trade_result
-          current_equity = trade_result[:final_equity]
-        end
-      end
-
-      {
-        total_trades: results.size,
-        winning_trades: results.count { |r| r[:pnl] > 0 },
-        total_pnl: results.sum { |r| r[:pnl] },
-        final_equity: current_equity,
-        trades: results
-      }
-    end
-
     private
 
     def position_size(equity_usd:, entry:, sl:, risk_fraction: 0.005)
@@ -114,36 +85,6 @@ module Strategy
 
       confidence = (trend_strength * 0.6 + pullback_quality * 0.4) * 100
       [confidence, 100].min.round(1)
-    end
-
-    def simulate_trade(signal, entry_candle, equity)
-      # Simple trade simulation - in reality you'd track the trade through multiple candles
-      entry_price = signal[:price]
-      quantity = signal[:quantity]
-
-      # For backtesting, assume we hit take profit or stop loss
-      # This is simplified - real backtesting would track each candle
-      exit_price = if rand > 0.5  # 50% win rate for demo
-        signal[:tp]
-      else
-        signal[:sl]
-      end
-      pnl = CostModel.round_trip_net_pnl(
-        entry_price: entry_price,
-        exit_price: exit_price,
-        quantity: quantity,
-        fee_rate: @config[:maker_fee],
-        slippage_rate: @config[:slippage]
-      )
-
-      {
-        entry_price: entry_price,
-        exit_price: exit_price,
-        quantity: quantity,
-        pnl: pnl,
-        final_equity: equity + pnl,
-        timestamp: entry_candle.timestamp
-      }
     end
   end
 end
