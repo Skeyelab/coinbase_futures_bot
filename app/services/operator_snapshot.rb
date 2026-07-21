@@ -97,6 +97,8 @@ class OperatorSnapshot
       take_profit: position.take_profit&.to_f,
       stop_loss: position.stop_loss&.to_f,
       unrealized_pnl: price ? position.unrealized_pnl_at(price) : nil,
+      max_adverse_excursion: position.max_adverse_excursion&.to_f,
+      holding_seconds: position.holding_seconds,
       day_trading: position.day_trading,
       paper: position.paper
     }

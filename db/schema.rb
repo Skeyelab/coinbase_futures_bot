@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_17_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_151801) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -201,6 +201,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_17_170000) do
     t.boolean "day_trading"
     t.decimal "entry_price"
     t.datetime "entry_time"
+    t.decimal "max_adverse_excursion"
     t.boolean "paper", default: false, null: false
     t.decimal "pnl"
     t.string "product_id"
@@ -277,6 +278,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_17_170000) do
     t.string "product_id", null: false
     t.datetime "updated_at", null: false
     t.index ["product_id", "observed_at"], name: "index_ticks_on_product_id_and_observed_at"
+  end
+
+  create_table "trading_pairs", force: :cascade do |t|
+    t.string "base_currency"
+    t.string "contract_type"
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.date "expiration_date"
+    t.decimal "min_size", precision: 20, scale: 10
+    t.decimal "price_increment", precision: 20, scale: 10
+    t.string "product_id", null: false
+    t.string "quote_currency"
+    t.decimal "size_increment", precision: 20, scale: 10
+    t.string "status"
+    t.datetime "updated_at", null: false
+    t.index ["expiration_date"], name: "index_trading_pairs_on_expiration_date"
+    t.index ["product_id"], name: "index_trading_pairs_on_product_id", unique: true
   end
 
   create_table "trading_profiles", force: :cascade do |t|

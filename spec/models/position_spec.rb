@@ -19,6 +19,57 @@ RSpec.describe Position, type: :model do
     )
   end
 
+  describe "#track_adverse_excursion!" do
+    subject(:position) do
+      create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG", entry_price: 100.0, size: 1, status: "OPEN")
+    end
+
+    before do
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with("BIT-29AUG25-CDE").and_return(10)
+    end
+
+    it "records the adverse (negative) unrealized dollar PnL" do
+      position.track_adverse_excursion!(98.0) # (98-100)*1*10 = -20
+
+      expect(position.reload.max_adverse_excursion).to eq(-20)
+    end
+
+    it "keeps the worst excursion across ticks and does not overwrite with a milder one" do
+      position.track_adverse_excursion!(98.0)  # -20
+      position.track_adverse_excursion!(95.0)  # -50 (worse → update)
+      position.track_adverse_excursion!(99.0)  # -10 (milder → keep -50)
+
+      expect(position.reload.max_adverse_excursion).to eq(-50)
+    end
+
+    it "ignores favorable (positive) PnL" do
+      position.track_adverse_excursion!(105.0) # +50
+
+      expect(position.reload.max_adverse_excursion).to be_nil
+    end
+
+    it "does nothing once the position is closed" do
+      position.update!(status: "CLOSED", close_time: Time.current)
+
+      position.track_adverse_excursion!(90.0)
+
+      expect(position.reload.max_adverse_excursion).to be_nil
+    end
+  end
+
+  describe "#holding_seconds" do
+    it "returns the entry→close duration for a closed position" do
+      position = create(:position, entry_time: Time.utc(2026, 7, 20, 12, 0, 0),
+        status: "CLOSED", close_time: Time.utc(2026, 7, 20, 12, 3, 30))
+
+      expect(position.holding_seconds).to eq(210)
+    end
+
+    it "is nil for an open position" do
+      expect(create(:position, status: "OPEN").holding_seconds).to be_nil
+    end
+  end
+
   describe "validations" do
     it "is valid with valid attributes" do
       expect(valid_position).to be_valid

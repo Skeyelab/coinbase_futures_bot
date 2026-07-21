@@ -163,6 +163,26 @@ class Position < ApplicationRecord
     )
   end
 
+  # Track the worst (most negative) unrealized dollar PnL seen while open — the
+  # position's Maximum Adverse Excursion. Called per tick; writes only when a new
+  # low is hit (a running minimum, so writes are naturally infrequent) and never
+  # for favorable moves, so it does not become a DB write per tick. update_column
+  # skips callbacks/validations for a cheap targeted write.
+  def track_adverse_excursion!(current_price)
+    pnl = unrealized_pnl_at(current_price)
+    return if pnl.nil? || pnl >= 0
+    return if max_adverse_excursion && pnl >= max_adverse_excursion
+
+    update_column(:max_adverse_excursion, pnl)
+  end
+
+  # Seconds the position was held (entry → close); nil while still open.
+  def holding_seconds
+    return nil unless closed? && entry_time && close_time
+
+    (close_time - entry_time).to_i
+  end
+
   def pnl_percentage
     return nil unless closed? && entry_price && pnl
 

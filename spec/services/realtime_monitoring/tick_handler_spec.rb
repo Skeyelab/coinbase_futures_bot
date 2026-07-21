@@ -91,6 +91,18 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  describe "#check_position_alerts adverse-excursion tracking" do
+    it "records each open position's max adverse excursion on the tick" do
+      product_id = "NOL-19JUN26-CDE"
+      position = create(:position, product_id: product_id, side: "LONG", entry_price: 100.0, size: 1)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with(product_id).and_return(10)
+
+      handler.send(:check_position_alerts, product_id, 97.0) # (97-100)*1*10 = -30
+
+      expect(position.reload.max_adverse_excursion).to eq(-30)
+    end
+  end
+
   describe "#check_dollar_pnl_exit (dollar-target + hard stop)" do
     let(:product_id) { "NOL-19JUN26-CDE" }
 

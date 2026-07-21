@@ -79,6 +79,17 @@ RSpec.describe OperatorSnapshot do
       # (93.62 - 93.46) * 1 * 10 = 1.60
       expect(row[:unrealized_pnl]).to eq(1.6)
     end
+
+    it "includes trade metrics: max adverse excursion and holding seconds" do
+      create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG", entry_price: 100.0, size: 1,
+        max_adverse_excursion: -42.5, status: "OPEN")
+      allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(10)
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
+
+      row = snapshot.positions[:positions].first
+
+      expect(row).to include(max_adverse_excursion: -42.5, holding_seconds: nil)
+    end
   end
 
   describe "#sentiment" do
