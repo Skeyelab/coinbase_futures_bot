@@ -3,11 +3,21 @@
 class FetchCandlesJob < ApplicationJob
   queue_as :default
 
-  def perform(backfill_days: 7)
+  # 1m history is capped (issue #342): deep 1m backfill costs ~288 API
+  # requests per symbol per 60 days and nothing needs it — the strategy uses
+  # the last 60 1m candles and the backtest steps on 5m. Override via env.
+  MAX_1M_BACKFILL_DAYS = ENV.fetch("MAX_1M_BACKFILL_DAYS", "3").to_i
+
+  # symbols: optional product_id filter (deep backfill for specific pairs);
+  # nil = all enabled contracts (hourly cron path).
+  def perform(backfill_days: 7, symbols: nil)
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
-    Contract.enabled.find_each do |pair|
+    scope = Contract.enabled
+    scope = scope.where(product_id: symbols) if symbols.present?
+
+    scope.find_each do |pair|
       Rails.logger.info("[Candles] Fetching candles for #{pair.product_id}")
       fetch_1m_candles(rest, pair, backfill_days)
       fetch_5m_candles(rest, pair, backfill_days)
@@ -21,15 +31,25 @@ class FetchCandlesJob < ApplicationJob
   private
 
   def fetch_1m_candles(rest, pair, backfill_days)
-    # 1m: cap single request at 5h (300 candles); chunked for longer windows
-    backfill_hours_1m = [backfill_days.to_i * 24, 6].min
-    start_time = [last_candle_time(pair.product_id, "1m")&.+(1.minute), backfill_hours_1m.hours.ago].compact.max
+    # 1m: honor backfill_days up to MAX_1M_BACKFILL_DAYS; single request only
+    # covers ~5h (300 candles), so chunk anything longer.
+    backfill_days_1m = [backfill_days.to_i, MAX_1M_BACKFILL_DAYS].min
+    start_time = [last_candle_time(pair.product_id, "1m")&.+(1.minute), backfill_days_1m.days.ago].compact.max
 
-    rest.upsert_1m_candles(
-      product_id: pair.product_id,
-      start_time: start_time,
-      end_time: Time.now.utc
-    )
+    if Time.now.utc - start_time > 5.hours
+      rest.upsert_1m_candles_chunked(
+        product_id: pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_hours: 5
+      )
+    else
+      rest.upsert_1m_candles(
+        product_id: pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
+    end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 1m candles for #{pair.product_id}: #{e.message}")
     Sentry.with_scope do |scope|
@@ -48,15 +68,25 @@ class FetchCandlesJob < ApplicationJob
   end
 
   def fetch_5m_candles(rest, pair, backfill_days)
-    # 5m: cap single request at 24h (288 candles); chunked for longer windows
-    backfill_days_5m = [backfill_days.to_i, 1].min
-    start_time = [last_candle_time(pair.product_id, "5m")&.+(5.minutes), backfill_days_5m.days.ago].compact.max
+    # 5m: honor the full backfill_days (issue #342 — the old 1-day cap made
+    # deep backtest history impossible). Single request covers ~24h (288
+    # candles); chunk anything longer.
+    start_time = [last_candle_time(pair.product_id, "5m")&.+(5.minutes), backfill_days.to_i.days.ago].compact.max
 
-    rest.upsert_5m_candles(
-      product_id: pair.product_id,
-      start_time: start_time,
-      end_time: Time.now.utc
-    )
+    if Time.now.utc - start_time > 24.hours
+      rest.upsert_5m_candles_chunked(
+        product_id: pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc,
+        chunk_hours: 24
+      )
+    else
+      rest.upsert_5m_candles(
+        product_id: pair.product_id,
+        start_time: start_time,
+        end_time: Time.now.utc
+      )
+    end
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 5m candles for #{pair.product_id}: #{e.message}")
     Sentry.with_scope do |scope|
@@ -75,13 +105,11 @@ class FetchCandlesJob < ApplicationJob
   end
 
   def fetch_15m_candles(rest, pair, backfill_days)
-    # Choose the later of (last known + 15m) and (backfill_days ago)
-    # Use shorter backfill for 15m candles since they're more frequent
-    backfill_days_15m = [backfill_days.to_i, 3].min # Cap at 3 days for 15m
-    start_time = [last_candle_time(pair.product_id, "15m")&.+(15.minutes), backfill_days_15m.days.ago].compact.max
+    # 15m: honor the full backfill_days (issue #342 — the old 3-day cap also
+    # made the chunked branch below unreachable). Chunk beyond ~3 days.
+    start_time = [last_candle_time(pair.product_id, "15m")&.+(15.minutes), backfill_days.to_i.days.ago].compact.max
 
-    # Use chunked fetching for large date ranges to avoid API limits
-    if backfill_days_15m > 3
+    if Time.now.utc - start_time > 3.days
       rest.upsert_15m_candles_chunked(
         product_id: pair.product_id,
         start_time: start_time,

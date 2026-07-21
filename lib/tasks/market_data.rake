@@ -23,109 +23,27 @@ namespace :market_data do
     puts "Completed upserting futures products"
   end
 
-  desc "Backfill BTC-USD 1h candles"
+  desc "Backfill candles for enabled contracts (issue #342). Usage: market_data:backfill[60] or market_data:backfill[60,'BTC-USD ETH-USD NOL-19AUG26-CDE']"
+  task :backfill, [:days, :products] => :environment do |_t, args|
+    days = (args[:days] || ENV["BACKFILL_DAYS"] || 30).to_i
+    products = (args[:products] || ENV["PRODUCTS"]).to_s.split(/[\s,]+/).reject(&:empty?)
+    symbols = products.presence
+
+    puts "Backfilling #{days}d of candles for #{symbols&.join(", ") || "ALL enabled contracts"} (inline)"
+    FetchCandlesJob.perform_now(backfill_days: days, symbols: symbols)
+    puts "Done. Candle depth:"
+    (symbols || Contract.enabled.pluck(:product_id)).each do |sym|
+      %w[1m 5m 15m 1h].each do |tf|
+        scope = Candle.where(symbol: sym, timeframe: tf)
+        puts "  #{sym} #{tf}: #{scope.count} candles (from #{scope.minimum(:timestamp)&.to_date})"
+      end
+    end
+  end
+
+  desc "Enqueue background candle backfill for all enabled contracts"
   task :backfill_candles, [:days] => :environment do |_t, args|
     days = (args[:days] || 30).to_i
     FetchCandlesJob.perform_later(backfill_days: days)
-  end
-
-  desc "Backfill BTC-USD 1h candles (direct API)"
-  task :backfill_1h_candles, [:days] => :environment do |_t, args|
-    days = (args[:days] || 30).to_i
-    rest = MarketData::CoinbaseRest.new
-
-    btc_pair = Contract.find_by(product_id: "BTC-USD")
-
-    unless btc_pair
-      puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      next
-    end
-
-    start_time = days.days.ago
-    end_time = Time.now.utc
-
-    puts "Backfilling 1h candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    puts "This will fetch approximately #{days * 24} candles..."
-
-    rest.upsert_1h_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
-
-    # Count what we got
-    count = Candle.where(symbol: btc_pair.product_id, timeframe: "1h").count
-    puts "Completed! Total 1h candles in database: #{count}"
-  end
-
-  desc "Backfill BTC-USD 15m candles"
-  task :backfill_15m_candles, [:days] => :environment do |_t, args|
-    days = (args[:days] || 7).to_i
-    rest = MarketData::CoinbaseRest.new
-
-    # Use existing BTC-USD product for now (spot trading)
-    # TODO: Research correct futures API endpoints for BTC-USD
-    btc_pair = Contract.find_by(product_id: "BTC-USD")
-
-    unless btc_pair
-      puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      next
-    end
-
-    start_time = days.days.ago
-    end_time = Time.now.utc
-
-    puts "Backfilling 15m candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    puts "This will fetch approximately #{days * 24 * 4} candles..."
-
-    rest.upsert_15m_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
-
-    # Count what we got
-    count = Candle.where(symbol: btc_pair.product_id, timeframe: "15m").count
-    puts "Completed! Total 15m candles in database: #{count}"
-  end
-
-  desc "Backfill BTC-USD 5m candles"
-  task :backfill_5m_candles, [:days] => :environment do |_t, args|
-    days = (args[:days] || 2).to_i
-    rest = MarketData::CoinbaseRest.new
-
-    # Use existing BTC-USD product for now (spot trading)
-    # TODO: Research correct futures API endpoints for BTC-USD
-    btc_pair = Contract.find_by(product_id: "BTC-USD")
-
-    unless btc_pair
-      puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      next
-    end
-
-    start_time = days.days.ago
-    end_time = Time.now.utc
-
-    puts "Backfilling 5m candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    puts "This will fetch approximately #{days * 24 * 12} candles..."
-
-    rest.upsert_5m_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
-
-    # Count what we got
-    count = Candle.where(symbol: btc_pair.product_id, timeframe: "5m").count
-    puts "Completed! Total 5m candles in database: #{count}"
-  end
-
-  desc "Test 1h candles (should work with most APIs)"
-  task :test_1h_candles, [:days] => :environment do |_t, args|
-    days = (args[:days] || 1).to_i
-    rest = MarketData::CoinbaseRest.new
-
-    btc_pair = Contract.find_by(product_id: "BTC-USD")
-
-    unless btc_pair
-      puts "No BTC trading pair found. Run 'rake market_data:upsert_futures_products' first."
-      next
-    end
-
-    start_time = days.days.ago
-    end_time = Time.now.utc
-
-    puts "Testing 1h candles for #{btc_pair.product_id} from #{start_time} to #{end_time}"
-    rest.upsert_1h_candles(product_id: btc_pair.product_id, start_time: start_time, end_time: end_time)
-    puts "Completed testing 1h candles"
   end
 
   desc "Test different candle granularities to see what the API supports"

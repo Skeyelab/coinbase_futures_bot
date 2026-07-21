@@ -22,7 +22,71 @@ RSpec.describe FetchCandlesJob, type: :job do
     allow(mock_rest).to receive(:upsert_30m_candles)
     allow(mock_rest).to receive(:upsert_1h_candles)
     allow(mock_rest).to receive(:upsert_1d_candles)
+    allow(mock_rest).to receive(:upsert_1m_candles_chunked)
+    allow(mock_rest).to receive(:upsert_5m_candles_chunked)
+    allow(mock_rest).to receive(:upsert_15m_candles_chunked)
+    allow(mock_rest).to receive(:upsert_1h_candles_chunked)
     allow(Rails.logger).to receive(:info)
+  end
+
+  describe "deep backfill (issue #342)" do
+    let(:mock_rest) { instance_double(MarketData::CoinbaseRest) }
+
+    before do
+      stub_rest(mock_rest)
+      btc_pair
+    end
+
+    it "honors backfill_days for 5m instead of silently capping at 1 day" do
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_5m_candles_chunked).with(
+        hash_including(product_id: "BIT-26JUN26-CDE",
+          start_time: satisfy { |t| t <= 59.days.ago })
+      )
+    end
+
+    it "honors backfill_days for 15m instead of silently capping at 3 days" do
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_15m_candles_chunked).with(
+        hash_including(start_time: satisfy { |t| t <= 59.days.ago })
+      )
+    end
+
+    it "caps 1m depth (API request budget) but honors more than the old 6-hour limit" do
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_1m_candles_chunked).with(
+        hash_including(start_time: satisfy { |t| t.between?(4.days.ago, 2.days.ago) })
+      )
+    end
+
+    it "filters to the requested symbols" do
+      Contract.find_or_create_by(product_id: "ET-26JUN26-CDE") do |tp|
+        tp.base_currency = "ETH"
+        tp.quote_currency = "USD"
+        tp.status = "active"
+        tp.enabled = true
+        tp.expiration_date = Date.new(2026, 6, 26)
+      end
+
+      described_class.perform_now(backfill_days: 1, symbols: ["ET-26JUN26-CDE"])
+
+      expect(mock_rest).to have_received(:upsert_1h_candles).with(hash_including(product_id: "ET-26JUN26-CDE"))
+      expect(mock_rest).not_to have_received(:upsert_1h_candles).with(hash_including(product_id: "BIT-26JUN26-CDE"))
+    end
+
+    it "keeps small incremental fetches unchunked (hourly cron path)" do
+      # Cron path: recent candles exist, so start_time = last + 5m (tiny window)
+      Candle.create!(symbol: "BIT-26JUN26-CDE", timeframe: "5m", timestamp: 10.minutes.ago,
+        open: 100, high: 101, low: 99, close: 100, volume: 1)
+
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_5m_candles)
+      expect(mock_rest).not_to have_received(:upsert_5m_candles_chunked)
+    end
   end
 
   describe "#perform" do
@@ -54,9 +118,10 @@ RSpec.describe FetchCandlesJob, type: :job do
       btc_pair
       described_class.perform_now(backfill_days: 7)
 
-      expect(mock_rest).to have_received(:upsert_1m_candles).once
-      expect(mock_rest).to have_received(:upsert_5m_candles).once
-      expect(mock_rest).to have_received(:upsert_15m_candles).once
+      # 7-day cold backfill: sub-day timeframes route through chunked fetching
+      expect(mock_rest).to have_received(:upsert_1m_candles_chunked).once
+      expect(mock_rest).to have_received(:upsert_5m_candles_chunked).once
+      expect(mock_rest).to have_received(:upsert_15m_candles_chunked).once
       expect(mock_rest).to have_received(:upsert_30m_candles).once
       expect(mock_rest).to have_received(:upsert_1h_candles).once
       expect(mock_rest).to have_received(:upsert_1d_candles).once
@@ -65,15 +130,15 @@ RSpec.describe FetchCandlesJob, type: :job do
     it "handles errors gracefully for individual candle timeframes" do
       mock_rest = instance_double(MarketData::CoinbaseRest)
       stub_rest(mock_rest)
-      allow(mock_rest).to receive(:upsert_1m_candles).and_raise("1m API Error")
+      allow(mock_rest).to receive(:upsert_1m_candles_chunked).and_raise("1m API Error")
       allow(Rails.logger).to receive(:error)
       allow(Sentry).to receive(:with_scope).and_yield(double("scope").as_null_object)
       allow(Sentry).to receive(:capture_exception)
 
       btc_pair
       expect { described_class.perform_now(backfill_days: 7) }.not_to raise_error
-      expect(mock_rest).to have_received(:upsert_5m_candles).once
-      expect(mock_rest).to have_received(:upsert_15m_candles).once
+      expect(mock_rest).to have_received(:upsert_5m_candles_chunked).once
+      expect(mock_rest).to have_received(:upsert_15m_candles_chunked).once
       expect(mock_rest).to have_received(:upsert_30m_candles).once
       expect(mock_rest).to have_received(:upsert_1h_candles).once
       expect(mock_rest).to have_received(:upsert_1d_candles).once
