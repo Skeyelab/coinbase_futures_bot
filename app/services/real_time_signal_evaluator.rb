@@ -65,7 +65,7 @@ class RealTimeSignalEvaluator
     pair_stats = {signals_created: 0, insufficient_data: 0}
 
     @strategies.each do |strategy_name, strategy|
-      strategy_result = evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
+      strategy_result = evaluate_strategy_for_symbol(strategy_name, strategy_for(symbol, strategy), symbol, equity_usd)
       pair_stats[:signals_created] += strategy_result[:signals_created]
       pair_stats[:insufficient_data] += strategy_result[:insufficient_data]
     end
@@ -97,29 +97,43 @@ class RealTimeSignalEvaluator
     end
   end
 
+  # Per-symbol calibrated params (issue #299): when calibration has activated
+  # a TradingProfile for this symbol, evaluate it with a strategy built from
+  # that profile instead of the global one. Cached per profile version.
+  def strategy_for(symbol, global_strategy)
+    profile = TradingProfile.active_profile(symbol)
+    return global_strategy unless profile
+
+    @symbol_strategies ||= {}
+    key = [symbol, profile.id, profile.updated_at]
+    @symbol_strategies[key] ||= build_multi_timeframe_strategy(profile)
+  end
+
   def load_strategies(profile = TradingProfile.effective)
+    {"MultiTimeframeSignal" => build_multi_timeframe_strategy(profile)}
+  end
+
+  def build_multi_timeframe_strategy(profile)
     config = Rails.application.config.real_time_signals
     strategy_config = config[:strategies]["MultiTimeframeSignal"]
 
-    {
-      "MultiTimeframeSignal" => Strategy::MultiTimeframeSignal.new(
-        ema_1h_short: strategy_config[:ema_1h_short],
-        ema_1h_long: strategy_config[:ema_1h_long],
-        ema_15m: strategy_config[:ema_15m],
-        ema_5m: strategy_config[:ema_5m],
-        ema_1m: strategy_config[:ema_1m],
-        min_1h_candles: strategy_config[:min_1h_candles],
-        min_15m_candles: strategy_config[:min_15m_candles],
-        min_5m_candles: strategy_config[:min_5m_candles],
-        min_1m_candles: strategy_config[:min_1m_candles],
-        tp_target: profile.tp_target.to_f,
-        sl_target: profile.sl_target.to_f,
-        risk_fraction: profile.risk_fraction.to_f,
-        contract_size_usd: strategy_config[:contract_size_usd],
-        max_position_size: profile.max_position_size,
-        min_position_size: profile.min_position_size
-      )
-    }
+    Strategy::MultiTimeframeSignal.new(
+      ema_1h_short: strategy_config[:ema_1h_short],
+      ema_1h_long: strategy_config[:ema_1h_long],
+      ema_15m: strategy_config[:ema_15m],
+      ema_5m: strategy_config[:ema_5m],
+      ema_1m: strategy_config[:ema_1m],
+      min_1h_candles: strategy_config[:min_1h_candles],
+      min_15m_candles: strategy_config[:min_15m_candles],
+      min_5m_candles: strategy_config[:min_5m_candles],
+      min_1m_candles: strategy_config[:min_1m_candles],
+      tp_target: profile.tp_target.to_f,
+      sl_target: profile.sl_target.to_f,
+      risk_fraction: profile.risk_fraction.to_f,
+      contract_size_usd: strategy_config[:contract_size_usd],
+      max_position_size: profile.max_position_size,
+      min_position_size: profile.min_position_size
+    )
   end
 
   def evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)

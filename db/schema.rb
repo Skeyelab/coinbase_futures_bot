@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_151801) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_192209) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -299,20 +299,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_151801) do
 
   create_table "trading_profiles", force: :cascade do |t|
     t.boolean "active", default: false, null: false
+    t.datetime "calibrated_at"
     t.datetime "created_at", null: false
     t.integer "deduplication_window", default: 300, null: false
     t.text "description"
     t.integer "max_position_size", default: 15, null: false
     t.integer "max_signals_per_hour", default: 10, null: false
+    t.jsonb "metrics", default: {}, null: false
     t.decimal "min_confidence_threshold", precision: 6, scale: 2, default: "60.0", null: false
     t.integer "min_position_size", default: 5, null: false
     t.string "name", null: false
     t.decimal "risk_fraction", precision: 10, scale: 6, default: "0.02", null: false
     t.decimal "sl_target", precision: 10, scale: 6, default: "0.004", null: false
+    t.string "symbol"
     t.decimal "tp_target", precision: 10, scale: 6, default: "0.006", null: false
     t.datetime "updated_at", null: false
     t.index "lower((name)::text)", name: "index_trading_profiles_on_lower_name", unique: true
-    t.index ["active"], name: "index_trading_profiles_one_active", unique: true, where: "(active IS TRUE)"
+    t.index ["symbol"], name: "index_trading_profiles_on_symbol"
+    t.index ["symbol"], name: "index_trading_profiles_one_active_per_symbol", unique: true, where: "(active IS TRUE)", nulls_not_distinct: true
   end
 
   create_table "underlyings", force: :cascade do |t|
