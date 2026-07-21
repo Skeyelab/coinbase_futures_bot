@@ -1,11 +1,6 @@
 # frozen_string_literal: true
 
 namespace :paper do
-  desc "Run one paper trading step for all enabled USD pairs (1h)"
-  task step: :environment do
-    PaperTradingJob.perform_now
-  end
-
   desc "Run calibration over recent history for all enabled pairs"
   task calibrate: :environment do
     CalibrationJob.perform_now
