@@ -40,10 +40,11 @@ RSpec.describe CalibrationJob, type: :job do
       0.008 => {total_pnl: 20.0}
     )
 
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"],
+      tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003])
 
     expect(calls.map { |c| c[:symbol] }.uniq).to eq(["BTC-USD"])
-    expect(calls.size).to eq(9) # default 3 tp x 3 sl grid
+    expect(calls.size).to eq(3)
 
     profile = TradingProfile.active_profile("BTC-USD")
     expect(profile).to be_present
@@ -58,10 +59,11 @@ RSpec.describe CalibrationJob, type: :job do
     insert_step_candles("BTC-USD")
     stub_walk_forward(0.004 => {total_pnl: 1.0}, 0.006 => {total_pnl: 2.0}, 0.008 => {total_pnl: 3.0})
 
-    described_class.new.perform(symbols: ["BTC-USD"])
+    grid = {tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003]}
+    described_class.new.perform(symbols: ["BTC-USD"], **grid)
     first = TradingProfile.active_profile("BTC-USD")
     travel 1.hour
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"], **grid)
 
     profiles = TradingProfile.where(symbol: "BTC-USD")
     expect(profiles.count).to eq(2)
@@ -74,12 +76,44 @@ RSpec.describe CalibrationJob, type: :job do
     insert_step_candles("ETH-USD")
     stub_walk_forward(0.004 => {total_pnl: 1.0}, 0.006 => {total_pnl: 2.0}, 0.008 => {total_pnl: 3.0})
 
-    described_class.new.perform(symbols: ["ETH-USD"])
+    grid = {tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003]}
+    described_class.new.perform(symbols: ["ETH-USD"], **grid)
     eth = TradingProfile.active_profile("ETH-USD")
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"], **grid)
 
     expect(eth.reload.active).to be true
     expect(TradingProfile.active_profile("BTC-USD")).to be_present
+  end
+
+  it "defaults to a wide-target grid: TP 100-250bps / SL 50-125bps (issue #373)" do
+    insert_step_candles("BTC-USD")
+    tps = []
+    sls = []
+    allow(Backtest::WalkForward).to receive(:new) do |**opts|
+      config = opts.fetch(:strategy).instance_variable_get(:@config)
+      tps << config[:tp_target]
+      sls << config[:sl_target]
+      agg = {trade_count: 5, total_pnl: 1.0, worst_window_drawdown: 0.0}
+      instance_double(Backtest::WalkForward, run: {windows: [], aggregate: agg})
+    end
+
+    described_class.new.perform(symbols: ["BTC-USD"])
+
+    # 60/40bps taker scalps need a 74% win rate to break even — the grid must
+    # only explore structures where costs are a minority of the price range.
+    expect(tps.min).to be >= 0.010
+    expect(tps.max).to be >= 0.025
+    expect(sls.min).to be >= 0.005
+    expect(sls.max).to be >= 0.0125
+  end
+
+  it "skips candidates with TP <= SL (unfavorable risk:reward)" do
+    insert_step_candles("BTC-USD")
+    calls = stub_walk_forward(0.01 => {total_pnl: 5.0})
+
+    described_class.new.perform(symbols: ["BTC-USD"], tp_targets: [0.01], sl_targets: [0.005, 0.01, 0.02])
+
+    expect(calls.size).to eq(1) # only 0.01/0.005 survives
   end
 
   it "accepts configurable grids instead of the hardcoded 3x3" do
@@ -101,13 +135,14 @@ RSpec.describe CalibrationJob, type: :job do
       0.008 => {total_pnl: 1.0}
     }
 
+    grid = {tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003]}
     stub_walk_forward(stub)
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"], **grid)
     expect(TradingProfile.active_profile("BTC-USD").tp_target.to_f).to eq(0.006) # 76 > 50
 
     travel 1.hour
     stub_walk_forward(stub)
-    described_class.new.perform(symbols: ["BTC-USD"], objective: :total_pnl)
+    described_class.new.perform(symbols: ["BTC-USD"], objective: :total_pnl, **grid)
     expect(TradingProfile.active_profile("BTC-USD").tp_target.to_f).to eq(0.004)
   end
 
@@ -134,7 +169,8 @@ RSpec.describe CalibrationJob, type: :job do
       max_position_size: 20, min_position_size: 2, min_confidence_threshold: 80)
     stub_walk_forward(0.004 => {total_pnl: 1.0}, 0.006 => {total_pnl: 2.0}, 0.008 => {total_pnl: 3.0})
 
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"],
+      tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003])
 
     profile = TradingProfile.active_profile("BTC-USD")
     expect(profile.risk_fraction.to_f).to eq(0.03)
@@ -158,7 +194,8 @@ RSpec.describe CalibrationJob, type: :job do
       0.004 => {trade_count: 0}, 0.006 => {trade_count: 0}, 0.008 => {trade_count: 0}
     )
 
-    described_class.new.perform(symbols: ["BTC-USD"])
+    described_class.new.perform(symbols: ["BTC-USD"],
+      tp_targets: [0.004, 0.006, 0.008], sl_targets: [0.003])
 
     expect(TradingProfile.where(symbol: "BTC-USD")).to be_empty
   end

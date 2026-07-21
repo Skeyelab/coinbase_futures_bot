@@ -8,8 +8,13 @@
 class CalibrationJob < ApplicationJob
   queue_as :default
 
-  DEFAULT_TP_TARGETS = [0.004, 0.006, 0.008].freeze
-  DEFAULT_SL_TARGETS = [0.003, 0.004, 0.005].freeze
+  # Wide-target grid (issue #373): at 60/40bps a taker scalp needs a 74%
+  # win rate just to break even (break-even p* = (SL+cost)/(TP+SL) with
+  # ~34bps round-trip cost). The grid only explores structures where costs
+  # are a minority of the price range — required skill edge 15–23pts vs the
+  # ~34pts the old 40-80bps grid demanded.
+  DEFAULT_TP_TARGETS = [0.010, 0.012, 0.015, 0.020, 0.025].freeze
+  DEFAULT_SL_TARGETS = [0.005, 0.0075, 0.010, 0.0125].freeze
   MIN_STEP_CANDLES = 100
 
   # Objectives score a walk-forward AGGREGATE (out-of-sample). Grid/random
@@ -46,9 +51,11 @@ class CalibrationJob < ApplicationJob
       return
     end
 
-    scored = @tp_targets.product(@sl_targets).map do |tp, sl|
+    candidates = @tp_targets.product(@sl_targets).select { |tp, sl| tp > sl }
+    scored = candidates.map do |tp, sl|
       evaluate_candidate(symbol, tp, sl, from, to)
     end
+    return if scored.empty?
     best = scored.max_by { |c| c[:score] }
 
     if best[:aggregate][:trade_count].to_i.zero?
