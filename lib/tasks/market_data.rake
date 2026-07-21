@@ -24,13 +24,14 @@ namespace :market_data do
   end
 
   desc "Backfill candles for enabled contracts (issue #342). Usage: market_data:backfill[60] or market_data:backfill[60,'BTC-USD ETH-USD NOL-19AUG26-CDE']"
-  task :backfill, [:days, :products] => :environment do |_t, args|
+  task :backfill, [:days, :products, :max_1m_days] => :environment do |_t, args|
     days = (args[:days] || ENV["BACKFILL_DAYS"] || 30).to_i
     products = (args[:products] || ENV["PRODUCTS"]).to_s.split(/[\s,]+/).reject(&:empty?)
     symbols = products.presence
+    max_1m_days = args[:max_1m_days]&.to_i
 
     puts "Backfilling #{days}d of candles for #{symbols&.join(", ") || "ALL enabled contracts"} (inline)"
-    FetchCandlesJob.perform_now(backfill_days: days, symbols: symbols)
+    FetchCandlesJob.perform_now(backfill_days: days, symbols: symbols, max_1m_days: max_1m_days)
     puts "Done. Candle depth:"
     (symbols || Contract.enabled.pluck(:product_id)).each do |sym|
       %w[1m 5m 15m 1h].each do |tf|

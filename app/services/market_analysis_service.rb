@@ -332,12 +332,16 @@ class MarketAnalysisService
   def calculate_macd(prices)
     return {macd: 0, signal: 0, histogram: 0} if prices.size < 26
 
-    ema_12 = calculate_ema(prices, 12)
-    ema_26 = calculate_ema(prices, 26)
-    macd_line = ema_12 - ema_26
-
-    # Simplified signal line (9-period EMA of MACD)
-    signal_line = calculate_ema([macd_line], 9)
+    # MACD series over expanding windows so the signal line is a real
+    # 9-period EMA of MACD values (issue #369: the old code took EMA(9) of a
+    # single value, which is nil -> 0, making signal always 0 and
+    # histogram === macd).
+    macd_series = (26..prices.size).map do |n|
+      window = prices.first(n)
+      Signals::Indicators.ema(window, 12) - Signals::Indicators.ema(window, 26)
+    end
+    macd_line = macd_series.last
+    signal_line = Signals::Indicators.ema(macd_series, 9) || 0.0
     histogram = macd_line - signal_line
 
     {

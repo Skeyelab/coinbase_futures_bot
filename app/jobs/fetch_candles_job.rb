@@ -3,14 +3,17 @@
 class FetchCandlesJob < ApplicationJob
   queue_as :default
 
-  # 1m history is capped (issue #342): deep 1m backfill costs ~288 API
-  # requests per symbol per 60 days and nothing needs it — the strategy uses
-  # the last 60 1m candles and the backtest steps on 5m. Override via env.
-  MAX_1M_BACKFILL_DAYS = ENV.fetch("MAX_1M_BACKFILL_DAYS", "3").to_i
+  # 1m history is capped by default (issue #342): deep 1m costs ~288 API
+  # requests per symbol per 60 days and the hourly cron doesn't need it.
+  # Pass max_1m_days (or set MAX_1M_BACKFILL_DAYS) for deliberate deep
+  # backfills — long-range walk-forward validation needs 1m depth because
+  # the strategy requires 60x1m before every evaluation (issue #378).
+  DEFAULT_MAX_1M_BACKFILL_DAYS = 3
 
   # symbols: optional product_id filter (deep backfill for specific pairs);
   # nil = all enabled contracts (hourly cron path).
-  def perform(backfill_days: 7, symbols: nil)
+  def perform(backfill_days: 7, symbols: nil, max_1m_days: nil)
+    @max_1m_days = (max_1m_days || ENV.fetch("MAX_1M_BACKFILL_DAYS", DEFAULT_MAX_1M_BACKFILL_DAYS)).to_i
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
@@ -40,7 +43,7 @@ class FetchCandlesJob < ApplicationJob
   def fetch_1m_candles(rest, pair, backfill_days)
     # 1m: honor backfill_days up to MAX_1M_BACKFILL_DAYS; single request only
     # covers ~5h (300 candles), so chunk anything longer.
-    backfill_days_1m = [backfill_days.to_i, MAX_1M_BACKFILL_DAYS].min
+    backfill_days_1m = [backfill_days.to_i, @max_1m_days].min
     start_time = fetch_start_time(pair.product_id, "1m", 1.minute, backfill_days_1m.days.ago)
 
     if Time.now.utc - start_time > 5.hours

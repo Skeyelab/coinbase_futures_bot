@@ -83,6 +83,14 @@ RSpec.describe FetchCandlesJob, type: :job do
       )
     end
 
+    it "allows deep 1m backfill via max_1m_days for deliberate long-range validation (issue #378)" do
+      described_class.perform_now(backfill_days: 60, max_1m_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_1m_candles_chunked).with(
+        hash_including(start_time: satisfy { |t| t <= 59.days.ago })
+      )
+    end
+
     it "filters to the requested symbols" do
       Contract.find_or_create_by(product_id: "ET-26JUN26-CDE") do |tp|
         tp.base_currency = "ETH"

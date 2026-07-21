@@ -19,10 +19,6 @@ Rails.application.configure do
       cron: ENV.fetch("SIGNALS_CRON", "1,16,31,46 * * * *"),
       class: "GenerateSignalsJob"
     },
-    paper_step: {
-      cron: ENV.fetch("PAPER_CRON", "*/15 * * * *"), # every 15 minutes
-      class: "PaperTradingJob"
-    },
     calibrate_daily: {
       cron: ENV.fetch("CALIBRATE_CRON", "0 2 * * *"), # daily at 02:00 UTC
       class: "CalibrationJob"
