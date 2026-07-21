@@ -147,6 +147,25 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  describe "#within_evaluation_hours? (24/7 crypto)" do
+    it "evaluates around the clock by default (no market-hours restriction)" do
+      travel_to(Time.utc(2026, 7, 21, 7, 0, 0)) do # 03:00 ET
+        expect(handler.send(:within_evaluation_hours?)).to be(true)
+      end
+    end
+
+    it "restricts to an ET window only when SIGNAL_EVAL_HOURS_ET is set" do
+      ClimateControl.modify(SIGNAL_EVAL_HOURS_ET: "9-16") do
+        travel_to(Time.utc(2026, 7, 21, 7, 0, 0)) do # 03:00 ET — outside
+          expect(handler.send(:within_evaluation_hours?)).to be(false)
+        end
+        travel_to(Time.utc(2026, 7, 21, 16, 0, 0)) do # 12:00 ET — inside
+          expect(handler.send(:within_evaluation_hours?)).to be(true)
+        end
+      end
+    end
+  end
+
   describe "#check_dollar_pnl_exit (dollar-target + hard stop)" do
     let(:product_id) { "NOL-19JUN26-CDE" }
 
