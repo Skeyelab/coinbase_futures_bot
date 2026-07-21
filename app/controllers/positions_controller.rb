@@ -8,10 +8,14 @@ class PositionsController < ActionController::Base
 
   def index
     @notice_message = params[:notice]
+    # Reflect the bot's mode: in dry-run show the simulated paper positions from
+    # the DB, not the live Coinbase account (list_open_positions always reads the
+    # real account and has no paper branch — showing it in dry-run is misleading).
+    @dry_run = DryRun.active?
     @positions = [] # Initialize to empty array
 
     begin
-      @positions = positions_service.list_open_positions
+      @positions = @dry_run ? paper_positions : positions_service.list_open_positions
 
       # Track successful position retrieval
       SentryHelper.add_breadcrumb(
@@ -141,5 +145,17 @@ class PositionsController < ActionController::Base
 
   def positions_service
     @positions_service ||= Trading::CoinbasePositions.new
+  end
+
+  # Open paper positions mapped to the same hash shape the view/live path uses.
+  def paper_positions
+    Position.open.where(paper: true).map do |p|
+      {
+        "product_id" => p.product_id,
+        "side" => p.side,
+        "number_of_contracts" => p.size,
+        "avg_entry_price" => p.entry_price
+      }
+    end
   end
 end
