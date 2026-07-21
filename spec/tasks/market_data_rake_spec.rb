@@ -17,10 +17,7 @@ RSpec.describe "market_data rake tasks", type: :task do
     Rake::Task["market_data:subscribe"].reenable
     Rake::Task["market_data:upsert_futures_products"].reenable
     Rake::Task["market_data:backfill_candles"].reenable
-    Rake::Task["market_data:backfill_1h_candles"].reenable
-    Rake::Task["market_data:backfill_15m_candles"].reenable
-    Rake::Task["market_data:backfill_5m_candles"].reenable
-    Rake::Task["market_data:test_1h_candles"].reenable
+    Rake::Task["market_data:backfill"].reenable
     Rake::Task["market_data:test_granularities"].reenable
     Rake::Task["market_data:subscribe_futures"].reenable
 
@@ -68,6 +65,23 @@ RSpec.describe "market_data rake tasks", type: :task do
     end.to output(/Completed upserting futures products/).to_stdout
   end
 
+  it "runs parameterized backfill for the given products (issue #342)" do
+    expect(FetchCandlesJob).to receive(:perform_now)
+      .with(backfill_days: 60, symbols: ["ETH-USD", "NOL-19AUG26-CDE"])
+
+    expect do
+      Rake::Task["market_data:backfill"].invoke("60", "ETH-USD NOL-19AUG26-CDE")
+    end.to output(/Backfilling 60d/).to_stdout
+  end
+
+  it "backfills all enabled contracts when no products are given" do
+    expect(FetchCandlesJob).to receive(:perform_now).with(backfill_days: 30, symbols: nil)
+
+    expect do
+      Rake::Task["market_data:backfill"].invoke(nil, nil)
+    end.to output(/ALL enabled contracts/).to_stdout
+  end
+
   it "enqueues backfill candles job with provided days" do
     expect do
       Rake::Task["market_data:backfill_candles"].invoke(7)
@@ -78,83 +92,6 @@ RSpec.describe "market_data rake tasks", type: :task do
     expect do
       Rake::Task["market_data:backfill_candles"].invoke(nil)
     end.to have_enqueued_job(FetchCandlesJob).with(backfill_days: 30)
-  end
-
-  it "runs backfill_1h_candles without error and calls rest" do
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_1h_candles)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-
-    expect do
-      Rake::Task["market_data:backfill_1h_candles"].invoke(1)
-    end.not_to raise_error
-  end
-
-  it "handles missing trading pair gracefully for backfill_1h_candles" do
-    @btc_pair.destroy!
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-    expect { Rake::Task["market_data:backfill_1h_candles"].invoke(1) }.not_to raise_error
-  end
-
-  it "runs backfill_15m_candles and calls rest" do
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_15m_candles)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-
-    expect do
-      Rake::Task["market_data:backfill_15m_candles"].invoke(1)
-    end.not_to raise_error
-  end
-
-  it "handles missing trading pair gracefully for backfill_15m_candles" do
-    @btc_pair.destroy!
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-    expect { Rake::Task["market_data:backfill_15m_candles"].invoke(1) }.not_to raise_error
-  end
-
-  it "runs backfill_5m_candles and calls rest" do
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_5m_candles)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-
-    expect do
-      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-    end.not_to raise_error
-  end
-
-  it "handles missing trading pair gracefully for backfill_5m_candles" do
-    @btc_pair.destroy!
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-    expect { Rake::Task["market_data:backfill_5m_candles"].invoke(1) }.not_to raise_error
-  end
-
-  it "runs backfill_5m_candles with mocked service" do
-    # Mock the CoinbaseRest service to avoid real API calls
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_5m_candles)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-
-    # Clear existing candles to avoid conflicts
-    Candle.where(timeframe: "5m", symbol: "BTC-USD").destroy_all
-
-    # Run the actual rake task
-    expect do
-      Rake::Task["market_data:backfill_5m_candles"].invoke(1)
-    end.not_to raise_error
-
-    # Verify that the mock was called
-    expect(mock_rest).to have_received(:upsert_5m_candles)
-  end
-
-  it "runs test_1h_candles and calls rest" do
-    mock_rest = instance_double(MarketData::CoinbaseRest)
-    allow(mock_rest).to receive(:upsert_1h_candles)
-    allow(MarketData::CoinbaseRest).to receive(:new).and_return(mock_rest)
-
-    expect { Rake::Task["market_data:test_1h_candles"].invoke(1) }.not_to raise_error
   end
 
   it "tests granularities without raising" do
