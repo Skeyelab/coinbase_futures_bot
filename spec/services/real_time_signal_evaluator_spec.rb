@@ -37,6 +37,17 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
       expect(captured).to eq(0.011)
     end
 
+    it "skips suspended symbols without evaluating (issue #371)" do
+      Trading::SymbolSuspension.suspend!("BIT-29AUG25-CDE", reason: "cost bleed")
+      called = false
+      allow_any_instance_of(Strategy::MultiTimeframeSignal).to receive(:signal) { called = true and nil }
+
+      stats = evaluator.evaluate_pair(contract)
+
+      expect(called).to be false
+      expect(stats).to eq({signals_created: 0, insufficient_data: 0, suspended: 1})
+    end
+
     it "falls back to the global profile when the symbol has no calibrated profile" do
       create(:trading_profile, :active, name: "global", tp_target: 0.006)
 

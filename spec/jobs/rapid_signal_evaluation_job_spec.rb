@@ -45,28 +45,41 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     end
 
     context "rapid signal evaluation algorithms" do
-      it "initializes multi-timeframe strategy with day trading parameters" do
+      it "initializes the strategy via StrategyFactory with rapid-path overrides" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
-        expected_config = {
-          ema_1h_short: 21,
-          ema_1h_long: 50,
-          ema_15m: 21,
-          ema_5m: 13,
-          ema_1m: 8,
-          min_1h_candles: 60,
-          min_15m_candles: 80,
-          min_5m_candles: 60,
-          min_1m_candles: 30,
-          tp_target: 0.004, # 40 bps for day trading
-          sl_target: 0.003, # 30 bps for day trading
-          contract_size_usd: 100.0, # BTC contract size
-          max_position_size: 5,
-          min_position_size: 1
-        }
+        # Live config + profile tp/sl (env defaults 0.006/0.004), with the
+        # rapid path's intentional shorter min-candle overrides preserved.
+        expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
+          hash_including(
+            ema_1h_short: 21, ema_1h_long: 50,
+            min_5m_candles: 60, min_1m_candles: 30,
+            tp_target: 0.006, sl_target: 0.004,
+            contract_size_usd: 100.0, max_position_size: 5, min_position_size: 1
+          )
+        )
 
-        expect(Strategy::MultiTimeframeSignal).to receive(:new).with(expected_config)
+        job.perform(product_id: product_id, current_price: current_price, asset: asset)
+      end
+
+      it "uses the symbol's calibrated per-symbol profile for tp/sl (issue #371 follow-on: executor bypassed calibration)" do
+        create(:trading_profile, name: "cal-btc", symbol: "BTC-USD", active: true,
+          tp_target: 0.011, sl_target: 0.005)
+        allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
+        allow(mock_strategy).to receive(:signal).and_return(nil)
+
+        expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
+          hash_including(tp_target: 0.011, sl_target: 0.005)
+        )
+
+        job.perform(product_id: product_id, current_price: current_price, asset: asset)
+      end
+
+      it "skips evaluation entirely for a suspended symbol (issue #371)" do
+        Trading::SymbolSuspension.suspend!(product_id, reason: "cost bleed", logger: mock_logger)
+
+        expect(Strategy::MultiTimeframeSignal).not_to receive(:new)
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
       end

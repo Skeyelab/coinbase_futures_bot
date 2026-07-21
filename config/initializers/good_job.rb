@@ -27,6 +27,10 @@ Rails.application.configure do
       cron: ENV.fetch("CALIBRATE_CRON", "0 2 * * *"), # daily at 02:00 UTC
       class: "CalibrationJob"
     },
+    symbol_circuit_breaker: {
+      cron: ENV.fetch("CIRCUIT_BREAKER_CRON", "30 2 * * *"), # daily, after calibration
+      class: "SymbolCircuitBreakerJob"
+    },
     news_fetch: {
       cron: ENV.fetch("NEWS_FETCH_CRON", "*/2 * * * *"), # every 2 minutes
       class: "FetchNewsJob"
