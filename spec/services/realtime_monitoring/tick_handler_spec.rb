@@ -49,14 +49,27 @@ RSpec.describe RealtimeMonitoring::TickHandler do
         expect(Heartbeat.status("market_data")[:stale]).to be(false)
       end
 
+      it "also beats the realtime_signal heartbeat so the trading-loop status is not a false stale alarm" do
+        # This monitoring loop (real_time:start) both ingests ticks and drives
+        # signal evaluation — it IS the realtime loop — so it must beat the
+        # realtime_signal heartbeat too, not just market_data.
+        expect(Heartbeat.status("realtime_signal")[:stale]).to be(true)
+
+        handler.process(ticker_data)
+
+        expect(Heartbeat.status("realtime_signal")[:stale]).to be(false)
+      end
+
       it "does not beat on invalid ticker data" do
         handler.process("product_id" => "BTC-USD", "price" => "0", "time" => ticker_data["time"])
 
         expect(Heartbeat.status("market_data")[:last_beat_at]).to be_nil
+        expect(Heartbeat.status("realtime_signal")[:last_beat_at]).to be_nil
       end
 
       it "throttles beats so it does not write once per tick" do
         expect(Heartbeat).to receive(:beat!).with("market_data", anything).once
+        expect(Heartbeat).to receive(:beat!).with("realtime_signal", anything).once
 
         3.times { handler.process(ticker_data) }
       end
