@@ -29,6 +29,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
     # Mock configuration
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
+    allow(ENV).to receive(:fetch).and_call_original
     allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "50000").and_return("50000")
 
     # Mock strategy creation
@@ -830,6 +831,20 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "returns false when at max positions" do
         create_open_positions_for("BTC", 2)
         expect(job_instance.send(:should_execute_signal?, signal)).to be false
+      end
+
+      it "returns false when the GLOBAL concurrent-position cap is reached, even in a different asset" do
+        ClimateControl.modify(MAX_CONCURRENT_POSITIONS: "1") do
+          create_open_positions_for("ETH", 1) # 1 total open, but @asset is BTC (per-asset would allow)
+          expect(job_instance.send(:should_execute_signal?, signal)).to be false
+        end
+      end
+
+      it "allows a signal when total open positions are under the global cap" do
+        ClimateControl.modify(MAX_CONCURRENT_POSITIONS: "3") do
+          create_open_positions_for("ETH", 1)
+          expect(job_instance.send(:should_execute_signal?, signal)).to be true
+        end
       end
 
       it "returns false for insufficient buying power" do

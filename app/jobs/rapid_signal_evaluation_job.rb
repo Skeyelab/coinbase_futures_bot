@@ -73,6 +73,17 @@ class RapidSignalEvaluationJob < ApplicationJob
     # Only execute high-confidence signals (>75%) for rapid execution
     return false if signal[:confidence] < 75
 
+    # GLOBAL concurrent-position cap across ALL products. The per-asset cap below
+    # does not bound total exposure — with many pairs enabled the bot could open
+    # one position per asset and blow past the operator's intended 1-3 total. This
+    # is the risk gate for trading a wider universe. Configurable via
+    # MAX_CONCURRENT_POSITIONS (default 3).
+    total_open = Position.open.count
+    if total_open >= global_max_concurrent_positions
+      @logger.info("[RSE] Skipping signal - at global max positions (#{total_open}/#{global_max_concurrent_positions})")
+      return false
+    end
+
     # Check if we already have positions in this asset
     existing_positions = Position.open.by_asset(@asset).count
     max_positions = max_concurrent_positions_for_asset(@asset)
@@ -141,6 +152,13 @@ class RapidSignalEvaluationJob < ApplicationJob
     when "ETH" then 10     # Max 10 ETH contracts (reduced from 20)
     else 5
     end
+  end
+
+  # Total open positions allowed across all products. Defaults to 3 (the top of
+  # the operator's 1-3 range); override with MAX_CONCURRENT_POSITIONS.
+  def global_max_concurrent_positions
+    value = ENV.fetch("MAX_CONCURRENT_POSITIONS", "3").to_i
+    value.positive? ? value : 3
   end
 
   def max_concurrent_positions_for_asset(asset)
