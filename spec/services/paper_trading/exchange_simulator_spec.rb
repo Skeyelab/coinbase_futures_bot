@@ -3,8 +3,56 @@
 require "rails_helper"
 
 RSpec.describe PaperTrading::ExchangeSimulator, type: :service do
-  let(:simulator) { described_class.new(starting_equity_usd: 10_000.0) }
+  # slippage: 0 keeps the fee-mechanics assertions exact; slippage behavior
+  # has its own describe block below.
+  let(:simulator) { described_class.new(starting_equity_usd: 10_000.0, slippage: 0.0) }
   let(:candle) { double("Candle", close: 50_000.0, high: 51_000.0, low: 49_000.0) }
+
+  describe "fee_rate" do
+    it "accepts fee_rate as the canonical fee kwarg (taker pricing)" do
+      sim = described_class.new(starting_equity_usd: 1_000.0, fee_rate: 0.002, slippage: 0.0)
+      sim.place_limit(symbol: "TEST", side: :buy, price: 100.0, quantity: 1.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 100.0, low: 100.0))
+
+      expect(sim.equity_usd).to eq(1_000.0 - 100.0 * 1.0 * 0.002)
+    end
+
+    it "still honors the legacy maker_fee kwarg" do
+      sim = described_class.new(starting_equity_usd: 1_000.0, maker_fee: 0.001, slippage: 0.0)
+      sim.place_limit(symbol: "TEST", side: :buy, price: 100.0, quantity: 1.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 100.0, low: 100.0))
+
+      expect(sim.equity_usd).to eq(1_000.0 - 100.0 * 1.0 * 0.001)
+    end
+  end
+
+  describe "slippage" do
+    let(:sim) { described_class.new(starting_equity_usd: 10_000.0, fee_rate: 0.0, slippage: 0.001) }
+
+    it "fills buy entries at an adversely slipped price" do
+      sim.place_limit(symbol: "TEST", side: :buy, price: 100.0, quantity: 1.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 101.0, low: 99.0))
+
+      expect(sim.fills.last[:price]).to be_within(1e-9).of(100.0 * 1.001)
+    end
+
+    it "fills sell entries at an adversely slipped price" do
+      sim.place_limit(symbol: "TEST", side: :sell, price: 100.0, quantity: 1.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 101.0, low: 99.0))
+
+      expect(sim.fills.last[:price]).to be_within(1e-9).of(100.0 * 0.999)
+    end
+
+    it "realizes long PnL from the slipped entry and slipped exit prices" do
+      sim.place_limit(symbol: "TEST", side: :buy, price: 100.0, quantity: 1.0, tp: 110.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 101.0, low: 99.0))
+      sim.on_candle(double("Candle", close: 111.0, high: 112.0, low: 109.0))
+
+      entry = 100.0 * 1.001
+      exit_price = 110.0 * 0.999
+      expect(sim.equity_usd).to be_within(1e-9).of(10_000.0 + (exit_price - entry) * 1.0)
+    end
+  end
 
   describe "#initialize" do
     it "sets initial equity" do

@@ -229,28 +229,4 @@ namespace :market_data do
 
     MarketData::CoinbaseSpotSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
   end
-
-  desc "Backtest spot-driven strategy from DB ticks"
-  task :backtest_spot_db, %i[start_iso end_iso spot_product futures_product] => :environment do |_t, args|
-    start_iso = args[:start_iso] || ENV["START_ISO"]
-    end_iso = args[:end_iso] || ENV["END_ISO"]
-    raise ArgumentError, "start_iso and end_iso required" if start_iso.to_s.strip.empty? || end_iso.to_s.strip.empty?
-
-    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
-    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD").to_s
-
-    stdout_logger = Logger.new($stdout)
-    stdout_logger.level = Logger::INFO
-
-    executor = Execution::FuturesExecutor.new(logger: stdout_logger)
-    strategy = Strategy::SpotDrivenStrategy.new(
-      spot_product_id: spot,
-      futures_product_id: perp,
-      executor: executor,
-      logger: stdout_logger
-    )
-
-    Backtest::SpotDbReplay.new(product_id: spot, strategy: strategy, start_time: start_iso, end_time: end_iso,
-      logger: stdout_logger).run
-  end
 end
