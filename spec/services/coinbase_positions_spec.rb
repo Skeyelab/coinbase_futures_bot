@@ -641,6 +641,36 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
   end
 
+  describe "fee persistence (issue #372)" do
+    before do
+      DryRun.enable!
+      allow(service).to receive(:get_current_market_price).and_return(50_000.0)
+    end
+
+    it "records the simulated taker fee (with per-contract floor) on the Position at entry" do
+      ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil, TAKER_MIN_FEE_PER_CONTRACT: nil) do
+        service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 2, type: :market)
+      end
+
+      position = Position.where(paper: true).last
+      # max(50_000 * 2 * 0.0015, 2 * 0.15) = $150 proportional dominates here
+      expect(position.entry_fee.to_f).to be_within(1e-6).of(150.0)
+    end
+
+    it "records the exit fee when a paper position closes" do
+      allow(service).to receive(:list_open_positions).and_return(
+        [{"product_id" => "BIT-29AUG25-CDE", "side" => "LONG", "number_of_contracts" => "1"}]
+      )
+      create(:position, paper: true, product_id: "BIT-29AUG25-CDE", size: 1.0, status: "OPEN")
+
+      ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil) do
+        service.close_position(product_id: "BIT-29AUG25-CDE", size: 1)
+      end
+
+      expect(Position.where(paper: true).order(:updated_at).last.exit_fee.to_f).to be > 0
+    end
+  end
+
   describe "paper-default gate at the order chokepoint (issue #352)" do
     it "forces dry-run and simulates when live trading is not confirmed, even with dry-run off" do
       DryRun.disable!

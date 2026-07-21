@@ -45,6 +45,38 @@ RSpec.describe DailySummaryJob, type: :job do
     end
   end
 
+  it "applies the flat per-contract fee floor for small-notional contracts (issue #372)" do
+    now = Time.current
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.0001)
+    create(:position, paper: true, status: "CLOSED", pnl: 30.0, size: 2.0,
+      entry_price: 50_000.0, entry_time: now - 600, close_time: now)
+
+    # proportional: 5 * 2 * 0.0015 = 0.015/side; floor: 2 * $0.15 = $0.30/side -> RT $0.60
+    expect(notifier).to receive(:alert).with(
+      "info", anything, a_string_including("Est. cost/round-trip: $0.6")
+    )
+
+    ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil, TAKER_MIN_FEE_PER_CONTRACT: nil) do
+      described_class.new.perform(notifier: notifier)
+    end
+  end
+
+  it "prefers recorded actual fees over the estimate (issue #372)" do
+    now = Time.current
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
+    create(:position, paper: true, status: "CLOSED", pnl: 30.0, size: 2.0,
+      entry_price: 50_000.0, entry_time: now - 600, close_time: now,
+      entry_fee: 2.5, exit_fee: 2.5)
+
+    expect(notifier).to receive(:alert).with(
+      "info", anything, a_string_including("Est. cost/round-trip: $5.0")
+    )
+
+    ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil) do
+      described_class.new.perform(notifier: notifier)
+    end
+  end
+
   it "fails the cost gate when costs exceed the realized edge" do
     now = Time.current
     allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)

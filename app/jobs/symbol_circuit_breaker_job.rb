@@ -41,7 +41,8 @@ class SymbolCircuitBreakerJob < ApplicationJob
       entry_price: notional_price,
       exit_price: notional_price,
       quantity: position.size.to_f,
-      fee_rate: CostModel.taker_fee_rate
+      fee_rate: CostModel.taker_fee_rate,
+      contracts: position.size.to_f
     )
   end
 end
