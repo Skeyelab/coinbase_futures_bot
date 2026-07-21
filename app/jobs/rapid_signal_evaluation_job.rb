@@ -17,20 +17,7 @@ class RapidSignalEvaluationJob < ApplicationJob
 
     @logger.debug("[RSE] Evaluating rapid signals for #{@product_id} at $#{@current_price}")
 
-    # LIVE-configured strategy via the shared factory so calibrated per-symbol
-    # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
-    # silently bypassing calibration). Rapid-path overrides: shorter min-candle
-    # requirements for tick-driven evaluation, per-asset contract sizing.
-    strategy = Trading::StrategyFactory.multi_timeframe(
-      profile: TradingProfile.effective(symbol: @product_id),
-      min_5m_candles: 60,
-      min_1m_candles: 30,
-      contract_size_usd: contract_size_for_asset(@asset),
-      max_position_size: max_contracts_for_asset(@asset),
-      min_position_size: 1
-    )
-
-    # Get current month contract for execution
+    # Get current month contract for execution (also drives contract sizing)
     begin
       contract_manager = MarketData::FuturesContractManager.new(logger: @logger)
       target_contract = contract_manager.current_month_contract(@asset)
@@ -43,6 +30,20 @@ class RapidSignalEvaluationJob < ApplicationJob
       @logger.warn("[RSE] No current month contract found for #{@asset}")
       return
     end
+
+    # LIVE-configured strategy via the shared factory so calibrated per-symbol
+    # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
+    # silently bypassing calibration). Rapid-path overrides: shorter min-candle
+    # requirements for tick-driven evaluation, real contract notional (issue
+    # #372: resolver base-units x current price, not hardcoded $100/$10).
+    strategy = Trading::StrategyFactory.multi_timeframe(
+      profile: TradingProfile.effective(symbol: @product_id),
+      min_5m_candles: 60,
+      min_1m_candles: 30,
+      contract_size_usd: contract_notional_usd(target_contract),
+      max_position_size: max_contracts_for_asset(@asset),
+      min_position_size: 1
+    )
 
     # Generate signal using spot price as reference
     begin
@@ -138,7 +139,20 @@ class RapidSignalEvaluationJob < ApplicationJob
     @logger.error("[RSE] Error executing futures signal: #{e.message}")
   end
 
-  def contract_size_for_asset(asset)
+  # Real $ notional per contract: resolver base-units x current price (issue
+  # #372). The resolver returns DEFAULT (1) when the API lookup fails or is
+  # unknown — fall back to the legacy per-asset assumption rather than treat
+  # a whole coin as one contract.
+  def contract_notional_usd(contract_id)
+    contract_size = Trading::ContractSizeResolver.for_product(contract_id).to_f
+    if (contract_size - Trading::ContractSizeResolver::DEFAULT_CONTRACT_SIZE.to_f).abs < Float::EPSILON
+      return legacy_contract_size_for_asset(@asset)
+    end
+
+    (contract_size * @current_price).round(2)
+  end
+
+  def legacy_contract_size_for_asset(asset)
     case asset
     when "BTC" then 100.0  # $100 per BTC contract
     when "ETH" then 10.0   # $10 per ETH contract

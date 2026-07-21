@@ -37,17 +37,7 @@ class DailySummaryJob < ApplicationJob
   # gate on positive expectancy NET of those costs.
   def cost_metrics(closed, wins)
     costed = closed.select { |p| p.entry_price }
-    total_cost = costed.sum do |p|
-      # Exit price isn't recorded on Position; approximate exit notional with
-      # entry — the price move is noise relative to notional for fee purposes.
-      notional_price = p.entry_price.to_f * contract_size(p.product_id)
-      CostModel.round_trip_cost(
-        entry_price: notional_price,
-        exit_price: notional_price,
-        quantity: p.size.to_f,
-        fee_rate: CostModel.taker_fee_rate
-      )
-    end
+    total_cost = costed.sum { |p| round_trip_cost_for(p) }
 
     avg_win = if wins.positive?
       closed.select { |p| p.pnl.to_f > 0 }.sum { |p| p.pnl.to_f } / wins
@@ -61,6 +51,24 @@ class DailySummaryJob < ApplicationJob
       net_of_costs: net,
       cost_gate_passed: net.nil? ? nil : net > 0
     }
+  end
+
+  # Prefer ACTUAL recorded fill fees (issue #372) over the estimate; estimate
+  # applies the flat per-contract floor. Exit price isn't recorded on
+  # Position, so estimated exit notional approximates with entry — the price
+  # move is noise relative to notional for fee purposes.
+  def round_trip_cost_for(position)
+    actual = position.entry_fee.to_f + position.exit_fee.to_f
+    return actual if position.entry_fee && position.exit_fee
+
+    notional_price = position.entry_price.to_f * contract_size(position.product_id)
+    CostModel.round_trip_cost(
+      entry_price: notional_price,
+      exit_price: notional_price,
+      quantity: position.size.to_f,
+      fee_rate: CostModel.taker_fee_rate,
+      contracts: position.size.to_f
+    )
   end
 
   def contract_size(product_id)

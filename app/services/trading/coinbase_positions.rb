@@ -257,6 +257,10 @@ module Trading
     # paper-labeled Position.
     def simulate_order(product_id:, side:, size:, price: nil)
       fill_price = price || get_current_market_price(product_id)
+      # Simulated taker fee with the flat per-contract floor (issue #372) so
+      # paper Positions carry realistic per-fill costs for reconciliation.
+      fee = [fill_price.to_f * size.to_f * CostModel.taker_fee_rate,
+        size.to_f * CostModel.min_fee_per_contract].max.round(6)
       order_id = PaperTrading::ExchangeSimulator.new.place_limit(
         symbol: product_id,
         side: simulator_side(side),
@@ -264,7 +268,7 @@ module Trading
         quantity: size.to_f
       )
       @logger.warn("[DryRun] Simulated order #{order_id}: #{side} #{size} #{product_id} @ #{fill_price} (no Coinbase order placed)")
-      {"success" => true, "order_id" => "DRY-RUN-#{order_id}", "dry_run" => true, "price" => fill_price}
+      {"success" => true, "order_id" => "DRY-RUN-#{order_id}", "dry_run" => true, "price" => fill_price, "fee" => fee}
     end
 
     def simulator_side(side)
@@ -474,6 +478,7 @@ module Trading
         take_profit: take_profit,
         stop_loss: stop_loss,
         paper: paper,
+        entry_fee: order_result.is_a?(Hash) ? order_result["fee"] : nil,
         trailing_stop_enabled: ActiveModel::Type::Boolean.new.cast(ENV.fetch("TRAILING_STOP_ENABLED", "false")),
         trailing_stop_state: {}
       )
@@ -517,6 +522,8 @@ module Trading
         filled_at: Time.current,
         coinbase_order_id: extract_order_id(order_result)
       )
+
+      position.update!(exit_fee: order_result["fee"]) if order_result.is_a?(Hash) && order_result["fee"]
 
       # Close the position
       position.close_position!(close_price)

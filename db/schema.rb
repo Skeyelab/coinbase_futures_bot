@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_192209) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_215137) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -199,8 +199,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_192209) do
     t.datetime "close_time"
     t.datetime "created_at", null: false
     t.boolean "day_trading"
+    t.decimal "entry_fee"
     t.decimal "entry_price"
     t.datetime "entry_time"
+    t.decimal "exit_fee"
     t.decimal "max_adverse_excursion"
     t.boolean "paper", default: false, null: false
     t.decimal "pnl"

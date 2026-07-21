@@ -76,6 +76,31 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
       end
 
+      it "derives contract_size_usd from the resolver and current price (issue #372)" do
+        allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with(contract_id).and_return(0.01)
+        allow(mock_strategy).to receive(:signal).and_return(nil)
+
+        # 0.01 base units x $50,000 = $500 notional per contract
+        expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
+          hash_including(contract_size_usd: 500.0)
+        )
+
+        job.perform(product_id: product_id, current_price: current_price, asset: asset)
+      end
+
+      it "falls back to legacy per-asset notional when the resolver returns its default (issue #372)" do
+        allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).with(contract_id).and_return(1.0)
+        allow(mock_strategy).to receive(:signal).and_return(nil)
+
+        expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
+          hash_including(contract_size_usd: 100.0)
+        )
+
+        job.perform(product_id: product_id, current_price: current_price, asset: asset)
+      end
+
       it "skips evaluation entirely for a suspended symbol (issue #371)" do
         Trading::SymbolSuspension.suspend!(product_id, reason: "cost bleed", logger: mock_logger)
 
@@ -781,7 +806,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "applies BTC-specific limits" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:contract_size_for_asset, "BTC")).to eq(100.0)
+        expect(job_instance.send(:legacy_contract_size_for_asset, "BTC")).to eq(100.0)
         expect(job_instance.send(:max_contracts_for_asset, "BTC")).to eq(5)
         expect(job_instance.send(:max_concurrent_positions_for_asset, "BTC")).to eq(2)
       end
@@ -789,7 +814,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "applies ETH-specific limits" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:contract_size_for_asset, "ETH")).to eq(10.0)
+        expect(job_instance.send(:legacy_contract_size_for_asset, "ETH")).to eq(10.0)
         expect(job_instance.send(:max_contracts_for_asset, "ETH")).to eq(10)
         expect(job_instance.send(:max_concurrent_positions_for_asset, "ETH")).to eq(3)
       end
@@ -797,7 +822,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "applies default limits for unknown assets" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:contract_size_for_asset, "UNKNOWN")).to eq(100.0)
+        expect(job_instance.send(:legacy_contract_size_for_asset, "UNKNOWN")).to eq(100.0)
         expect(job_instance.send(:max_contracts_for_asset, "UNKNOWN")).to eq(5)
         expect(job_instance.send(:max_concurrent_positions_for_asset, "UNKNOWN")).to eq(2)
       end
