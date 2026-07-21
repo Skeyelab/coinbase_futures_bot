@@ -17,7 +17,10 @@ RSpec.describe "CI Environment Verification", :ci_only do
   end
 
   it "can perform real database operations" do
-    initial_count = Position.count
+    # Scope every count to this spec's own marker row: global Position.count
+    # is shifted by parallel worker-mates sharing the DB, which made this
+    # flake (see #309's parallel-pollution family; it blocked PR #360).
+    scope = Position.where(product_id: "CI-TEST-USD")
 
     expect do
       Position.create!(
@@ -29,17 +32,13 @@ RSpec.describe "CI Environment Verification", :ci_only do
         status: "OPEN", # Use uppercase enum value
         day_trading: false
       )
-    end.to change { Position.count }.by(1)
+    end.to change { scope.count }.by(1)
 
-    # Verify the record was created
-    position = Position.last
-    expect(position.product_id).to eq("CI-TEST-USD")
+    position = scope.last
     expect(position.side).to eq("LONG")
     expect(position.status).to eq("OPEN")
 
-    # Clean up - destroy the test record
-    expect { position.destroy! }.to change { Position.count }.by(-1)
-    expect(Position.count).to eq(initial_count)
+    expect { position.destroy! }.to change { scope.count }.by(-1)
 
     puts "✅ Real database operations verified"
   end
