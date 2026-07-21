@@ -20,7 +20,7 @@ module Strategy
       min_1m_candles: 60,
       tp_target: 0.004, # 40 bps (tighter for day trading)
       sl_target: 0.003, # 30 bps (tighter for day trading)
-      maker_fee: 0.0005,
+      fee_rate: nil, # resolved to CostModel.taker_fee_rate in initialize; momentum entries cross the spread
       slippage: 0.0002,
       risk_fraction: 0.005,
       # Futures-specific settings
@@ -32,6 +32,9 @@ module Strategy
 
     def initialize(config = {})
       @config = DEFAULTS.merge(config)
+      # Break-even must be priced at the fees fills actually pay (taker) or
+      # the TP floor sits below true break-even. maker_fee kept as legacy key.
+      @config[:fee_rate] ||= @config[:maker_fee] || CostModel.taker_fee_rate
     end
 
     # Decide on a potential entry.
@@ -105,7 +108,7 @@ module Strategy
       if trend == :up
         if interacted_with_5m_ema && last_close_5m > ema5 && micro_timing_ok
           entry = last_close_1m # Use 1m close for precise entry
-          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee],
+          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
             slippage_rate: @config[:slippage])
           tp = [entry * (1.0 + @config[:tp_target]), be * 1.001].max
           sl = entry * (1.0 - @config[:sl_target])
@@ -116,7 +119,7 @@ module Strategy
         end
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
-        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee],
+        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
           slippage_rate: @config[:slippage])
         tp = [entry * (1.0 - @config[:tp_target]), be * 0.999].min
         sl = entry * (1.0 + @config[:sl_target])

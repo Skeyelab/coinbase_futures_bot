@@ -4,9 +4,10 @@ class GenerateSignalsJob < ApplicationJob
   queue_as :default
 
   def perform(equity_usd: default_equity_usd)
-    strat = Strategy::MultiTimeframeSignal.new(
-      ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21, min_1h_candles: 60, min_15m_candles: 80
-    )
+    # Same profile-aware build as the realtime evaluator, so Slack signal
+    # notifications advertise the tp/sl actually traded (drift audit: this
+    # job hardcoded EMAs and leaked class-DEFAULT tp/sl to Slack).
+    strat = Trading::StrategyFactory.multi_timeframe
 
     Contract.enabled.find_each do |pair|
       puts "Analyzing #{pair.product_id}..."

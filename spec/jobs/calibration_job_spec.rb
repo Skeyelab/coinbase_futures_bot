@@ -111,6 +111,38 @@ RSpec.describe CalibrationJob, type: :job do
     expect(TradingProfile.active_profile("BTC-USD").tp_target.to_f).to eq(0.004)
   end
 
+  it "evaluates candidates with the LIVE strategy config, not class DEFAULTS (drift audit)" do
+    insert_step_candles("BTC-USD")
+    captured_configs = []
+    allow(Backtest::WalkForward).to receive(:new) do |**opts|
+      captured_configs << opts.fetch(:strategy).instance_variable_get(:@config)
+      agg = {trade_count: 5, total_pnl: 1.0, worst_window_drawdown: 0.0}
+      instance_double(Backtest::WalkForward, run: {windows: [], aggregate: agg})
+    end
+
+    described_class.new.perform(symbols: ["BTC-USD"], tp_targets: [0.01], sl_targets: [0.005])
+
+    live = Rails.application.config.real_time_signals[:strategies]["MultiTimeframeSignal"]
+    expect(captured_configs.first[:ema_1h_short]).to eq(live[:ema_1h_short])
+    expect(captured_configs.first[:ema_1h_long]).to eq(live[:ema_1h_long])
+    expect(captured_configs.first[:resolve_symbols]).to be(false)
+  end
+
+  it "copies untuned risk knobs from the symbol's effective profile instead of resetting to schema defaults" do
+    insert_step_candles("BTC-USD")
+    create(:trading_profile, :active, name: "operator", risk_fraction: 0.03,
+      max_position_size: 20, min_position_size: 2, min_confidence_threshold: 80)
+    stub_walk_forward(0.004 => {total_pnl: 1.0}, 0.006 => {total_pnl: 2.0}, 0.008 => {total_pnl: 3.0})
+
+    described_class.new.perform(symbols: ["BTC-USD"])
+
+    profile = TradingProfile.active_profile("BTC-USD")
+    expect(profile.risk_fraction.to_f).to eq(0.03)
+    expect(profile.max_position_size).to eq(20)
+    expect(profile.min_position_size).to eq(2)
+    expect(profile.min_confidence_threshold.to_f).to eq(80.0)
+  end
+
   it "skips symbols without enough step candles" do
     calls = stub_walk_forward({})
 

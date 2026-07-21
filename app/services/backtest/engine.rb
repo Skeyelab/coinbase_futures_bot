@@ -22,13 +22,17 @@ module Backtest
     attr_reader :strategy
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
-      fee_rate: nil, slippage: 0.0002, logger: Rails.logger)
+      fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, logger: Rails.logger)
       @symbol = symbol
-      @strategy = strategy || Strategy::MultiTimeframeSignal.new(resolve_symbols: false)
+      @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
       @starting_equity = starting_equity.to_f
       @fee_rate = (fee_rate || CostModel.taker_fee_rate).to_f
       @slippage = slippage.to_f
+      # Signals size in CONTRACTS; the simulator prices in base units. Convert
+      # via the strategy's own $-per-contract model or the PnL/fees are
+      # inflated ~(price / contract_size_usd)x — ~1000x for BTC.
+      @contract_size_usd = (contract_size_usd || strategy_contract_size_usd || 100.0).to_f
       @logger = logger
     end
 
@@ -64,9 +68,24 @@ module Backtest
       sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: candle.timestamp)
       return unless sig && sig[:quantity].to_f > 0
 
+      base_qty = contracts_to_base_units(sig[:quantity], sig[:price])
+      return unless base_qty > 0
+
       id = sim.place_limit(symbol: @symbol, side: SideNormalizer.simulator_fill_side(sig[:side]),
-        price: sig[:price], quantity: sig[:quantity], tp: sig[:tp], sl: sig[:sl])
+        price: sig[:price], quantity: base_qty, tp: sig[:tp], sl: sig[:sl])
       entered_at[id] = candle.timestamp
+    end
+
+    # contracts x ($ notional per contract) / price = base units
+    def contracts_to_base_units(contracts, price)
+      return 0.0 unless price.to_f.positive?
+
+      contracts.to_f * @contract_size_usd / price.to_f
+    end
+
+    def strategy_contract_size_usd
+      config = @strategy.instance_variable_get(:@config)
+      config.is_a?(Hash) ? config[:contract_size_usd] : nil
     end
 
     def position_active?(sim)

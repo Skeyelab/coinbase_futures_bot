@@ -114,26 +114,7 @@ class RealTimeSignalEvaluator
   end
 
   def build_multi_timeframe_strategy(profile)
-    config = Rails.application.config.real_time_signals
-    strategy_config = config[:strategies]["MultiTimeframeSignal"]
-
-    Strategy::MultiTimeframeSignal.new(
-      ema_1h_short: strategy_config[:ema_1h_short],
-      ema_1h_long: strategy_config[:ema_1h_long],
-      ema_15m: strategy_config[:ema_15m],
-      ema_5m: strategy_config[:ema_5m],
-      ema_1m: strategy_config[:ema_1m],
-      min_1h_candles: strategy_config[:min_1h_candles],
-      min_15m_candles: strategy_config[:min_15m_candles],
-      min_5m_candles: strategy_config[:min_5m_candles],
-      min_1m_candles: strategy_config[:min_1m_candles],
-      tp_target: profile.tp_target.to_f,
-      sl_target: profile.sl_target.to_f,
-      risk_fraction: profile.risk_fraction.to_f,
-      contract_size_usd: strategy_config[:contract_size_usd],
-      max_position_size: profile.max_position_size,
-      min_position_size: profile.min_position_size
-    )
+    Trading::StrategyFactory.multi_timeframe(profile: profile)
   end
 
   def evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
