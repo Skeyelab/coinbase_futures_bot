@@ -41,9 +41,9 @@ SENTIMENT_ENABLE=true
 SENTIMENT_Z_THRESHOLD=1.2
 
 # Job Schedules (optional overrides)
-CANDLES_CRON="0 5 * * *"
-PAPER_CRON="*/15 * * * *"
+CANDLES_CRON="5 * * * *"
 CALIBRATE_CRON="0 2 * * *"
+HEALTH_CHECK_CRON="0 * * * *"
 ```
 
 ## Configuration Categories
@@ -199,6 +199,14 @@ NEWS_MAX_AGE_HOURS=24                          # Maximum article age
 PAPER_TRADING_MODE=true                         # Enable paper trading (safe default)
 DEFAULT_DAY_TRADING=true                        # Default to day trading mode
 
+# Live trading safety (Trading::ExecutionSafety)
+LIVE_TRADING_CONFIRMED=1                        # REQUIRED on every live path; without it dry-run is forced ON
+
+# Fees (taker pricing — momentum entries cross the spread; see CostModel)
+TAKER_FEE_RATE=0.0015                           # Taker fee per side (default 15 bps)
+BACKTEST_TAKER_FEE_RATE=0.0015                  # Backtest-only override (takes precedence)
+TAKER_MIN_FEE_PER_CONTRACT=0.15                 # Flat per-contract per-side fee floor ($0.15)
+
 # Risk management
 SIGNAL_EQUITY_USD=50000                         # Default equity for position sizing
 MAX_POSITION_SIZE=10                            # Maximum contracts per position
@@ -260,18 +268,18 @@ SENTIMENT_AGG_CRON="*/5 * * * *"                # Aggregate sentiment (every 5 m
 # Trading jobs
 GENERATE_SIGNALS_CRON="*/15 * * * *"            # Generate signals (every 15 minutes)
 RAPID_SIGNALS_CRON="*/1 * * * *"                # Rapid signal evaluation (every minute)
-PAPER_CRON="*/15 * * * *"                       # Paper trading (every 15 minutes)
 
 # Position management jobs
-DAY_TRADING_MANAGEMENT_CRON="*/5 * * * *"       # Day trading management (every 5 minutes)
+DAY_TRADING_MANAGEMENT_CRON="*/15 * * * *"      # Day trading management (every 15 minutes, 24/7)
 SWING_MANAGEMENT_CRON="*/15 * * * *"            # Swing management (every 15 minutes)
 END_OF_DAY_CLOSURE_CRON="0 16 * * 1-5"         # End of day closure (4 PM EST, weekdays)
 
 # Risk and monitoring jobs
 CONTRACT_EXPIRY_CRON="0 6 * * *"                # Contract expiry check (6 AM UTC)
 BASIS_MONITORING_CRON="*/10 * * * *"            # Basis monitoring (every 10 minutes)
-HEALTH_CHECK_CRON="*/5 * * * *"                 # Health checks (every 5 minutes)
-CALIBRATION_CRON="0 2 * * *"                    # Strategy calibration (2 AM UTC daily)
+HEALTH_CHECK_CRON="0 * * * *"                   # Health checks (hourly, 24/7)
+CALIBRATE_CRON="0 2 * * *"                      # Strategy calibration (2 AM UTC daily)
+CIRCUIT_BREAKER_CRON="30 2 * * *"               # Symbol circuit breaker (2:30 AM UTC daily)
 ```
 
 #### Job Processing

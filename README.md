@@ -20,7 +20,7 @@ Automated cryptocurrency futures trading bot with a full-screen TUI dashboard, A
 - **Real-Time Signal Generation**: Live evaluation, deduplication, and Action Cable broadcasting
 - **Day & Swing Trading**: Position lifecycle workflows, contract expiry, end-of-day closure, trailing stops
 - **Sentiment Analysis**: CryptoPanic plus RSS sources with lexicon scoring
-- **Paper Trading**: Simulation and calibration jobs
+- **Nightly Calibration**: Walk-forward grid search of the live strategy; activates versioned per-symbol TradingProfiles
 - **Background Processing**: GoodJob on PostgreSQL with cron scheduling
 - **REST & WebSocket APIs**: Signals, sentiment, chat, positions, health checks
 - **Observability**: Sentry error/performance monitoring, Slack notifications and commands
@@ -199,8 +199,8 @@ Agent-oriented reference: [AGENTS.md](AGENTS.md)
 ```bash
 bin/rake market_data:subscribe[BTC-USD]
 PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
-bin/rake market_data:backfill_candles[7]
-bin/rake market_data:backfill_1h_candles[30]
+bin/rake market_data:backfill_candles[7]               # enqueue background backfill
+bin/rails "market_data:backfill[30,'BTC-USD ETH-USD']"  # inline deep backfill (all TFs; products optional)
 bin/rake market_data:upsert_futures_products   # sync contract catalog
 ```
 
@@ -208,7 +208,6 @@ bin/rake market_data:upsert_futures_products   # sync contract catalog
 
 ```bash
 bin/rake signals:generate
-bin/rake paper:step
 bin/rake day_trading:check_positions
 bin/rake day_trading:pnl
 bin/rake day_trading:close_expired
@@ -218,6 +217,16 @@ bin/rake day_trading:manage
 
 curl "http://localhost:3000/sentiment/aggregates?symbol=BTC-USD&limit=5"
 ```
+
+### Backtesting
+
+```bash
+bin/rails "backtest:run[BTC-USD,2026-05-01,2026-07-01,5m]"           # Backtest::Engine, JSON metrics
+bin/rails "backtest:walk_forward[BTC-USD,2026-05-01,2026-07-01]"     # Backtest::WalkForward, rolling OOS windows
+```
+
+Nightly `CalibrationJob` (02:00 UTC, `CALIBRATE_CRON`) runs the same walk-forward
+engine over the live strategy and activates versioned per-symbol `TradingProfile`s.
 
 ### Real-Time Signals
 

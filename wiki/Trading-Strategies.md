@@ -256,42 +256,9 @@ day_trading_config = {
 }
 ```
 
-## Supporting Strategies
+## Retired Strategies
 
-### 1. Spot-Driven Strategy
-
-**Purpose**: Generates futures signals based on spot market analysis.
-
-**Key Features**:
-- Analyzes spot market trends (BTC-USD, ETH-USD)
-- Maps spot signals to corresponding futures contracts
-- Cross-market arbitrage opportunities
-- Basis risk management
-
-**Usage**:
-```ruby
-strategy = Strategy::SpotDrivenStrategy.new
-signals = strategy.generate_signals(
-  product_ids: ["BTC-USD", "ETH-USD"],
-  as_of: Time.current
-)
-```
-
-### 2. Pullback Strategy
-
-**Purpose**: Specialized pullback entry strategy for trend-following trades.
-
-**Key Features**:
-- 1-hour timeframe pullback detection
-- Fibonacci retracement levels
-- Support/resistance confirmation
-- Volume-based entry validation
-
-**Entry Conditions**:
-- Strong 1h trend established
-- Price pulls back to EMA or key level
-- Volume decreases during pullback
-- Volume increases on trend resumption
+`Strategy::SpotDrivenStrategy` and `Strategy::Pullback1h` have been deleted from the codebase. `MultiTimeframeSignal` is the only strategy. It is always built via `Trading::StrategyFactory`, which combines the `real_time_signals` initializer config with the effective `TradingProfile` — including per-symbol profiles activated nightly by `CalibrationJob` (walk-forward grid search, TP 100-250 bps x SL 50-125 bps).
 
 ## Risk Management Framework
 

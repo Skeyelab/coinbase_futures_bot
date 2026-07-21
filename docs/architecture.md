@@ -28,9 +28,9 @@ The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes fo
 │  • FuturesExecutor - Order execution and risk management       │
 │                                                                 │
 │  Strategy Services                                              │
-│  • MultiTimeframeSignal - Main trading strategy                │
-│  • SpotDrivenStrategy - Spot-based signal generation           │
-│  • PaperTrading::ExchangeSimulator - Backtesting engine        │
+│  • MultiTimeframeSignal - The trading strategy                 │
+│  • Trading::StrategyFactory - Live-configured strategy builder │
+│  • Backtest::Engine / WalkForward - Backtesting engine         │
 │                                                                 │
 │  External API Clients                                           │
 │  • Coinbase::AdvancedTradeClient - Futures trading API         │
@@ -48,14 +48,15 @@ The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes fo
 │                                                                 │
 │  Signal Generation Jobs                                         │
 │  • GenerateSignalsJob - Trading signal generation              │
-│  • CalibrationJob - Strategy parameter optimization            │
+│  • CalibrationJob - Nightly walk-forward tuning; activates     │
+│    per-symbol TradingProfiles                                   │
 │                                                                 │
 │  Sentiment Analysis Jobs                                        │
 │  • ScoreSentimentJob - Sentiment scoring for news events       │
 │  • AggregateSentimentJob - Rolling sentiment aggregations      │
 │                                                                 │
 │  Trading Jobs                                                   │
-│  • PaperTradingJob - Automated paper trading execution         │
+│  • SymbolCircuitBreakerJob - Daily per-symbol suspension       │
 └─────────────────────────────────────────────────────────────────┘
                                     │
 ┌─────────────────────────────────────────────────────────────────┐

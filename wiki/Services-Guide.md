@@ -195,12 +195,12 @@ next_contract = manager.next_month_contract("BTC")
 - Futures and options data handling
 - Advanced market data processing
 
-### 3. Trading Strategy Services (3 services)
+### 3. Trading Strategy Services
 
 #### Strategy::MultiTimeframeSignal
 **Location**: `app/services/strategy/multi_timeframe_signal.rb`
 
-**Purpose**: Main trading strategy implementing multi-timeframe analysis for day trading.
+**Purpose**: The trading strategy — multi-timeframe analysis for day trading. It is the only strategy in the codebase (`SpotDrivenStrategy` and `Pullback1h` have been deleted).
 
 **Key Features**:
 - **Multi-timeframe Analysis**: 1h trend, 15m confirmation, 5m entry, 1m timing
@@ -209,16 +209,12 @@ next_contract = manager.next_month_contract("BTC")
 - **Sentiment Integration**: Sentiment z-score filtering
 - **Day Trading Optimization**: Tight stops and quick profits
 
-**Configuration**:
+**Configuration**: Production paths never construct the strategy directly — they build it through `Trading::StrategyFactory.multi_timeframe`, which layers the `real_time_signals` initializer (EMA periods, min candle counts, contract sizing) and the effective `TradingProfile` (tp/sl, risk fraction, position size bounds) on top of the defaults:
+
 ```ruby
-strategy = Strategy::MultiTimeframeSignal.new(
-  ema_1h_short: 21,    # 1h short EMA
-  ema_1h_long: 50,     # 1h long EMA
-  ema_15m: 21,         # 15m EMA
-  ema_5m: 13,          # 5m EMA
-  ema_1m: 8,           # 1m EMA
-  tp_target: 0.004,    # 40 bps take profit
-  sl_target: 0.003     # 30 bps stop loss
+strategy = Trading::StrategyFactory.multi_timeframe                                # global profile
+strategy = Trading::StrategyFactory.multi_timeframe(                               # per-symbol profile
+  profile: TradingProfile.effective(symbol: "BTC-USD")
 )
 ```
 
@@ -231,35 +227,7 @@ if signal
 end
 ```
 
-#### Strategy::SpotDrivenStrategy
-**Location**: `app/services/strategy/spot_driven_strategy.rb`
-
-**Purpose**: Strategy that generates futures signals based on spot market analysis.
-
-**Key Features**:
-- Spot market trend analysis
-- Sentiment-based signal filtering
-- Multi-product signal generation
-- Z-score threshold gating
-
-**Usage**:
-```ruby
-strategy = Strategy::SpotDrivenStrategy.new
-signals = strategy.generate_signals(
-  product_ids: ["BTC-USD", "ETH-USD"],
-  as_of: Time.current
-)
-```
-
-#### Strategy::Pullback1h
-**Location**: `app/services/strategy/pullback_1h.rb`
-
-**Purpose**: Pullback entry strategy for trend-following trades.
-
-**Key Features**:
-- 1-hour timeframe pullback detection
-- EMA-based trend confirmation
-- Entry timing optimization
+Fees are priced at taker (`CostModel.taker_fee_rate`, default 15 bps/side) — momentum entries cross the spread. The shared indicator math (SMA-seeded EMA) lives in `Signals::Indicators`.
 
 ### 4. Execution Services (1 service)
 
@@ -442,18 +410,26 @@ order_result = simulator.place_order({
 })
 ```
 
-### 8. Backtesting Services (1 service)
+### 8. Backtesting Services
 
-#### Backtest::SpotDbReplay
-**Location**: `app/services/backtest/spot_db_replay.rb`
+#### Backtest::Engine
+**Location**: `app/services/backtest/engine.rb`
 
-**Purpose**: Historical data replay engine for strategy backtesting.
+**Purpose**: Event-driven replay of the live-configured `MultiTimeframeSignal` over stored candles.
 
 **Key Features**:
-- Historical tick data replay
-- Strategy performance simulation
-- Time-series data processing
-- Performance metrics calculation
+- Steps candle-by-candle (default 5m) with `as_of`-bounded data reads
+- Uses `Trading::StrategyFactory`, so results describe live behavior
+- Net-of-costs accounting via `CostModel` (taker fees, per-contract fee floor)
+- Produces a `Backtest::Result` (PnL, win rate, drawdown, trade list)
+- CLI: `bin/rails "backtest:run[BTC-USD,2026-05-01,2026-07-01,5m]"`
+
+#### Backtest::WalkForward
+**Location**: `app/services/backtest/walk_forward.rb`
+
+**Purpose**: Rolling out-of-sample evaluation on top of `Backtest::Engine` — train/eval windows slide across history and only out-of-sample windows are aggregated. Used by the nightly `CalibrationJob`.
+
+- CLI: `bin/rails "backtest:walk_forward[BTC-USD,2026-04-01,2026-07-01,14,7]"`
 
 ### 9. Chat Interface Services (3 services)
 

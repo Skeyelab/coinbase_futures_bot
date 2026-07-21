@@ -2,7 +2,7 @@
 
 ## Overview
 
-The coinbase_futures_bot implements multiple trading strategies designed for cryptocurrency futures markets. Each strategy incorporates technical analysis, risk management, and sentiment filtering to generate trading signals.
+The coinbase_futures_bot has one production strategy: `Strategy::MultiTimeframeSignal`. It is always built via `Trading::StrategyFactory`, which layers initializer config and the effective `TradingProfile` (global or per-symbol, including nightly-calibrated profiles) on top of the strategy defaults. The strategy combines technical analysis, risk management, and sentiment filtering to generate trading signals.
 
 **Important**: This system exclusively trades current month futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`) and does not support perpetual contracts. All strategies include automatic contract resolution and rollover management.
 
@@ -34,9 +34,9 @@ Market Data → Technical Analysis → Sentiment Filter → Risk Management → 
   OHLCV Data    EMA/Indicators    Z-Score Threshold    Position Size    Order Parameters
 ```
 
-## Implemented Strategies
+## Implemented Strategy
 
-### 1. Multi-Timeframe Signal Strategy
+### Multi-Timeframe Signal Strategy
 
 **Location**: `app/services/strategy/multi_timeframe_signal.rb`
 
@@ -69,9 +69,10 @@ DEFAULTS = {
   min_1m_candles: 60,      # ~1 hour of 1m data
 
   # Risk management
-  tp_target: 0.004,        # 40 basis points take profit
-  sl_target: 0.003,        # 30 basis points stop loss
-  maker_fee: 0.0005,       # 5 basis points maker fee
+  tp_target: 0.004,        # 40 basis points take profit (overridden by calibrated TradingProfiles)
+  sl_target: 0.003,        # 30 basis points stop loss (overridden by calibrated TradingProfiles)
+  fee_rate: nil,           # resolved to CostModel.taker_fee_rate (default 15 bps/side);
+                           # maker_fee is accepted as a legacy alias
   slippage: 0.0002,        # 2 basis points slippage
   risk_fraction: 0.005,    # 0.5% of equity at risk per trade
 
@@ -153,10 +154,10 @@ end
 stop_loss = entry_price * (1 - sl_target)  # For longs
 take_profit = entry_price * (1 + tp_target) # For longs
 
-# Adjust for break-even after fees
+# Adjust for break-even after fees (priced at taker — momentum entries cross the spread)
 break_even = CostModel.break_even_exit(
   entry_price: entry_price,
-  fee_rate: maker_fee,
+  fee_rate: fee_rate,   # defaults to CostModel.taker_fee_rate (15 bps/side)
   slippage_rate: slippage
 )
 ```
@@ -181,216 +182,58 @@ def sentiment_gate_passed?(symbol, signal_direction)
 end
 ```
 
-### 2. Spot-Driven Strategy
+### Retired Strategies
 
-**Location**: `app/services/strategy/spot_driven_strategy.rb`
-
-**Purpose**: Generates signals based on spot market analysis with sentiment filtering.
-
-#### Strategy Logic
-
-This strategy serves as a framework for spot-to-futures arbitrage and sentiment-based trading:
-
-```ruby
-def generate_signals(product_ids: ["BTC-USD", "ETH-USD"])
-  signals = {}
-  product_ids.each do |product_id|
-    z_score = latest_sentiment_z(product_id, window: "15m")
-    base_signal = base_strategy_signal(product_id)
-    signals[product_id] = apply_sentiment_gate(base_signal, z_score)
-  end
-  signals
-end
-```
-
-#### Sentiment Filtering
-
-```ruby
-def apply_sentiment_gate(base_signal, z_score)
-  threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
-
-  if z_score.abs < threshold
-    :flat  # No position if sentiment not strong enough
-  else
-    base_signal  # Allow signal if sentiment confirms
-  end
-end
-```
-
-#### Current Implementation
-
-The base strategy currently returns `:flat` signals, serving as a template for:
-- Spot-futures basis trading
-- News-driven trading strategies
-- Sentiment-momentum strategies
-
-**Note**: This project focuses exclusively on current month futures contracts, not perpetual contracts.
-
-### 3. Pullback Strategy (1h)
-
-**Location**: `app/services/strategy/pullback_1h.rb`
-
-**Purpose**: Trend-following strategy that enters on pullbacks to key moving averages.
-
-#### Strategy Configuration
-
-```ruby
-DEFAULTS = {
-  maker_fee: 0.0005,      # 5 bps maker fee
-  slippage: 0.0002,       # 2 bps slippage
-  tp_margin: 0.001,       # 10 bps margin above break-even
-  tp_target: 0.006,       # 60 bps take profit target
-  sl_target: 0.004,       # 40 bps stop loss
-  min_candles: 50,        # Minimum data requirement
-  ema_short: 12,          # Short EMA period
-  ema_long: 50            # Long EMA period
-}
-```
-
-#### Entry Logic
-
-```ruby
-def signal(candles:, symbol:, equity_usd: 1000.0)
-  # Trend analysis
-  uptrend = last.close.to_f > ema_long
-  pullback = last.low.to_f <= ema_short && last.close.to_f >= ema_short
-
-  # Confirmation filters
-  volume_confirmation = volume_increasing?(candles)
-  momentum_confirmation = momentum_positive?(closes)
-
-  # Entry only if all conditions met
-  return nil unless uptrend && pullback && volume_confirmation && momentum_confirmation
-
-  # Calculate position parameters
-  {
-    side: :buy,
-    price: entry_price,
-    quantity: position_size,
-    tp: take_profit_level,
-    sl: stop_loss_level,
-    confidence: confidence_score
-  }
-end
-```
-
-#### Confirmation Filters
-
-##### Volume Confirmation
-```ruby
-def volume_increasing?(candles)
-  recent_volumes = candles.last(3).map { |c| c.volume.to_f }
-  recent_volumes.last > recent_volumes.first
-end
-```
-
-##### Momentum Confirmation
-```ruby
-def momentum_positive?(closes)
-  recent_closes = closes.last(5)
-  recent_closes.last > recent_closes.first
-end
-```
-
-#### Backtesting Framework
-
-The strategy includes built-in backtesting capabilities:
-
-```ruby
-def backtest(candles:, symbol:, equity_usd: 1000.0)
-  results = []
-  current_equity = equity_usd
-
-  (min_candles..candles.size-1).each do |i|
-    test_candles = candles[0..i]
-    signal = signal(candles: test_candles, symbol: symbol, equity_usd: current_equity)
-
-    if signal
-      trade_result = simulate_trade(signal, test_candles.last, current_equity)
-      results << trade_result
-      current_equity = trade_result[:final_equity]
-    end
-  end
-
-  {
-    total_trades: results.size,
-    winning_trades: results.count { |r| r[:pnl] > 0 },
-    total_pnl: results.sum { |r| r[:pnl] },
-    final_equity: current_equity,
-    trades: results
-  }
-end
-```
+`Strategy::SpotDrivenStrategy` and `Strategy::Pullback1h` have been deleted. `MultiTimeframeSignal` is the only strategy; backtesting is handled by `Backtest::Engine` and `Backtest::WalkForward` (see below) rather than per-strategy backtest methods.
 
 ## Strategy Integration
 
+### Strategy Factory
+
+The strategy is never constructed directly in production paths. `Trading::StrategyFactory.multi_timeframe` is the single builder used by the realtime evaluator, `GenerateSignalsJob`, calibration, and the backtest engine — so offline results describe online behavior:
+
+- The `real_time_signals` initializer supplies structure (EMA periods, min candle counts, contract sizing).
+- The effective `TradingProfile` supplies the tunable risk knobs (`tp_target`, `sl_target`, `risk_fraction`, position size bounds). `TradingProfile.effective(symbol:)` prefers an active per-symbol profile (e.g. nightly-calibrated) and falls back to the global profile.
+- Explicit overrides win — used for calibration candidates (tp/sl) and backtest mode (`resolve_symbols: false`).
+
 ### Signal Generation Job
 
-Strategies are executed through the `GenerateSignalsJob`:
+Signals are generated through `GenerateSignalsJob`, which builds the strategy via the factory:
 
 ```ruby
 class GenerateSignalsJob < ApplicationJob
   def perform(equity_usd: default_equity_usd)
-    strategy = Strategy::MultiTimeframeSignal.new(
-      ema_1h_short: 21,
-      ema_1h_long: 50,
-      ema_15m: 21,
-      min_1h_candles: 60,
-      min_15m_candles: 80
-    )
+    strat = Trading::StrategyFactory.multi_timeframe
 
-    TradingPair.enabled.find_each do |pair|
-      signal = strategy.signal(symbol: pair.product_id, equity_usd: equity_usd)
-      process_signal(pair, signal) if signal
+    Contract.enabled.find_each do |pair|
+      order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
+      # Slack notification + optional execution
     end
   end
 end
 ```
 
-### Paper Trading Integration
+### Backtesting & Calibration
 
-Strategies are tested through the paper trading system:
+Backtesting is handled by dedicated services rather than per-strategy methods:
 
-```ruby
-class PaperTradingJob < ApplicationJob
-  def perform
-    simulator = PaperTrading::ExchangeSimulator.new
-    strategy = Strategy::MultiTimeframeSignal.new
-
-    TradingPair.enabled.find_each do |pair|
-      signal = strategy.signal(symbol: pair.product_id, equity_usd: simulator.equity_usd)
-
-      if signal
-        simulator.place_limit(
-          symbol: pair.product_id,
-          side: signal[:side],
-          price: signal[:price],
-          quantity: signal[:quantity],
-          tp: signal[:tp],
-          sl: signal[:sl]
-        )
-      end
-    end
-  end
-end
-```
+- `Backtest::Engine` replays the live-configured strategy over stored candles (`bin/rails "backtest:run[BTC-USD,<from>,<to>,5m]"`), producing a `Backtest::Result` with net-of-costs metrics.
+- `Backtest::WalkForward` runs rolling out-of-sample windows (`bin/rails "backtest:walk_forward[...]"`).
+- `CalibrationJob` (nightly, 02:00 UTC) grid-searches TP 100-250 bps x SL 50-125 bps (TP > SL only) through `Backtest::WalkForward` and persists + activates versioned per-symbol `TradingProfile`s that live execution reads via `TradingProfile.effective(symbol:)`.
 
 ## Technical Indicators
 
 ### Exponential Moving Average (EMA)
 
-All strategies use a consistent EMA calculation:
+The canonical EMA is implemented once in `Signals::Indicators` (`app/services/signals/indicators.rb`) and shared by the strategy, backtests, and calibration. It is SMA-seeded (the TA-Lib / TradingView convention, so values can be verified against external charting) and returns `nil` when the series is shorter than the period:
 
 ```ruby
 def ema(values, period)
-  k = 2.0 / (period + 1)  # Smoothing factor
-  ema = values.first       # Initialize with first value
+  return nil if period <= 0 || values.size < period
 
-  values.each do |value|
-    ema = value * k + ema * (1 - k)
-  end
-
-  ema
+  k = 2.0 / (period + 1)                       # Smoothing factor
+  seed = values.first(period).sum / period      # Seed with SMA of first `period` values
+  values.drop(period).reduce(seed) { |acc, v| v * k + acc * (1 - k) }
 end
 ```
 
@@ -583,8 +426,8 @@ end
 ```
 
 4. **Integration**:
+- Build via `Trading::StrategyFactory` so live, backtest, and calibration stay in sync
 - Add to `GenerateSignalsJob`
-- Configure in `PaperTradingJob`
 - Update documentation
 
 ### Best Practices
@@ -745,9 +588,9 @@ end
 ### Debug Commands
 
 ```bash
-# Test strategy in console
+# Test strategy in console (live-configured, profile-aware)
 bin/rails console
-strategy = Strategy::MultiTimeframeSignal.new
+strategy = Trading::StrategyFactory.multi_timeframe
 signal = strategy.signal(symbol: 'BTC-USD', equity_usd: 10_000)
 
 # Check data availability
@@ -756,6 +599,6 @@ Candle.where(symbol: 'BTC-USD').group(:timeframe).count
 # Generate signals for all pairs
 GenerateSignalsJob.perform_now(equity_usd: 5_000)
 
-# Paper trading simulation
-PaperTradingJob.perform_now
+# Backtest the live strategy
+Backtest::Engine.new(symbol: 'BTC-USD', step: '5m').run(from: 30.days.ago, to: Time.current)
 ```

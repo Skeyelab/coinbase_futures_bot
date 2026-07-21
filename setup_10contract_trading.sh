@@ -37,11 +37,9 @@ cd /Users/edahl/Documents/GitHub/coinbase_futures_bot
 echo "   Syncing trading products..."
 bin/rake market_data:upsert_futures_products
 
-# Backfill candle data
+# Backfill candle data (all timeframes, all enabled contracts)
 echo "   Backfilling candle data..."
-bin/rake market_data:backfill_1h_candles[2]  # 2 days of hourly data
-bin/rake market_data:backfill_15m_candles[2] # 2 days of 15m data
-bin/rake market_data:backfill_5m_candles[1]  # 1 day of 5m data
+bin/rails "market_data:backfill[2]"  # 2 days of 1m/5m/15m/30m/1h/1d data
 
 echo ""
 echo "📈 Available Trading Pairs:"
