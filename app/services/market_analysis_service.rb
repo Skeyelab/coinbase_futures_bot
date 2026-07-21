@@ -735,7 +735,7 @@ class MarketAnalysisService
   end
 
   def calculate_position_size(entry_price, stop_loss, risk_level)
-    base_equity = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    base_equity = Trading::SignalEquity.usd
     risk_per_trade = TRADE_RISK_RATES.fetch(risk_level, 0.01)
     risk_amount = base_equity * risk_per_trade
     price_risk = (entry_price - stop_loss).abs

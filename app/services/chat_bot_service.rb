@@ -395,7 +395,7 @@ class ChatBotService
 
   def execute_position_sizing_command(content, original_input)
     # Extract sizing information from content
-    current_equity = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    current_equity = Trading::SignalEquity.usd
     risk_per_trade = ENV.fetch("RISK_PER_TRADE_PERCENT", "2").to_f
 
     {

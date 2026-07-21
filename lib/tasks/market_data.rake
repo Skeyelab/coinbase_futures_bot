@@ -102,27 +102,6 @@ namespace :market_data do
     end
   end
 
-  desc "Run spot-driven strategy: consume BTC-USD ticks and drive BTC-USD executor"
-  task :run_spot_driven_strategy, %i[spot_product futures_product] => :environment do |_t, args|
-    spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s
-    perp = (args[:futures_product] || ENV["FUTURES_PRODUCT"] || "BTC-USD").to_s
-
-    puts "Running spot-driven strategy: spot=#{spot} -> futures=#{perp}"
-    stdout_logger = Logger.new($stdout)
-    stdout_logger.level = Logger::DEBUG
-
-    executor = Execution::FuturesExecutor.new(logger: stdout_logger)
-    strategy = Strategy::SpotDrivenStrategy.new(
-      spot_product_id: spot,
-      futures_product_id: perp,
-      executor: executor,
-      logger: stdout_logger
-    )
-
-    on_ticker = ->(tick) { strategy.on_ticker(tick) }
-    MarketData::CoinbaseSpotSubscriber.new(product_ids: [spot], logger: stdout_logger, on_ticker: on_ticker).start
-  end
-
   desc "Persist live spot ticks to DB (Tick) for backtesting"
   task :ingest_spot_to_db, [:spot_product] => :environment do |_t, args|
     spot = (args[:spot_product] || ENV["SPOT_PRODUCT"] || "BTC-USD").to_s

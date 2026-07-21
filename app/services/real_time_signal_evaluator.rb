@@ -67,7 +67,7 @@ class RealTimeSignalEvaluator
       return {signals_created: 0, insufficient_data: 0, suspended: 1}
     end
 
-    equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
+    equity_usd = Trading::SignalEquity.usd
     pair_stats = {signals_created: 0, insufficient_data: 0}
 
     @strategies.each do |strategy_name, strategy|

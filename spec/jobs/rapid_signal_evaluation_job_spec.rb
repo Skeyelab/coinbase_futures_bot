@@ -30,7 +30,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     # Mock configuration
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
     allow(ENV).to receive(:fetch).and_call_original
-    allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "50000").and_return("50000")
+    allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", anything) { |_, default| default }
 
     # Mock strategy creation
     allow(Strategy::MultiTimeframeSignal).to receive(:new).and_return(mock_strategy)
@@ -124,16 +124,17 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
+        # Unified default (issue #375): $10k everywhere, no more 5x executor skew
         expect(mock_strategy).to receive(:signal).with(
           symbol: product_id,
-          equity_usd: 50_000.0
+          equity_usd: 10_000.0
         )
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
       end
 
       it "respects custom equity from environment" do
-        allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", "50000").and_return("75000")
+        allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", anything).and_return("75000")
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
