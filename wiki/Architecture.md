@@ -40,10 +40,10 @@ The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes fo
 │  • DayTradingPositionManager - Intraday position logic         │
 │  • SwingPositionManager - Multi-day position logic             │
 │                                                                 │
-│  Strategy Services (3 services)                                │
-│  • MultiTimeframeSignal - Main trading strategy                │
-│  • SpotDrivenStrategy - Spot-based signal generation           │
-│  • PullbackStrategy - Pullback entry strategy                  │
+│  Strategy Services                                              │
+│  • MultiTimeframeSignal - The trading strategy                 │
+│  • Trading::StrategyFactory - Live-configured strategy builder │
+│  • Backtest::Engine / WalkForward - Backtesting                │
 │                                                                 │
 │  External API Clients (3 services)                             │
 │  • Coinbase::AdvancedTradeClient - Futures trading API         │
@@ -88,8 +88,9 @@ The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes fo
 │  • MarginWindowMonitoringJob - Margin monitoring               │
 │  • ArbitrageOpportunityJob - Cross-market opportunities        │
 │  • HealthCheckJob - System health monitoring                   │
-│  • CalibrationJob - Strategy parameter tuning                  │
-│  • PaperTradingJob - Simulation execution                      │
+│  • CalibrationJob - Nightly walk-forward tuning; activates     │
+│    per-symbol TradingProfiles                                   │
+│  • SymbolCircuitBreakerJob - Daily per-symbol suspension       │
 │  • TestJob - Development testing                               │
 └─────────────────────────────────────────────────────────────────┘
                                     │

@@ -41,9 +41,9 @@ SENTIMENT_ENABLE=true
 SENTIMENT_Z_THRESHOLD=1.2
 
 # Job Schedules (optional overrides)
-CANDLES_CRON="0 5 * * *"
-PAPER_CRON="*/15 * * * *"
+CANDLES_CRON="5 * * * *"
 CALIBRATE_CRON="0 2 * * *"
+HEALTH_CHECK_CRON="0 * * * *"
 ```
 
 ## Configuration Categories
@@ -164,7 +164,15 @@ MAX_POSITION_SIZE=5            # maximum contracts per position
 MIN_POSITION_SIZE=1            # minimum contracts per position
 
 # Strategy parameters
-SIGNAL_EQUITY_USD=10000        # default equity for signal generation
+SIGNAL_EQUITY_USD=10000        # default equity for signal generation ($10k default)
+
+# Live trading safety (Trading::ExecutionSafety)
+LIVE_TRADING_CONFIRMED=1       # REQUIRED on every live path; without it dry-run is forced ON
+
+# Fees (taker pricing; see CostModel)
+TAKER_FEE_RATE=0.0015          # taker fee per side (default 15 bps)
+BACKTEST_TAKER_FEE_RATE=0.0015 # backtest-only override (takes precedence)
+TAKER_MIN_FEE_PER_CONTRACT=0.15 # flat per-contract per-side fee floor ($0.15)
 ```
 
 ### 5. Job Scheduling Configuration
@@ -181,8 +189,8 @@ SENTIMENT_SCORE_CRON="*/2 * * * *"  # Score sentiment (every 2 minutes)
 SENTIMENT_AGG_CRON="*/5 * * * *"    # Aggregate sentiment (every 5 minutes)
 
 # Trading jobs
-PAPER_CRON="*/15 * * * *"          # Paper trading (every 15 minutes)
 CALIBRATE_CRON="0 2 * * *"         # Strategy calibration (daily at 2 AM UTC)
+CIRCUIT_BREAKER_CRON="30 2 * * *"  # Symbol circuit breaker (daily at 2:30 AM UTC)
 ```
 
 #### Job Processing

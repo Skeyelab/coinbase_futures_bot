@@ -26,14 +26,19 @@ app/services/
 │   ├── crypto_panic_client.rb    # News data source
 │   └── simple_lexicon_scorer.rb  # Sentiment scoring
 ├── strategy/               # Trading strategy services
-│   ├── multi_timeframe_signal.rb  # Main trading strategy
-│   ├── spot_driven_strategy.rb    # Spot-based signals
-│   └── pullback_1h.rb            # Pullback strategy
+│   └── multi_timeframe_signal.rb  # The trading strategy
 ├── trading/                # Position management services
-│   └── coinbase_positions.rb     # Position tracking
+│   ├── coinbase_positions.rb     # Position tracking
+│   ├── strategy_factory.rb       # Live-configured strategy builder
+│   ├── execution_safety.rb       # LIVE_TRADING_CONFIRMED gate
+│   └── symbol_suspension.rb      # Per-symbol circuit breaker state
 ├── backtest/               # Backtesting services
-│   └── spot_db_replay.rb   # Historical data replay
-└── cost_model.rb           # Trading cost calculations
+│   ├── engine.rb           # Event-driven candle replay
+│   ├── result.rb           # Net-of-costs metrics
+│   └── walk_forward.rb     # Rolling out-of-sample evaluation
+├── signals/                # Shared indicator math
+│   └── indicators.rb       # Canonical SMA-seeded EMA / SMA
+└── cost_model.rb           # Trading cost calculations (taker fees)
 ```
 
 ## Service Categories
@@ -50,7 +55,7 @@ app/services/
 
 ### 3. Strategy Services
 - **Purpose**: Generate trading signals and manage strategy logic
-- **Key Services**: MultiTimeframeSignal, SpotDrivenStrategy
+- **Key Services**: MultiTimeframeSignal (built via Trading::StrategyFactory), Signals::Indicators
 - **Documentation**: [strategies.md](strategies.md)
 
 ### 4. External API Clients

@@ -268,8 +268,8 @@ GOOD_JOB_POLL_INTERVAL=5
 GOOD_JOB_CLEANUP_INTERVAL=1  # days
 
 # Job Schedules (production tuned)
-CANDLES_CRON="0 */1 * * *"      # Every hour
-PAPER_CRON="*/30 * * * *"       # Every 30 minutes
+CANDLES_CRON="5 * * * *"        # Every hour
+CALIBRATE_CRON="0 2 * * *"      # Nightly calibration
 SENTIMENT_FETCH_CRON="*/5 * * * *"  # Every 5 minutes
 ```
 

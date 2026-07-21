@@ -104,7 +104,8 @@ bin/rake "realtime:evaluate_symbol[BIT-27JUN26-CDE]"
 ### Market Data Tasks
 
 ```bash
-bin/rake "market_data:backfill_1h_candles[2]"
+bin/rails "market_data:backfill[2]"                      # all timeframes, all enabled contracts
+bin/rails "market_data:backfill[30,'BTC-USD ETH-USD']"   # deep backfill for specific products
 bin/rake "market_data:subscribe[BTC-USD]"
 PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
 ```

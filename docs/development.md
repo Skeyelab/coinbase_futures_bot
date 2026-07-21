@@ -181,13 +181,13 @@ bin/rake market_data:backfill_candles[7]
 INLINE=1 bin/rake "market_data:subscribe_spot[BTC-USD]"
 ```
 
-#### Paper Trading
+#### Signals & Backtesting
 ```bash
-# Run one step of paper trading
-bin/rake paper:step
-
 # Generate trading signals
 bin/rake signals:generate
+
+# Backtest the live strategy
+bin/rails "backtest:run[BTC-USD,2026-05-01,2026-07-01,5m]"
 ```
 
 ## Code Style and Standards

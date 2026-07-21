@@ -11,9 +11,10 @@ The coinbase_futures_bot uses GoodJob as the background job processing system, b
 │                    Job Scheduling Layer                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  Cron Jobs (GoodJob)                                           │
-│  • FetchCandlesJob: 0 5 * * * (hourly at minute 5)            │
-│  • PaperTradingJob: */15 * * * * (every 15 minutes)           │
+│  • FetchCandlesJob: 5 * * * * (hourly at minute 5)            │
 │  • CalibrationJob: 0 2 * * * (daily at 2:00 UTC)             │
+│  • SymbolCircuitBreakerJob: 30 2 * * * (daily at 2:30 UTC)   │
+│  • HealthCheckJob: 0 * * * * (hourly, 24/7)                  │
 │  • FetchCryptopanicJob: */2 * * * * (every 2 minutes)         │
 │  • ScoreSentimentJob: */2 * * * * (every 2 minutes)           │
 │  • AggregateSentimentJob: */5 * * * * (every 5 minutes)       │
@@ -47,29 +48,34 @@ The coinbase_futures_bot uses GoodJob as the background job processing system, b
 
 **Purpose**: Fetches OHLCV candle data from Coinbase for technical analysis.
 
-**Schedule**: `0 5 * * *` (hourly at minute 5, configurable via `CANDLES_CRON`)
+**Schedule**: `5 * * * *` (hourly at minute 5, configurable via `CANDLES_CRON`)
 
 **Parameters**:
 - `backfill_days` (integer, default: 7) - Days of historical data to fetch
+- `symbols` (array, optional) - Restrict to specific product IDs (nil = all enabled contracts)
+- `max_1m_days` (integer, optional) - Raise the 1m depth cap (default `MAX_1M_BACKFILL_DAYS`, 3 days)
 
-**Timeframes**: 1m, 5m, 15m, 1h
+**Timeframes**: 1m, 5m, 15m, 30m, 1h, 1d
 
 **Implementation**:
 ```ruby
 class FetchCandlesJob < ApplicationJob
   queue_as :default
 
-  def perform(backfill_days: 7)
+  def perform(backfill_days: 7, symbols: nil, max_1m_days: nil)
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
-    btc_pair = TradingPair.find_by(product_id: "BTC-USD")
-    return unless btc_pair
+    # Auto-disable contracts whose expiration_date has passed
+    Contract.enabled.where(expiration_date: ...Date.current).find_each { |c| c.update!(enabled: false) }
 
-    fetch_1m_candles(rest, btc_pair, backfill_days)
-    fetch_5m_candles(rest, btc_pair, backfill_days)
-    fetch_15m_candles(rest, btc_pair, backfill_days)
-    fetch_1h_candles(rest, btc_pair, backfill_days)
+    scope = Contract.enabled
+    scope = scope.where(product_id: symbols) if symbols.present?
+
+    scope.find_each do |pair|
+      # 1m/5m/15m/30m/1h/1d, chunked per timeframe;
+      # refetches the whole window when stored history is shallower (backward fill)
+    end
   end
 end
 ```
@@ -202,17 +208,12 @@ end
 **Implementation**:
 ```ruby
 def perform(equity_usd: default_equity_usd)
-  strategy = Strategy::MultiTimeframeSignal.new(
-    ema_1h_short: 21,
-    ema_1h_long: 50,
-    ema_15m: 21,
-    min_1h_candles: 60,
-    min_15m_candles: 80
-  )
+  # Profile-aware build — same strategy config the realtime evaluator uses
+  strat = Trading::StrategyFactory.multi_timeframe
 
-  TradingPair.enabled.find_each do |pair|
-    signal = strategy.signal(symbol: pair.product_id, equity_usd: equity_usd)
-    process_signal(pair, signal) if signal
+  Contract.enabled.find_each do |pair|
+    order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
+    # Slack notification + optional execution
   end
 end
 ```
@@ -222,83 +223,37 @@ end
 - Risk management and position sizing
 - Sentiment filtering integration
 
-#### PaperTradingJob
-
-**Purpose**: Executes automated paper trading for strategy validation.
-
-**Schedule**: `*/15 * * * *` (every 15 minutes, configurable via `PAPER_CRON`)
-
-**Implementation**:
-```ruby
-def perform
-  simulator = PaperTrading::ExchangeSimulator.new
-  strategy = Strategy::MultiTimeframeSignal.new
-
-  TradingPair.enabled.find_each do |pair|
-    signal = strategy.signal(symbol: pair.product_id, equity_usd: simulator.equity_usd)
-
-    if signal
-      simulator.place_limit(
-        symbol: pair.product_id,
-        side: signal[:side],
-        price: signal[:price],
-        quantity: signal[:quantity],
-        tp: signal[:tp],
-        sl: signal[:sl]
-      )
-    end
-
-    # Process market updates
-    latest_candle = Candle.for_symbol(pair.product_id).hourly.order(:timestamp).last
-    simulator.on_candle(latest_candle) if latest_candle
-  end
-
-  Rails.logger.info("Paper trading equity: $#{simulator.equity_usd.round(2)}")
-end
-```
-
 #### CalibrationJob
 
-**Purpose**: Optimizes strategy parameters using historical backtesting.
+**Purpose**: Tunes the LIVE strategy nightly via walk-forward (out-of-sample) grid search, then persists and **activates** a versioned per-symbol `TradingProfile` that live execution reads via `TradingProfile.effective(symbol:)`. This is a material operational behavior: the tp/sl the bot trades with can change every night.
 
 **Schedule**: `0 2 * * *` (daily at 2:00 UTC, configurable via `CALIBRATE_CRON`)
 
-**Optimization Method**: Grid search over parameter combinations
+**Method**:
+- Grid: TP targets 100-250 bps x SL targets 50-125 bps, TP > SL candidates only
+- Each candidate runs the live-configured `Strategy::MultiTimeframeSignal` (built via `Trading::StrategyFactory`) through `Backtest::WalkForward` — rolling train/eval windows (defaults: 60-day lookback, 14-day train, 7-day eval, 5m step)
+- Objective: `drawdown_penalized` by default (total PnL scaled by worst-window drawdown); `total_pnl` also available
+- The winner is persisted as a new `TradingProfile` (copying untuned risk knobs — risk_fraction, position sizes, confidence, dedupe — from the symbol's current effective profile) and activated
+- Symbols with insufficient candle history, or whose best candidate produced no trades, are skipped
 
-**Implementation**:
+**Per-symbol profile contract**: the realtime evaluator (`RealTimeSignalEvaluator`) reads `min_confidence_threshold`, `deduplication_window`, and `max_signals_per_hour` from the **global** profile only — per-symbol values for those fields are ignored by design. Per-symbol profiles override strategy parameters (tp/sl, risk fraction, position size bounds).
+
+**Implementation sketch**:
 ```ruby
-def perform
-  TradingPair.enabled.find_each do |pair|
-    candles = Candle.for_symbol(pair.product_id)
-                   .hourly
-                   .where("timestamp >= ?", 120.days.ago)
-                   .order(:timestamp)
-                   .to_a
-
-    return if candles.size < 300
-
-    best_params = grid_search(candles)
-    store_calibration_results(pair, best_params)
+def perform(symbols: nil, objective: :drawdown_penalized, ...)
+  (symbols.presence || Contract.enabled.pluck(:product_id)).each do |symbol|
+    candidates = tp_targets.product(sl_targets).select { |tp, sl| tp > sl }
+    best = candidates.map { |tp, sl| evaluate_via_walk_forward(symbol, tp, sl) }.max_by { |c| c[:score] }
+    persist_and_activate_profile(symbol, best)
   end
-end
-
-def grid_search(candles)
-  tp_targets = [0.004, 0.006, 0.008]
-  sl_targets = [0.003, 0.004, 0.005]
-
-  best_result = nil
-
-  tp_targets.product(sl_targets).each do |tp, sl|
-    pnl = simulate_strategy(candles, tp_target: tp, sl_target: sl)
-
-    if best_result.nil? || pnl > best_result[:pnl]
-      best_result = { tp_target: tp, sl_target: sl, pnl: pnl }
-    end
-  end
-
-  best_result
 end
 ```
+
+#### SymbolCircuitBreakerJob
+
+**Purpose**: Daily per-symbol circuit breaker — suspends (via `Trading::SymbolSuspension`) any symbol whose trailing 7-day realized gross PnL fails to cover its estimated taker round-trip costs (minimum 5 trades). Suspension blocks new entries only; exits continue, and resume is manual.
+
+**Schedule**: `30 2 * * *` (daily at 2:30 UTC, after calibration; configurable via `CIRCUIT_BREAKER_CRON`)
 
 #### DayTradingPositionManagementJob
 
@@ -417,17 +372,17 @@ Rails.application.configure do
 
   # Cron jobs configuration
   config.good_job.cron = {
-    fetch_candles: {
-      cron: ENV.fetch('CANDLES_CRON', '0 5 * * *'),
+    candles_1h: {
+      cron: ENV.fetch('CANDLES_CRON', '5 * * * *'),
       class: 'FetchCandlesJob'
     },
-    paper_trading: {
-      cron: ENV.fetch('PAPER_CRON', '*/15 * * * *'),
-      class: 'PaperTradingJob'
-    },
-    calibration: {
+    calibrate_daily: {
       cron: ENV.fetch('CALIBRATE_CRON', '0 2 * * *'),
       class: 'CalibrationJob'
+    },
+    symbol_circuit_breaker: {
+      cron: ENV.fetch('CIRCUIT_BREAKER_CRON', '30 2 * * *'),
+      class: 'SymbolCircuitBreakerJob'
     },
     fetch_sentiment: {
       cron: ENV.fetch('SENTIMENT_FETCH_CRON', '*/2 * * * *'),
@@ -454,16 +409,17 @@ end
 
 ```bash
 # Cron schedules (override defaults)
-CANDLES_CRON="0 5 * * *"           # Hourly candle fetch
-PAPER_CRON="*/15 * * * *"          # Paper trading frequency
+CANDLES_CRON="5 * * * *"           # Hourly candle fetch
 CALIBRATE_CRON="0 2 * * *"         # Daily calibration
+CIRCUIT_BREAKER_CRON="30 2 * * *"  # Daily symbol circuit breaker
+HEALTH_CHECK_CRON="0 * * * *"      # Hourly health check (24/7)
 SENTIMENT_FETCH_CRON="*/2 * * * *"  # News fetching
 SENTIMENT_SCORE_CRON="*/2 * * * *"  # Sentiment scoring
 SENTIMENT_AGG_CRON="*/5 * * * *"    # Sentiment aggregation
 
 # Job-specific parameters
-SIGNAL_EQUITY_USD=10000            # Default equity for signals
-CANDLES_BACKFILL_DAYS=7           # Default backfill period
+SIGNAL_EQUITY_USD=10000            # Default equity for signals ($10k default)
+MAX_1M_BACKFILL_DAYS=3             # Cap on 1m candle backfill depth
 
 # Feature flags
 SENTIMENT_ENABLE=true             # Enable sentiment filtering
@@ -478,7 +434,7 @@ SENTIMENT_Z_THRESHOLD=1.2         # Z-score threshold for signals
 # Execute jobs immediately
 FetchCandlesJob.perform_now(backfill_days: 1)
 GenerateSignalsJob.perform_now(equity_usd: 5000)
-PaperTradingJob.perform_now
+CalibrationJob.perform_now(symbols: ["BTC-USD"])
 
 # Schedule jobs for later
 FetchCandlesJob.perform_later(backfill_days: 30)
@@ -489,15 +445,16 @@ MarketDataSubscribeJob.perform_later(["BTC-USD"])
 
 ```bash
 # Candle data collection
-bin/rake market_data:backfill_candles[7]
-bin/rake market_data:backfill_1h_candles[30]
+bin/rake market_data:backfill_candles[7]                    # enqueue background backfill
+bin/rails "market_data:backfill[30,'BTC-USD ETH-USD']"      # inline deep backfill (all TFs; products optional)
 
 # Market data subscription
 bin/rake market_data:subscribe[BTC-USD]
 PRODUCT_IDS=BTC-USD,ETH-USD bin/rake market_data:subscribe
 
-# Paper trading
-bin/rake paper:step
+# Backtesting
+bin/rails "backtest:run[BTC-USD,2026-05-01,2026-07-01,5m]"
+bin/rails "backtest:walk_forward[BTC-USD,2026-05-01,2026-07-01]"
 
 # Signal generation
 bin/rake signals:generate

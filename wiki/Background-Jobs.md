@@ -41,28 +41,30 @@ The coinbase_futures_bot uses **GoodJob** as its background job processing syste
 #### FetchCandlesJob
 **File**: `app/jobs/fetch_candles_job.rb`  
 **Queue**: `:default`  
-**Schedule**: Configurable via `CANDLES_CRON` (default: `"0 5 * * *"` - hourly at minute 5)
+**Schedule**: Configurable via `CANDLES_CRON` (default: `"5 * * * *"` - hourly at minute 5)
 
-**Purpose**: Fetches historical OHLCV candle data from Coinbase REST API for multiple timeframes.
+**Purpose**: Fetches historical OHLCV candle data from Coinbase REST API for all enabled contracts.
 
 **Key Features**:
-- **Multi-timeframe Support**: 1m, 5m, 15m, 1h candles
-- **Backfill Logic**: Configurable backfill period (default: 7 days)
-- **Chunked Fetching**: Handles large date ranges efficiently
-- **Product Synchronization**: Updates trading pair metadata
+- **Multi-timeframe Support**: 1m, 5m, 15m, 30m, 1h, 1d candles
+- **Backfill Logic**: Configurable backfill period (default: 7 days); refetches the whole window when stored history is shallower than requested (backward fill), then returns to incremental fetching
+- **Chunked Fetching**: 1m at 5h, 5m at 24h, 15m at 3d, 1h at 14d chunks
+- **1m Depth Cap**: `MAX_1M_BACKFILL_DAYS` (default 3) unless `max_1m_days` is passed explicitly
+- **Contract Hygiene**: Auto-disables contracts whose expiration date has passed
 
 **Configuration**:
 ```bash
-CANDLES_CRON="0 5 * * *"        # Schedule (hourly at minute 5)
-CANDLES_BACKFILL_DAYS=7         # Days to backfill on startup
+CANDLES_CRON="5 * * * *"        # Schedule (hourly at minute 5)
+MAX_1M_BACKFILL_DAYS=3          # 1m depth cap
 ```
 
 **Usage**:
 ```ruby
-# Manual execution
+# Manual execution (all enabled contracts)
 FetchCandlesJob.perform_later(backfill_days: 3)
 
-# Processes enabled products: BTC-USD, ETH-USD
+# Deep backfill via rake
+# bin/rails "market_data:backfill[60,'BTC-USD ETH-USD']"
 ```
 
 #### FetchCryptopanicJob
@@ -127,7 +129,7 @@ SENTIMENT_FETCH_CRON="*/2 * * * *"
 
 **Configuration**:
 ```bash
-SIGNAL_EQUITY_USD=50000         # Equity for position sizing
+SIGNAL_EQUITY_USD=10000         # Equity for position sizing (Trading::SignalEquity, $10k default)
 GENERATE_SIGNALS_CRON="*/15 * * * *"
 ```
 
@@ -374,7 +376,7 @@ BASIS_ARBITRAGE_THRESHOLD_BPS=50
 #### HealthCheckJob
 **File**: `app/jobs/health_check_job.rb`  
 **Queue**: `:monitoring`  
-**Schedule**: Every 5 minutes
+**Schedule**: `"0 * * * *"` (hourly, 24/7; configurable via `HEALTH_CHECK_CRON`)
 
 **Purpose**: Comprehensive system health monitoring and alerting.
 
@@ -395,28 +397,25 @@ BASIS_ARBITRAGE_THRESHOLD_BPS=50
 #### CalibrationJob
 **File**: `app/jobs/calibration_job.rb`  
 **Queue**: `:default`  
-**Schedule**: `"0 2 * * *"` (daily at 2:00 AM UTC)
+**Schedule**: `"0 2 * * *"` (daily at 2:00 AM UTC; configurable via `CALIBRATE_CRON`)
 
-**Purpose**: Calibrates trading strategy parameters based on market conditions.
+**Purpose**: Tunes the LIVE strategy nightly via walk-forward grid search and **activates** the winning parameters — the tp/sl the bot trades with can change every night.
 
 **Key Features**:
-- **Parameter Optimization**: Adjusts strategy parameters
-- **Market Regime Detection**: Identifies changing market conditions
-- **Performance Analysis**: Analyzes recent strategy performance
-- **Adaptive Configuration**: Updates configuration based on analysis
+- **Grid Search**: TP targets 100-250 bps x SL targets 50-125 bps, TP > SL candidates only
+- **Live-Strategy Evaluation**: Each candidate runs the live-configured `Strategy::MultiTimeframeSignal` (via `Trading::StrategyFactory`) through `Backtest::WalkForward` — rolling out-of-sample windows (defaults: 60-day lookback, 14-day train, 7-day eval, 5m step)
+- **Objective**: `drawdown_penalized` by default (total PnL scaled by worst-window drawdown)
+- **Profile Activation**: Persists the winner as a versioned per-symbol `TradingProfile` (copying untuned risk knobs from the current effective profile) and activates it; live execution reads it via `TradingProfile.effective(symbol:)`
+- **Safety**: Skips symbols with insufficient candle history or whose best candidate produced no trades
 
-#### PaperTradingJob
-**File**: `app/jobs/paper_trading_job.rb`  
+**Note on per-symbol profiles**: the realtime evaluator (`RealTimeSignalEvaluator`) reads `min_confidence_threshold`, `deduplication_window`, and `max_signals_per_hour` from the **global** profile only — per-symbol values for those fields are ignored by design. Per-symbol profiles override the strategy parameters (tp/sl, risk fraction, position size bounds).
+
+#### SymbolCircuitBreakerJob
+**File**: `app/jobs/symbol_circuit_breaker_job.rb`  
 **Queue**: `:default`  
-**Schedule**: `"*/15 * * * *"` (every 15 minutes)
+**Schedule**: `"30 2 * * *"` (daily at 2:30 AM UTC, after calibration; configurable via `CIRCUIT_BREAKER_CRON`)
 
-**Purpose**: Executes paper trading simulation for strategy validation.
-
-**Key Features**:
-- **Realistic Simulation**: Simulates real trading conditions
-- **Performance Tracking**: Tracks simulated P&L
-- **Strategy Validation**: Validates strategies before live trading
-- **Risk-free Testing**: Tests new features without capital risk
+**Purpose**: Suspends (via `Trading::SymbolSuspension`) any symbol whose trailing 7-day realized gross PnL fails to cover its estimated taker round-trip costs (minimum 5 trades). Suspension blocks new entries only — exits continue — and resume is manual.
 
 #### TestJob
 **File**: `app/jobs/test_job.rb`  
@@ -573,10 +572,12 @@ GOOD_JOB_MAX_THREADS=5             # Worker thread count
 GOOD_JOB_POLL_INTERVAL=10          # Seconds between job polls
 
 # Job Schedules
-CANDLES_CRON="0 5 * * *"           # Candle fetching
+CANDLES_CRON="5 * * * *"           # Candle fetching (hourly at minute 5)
 SENTIMENT_FETCH_CRON="*/2 * * * *"  # Sentiment collection
 GENERATE_SIGNALS_CRON="*/15 * * * *" # Signal generation
 CALIBRATE_CRON="0 2 * * *"         # Strategy calibration
+CIRCUIT_BREAKER_CRON="30 2 * * *"  # Symbol circuit breaker
+HEALTH_CHECK_CRON="0 * * * *"      # Health checks (hourly, 24/7)
 
 # Risk Management
 CONTRACT_EXPIRY_BUFFER_DAYS=2      # Contract expiry buffer

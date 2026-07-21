@@ -89,7 +89,6 @@ end
 - `GenerateSignalsJob` - Signal generation failures  
 - `DayTradingPositionManagementJob` - Critical position management errors
 - `HealthCheckJob` - System health monitoring failures
-- `PaperTradingJob` - Trading simulation errors
 - All sentiment analysis jobs
 
 ### 2. API Controllers (`ApplicationController`)
