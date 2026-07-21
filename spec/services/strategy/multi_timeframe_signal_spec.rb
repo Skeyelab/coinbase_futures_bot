@@ -1216,10 +1216,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
   describe "upcoming month contract functionality" do
     let(:current_date) { Date.new(2025, 8, 15) } # Mid-August 2025
 
-    before do
-      # Mock Date.current to return a fixed date for testing
-      allow(Date).to receive(:current).and_return(current_date)
-    end
+    before { travel_to current_date }
+    after { travel_back }
 
     let!(:btc_current_month) do
       Contract.create!(
@@ -1264,10 +1262,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       end
 
       context "when current month contract is not tradeable" do
-        before do
-          # Mock Date.current to make current month contracts expire tomorrow
-          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
-        end
+        before { travel_to Date.new(2025, 8, 28) }
 
         it "falls back to upcoming month contract for BTC" do
           result = strategy.send(:resolve_trading_symbol, "BTC")
@@ -1351,10 +1346,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       let(:strategy) { described_class.new }
 
       context "when contracts expire tomorrow (not tradeable)" do
-        before do
-          # Set date to make current month contracts expire tomorrow (not tradeable)
-          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
-        end
+        before { travel_to Date.new(2025, 8, 28) }
 
         it "prioritizes upcoming month contracts for new signals" do
           # Current month expires tomorrow so not tradeable, use upcoming month
@@ -1364,10 +1356,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       end
 
       context "when contracts expire today" do
-        before do
-          # Set date to expiration day
-          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 29))
-        end
+        before { travel_to Date.new(2025, 8, 29) }
 
         it "uses upcoming month contracts only" do
           result = strategy.send(:resolve_trading_symbol, "BTC")

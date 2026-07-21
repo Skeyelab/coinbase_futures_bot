@@ -6,10 +6,11 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
   let(:manager) { described_class.new }
   let(:current_date) { Date.new(2025, 8, 15) } # Mid-August 2025
 
-  # Mock Date.current to return a fixed date for all tests
-  before do
-    allow(Date).to receive(:current).and_return(current_date)
-  end
+  # travel_to (not allow(Date)) so ALL clocks — Time.current, Date.current,
+  # Date.today — move together and reset reliably; a partial stub left this
+  # spec vulnerable to clock pollution from parallel worker-mates (#309).
+  before { travel_to current_date }
+  after { travel_back }
 
   # Helper method to dynamically generate expected contract IDs
   def expected_contract_id_for_month(asset, month_date)
@@ -297,10 +298,7 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       context "when current month contract is not tradeable but upcoming month is" do
-        before do
-          # Mock Date.current to make current month contracts expire tomorrow
-          allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
-        end
+        before { travel_to Date.new(2025, 8, 28) }
 
         let!(:btc_current) do
           Contract.create!(
