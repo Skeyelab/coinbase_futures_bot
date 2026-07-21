@@ -29,6 +29,8 @@ module RealtimeMonitoring
     def start!(product_ids: nil, futures_product_ids: nil, spot_product_ids: nil)
       return failure("Real-time monitoring already running") if active?
 
+      Trading::ExecutionSafety.enforce_paper_default!(logger: @logger)
+
       explicit = Array(product_ids).compact
       @futures_product_ids = ProductResolver.futures_product_ids(override: futures_product_ids, explicit: explicit)
       @spot_product_ids = ProductResolver.spot_product_ids(override: spot_product_ids, explicit: explicit)

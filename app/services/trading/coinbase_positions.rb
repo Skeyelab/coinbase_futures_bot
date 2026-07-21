@@ -243,6 +243,7 @@ module Trading
     # brokerage endpoint. Every order-placing method (open/close/increase) goes
     # through here so the dry-run guarantee holds at one boundary.
     def submit_order(order_body, product_id:, side:, size:, price: nil)
+      Trading::ExecutionSafety.enforce_paper_default!(logger: @logger)
       return simulate_order(product_id: product_id, side: side, size: size, price: price) if DryRun.active?
 
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)

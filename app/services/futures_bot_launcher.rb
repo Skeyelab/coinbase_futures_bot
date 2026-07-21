@@ -85,12 +85,7 @@ class FuturesBotLauncher
   # confirmation, force DRY-RUN before any subsystem (and thus any order flow)
   # starts, so "start the bot" defaults to paper. See DryRun.
   def enforce_execution_safety
-    return if ENV["LIVE_TRADING_CONFIRMED"] == "1"
-    return if DryRun.active?
-
-    @logger.warn("[Launcher] Live trading not confirmed — forcing DRY-RUN. " \
-                 "Set LIVE_TRADING_CONFIRMED=1 and disable dry-run to trade live.")
-    DryRun.enable!(logger: @logger)
+    Trading::ExecutionSafety.enforce_paper_default!(logger: @logger)
   end
 
   def start_market_data
