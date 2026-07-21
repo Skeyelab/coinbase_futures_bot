@@ -56,24 +56,28 @@ module Strategy
 
       # 1h trend analysis (dominant trend)
       closes_1h = candles_1h.map { |c| c.close.to_f }
-      ema1h_s = ema(closes_1h, @config[:ema_1h_short])
-      ema1h_l = ema(closes_1h, @config[:ema_1h_long])
-      trend = (ema1h_s > ema1h_l) ? :up : :down
+      ema1h_s = Signals::Indicators.ema(closes_1h, @config[:ema_1h_short])
+      ema1h_l = Signals::Indicators.ema(closes_1h, @config[:ema_1h_long])
 
       # 15m trend confirmation (intraday direction)
       closes_15m = candles_15m.map { |c| c.close.to_f }
-      ema15 = ema(closes_15m, @config[:ema_15m])
+      ema15 = Signals::Indicators.ema(closes_15m, @config[:ema_15m])
       last_15m = candles_15m.last
 
       # 5m entry trigger (short-term trend)
       closes_5m = candles_5m.map { |c| c.close.to_f }
-      ema5 = ema(closes_5m, @config[:ema_5m])
+      ema5 = Signals::Indicators.ema(closes_5m, @config[:ema_5m])
       last_5m = candles_5m.last
 
       # 1m micro-timing (entry precision)
       closes_1m = candles_1m.map { |c| c.close.to_f }
-      ema1 = ema(closes_1m, @config[:ema_1m])
+      ema1 = Signals::Indicators.ema(closes_1m, @config[:ema_1m])
       last_1m = candles_1m.last
+
+      # nil when a configured EMA period exceeds the candles available
+      return nil if [ema1h_s, ema1h_l, ema15, ema5, ema1].any?(&:nil?)
+
+      trend = (ema1h_s > ema1h_l) ? :up : :down
 
       # Multi-timeframe confirmation logic
       return nil unless confirm_trend_alignment(trend, ema15, ema5, ema1, last_15m, last_5m, last_1m)
@@ -135,18 +139,6 @@ module Strategy
       else
         false
       end
-    end
-
-    def ema(values, period)
-      period = period.to_i
-      return values.last.to_f if period <= 1 || values.empty?
-
-      k = 2.0 / (period + 1)
-      ema_value = values.first.to_f
-      values.drop(1).each do |v| # Skip first value to avoid double-counting
-        ema_value = v.to_f * k + ema_value * (1 - k)
-      end
-      ema_value
     end
 
     def position_size(equity_usd:, entry:, sl:, risk_fraction:)

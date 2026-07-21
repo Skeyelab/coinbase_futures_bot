@@ -73,22 +73,22 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
   describe "EMA Calculation Validation" do
     let(:strategy) { described_class.new }
 
-    describe "#ema" do
+    describe "shared EMA (Signals::Indicators)" do
       it "calculates EMA correctly for single period" do
         values = [100.0]
-        result = strategy.send(:ema, values, 1)
+        result = Signals::Indicators.ema(values, 1)
         expect(result).to eq(100.0)
       end
 
       it "calculates EMA correctly for simple values" do
         values = [100, 102, 104, 103, 105]
         period = 3
-        result = strategy.send(:ema, values, period)
+        result = Signals::Indicators.ema(values, period)
 
-        # Manual calculation verification
+        # Manual calculation: SMA-seeded (TA-Lib/TradingView convention)
         k = 2.0 / (period + 1)  # 0.5
-        expected = 100.0  # Start with first value
-        values.each do |v|
+        expected = values.first(period).sum / period.to_f
+        values.drop(period).each do |v|
           expected = v * k + expected * (1 - k)
         end
 
@@ -97,22 +97,20 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
       it "handles edge cases properly" do
         # Empty array
-        expect(strategy.send(:ema, [], 10)).to eq(0.0)
+        expect(Signals::Indicators.ema([], 10)).to be_nil
 
         # Period of 0
-        expect(strategy.send(:ema, [100, 102], 0)).to eq(102.0)
+        expect(Signals::Indicators.ema([100, 102], 0)).to be_nil
 
         # Period greater than values length
-        values = [100, 102]
-        result = strategy.send(:ema, values, 10)
-        expect(result).to be_a(Float)
+        expect(Signals::Indicators.ema([100, 102], 10)).to be_nil
       end
 
       it "validates 1-hour EMA accuracy for trend detection" do
         # Create realistic price series for 1h timeframe
         prices = Array.new(50) { |i| 50000 + (i * 100) }  # Uptrend
-        ema_short = strategy.send(:ema, prices, 12)
-        ema_long = strategy.send(:ema, prices, 26)
+        ema_short = Signals::Indicators.ema(prices, 12)
+        ema_long = Signals::Indicators.ema(prices, 26)
 
         # In uptrend, short EMA should be higher than long EMA
         expect(ema_short).to be > ema_long
@@ -125,7 +123,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         prices = []
         50.times { |i| prices << (100 + Math.sin(i * 0.1) * 2 + i * 0.05) }
 
-        ema = strategy.send(:ema, prices, 21)
+        ema = Signals::Indicators.ema(prices, 21)
         expect(ema).to be_between(prices.min, prices.max)
         expect(ema).to be > prices.first  # Should trend up
       end
@@ -135,7 +133,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         prices = Array.new(30) { |i| 100 + i * 0.1 }  # Uptrend
         prices += [99.5, 99.8, 100.2, 100.5]  # Pullback and recovery
 
-        ema = strategy.send(:ema, prices, 13)
+        ema = Signals::Indicators.ema(prices, 13)
         expect(ema).to be_between(99.0, 102.0)
       end
 
@@ -146,7 +144,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
           base_price + Math.sin(i * 0.5) * 0.1 + (i * 0.01)
         end
 
-        ema = strategy.send(:ema, prices, 8)
+        ema = Signals::Indicators.ema(prices, 8)
         expect(ema).to be_within(0.5).of(base_price)
         expect(ema).to be > base_price  # Should trend slightly up
       end
@@ -166,8 +164,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
 
-        ema_short = strategy.send(:ema, closes_1h, 12)
-        ema_long = strategy.send(:ema, closes_1h, 26)
+        ema_short = Signals::Indicators.ema(closes_1h, 12)
+        ema_long = Signals::Indicators.ema(closes_1h, 26)
         trend = (ema_short > ema_long) ? :up : :down
 
         expect(trend).to eq(:up)
@@ -181,9 +179,9 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
 
         # Calculate EMAs for each timeframe
-        ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
-        ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
+        ema15 = Signals::Indicators.ema(candles_15m.map(&:close), 21)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
+        ema1 = Signals::Indicators.ema(candles_1m.map(&:close), 8)
 
         # Check alignment
         last_15m = candles_15m.last
@@ -205,8 +203,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
 
-        ema_short = strategy.send(:ema, closes_1h, 12)
-        ema_long = strategy.send(:ema, closes_1h, 26)
+        ema_short = Signals::Indicators.ema(closes_1h, 12)
+        ema_long = Signals::Indicators.ema(closes_1h, 26)
         trend = (ema_short > ema_long) ? :up : :down
 
         expect(trend).to eq(:down)
@@ -220,9 +218,9 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
 
         # Calculate EMAs for each timeframe
-        ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
-        ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
+        ema15 = Signals::Indicators.ema(candles_15m.map(&:close), 21)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
+        ema1 = Signals::Indicators.ema(candles_1m.map(&:close), 8)
 
         # Check alignment for downtrend
         last_15m = candles_15m.last
@@ -259,8 +257,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
 
-        ema_short = strategy.send(:ema, closes_1h, 12)
-        ema_long = strategy.send(:ema, closes_1h, 26)
+        ema_short = Signals::Indicators.ema(closes_1h, 12)
+        ema_long = Signals::Indicators.ema(closes_1h, 26)
 
         # In sideways market, EMAs should be close to each other
         spread_percentage = ((ema_short - ema_long).abs / ema_long) * 100
@@ -330,7 +328,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       it "validates pullback detection for long entries" do
         # Test pullback detection logic
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
 
         recent_5m = candles_5m.last(8)
         interacted_with_ema = recent_5m.any? do |c|
@@ -402,7 +400,7 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       it "validates rejection pattern detection for short entries" do
         # Test rejection pattern at resistance (5m EMA)
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
 
         # In downtrend, last close should be below EMA
@@ -448,8 +446,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1h = Candle.for_symbol("BTC-USD").hourly.order(:timestamp).last(80)
         closes_1h = candles_1h.map { |c| c.close.to_f }
 
-        ema_short = strategy.send(:ema, closes_1h, 12)
-        ema_long = strategy.send(:ema, closes_1h, 26)
+        ema_short = Signals::Indicators.ema(closes_1h, 12)
+        ema_long = Signals::Indicators.ema(closes_1h, 26)
 
         # Current trend
         current_trend = (ema_short > ema_long) ? :up : :down
@@ -599,13 +597,13 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
         # 1h trend
         closes_1h = candles_1h.map { |c| c.close.to_f }
-        ema1h_s = strategy.send(:ema, closes_1h, 12)
-        ema1h_l = strategy.send(:ema, closes_1h, 26)
+        ema1h_s = Signals::Indicators.ema(closes_1h, 12)
+        ema1h_l = Signals::Indicators.ema(closes_1h, 26)
         trend_1h = (ema1h_s > ema1h_l) ? :up : :down
 
         # 15m confirmation
         closes_15m = candles_15m.map { |c| c.close.to_f }
-        ema15 = strategy.send(:ema, closes_15m, 21)
+        ema15 = Signals::Indicators.ema(closes_15m, 21)
         last_15m = candles_15m.last
 
         # Both should align for uptrend
@@ -618,11 +616,11 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_5m = Candle.for_symbol("BTC-USD").five_minute.order(:timestamp).last(100)
 
         # 15m trend confirmation
-        ema15 = strategy.send(:ema, candles_15m.map(&:close), 21)
+        ema15 = Signals::Indicators.ema(candles_15m.map(&:close), 21)
         last_15m = candles_15m.last
 
         # 5m entry trigger
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
 
         # Both should be above their respective EMAs in uptrend
@@ -635,11 +633,11 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         candles_1m = Candle.for_symbol("BTC-USD").one_minute.order(:timestamp).last(60)
 
         # 5m entry conditions
-        ema5 = strategy.send(:ema, candles_5m.map(&:close), 13)
+        ema5 = Signals::Indicators.ema(candles_5m.map(&:close), 13)
         last_5m = candles_5m.last
 
         # 1m micro-timing
-        ema1 = strategy.send(:ema, candles_1m.map(&:close), 8)
+        ema1 = Signals::Indicators.ema(candles_1m.map(&:close), 8)
         last_1m = candles_1m.last
 
         # Micro-timing validation
@@ -1071,26 +1069,26 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
       # 1h trend analysis
       closes_1h = candles_1h.map { |c| c.close.to_f }
-      ema1h_s = strat.send(:ema, closes_1h, 1)
-      ema1h_l = strat.send(:ema, closes_1h, 1)
+      ema1h_s = Signals::Indicators.ema(closes_1h, 1)
+      ema1h_l = Signals::Indicators.ema(closes_1h, 1)
       trend = (ema1h_s > ema1h_l) ? :up : :down
       puts "  1h trend: #{trend} (EMA short: #{ema1h_s.round(4)}, EMA long: #{ema1h_l.round(4)})"
 
       # 15m trend confirmation
       closes_15m = candles_15m.map { |c| c.close.to_f }
-      ema15 = strat.send(:ema, closes_15m, 1)
+      ema15 = Signals::Indicators.ema(closes_15m, 1)
       last_15m = candles_15m.last
       puts "  15m EMA: #{ema15.round(4)}, Last close: #{last_15m.close.to_f.round(4)}"
 
       # 5m entry trigger
       closes_5m = candles_5m.map { |c| c.close.to_f }
-      ema5 = strat.send(:ema, closes_5m, 1)
+      ema5 = Signals::Indicators.ema(closes_5m, 1)
       last_5m = candles_5m.last
       puts "  5m EMA: #{ema5.round(4)}, Last close: #{last_5m.close.to_f.round(4)}"
 
       # 1m micro-timing
       closes_1m = candles_1m.map { |c| c.close.to_f }
-      ema1 = strat.send(:ema, closes_1m, 1)
+      ema1 = Signals::Indicators.ema(closes_1m, 1)
       last_1m = candles_1m.last
       puts "  1m EMA: #{ema1.round(4)}, Last close: #{last_1m.close.to_f.round(4)}"
 

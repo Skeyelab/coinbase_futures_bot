@@ -299,16 +299,7 @@ class MarketAnalysisService
   end
 
   def calculate_ema(prices, period)
-    return 0 if prices.size < period
-
-    multiplier = 2.0 / (period + 1)
-    ema = prices.first(period).sum / period
-
-    prices[period..].each do |price|
-      ema = (price * multiplier) + (ema * (1 - multiplier))
-    end
-
-    ema.round(2)
+    Signals::Indicators.ema(prices, period)&.round(2) || 0
   end
 
   def calculate_rsi(prices, period = 14)

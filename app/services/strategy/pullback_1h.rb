@@ -22,8 +22,10 @@ module Strategy
       return nil if candles.size < @config[:min_candles]
 
       closes = candles.map { |c| c.close.to_f }
-      ema_short = ema(closes, @config[:ema_short])
-      ema_long = ema(closes, @config[:ema_long])
+      ema_short = Signals::Indicators.ema(closes, @config[:ema_short])
+      ema_long = Signals::Indicators.ema(closes, @config[:ema_long])
+      return nil if ema_short.nil? || ema_long.nil?
+
       last = candles.last
 
       # Trend analysis
@@ -83,15 +85,6 @@ module Strategy
     end
 
     private
-
-    def ema(values, period)
-      k = 2.0 / (period + 1)
-      ema = values.first
-      values.each do |v|
-        ema = v * k + ema * (1 - k)
-      end
-      ema
-    end
 
     def position_size(equity_usd:, entry:, sl:, risk_fraction: 0.005)
       risk_per_unit = (entry - sl).abs
