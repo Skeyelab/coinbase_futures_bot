@@ -78,14 +78,31 @@ RSpec.describe FetchCandlesJob, type: :job do
     end
 
     it "keeps small incremental fetches unchunked (hourly cron path)" do
-      # Cron path: recent candles exist, so start_time = last + 5m (tiny window)
-      Candle.create!(symbol: "BIT-26JUN26-CDE", timeframe: "5m", timestamp: 10.minutes.ago,
-        open: 100, high: 101, low: 99, close: 100, volume: 1)
+      # Cron path: history already reaches the requested cutoff AND recent
+      # candles exist -> only the tiny (last..now) window is fetched.
+      [61.days.ago, 10.minutes.ago].each do |ts|
+        Candle.create!(symbol: "BIT-26JUN26-CDE", timeframe: "5m", timestamp: ts,
+          open: 100, high: 101, low: 99, close: 100, volume: 1)
+      end
 
       described_class.perform_now(backfill_days: 60)
 
       expect(mock_rest).to have_received(:upsert_5m_candles)
       expect(mock_rest).not_to have_received(:upsert_5m_candles_chunked)
+    end
+
+    it "fills BACKWARD when existing history is shallower than backfill_days" do
+      # The first #342 fix only helped cold starts: with any recent candle,
+      # start anchored to (last + step) and deep history was never fetched.
+      # Shallow history must trigger a full-window refetch (upserts dedupe).
+      Candle.create!(symbol: "BIT-26JUN26-CDE", timeframe: "5m", timestamp: 10.minutes.ago,
+        open: 100, high: 101, low: 99, close: 100, volume: 1)
+
+      described_class.perform_now(backfill_days: 60)
+
+      expect(mock_rest).to have_received(:upsert_5m_candles_chunked).with(
+        hash_including(start_time: satisfy { |t| t <= 59.days.ago })
+      )
     end
   end
 
