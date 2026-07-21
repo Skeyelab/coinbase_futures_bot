@@ -520,7 +520,9 @@ module MarketData
     end
 
     # Upsert candles using chunked fetching for large date ranges
-    def upsert_1h_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 30)
+    # chunk_days must keep each request under the ~350-candle API cap
+    # (14 days = 336 hourly candles); 30-day chunks got truncated (issue #368).
+    def upsert_1h_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 14)
       data = fetch_candles_in_chunks(product_id: product_id, start_time: start_time, end_time: end_time, chunk_days: chunk_days)
       # API returns most recent first; normalize oldest→newest
       data.sort_by { |arr| arr[0].to_i }.each do |arr|
