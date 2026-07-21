@@ -63,6 +63,11 @@ Rails.application.configure do
       cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
       class: "HealthCheckJob"
     },
+    # Daily paper-trading summary to Slack (Stage-2 validation tracking)
+    daily_summary: {
+      cron: ENV.fetch("DAILY_SUMMARY_CRON", "0 13 * * *"), # once daily, 13:00 UTC
+      class: "DailySummaryJob"
+    },
     # Swing position management - run every 4 hours (24/7 for overnight positions)
     swing_position_management: {
       cron: ENV.fetch("SWING_POSITION_MANAGEMENT_CRON", "0 */4 * * *"), # every 4 hours
