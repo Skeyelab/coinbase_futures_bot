@@ -205,8 +205,7 @@ module RealtimeMonitoring
     end
 
     def should_evaluate_signals?(product_id, price)
-      current_hour_et = Time.current.in_time_zone("America/New_York").hour
-      return false unless (9..16).cover?(current_hour_et)
+      return false unless within_evaluation_hours?
 
       last_price_key = "last_price_#{product_id}"
       last_price = Rails.cache.read(last_price_key)
@@ -220,6 +219,17 @@ module RealtimeMonitoring
 
       Rails.cache.write(last_price_key, price, expires_in: 5.minutes)
       significant_movement
+    end
+
+    # Crypto futures trade 24/7, so signals are evaluated around the clock by
+    # default. Set SIGNAL_EVAL_HOURS_ET to an inclusive ET hour window (e.g.
+    # "9-16") to restrict evaluation to a session — for instruments that have one.
+    def within_evaluation_hours?
+      window = ENV["SIGNAL_EVAL_HOURS_ET"].to_s.strip
+      return true if window.empty?
+
+      from, to = window.split("-", 2).map(&:to_i)
+      (from..to).cover?(Time.current.in_time_zone("America/New_York").hour)
     end
 
     def rapid_signal_interval_seconds
