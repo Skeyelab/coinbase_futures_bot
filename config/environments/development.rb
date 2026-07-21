@@ -70,9 +70,15 @@ Rails.application.configure do
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
 
-  # Allow ngrok domains for development
+  # Allow tunnel/proxy hosts for development so inbound webhooks (e.g. Slack slash
+  # commands) reach the app: ngrok, Tailscale serve/funnel (*.ts.net), and any
+  # hosts listed in RAILS_ALLOWED_HOSTS (comma-separated).
   config.hosts << "skeyelab.ngrok.io"
   config.hosts << /.*\.ngrok\.io/
+  config.hosts << /.*\.ts\.net/
+  ENV.fetch("RAILS_ALLOWED_HOSTS", "").split(",").map(&:strip).reject(&:blank?).each do |h|
+    config.hosts << h
+  end
 
   # GoodJob runs inside Puma in dev — no separate process needed.
   config.good_job.execution_mode = :async
