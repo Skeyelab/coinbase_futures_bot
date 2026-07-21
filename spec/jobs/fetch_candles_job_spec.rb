@@ -9,7 +9,7 @@ RSpec.describe FetchCandlesJob, type: :job do
       tp.quote_currency = "USD"
       tp.status = "active"
       tp.enabled = true
-      tp.expiration_date = Date.new(2026, 6, 26)
+      tp.expiration_date = Date.current + 60
     end
   end
 
@@ -27,6 +27,27 @@ RSpec.describe FetchCandlesJob, type: :job do
     allow(mock_rest).to receive(:upsert_15m_candles_chunked)
     allow(mock_rest).to receive(:upsert_1h_candles_chunked)
     allow(Rails.logger).to receive(:info)
+  end
+
+  describe "expired contract auto-disable (issue #368)" do
+    it "disables contracts past expiration so nothing keeps targeting them" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      expired = Contract.find_or_create_by(product_id: "NOL-20JUL26-CDE") do |tp|
+        tp.base_currency = "OIL"
+        tp.quote_currency = "USD"
+        tp.status = "active"
+        tp.enabled = true
+        tp.expiration_date = Date.current - 1
+      end
+      btc_pair
+
+      described_class.perform_now(backfill_days: 1)
+
+      expect(expired.reload.enabled).to be false
+      expect(btc_pair.reload.enabled).to be true
+      expect(mock_rest).not_to have_received(:upsert_1h_candles).with(hash_including(product_id: "NOL-20JUL26-CDE"))
+    end
   end
 
   describe "deep backfill (issue #342)" do
@@ -68,7 +89,7 @@ RSpec.describe FetchCandlesJob, type: :job do
         tp.quote_currency = "USD"
         tp.status = "active"
         tp.enabled = true
-        tp.expiration_date = Date.new(2026, 6, 26)
+        tp.expiration_date = Date.current + 60
       end
 
       described_class.perform_now(backfill_days: 1, symbols: ["ET-26JUN26-CDE"])

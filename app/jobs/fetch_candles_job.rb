@@ -14,6 +14,13 @@ class FetchCandlesJob < ApplicationJob
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
 
+    # Expired contracts must not stay enabled (issue #368): subscriptions,
+    # backfill, and signal evaluation would keep targeting dead symbols.
+    Contract.enabled.where(expiration_date: ...Date.current).find_each do |expired|
+      expired.update!(enabled: false)
+      Rails.logger.warn("[Candles] Disabled expired contract #{expired.product_id} (expired #{expired.expiration_date})")
+    end
+
     scope = Contract.enabled
     scope = scope.where(product_id: symbols) if symbols.present?
 

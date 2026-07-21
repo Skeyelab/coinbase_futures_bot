@@ -36,7 +36,7 @@ class GenerateSignalsJob < ApplicationJob
   private
 
   def default_equity_usd
-    value = ENV["SIGNAL_EQUITY_USD"] || 10_000
+    value = Trading::SignalEquity.usd
     Float(value)
   rescue ArgumentError, TypeError
     0.0

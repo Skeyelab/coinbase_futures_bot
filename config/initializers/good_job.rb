@@ -49,7 +49,9 @@ Rails.application.configure do
     },
     # Day trading position management - run every 15 minutes during trading hours
     day_trading_management: {
-      cron: ENV.fetch("DAY_TRADING_MANAGEMENT_CRON", "*/15 9-16 * * 1-5"), # every 15 min, 9AM-4PM, Mon-Fri
+      # Crypto trades 24/7 (issue #366): positions opened nights/weekends need
+      # management too. Restrict via env for session-bound instruments.
+      cron: ENV.fetch("DAY_TRADING_MANAGEMENT_CRON", "*/15 * * * *"),
       class: "DayTradingPositionManagementJob"
     },
     # End of day position closure - run at market close (4:00 PM ET = 8:00 PM UTC)
@@ -64,7 +66,7 @@ Rails.application.configure do
     },
     # Health check - run every hour during trading hours
     health_check: {
-      cron: ENV.fetch("HEALTH_CHECK_CRON", "0 9-17 * * 1-5"), # every hour, 9AM-5PM, Mon-Fri
+      cron: ENV.fetch("HEALTH_CHECK_CRON", "0 * * * *"), # hourly, 24/7 (issue #366)
       class: "HealthCheckJob"
     },
     # Daily paper-trading summary to Slack (Stage-2 validation tracking)
