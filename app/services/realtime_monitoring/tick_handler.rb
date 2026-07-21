@@ -5,6 +5,7 @@ module RealtimeMonitoring
     DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS = 60
     DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS = 30
     MARKET_DATA_HEARTBEAT_INTERVAL_SECONDS = 5
+    CLOSE_TRIGGER_COOLDOWN_SECONDS = 60
 
     def initialize(logger: Rails.logger, contract_manager: nil, phased_limiter: nil)
       @logger = logger
@@ -128,7 +129,19 @@ module RealtimeMonitoring
       end
     end
 
-    def trigger_position_close(position, reason)
+    # Enqueue a close, debounced per position. A position that keeps meeting a
+    # close condition every tick (e.g. an overdue day-trade past the 6h limit)
+    # would otherwise enqueue a PositionCloseJob on every tick — ~85/min — flooding
+    # the queue until a worker drains it (361 piled up in a paper session). The
+    # in-memory cooldown (this handler is a single long-lived instance) re-triggers
+    # at most once per cooldown per position, which still provides a retry backstop
+    # if the position is somehow still open later.
+    def trigger_position_close(position, reason, now: Time.current)
+      @close_triggered_at ||= {}
+      last = @close_triggered_at[position.id]
+      return if last && now - last < CLOSE_TRIGGER_COOLDOWN_SECONDS
+
+      @close_triggered_at[position.id] = now
       PositionCloseJob.perform_later(
         position_id: position.id,
         reason: reason,

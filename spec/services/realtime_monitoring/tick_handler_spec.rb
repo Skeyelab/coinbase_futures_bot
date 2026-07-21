@@ -91,6 +91,37 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  describe "#trigger_position_close debounce" do
+    it "does not re-enqueue a close for the same position within the cooldown" do
+      position = create(:position)
+
+      expect(PositionCloseJob).to receive(:perform_later).once
+
+      handler.send(:trigger_position_close, position, "time_limit")
+      handler.send(:trigger_position_close, position, "time_limit")
+    end
+
+    it "re-enqueues once the cooldown has elapsed" do
+      position = create(:position)
+
+      expect(PositionCloseJob).to receive(:perform_later).twice
+
+      now = Time.current
+      handler.send(:trigger_position_close, position, "time_limit", now: now)
+      handler.send(:trigger_position_close, position, "time_limit", now: now + 61)
+    end
+
+    it "does not let one position's cooldown block another" do
+      a = create(:position)
+      b = create(:position)
+
+      expect(PositionCloseJob).to receive(:perform_later).twice
+
+      handler.send(:trigger_position_close, a, "time_limit")
+      handler.send(:trigger_position_close, b, "time_limit")
+    end
+  end
+
   describe "#check_position_alerts adverse-excursion tracking" do
     it "records each open position's max adverse excursion on the tick" do
       product_id = "NOL-19JUN26-CDE"
