@@ -55,6 +55,10 @@ module RealtimeMonitoring
 
     def check_position_alerts(product_id, price)
       positions_for_tick(product_id).find_each do |position|
+        # Record how far underwater this position went (MAE) before any exit
+        # check, so the excursion is captured even on the tick that closes it.
+        position.track_adverse_excursion!(price)
+
         # Dollar-PnL exit ($20-50 target + hard dollar stop) takes precedence for
         # day-trading positions; if it closes, skip the bps threshold checks.
         next if check_dollar_pnl_exit(position, price)
