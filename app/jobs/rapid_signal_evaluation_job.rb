@@ -10,21 +10,21 @@ class RapidSignalEvaluationJob < ApplicationJob
     @asset = asset
     @day_trading = day_trading.nil? ? Rails.application.config.default_day_trading : day_trading
 
+    if Trading::SymbolSuspension.suspended?(@product_id)
+      @logger.info("[RSE] #{@product_id} is suspended (#{Trading::SymbolSuspension.all.dig(@product_id, "reason")}) — skipping evaluation")
+      return
+    end
+
     @logger.debug("[RSE] Evaluating rapid signals for #{@product_id} at $#{@current_price}")
 
-    # Use multi-timeframe strategy with emphasis on shorter timeframes for day trading
-    strategy = Strategy::MultiTimeframeSignal.new(
-      ema_1h_short: 21,
-      ema_1h_long: 50,
-      ema_15m: 21,
-      ema_5m: 13,
-      ema_1m: 8,
-      min_1h_candles: 60,
-      min_15m_candles: 80,
+    # LIVE-configured strategy via the shared factory so calibrated per-symbol
+    # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
+    # silently bypassing calibration). Rapid-path overrides: shorter min-candle
+    # requirements for tick-driven evaluation, per-asset contract sizing.
+    strategy = Trading::StrategyFactory.multi_timeframe(
+      profile: TradingProfile.effective(symbol: @product_id),
       min_5m_candles: 60,
       min_1m_candles: 30,
-      tp_target: 0.004, # 40 bps for day trading
-      sl_target: 0.003, # 30 bps for day trading
       contract_size_usd: contract_size_for_asset(@asset),
       max_position_size: max_contracts_for_asset(@asset),
       min_position_size: 1

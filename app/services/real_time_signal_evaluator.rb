@@ -61,6 +61,12 @@ class RealTimeSignalEvaluator
   # Evaluate a specific trading pair for signals
   def evaluate_pair(contract)
     symbol = resolve_symbol(contract.product_id)
+
+    if Trading::SymbolSuspension.suspended?(symbol)
+      @logger.debug("[RTSE] Skip #{symbol}: suspended")
+      return {signals_created: 0, insufficient_data: 0, suspended: 1}
+    end
+
     equity_usd = ENV.fetch("SIGNAL_EQUITY_USD", "10000").to_f
     pair_stats = {signals_created: 0, insufficient_data: 0}
 
