@@ -240,6 +240,24 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       expect(result["success"]).to be true
     end
 
+    it "caps the close size at the actual open contracts so a close cannot flip or grow the position" do
+      # The Advanced Trade API has no reduce_only flag, so we enforce it app-side:
+      # a requested close larger than what's open is capped to the open size.
+      allow(service).to receive(:list_open_positions).and_return([
+        {"product_id" => "BIP-20DEC30-CDE", "number_of_contracts" => "2", "side" => "LONG"}
+      ])
+
+      expect(service).to receive(:build_order_body).with(hash_including(size: "2")).and_return({
+        "client_order_id" => "x", "product_id" => "BIP-20DEC30-CDE", "side" => "SELL",
+        "order_configuration" => {"market_market_ioc" => {"base_size" => "2"}}
+      })
+      mock_response = instance_double("Response", body: {"success" => true, "order_id" => "c"}.to_json)
+      conn = service.instance_variable_get(:@conn)
+      expect(conn).to receive(:post).and_return(mock_response)
+
+      service.close_position(product_id: "BIP-20DEC30-CDE", size: "5")
+    end
+
     it "builds correct order body for LONG position close (SELL order)" do
       allow(service).to receive(:list_open_positions).and_return([
         {"product_id" => "BIP-20DEC30-CDE",

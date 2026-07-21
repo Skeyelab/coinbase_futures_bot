@@ -136,15 +136,24 @@ module Trading
       TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
       raise "Authentication required" unless @authenticated || DryRun.active?
 
-      # If explicit size provided, still infer side from current position when possible,
-      # but avoid failing if positions cannot be fetched (e.g., in tests)
+      # If explicit size provided, infer the actual open size + side from the
+      # exchange. The Advanced Trade API has no reduce_only flag, so we enforce it
+      # app-side: cap the close at the open contracts so an oversized/mismatched
+      # request can never flip or grow the position instead of reducing it. If the
+      # open size can't be determined (e.g., in tests), fall back to the request.
       if size
-        pos_size = size.to_s
-        begin
-          _ignored_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
+        actual_size, pos_side = begin
+          infer_position(product_id: product_id, explicit_size: nil)
         rescue => e
-          @logger.debug("close_position: could not infer position side with explicit size: #{e.class}: #{e.message}")
-          pos_side = :buy
+          @logger.debug("close_position: could not infer open position: #{e.class}: #{e.message}")
+          [nil, :buy]
+        end
+
+        pos_size = if actual_size && actual_size.to_f > 0 && size.to_f > actual_size.to_f
+          @logger.warn("close_position: requested #{size} exceeds open #{actual_size} for #{product_id}; capping to open size (no reduce_only on Advanced Trade API)")
+          actual_size.to_s
+        else
+          size.to_s
         end
       else
         pos_size, pos_side = infer_position(product_id: product_id, explicit_size: size)
