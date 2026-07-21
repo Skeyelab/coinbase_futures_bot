@@ -1,3 +1,13 @@
+<% if @dry_run %>
+  <div style="padding: 10px; margin-bottom: 10px; background: #fff3cd; border: 1px solid #ffe08a; color: #664d03; font-weight: bold;">
+    🧪 DRY-RUN (PAPER) — showing simulated paper positions. Your real Coinbase account is not shown here and is not being traded.
+  </div>
+<% else %>
+  <div style="padding: 10px; margin-bottom: 10px; background: #f8d7da; border: 1px solid #f1aeb5; color: #842029; font-weight: bold;">
+    🔴 LIVE — showing your real Coinbase account positions.
+  </div>
+<% end %>
+
 <% if @notice_message.present? %>
   <div style="padding: 8px; margin-bottom: 10px; background: #eef7ff; border: 1px solid #b6daff; color: #084b83;">
     <%= @notice_message %>

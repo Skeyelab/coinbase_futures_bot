@@ -109,6 +109,34 @@ RSpec.describe PositionsController, type: :controller do
     end
   end
 
+  describe "GET #index in dry-run (paper) mode" do
+    before do
+      request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("admin:password123")
+      DryRun.enable!
+    end
+
+    it "shows paper positions from the DB, not the live Coinbase account" do
+      create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG", size: 2, entry_price: 100.0,
+        paper: true, status: "OPEN")
+      expect(positions_service).not_to receive(:list_open_positions)
+
+      get :index
+
+      expect(assigns(:dry_run)).to be(true)
+      row = assigns(:positions).first
+      expect(row).to include("product_id" => "BIT-29AUG25-CDE", "side" => "LONG")
+      expect(row["avg_entry_price"]).to eq(100.0)
+    end
+
+    it "excludes live (non-paper) positions" do
+      create(:position, product_id: "BIT-29AUG25-CDE", paper: false, status: "OPEN")
+
+      get :index
+
+      expect(assigns(:positions)).to eq([])
+    end
+  end
+
   describe "GET #edit" do
     before do
       request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("admin:password123")
