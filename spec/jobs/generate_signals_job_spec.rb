@@ -114,11 +114,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
       it "initializes strategy with correct parameters" do
         expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
-          ema_1h_short: 21,
-          ema_1h_long: 50,
-          ema_15m: 21,
-          min_1h_candles: 60,
-          min_15m_candles: 80
+          hash_including(ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21,
+            min_1h_candles: 60, min_15m_candles: 80)
         )
 
         job.perform
@@ -395,6 +392,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         create_sentiment_data(symbol: contract.product_id, z_score: 2.5, avg_score: 0.4)
 
         # Enable sentiment filtering
+        allow(ENV).to receive(:fetch).and_call_original
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
       end
@@ -404,11 +402,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
         # Verify strategy was called with correct parameters
         expect(Strategy::MultiTimeframeSignal).to have_received(:new).with(
-          ema_1h_short: 21,
-          ema_1h_long: 50,
-          ema_15m: 21,
-          min_1h_candles: 60,
-          min_15m_candles: 80
+          hash_including(ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21,
+            min_1h_candles: 60, min_15m_candles: 80)
         )
       end
 
@@ -445,6 +440,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         create_sentiment_data(symbol: contract.product_id, z_score: -2.5, avg_score: -0.4)
 
         # Enable sentiment filtering
+        allow(ENV).to receive(:fetch).and_call_original
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.0")
       end
@@ -587,6 +583,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     context "with sentiment filtering enabled" do
       before do
+        allow(ENV).to receive(:fetch).and_call_original
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.5")
       end
@@ -707,11 +704,8 @@ RSpec.describe GenerateSignalsJob, type: :job do
 
     it "integrates with multi-timeframe strategy configuration" do
       expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
-        ema_1h_short: 21,
-        ema_1h_long: 50,
-        ema_15m: 21,
-        min_1h_candles: 60,
-        min_15m_candles: 80
+        hash_including(ema_1h_short: 21, ema_1h_long: 50, ema_15m: 21,
+          min_1h_candles: 60, min_15m_candles: 80)
       )
 
       allow(mock_strategy).to receive(:signal).and_return(mock_signal)
@@ -902,6 +896,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         )
 
         # Configure realistic environment
+        allow(ENV).to receive(:fetch).and_call_original
         allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
         allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("1.2")
 

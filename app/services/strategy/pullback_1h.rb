@@ -3,7 +3,7 @@
 module Strategy
   class Pullback1h
     DEFAULTS = {
-      maker_fee: 0.0005,
+      fee_rate: nil, # resolved to CostModel.taker_fee_rate in initialize
       slippage: 0.0002,
       tp_margin: 0.001,
       tp_target: 0.006,
@@ -15,6 +15,7 @@ module Strategy
 
     def initialize(config = {})
       @config = DEFAULTS.merge(config)
+      @config[:fee_rate] ||= @config[:maker_fee] || CostModel.taker_fee_rate
     end
 
     # Given recent candles, return a potential order: { side:, price:, quantity:, tp:, sl: }
@@ -39,7 +40,7 @@ module Strategy
       return nil unless uptrend && pullback && volume_confirmation && momentum_confirmation
 
       entry = last.close.to_f
-      be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:maker_fee], slippage_rate: @config[:slippage])
+      be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate], slippage_rate: @config[:slippage])
       tp = [entry * (1.0 + @config[:tp_target]), be * (1.0 + @config[:tp_margin])].max
       sl = entry * (1.0 - @config[:sl_target])
 

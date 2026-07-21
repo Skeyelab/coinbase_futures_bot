@@ -95,6 +95,35 @@ RSpec.describe Backtest::Engine, type: :service do
       expect(engine.strategy).to be_a(Strategy::MultiTimeframeSignal)
       expect(engine.strategy.instance_variable_get(:@config)[:resolve_symbols]).to be(false)
     end
+
+    it "builds the default strategy with LIVE config, not class DEFAULTS (drift audit)" do
+      engine = described_class.new(symbol: "TEST-USD")
+      live = Rails.application.config.real_time_signals[:strategies]["MultiTimeframeSignal"]
+      expect(engine.strategy.instance_variable_get(:@config)[:ema_1h_short]).to eq(live[:ema_1h_short])
+      expect(engine.strategy.instance_variable_get(:@config)[:ema_1h_long]).to eq(live[:ema_1h_long])
+    end
+  end
+
+  describe "contract-size-aware units (drift audit: PnL was ~1000x inflated)" do
+    it "converts contract quantity to base units using the strategy's contract_size_usd" do
+      insert_step_candles(Array.new(10, 50_000.0) + (1..10).map { |i| 50_000.0 + i * 200 })
+
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          # 5 contracts at $100 notional each = $500 notional = 0.01 base units
+          {side: :long, price: 50_000.0, quantity: 5.0, tp: 51_000.0, sl: 49_000.0, confidence: 50.0}
+        end
+      end
+
+      engine = described_class.new(symbol: "TEST-USD", strategy: strategy,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0, contract_size_usd: 100.0)
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      trade = result.trades.first
+      # base qty = 5 * 100 / 50_000 = 0.01; TP at 51_000 -> pnl = 1_000 * 0.01 = $10
+      expect(trade[:quantity]).to be_within(1e-9).of(0.01)
+      expect(trade[:pnl]).to be_within(1e-6).of(10.0)
+    end
   end
 
   describe "integration with the live strategy" do

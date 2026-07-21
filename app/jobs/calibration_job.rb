@@ -60,7 +60,12 @@ class CalibrationJob < ApplicationJob
   end
 
   def evaluate_candidate(symbol, tp, sl, from, to)
-    strategy = Strategy::MultiTimeframeSignal.new(resolve_symbols: false, tp_target: tp, sl_target: sl)
+    # LIVE-configured strategy (same EMAs/min-candles the evaluator runs),
+    # baseline knobs from the symbol's effective profile, candidate tp/sl on top.
+    strategy = Trading::StrategyFactory.multi_timeframe(
+      profile: TradingProfile.effective(symbol: symbol),
+      tp_target: tp, sl_target: sl, resolve_symbols: false
+    )
     report = Backtest::WalkForward.new(symbol: symbol, strategy: strategy, step: @step)
       .run(from: from, to: to, train_span: @train_days.days, eval_span: @eval_days.days)
     aggregate = report[:aggregate]
@@ -69,11 +74,21 @@ class CalibrationJob < ApplicationJob
   end
 
   def persist_profile(symbol, best, candidates_evaluated)
+    # Copy the untuned risk knobs from what the symbol currently trades with;
+    # only tp/sl were calibrated. Without this, activation silently reset
+    # risk_fraction / position sizes / confidence to schema defaults.
+    baseline = TradingProfile.effective(symbol: symbol)
     profile = TradingProfile.create!(
       name: "calibrated #{symbol} #{Time.current.utc.iso8601}",
       symbol: symbol,
       tp_target: best[:tp_target],
       sl_target: best[:sl_target],
+      risk_fraction: baseline.risk_fraction,
+      max_position_size: baseline.max_position_size,
+      min_position_size: baseline.min_position_size,
+      min_confidence_threshold: baseline.min_confidence_threshold,
+      max_signals_per_hour: baseline.max_signals_per_hour,
+      deduplication_window: baseline.deduplication_window,
       calibrated_at: Time.current,
       description: "Auto-calibrated via walk-forward backtest (#{@objective})",
       metrics: {
