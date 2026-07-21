@@ -39,6 +39,13 @@ RSpec.describe Backtest::Result do
     expect(result.sharpe_like).to be_within(0.01).of(0.82)
   end
 
+  it "computes net expectancy and the cost gate (issue #353)" do
+    expect(result.expectancy).to be_within(1e-6).of(110.0 / 3)
+    expect(result.cost_gate_passed).to be true
+    expect(result.to_h[:expectancy]).to be_within(1e-6).of(110.0 / 3)
+    expect(result.to_h[:cost_gate_passed]).to be true
+  end
+
   it "surfaces round-trip costs relative to the average win (issue #353)" do
     expect(result.total_fees).to be_within(1e-9).of(27.0)
     expect(result.avg_win).to be_within(1e-9).of(80.0)
@@ -68,6 +75,8 @@ RSpec.describe Backtest::Result do
       expect(result.max_drawdown).to eq(0.0)
       expect(result.sharpe_like).to be_nil
       expect(result.cost_pct_of_avg_win).to be_nil
+      expect(result.expectancy).to be_nil
+      expect(result.cost_gate_passed).to be_nil
     end
   end
 end

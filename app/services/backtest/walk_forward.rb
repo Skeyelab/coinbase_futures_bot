@@ -38,11 +38,16 @@ module Backtest
     def aggregate(windows)
       metrics = windows.map { |w| w[:metrics] }
       win_rates = metrics.filter_map { |m| m[:win_rate] }
+      trade_count = metrics.sum { |m| m[:trade_count] }
+      total_pnl = metrics.sum { |m| m[:total_pnl] }
+      expectancy = trade_count.positive? ? total_pnl / trade_count : nil
       {
         window_count: windows.size,
-        trade_count: metrics.sum { |m| m[:trade_count] },
-        total_pnl: metrics.sum { |m| m[:total_pnl] },
+        trade_count: trade_count,
+        total_pnl: total_pnl,
         total_fees: metrics.sum { |m| m[:total_fees] },
+        expectancy: expectancy,
+        cost_gate_passed: expectancy.nil? ? nil : expectancy > 0,
         mean_win_rate: win_rates.empty? ? nil : win_rates.sum / win_rates.size,
         worst_window_drawdown: metrics.map { |m| m[:max_drawdown] }.max,
         profitable_windows: metrics.count { |m| m[:total_pnl] > 0 }

@@ -27,7 +27,7 @@ module Backtest
       @strategy = strategy || Strategy::MultiTimeframeSignal.new(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
       @starting_equity = starting_equity.to_f
-      @fee_rate = (fee_rate || ENV.fetch("BACKTEST_TAKER_FEE_RATE", "0.0015")).to_f
+      @fee_rate = (fee_rate || CostModel.taker_fee_rate).to_f
       @slippage = slippage.to_f
       @logger = logger
     end
