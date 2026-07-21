@@ -1,30 +1,17 @@
 require "rails_helper"
 
-# Acceptance for issue #297: live (MultiTimeframeSignal) and
-# backtest/calibration (Pullback1h) paths must compute identical indicator
-# values on identical input. Both are proven to route through the single
-# shared implementation in Signals::Indicators.
+# Acceptance for issue #297: every strategy path must compute indicator
+# values through the single shared implementation in Signals::Indicators.
+# (Pullback1h retired in #364 — MultiTimeframeSignal is the only strategy.)
 RSpec.describe "Strategy indicator parity", type: :service do
   it "no strategy class retains its own EMA implementation" do
-    [Strategy::MultiTimeframeSignal, Strategy::Pullback1h].each do |klass|
-      own_methods = klass.instance_methods(false) + klass.private_instance_methods(false)
-      expect(own_methods).not_to include(:ema), "#{klass} still defines a private #ema"
-    end
+    own_methods = Strategy::MultiTimeframeSignal.instance_methods(false) +
+      Strategy::MultiTimeframeSignal.private_instance_methods(false)
+    expect(own_methods).not_to include(:ema), "MultiTimeframeSignal still defines a private #ema"
   end
 
   describe "routing through Signals::Indicators" do
     before { allow(Signals::Indicators).to receive(:ema).and_call_original }
-
-    it "Pullback1h computes its EMAs via the shared module" do
-      stub_candle = Struct.new(:close, :low, :high, :volume, :timestamp)
-      closes = Array.new(60) { |i| 100.0 + i * 0.5 }
-      candles = closes.map { |c| stub_candle.new(c, c - 1.0, c + 1.0, 10.0, Time.current) }
-
-      Strategy::Pullback1h.new.signal(candles: candles, symbol: "DOGE-USD")
-
-      expect(Signals::Indicators).to have_received(:ema).with(closes, 12)
-      expect(Signals::Indicators).to have_received(:ema).with(closes, 50)
-    end
 
     it "MultiTimeframeSignal computes its EMAs via the shared module" do
       base_time = Time.parse("2025-08-27T12:00:00Z")

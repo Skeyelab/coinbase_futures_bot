@@ -11,11 +11,6 @@ RSpec.describe "Strategy fee defaults", type: :service do
     expect(config[:fee_rate]).to eq(CostModel.taker_fee_rate)
   end
 
-  it "Pullback1h prices break-even at taker costs by default" do
-    config = Strategy::Pullback1h.new.instance_variable_get(:@config)
-    expect(config[:fee_rate]).to eq(CostModel.taker_fee_rate)
-  end
-
   it "honors the legacy maker_fee override key" do
     config = Strategy::MultiTimeframeSignal.new(maker_fee: 0.0005).instance_variable_get(:@config)
     expect(config[:fee_rate]).to eq(0.0005)

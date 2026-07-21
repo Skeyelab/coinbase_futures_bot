@@ -159,4 +159,39 @@ RSpec.describe MarketAnalysisService do
       expect(scope_double).to have_received(:hourly)
     end
   end
+
+  describe "#calculate_macd (issue #369)" do
+    let(:service) { described_class.new(symbol: "BTC-USD") }
+
+    it "computes a real signal line (9-period EMA of the MACD series), not always 0" do
+      # Trending series: MACD is meaningfully nonzero and signal must lag it,
+      # not sit at 0 (the old bug: EMA of a 1-element array -> nil -> 0).
+      prices = Array.new(60) { |i| 100.0 + i * 2.0 }
+
+      result = service.send(:calculate_macd, prices)
+
+      expect(result[:macd]).not_to eq(0)
+      expect(result[:signal]).not_to eq(0)
+      expect(result[:histogram]).to be_within(1e-6).of(result[:macd] - result[:signal])
+      # In a steady uptrend the MACD series converges; signal tracks close to it
+      expect((result[:signal] - result[:macd]).abs).to be < result[:macd].abs
+    end
+
+    it "matches the shared-indicator math for the signal line" do
+      prices = Array.new(60) { |i| 100.0 + Math.sin(i * 0.25) * 8 + i * 0.5 }
+
+      macd_series = (26..prices.size).map do |n|
+        window = prices.first(n)
+        Signals::Indicators.ema(window, 12) - Signals::Indicators.ema(window, 26)
+      end
+      expected_signal = Signals::Indicators.ema(macd_series, 9)
+
+      result = service.send(:calculate_macd, prices)
+      expect(result[:signal]).to be_within(0.0001).of(expected_signal.round(4))
+    end
+
+    it "returns zeros only when there is insufficient data" do
+      expect(service.send(:calculate_macd, [1.0] * 10)).to eq({macd: 0, signal: 0, histogram: 0})
+    end
+  end
 end

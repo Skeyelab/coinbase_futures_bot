@@ -35,6 +35,27 @@ RSpec.describe Backtest::WalkForward, type: :service do
     end
   end
 
+  it "reports per-window data coverage so data-starved windows are visible (issue #378)" do
+    # 5m candles across the whole span, 1m candles only in the last 2 days:
+    # early windows must show one_minute coverage ~0, late ones > 0.
+    (0...(9 * 288)).step(12).each do |i|
+      Candle.create!(symbol: "TEST-USD", timeframe: "5m", timestamp: from + i * 5.minutes,
+        open: 100, high: 101, low: 99, close: 100, volume: 1)
+    end
+    (0...(2 * 1440)).step(30).each do |i|
+      Candle.create!(symbol: "TEST-USD", timeframe: "1m", timestamp: to - 2.days + i.minutes,
+        open: 100, high: 101, low: 99, close: 100, volume: 1)
+    end
+
+    report = described_class.new(symbol: "TEST-USD", strategy: never_signals)
+      .run(from: from, to: to, train_span: 3.days, eval_span: 2.days)
+
+    coverages = report[:windows].map { |w| w[:data_coverage][:one_minute] }
+    expect(coverages.first).to eq(0.0)
+    expect(coverages.last).to be > 0.0
+    expect(report[:windows].first[:data_coverage][:five_minute]).to be > 0.0
+  end
+
   it "aggregates across windows" do
     report = described_class.new(symbol: "TEST-USD", strategy: never_signals)
       .run(from: from, to: to, train_span: 3.days, eval_span: 2.days)

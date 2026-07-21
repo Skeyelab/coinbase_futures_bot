@@ -25,7 +25,10 @@ module Backtest
           train_to: train_to.iso8601,
           eval_from: train_to.iso8601,
           eval_to: eval_to.iso8601,
-          metrics: result.to_h.except(:trades)
+          metrics: result.to_h.except(:trades),
+          # Issue #378: a zero-trade window with low 1m coverage is
+          # data-starved, not signal-quiet — make that visible.
+          data_coverage: data_coverage(train_to, eval_to)
         }
         cursor += eval_span
       end
@@ -34,6 +37,24 @@ module Backtest
     end
 
     private
+
+    # Fraction of the eval window covered by stored candles per timeframe
+    # (candles present / candles expected for a fully-covered window).
+    def data_coverage(from, to)
+      symbol = @engine_options.fetch(:symbol)
+      span_minutes = ((to - from) / 60).to_f
+      {
+        one_minute: coverage_fraction(symbol, "1m", from, to, span_minutes),
+        five_minute: coverage_fraction(symbol, "5m", from, to, span_minutes / 5)
+      }
+    end
+
+    def coverage_fraction(symbol, timeframe, from, to, expected)
+      return 0.0 unless expected.positive?
+
+      count = Candle.where(symbol: symbol, timeframe: timeframe, timestamp: from..to).count
+      [(count / expected).round(4), 1.0].min
+    end
 
     def aggregate(windows)
       metrics = windows.map { |w| w[:metrics] }

@@ -67,7 +67,7 @@ RSpec.describe "market_data rake tasks", type: :task do
 
   it "runs parameterized backfill for the given products (issue #342)" do
     expect(FetchCandlesJob).to receive(:perform_now)
-      .with(backfill_days: 60, symbols: ["ETH-USD", "NOL-19AUG26-CDE"])
+      .with(backfill_days: 60, symbols: ["ETH-USD", "NOL-19AUG26-CDE"], max_1m_days: nil)
 
     expect do
       Rake::Task["market_data:backfill"].invoke("60", "ETH-USD NOL-19AUG26-CDE")
@@ -75,7 +75,7 @@ RSpec.describe "market_data rake tasks", type: :task do
   end
 
   it "backfills all enabled contracts when no products are given" do
-    expect(FetchCandlesJob).to receive(:perform_now).with(backfill_days: 30, symbols: nil)
+    expect(FetchCandlesJob).to receive(:perform_now).with(backfill_days: 30, symbols: nil, max_1m_days: nil)
 
     expect do
       Rake::Task["market_data:backfill"].invoke(nil, nil)
