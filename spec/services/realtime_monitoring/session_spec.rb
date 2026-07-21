@@ -42,6 +42,14 @@ RSpec.describe RealtimeMonitoring::Session do
       expect(result[:success]).to be(false)
       expect(result[:error]).to match(/already running/i)
     end
+
+    it "enforces the paper-default execution gate before starting (issue #352)" do
+      allow(Trading::ExecutionSafety).to receive(:enforce_paper_default!).and_return(:forced_paper)
+
+      session.start!
+
+      expect(Trading::ExecutionSafety).to have_received(:enforce_paper_default!)
+    end
   end
 
   describe "#stop!" do

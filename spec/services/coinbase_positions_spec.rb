@@ -627,7 +627,7 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
   end
 
-  describe "live mode (dry-run off)" do
+  describe "live mode (dry-run off, LIVE_TRADING_CONFIRMED=1)" do
     it "sends the order to Coinbase" do
       allow(service).to receive(:get_current_market_price).and_return(50_000.0)
       fake_response = instance_double(Faraday::Response, body: {"success" => true, "order_id" => "live-1"}.to_json)
@@ -635,7 +635,24 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
 
       expect(service).to receive(:authenticated_post)
 
-      service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+      ClimateControl.modify(LIVE_TRADING_CONFIRMED: "1") do
+        service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+      end
+    end
+  end
+
+  describe "paper-default gate at the order chokepoint (issue #352)" do
+    it "forces dry-run and simulates when live trading is not confirmed, even with dry-run off" do
+      DryRun.disable!
+      allow(service).to receive(:get_current_market_price).and_return(50_000.0)
+      expect(service).not_to receive(:authenticated_post)
+
+      result = ClimateControl.modify(LIVE_TRADING_CONFIRMED: nil) do
+        service.open_position(product_id: "BIT-29AUG25-CDE", side: :buy, size: 1, type: :market)
+      end
+
+      expect(result["dry_run"]).to be true
+      expect(DryRun.active?).to be true
     end
   end
 end

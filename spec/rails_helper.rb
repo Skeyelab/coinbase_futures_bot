@@ -3,6 +3,10 @@
 # SimpleCov removed entirely
 
 ENV["RAILS_ENV"] ||= "test"
+# Test baseline: live-trading confirmed, so specs exercising live order flow
+# work unchanged. The paper-default gate (issue #352) is tested explicitly by
+# unsetting this via ClimateControl in execution_safety / chokepoint specs.
+ENV["LIVE_TRADING_CONFIRMED"] = "1"
 require File.expand_path("../config/environment", __dir__)
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require "rspec/rails"
