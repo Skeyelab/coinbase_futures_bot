@@ -68,6 +68,20 @@ module Backtest
       cost_per_round_trip / avg_win * 100.0
     end
 
+    # Mean net PnL per trade (trade pnl already includes fees + slippage).
+    def expectancy
+      return nil if trades.empty?
+
+      total_pnl / trades.size
+    end
+
+    # Issue #353 hard gate: positive expectancy NET of costs.
+    def cost_gate_passed
+      return nil if expectancy.nil?
+
+      expectancy > 0
+    end
+
     # Largest peak-to-trough decline on the equity curve, as a fraction of
     # the running peak.
     def max_drawdown
@@ -115,6 +129,8 @@ module Backtest
         avg_loss: avg_loss,
         cost_per_round_trip: cost_per_round_trip,
         cost_pct_of_avg_win: cost_pct_of_avg_win,
+        expectancy: expectancy,
+        cost_gate_passed: cost_gate_passed,
         max_drawdown: max_drawdown,
         sharpe_like: sharpe_like,
         trades: trades.map { |t| t.merge(entered_at: t[:entered_at]&.utc&.iso8601, exited_at: t[:exited_at]&.utc&.iso8601) }

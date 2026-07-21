@@ -42,7 +42,9 @@ RSpec.describe Backtest::WalkForward, type: :service do
     expect(report[:aggregate]).to include(
       window_count: 3,
       trade_count: 0,
-      total_pnl: 0.0
+      total_pnl: 0.0,
+      expectancy: nil,
+      cost_gate_passed: nil
     )
     expect { JSON.generate(report) }.not_to raise_error
   end
