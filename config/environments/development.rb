@@ -17,15 +17,18 @@ Rails.application.configure do
   # Enable server timing.
   config.server_timing = true
 
-  # Enable/disable caching. By default caching is disabled.
-  # Run rails dev:cache to toggle caching.
+  # Low-level cache store (Rails.cache): use an in-process memory store even when
+  # HTTP/fragment caching is off. The trading bot's rate limiters (PhasedRateLimiter,
+  # tick-driven signal/basis/arbitrage throttles) rely on Rails.cache; with the
+  # Rails default :null_store they silently no-op and enqueue a job on nearly every
+  # tick (~6.5k jobs/5min observed on the always-on box). memory_store is per-process
+  # and cleared on restart, so it's safe for dev. Controller/view caching still
+  # follows the rails dev:cache toggle below.
+  config.cache_store = :memory_store
   if Rails.root.join("tmp/caching-dev.txt").exist?
-    config.cache_store = :memory_store
     config.public_file_server.headers = {"Cache-Control" => "public, max-age=#{2.days.to_i}"}
   else
     config.action_controller.perform_caching = false
-
-    config.cache_store = :null_store
   end
 
   # Don't care if the mailer can't send.
