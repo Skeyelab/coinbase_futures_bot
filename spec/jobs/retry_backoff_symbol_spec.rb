@@ -42,7 +42,7 @@ RSpec.describe "ActiveJob retry backoff symbols" do
 
     VALID_BACKOFF_SYMBOLS.each do |sym|
       job = ContractExpiryMonitoringJob.new
-      delay = determine.bind(job).call(seconds_or_duration_or_algorithm: sym, executions: 1)
+      delay = determine.bind_call(job, seconds_or_duration_or_algorithm: sym, executions: 1)
       expect(delay).to be_a(Numeric), "#{sym} did not resolve to a numeric delay"
     end
   end
@@ -52,7 +52,7 @@ RSpec.describe "ActiveJob retry backoff symbols" do
     job = ContractExpiryMonitoringJob.new
 
     expect {
-      determine.bind(job).call(seconds_or_duration_or_algorithm: :exponentially_longer, executions: 1)
+      determine.bind_call(job, seconds_or_duration_or_algorithm: :exponentially_longer, executions: 1)
     }.to raise_error(RuntimeError, /Couldn't determine a delay/)
   end
 end
