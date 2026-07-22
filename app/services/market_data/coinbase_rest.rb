@@ -123,6 +123,51 @@ module MarketData
     end
 
     # Fetch candles in chunks to avoid API limits
+    # Streaming chunked backfill: fetch one chunk, PERSIST it, move on.
+    # The old accumulate-then-write pattern held every chunk in memory, gave
+    # zero progress visibility (row counts flat until the end), and lost the
+    # entire run if a late chunk raised. Now a failed chunk loses only
+    # itself, and re-runs are cheap because upserts dedupe.
+    def stream_upsert_candles(product_id:, timeframe:, start_time:, end_time:, chunk_span:, granularity:)
+      total = 0
+      current_start = start_time
+
+      while current_start < end_time
+        current_end = [current_start + chunk_span, end_time].min
+        begin
+          chunk = fetch_candles(
+            product_id: product_id,
+            start_iso8601: current_start.iso8601,
+            end_iso8601: current_end.iso8601,
+            granularity: granularity
+          )
+          persist_candles(product_id, timeframe, chunk)
+          total += chunk.count
+          sleep(0.1) if chunk.any? # rate-limit courtesy
+        rescue => e
+          Rails.logger.error("Failed #{timeframe} candles chunk for #{product_id} #{current_start}..#{current_end}: #{e.message}")
+        end
+        current_start = current_end
+      end
+
+      Rails.logger.info("Streamed #{total} #{timeframe} candles for #{product_id}")
+      total
+    end
+
+    def persist_candles(product_id, timeframe, data)
+      data.each do |arr|
+        next unless arr.is_a?(Array) && arr.length >= 6
+
+        ts = Time.at(arr[0]).utc
+        low, high, open, close, volume = arr[1..5]
+        Candle.upsert({
+          symbol: product_id, timeframe: timeframe, timestamp: ts,
+          open: open, high: high, low: low, close: close, volume: volume,
+          created_at: Time.now.utc, updated_at: Time.now.utc
+        }, unique_by: :index_candles_on_symbol_and_timeframe_and_timestamp)
+      end
+    end
+
     def fetch_candles_in_chunks(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 30)
       all_data = []
       current_start = start_time
@@ -238,51 +283,9 @@ module MarketData
 
     # Upsert 15-minute candles using chunked fetching for large date ranges
     def upsert_15m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 3)
-      all_data = []
-      current_start = start_time
-
-      while current_start < end_time
-        current_end = [current_start + chunk_days.days, end_time].min
-        begin
-          chunk_data = fetch_candles(
-            product_id: product_id,
-            start_iso8601: current_start.iso8601,
-            end_iso8601: current_end.iso8601,
-            granularity: 900
-          )
-          all_data.concat(chunk_data)
-          current_start = current_end
-          # Small delay to avoid rate limiting
-          sleep(0.1) if chunk_data.any?
-        rescue => e
-          Rails.logger.error("Failed to fetch 15m candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
-          current_start = current_end
-        end
-      end
-
-      # Process all the collected data
-      Rails.logger.info("Processing #{all_data.count} total 15m candles in chunks")
-
-      all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
-        next unless arr.is_a?(Array) && arr.length >= 6
-
-        ts = Time.at(arr[0]).utc
-        low, high, open, close, volume = arr[1..5]
-
-        Candle.create_or_find_by(
-          symbol: product_id,
-          timeframe: "15m",
-          timestamp: ts
-        ) do |candle|
-          candle.open = open
-          candle.high = high
-          candle.low = low
-          candle.close = close
-          candle.volume = volume
-        end
-      end
-
-      Rails.logger.info("Completed upserting #{all_data.count} 15m candles in chunks for #{product_id}")
+      stream_upsert_candles(product_id: product_id, timeframe: "15m",
+        start_time: start_time, end_time: end_time,
+        chunk_span: chunk_days.days, granularity: 900)
     end
 
     # Upsert 30-minute candles
@@ -378,51 +381,9 @@ module MarketData
 
     # Upsert 5-minute candles using chunked fetching for large date ranges
     def upsert_5m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 24)
-      all_data = []
-      current_start = start_time
-
-      while current_start < end_time
-        current_end = [current_start + chunk_hours.hours, end_time].min
-        begin
-          chunk_data = fetch_candles(
-            product_id: product_id,
-            start_iso8601: current_start.iso8601,
-            end_iso8601: current_end.iso8601,
-            granularity: 300
-          )
-          all_data.concat(chunk_data)
-          current_start = current_end
-          # Small delay to avoid rate limiting
-          sleep(0.1) if chunk_data.any?
-        rescue => e
-          Rails.logger.error("Failed to fetch 5m candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
-          current_start = current_end
-        end
-      end
-
-      # Process all the collected data
-      Rails.logger.info("Processing #{all_data.count} total 5m candles in chunks")
-
-      all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
-        next unless arr.is_a?(Array) && arr.length >= 6
-
-        ts = Time.at(arr[0]).utc
-        low, high, open, close, volume = arr[1..5]
-
-        Candle.create_or_find_by(
-          symbol: product_id,
-          timeframe: "5m",
-          timestamp: ts
-        ) do |candle|
-          candle.open = open
-          candle.high = high
-          candle.low = low
-          candle.close = close
-          candle.volume = volume
-        end
-      end
-
-      Rails.logger.info("Completed upserting #{all_data.count} 5m candles in chunks for #{product_id}")
+      stream_upsert_candles(product_id: product_id, timeframe: "5m",
+        start_time: start_time, end_time: end_time,
+        chunk_span: chunk_hours.hours, granularity: 300)
     end
 
     # Upsert 1-minute candles
@@ -472,75 +433,18 @@ module MarketData
 
     # Upsert 1-minute candles using chunked fetching for large date ranges
     def upsert_1m_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_hours: 5)
-      all_data = []
-      current_start = start_time
-
-      while current_start < end_time
-        current_end = [current_start + chunk_hours.hours, end_time].min
-        begin
-          chunk_data = fetch_candles(
-            product_id: product_id,
-            start_iso8601: current_start.iso8601,
-            end_iso8601: current_end.iso8601,
-            granularity: 60
-          )
-          all_data.concat(chunk_data)
-          current_start = current_end
-          # Small delay to avoid rate limiting
-          sleep(0.1) if chunk_data.any?
-        rescue => e
-          Rails.logger.error("Failed to fetch 1m candles chunk for #{product_id} from #{current_start} to #{current_end}: #{e.message}")
-          current_start = current_end
-        end
-      end
-
-      # Process all the collected data
-      Rails.logger.info("Processing #{all_data.count} total 1m candles in chunks")
-
-      all_data.sort_by { |arr| arr[0].to_i }.each do |arr|
-        next unless arr.is_a?(Array) && arr.length >= 6
-
-        ts = Time.at(arr[0]).utc
-        low, high, open, close, volume = arr[1..5]
-
-        Candle.create_or_find_by(
-          symbol: product_id,
-          timeframe: "1m",
-          timestamp: ts
-        ) do |candle|
-          candle.open = open
-          candle.high = high
-          candle.low = low
-          candle.close = close
-          candle.volume = volume
-        end
-      end
-
-      Rails.logger.info("Completed upserting #{all_data.count} 1m candles in chunks for #{product_id}")
+      stream_upsert_candles(product_id: product_id, timeframe: "1m",
+        start_time: start_time, end_time: end_time,
+        chunk_span: chunk_hours.hours, granularity: 60)
     end
 
     # Upsert candles using chunked fetching for large date ranges
     # chunk_days must keep each request under the ~350-candle API cap
     # (14 days = 336 hourly candles); 30-day chunks got truncated (issue #368).
     def upsert_1h_candles_chunked(product_id:, start_time:, end_time: Time.now.utc, chunk_days: 14)
-      data = fetch_candles_in_chunks(product_id: product_id, start_time: start_time, end_time: end_time, chunk_days: chunk_days)
-      # API returns most recent first; normalize oldest→newest
-      data.sort_by { |arr| arr[0].to_i }.each do |arr|
-        ts = Time.at(arr[0]).utc
-        low, high, open, close, volume = arr[1..5]
-        Candle.upsert({
-          symbol: product_id,
-          timeframe: "1h",
-          timestamp: ts,
-          open: open,
-          high: high,
-          low: low,
-          close: close,
-          volume: volume,
-          created_at: Time.now.utc,
-          updated_at: Time.now.utc
-        }, unique_by: :index_candles_on_symbol_and_timeframe_and_timestamp)
-      end
+      stream_upsert_candles(product_id: product_id, timeframe: "1h",
+        start_time: start_time, end_time: end_time,
+        chunk_span: chunk_days.days, granularity: 3600)
     end
 
     private
