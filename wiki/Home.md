@@ -28,7 +28,7 @@ Welcome to the documentation wiki for the **Coinbase Futures Bot**. This repo is
 
 - **Runtime**: Ruby `3.2.4`, Rails `8.1`, PostgreSQL, GoodJob, RSpec (~2,400 examples), StandardRB, Brakeman
 - **Trading model**: both day-trading and swing-trading positions exist
-- **Contract model**: repo is centered on expiring Coinbase futures contracts, not perpetuals
+- **Contract model**: live trading today runs on expiring dated Coinbase futures contracts (BIT/ET); perpetual futures (BIP first) are the adopted primary venue per ADR 0002 but not yet live — new candidate symbols stay suspended for data collection until they pass calibration and cost gates
 - **Primary operator surfaces**: `bin/futuresbot`, `bin/rake`, `/positions`, `/signals/*`, `/health`, `/up`
 
 ## Operator Entry Points
@@ -60,4 +60,4 @@ Welcome to the documentation wiki for the **Coinbase Futures Bot**. This repo is
 
 ---
 
-**Last Updated**: 2026-06-08
+**Last Updated**: 2026-07-22

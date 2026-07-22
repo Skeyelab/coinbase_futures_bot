@@ -104,6 +104,8 @@ def perform(product_ids)
 end
 ```
 
+> **Note**: the in-code comment about perpetual contracts predates [ADR 0002](adr/0002-perpetual-futures-as-primary-venue.md) — perpetuals (BIP first) are now the adopted primary venue, pending venue migration (#390, which includes generalizing the realtime subscription catalog beyond BIT/ET/NOL).
+
 ### Sentiment Analysis Jobs
 
 #### FetchCryptopanicJob

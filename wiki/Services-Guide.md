@@ -227,7 +227,7 @@ if signal
 end
 ```
 
-Fees are priced at taker (`CostModel.taker_fee_rate`, default 15 bps/side) — momentum entries cross the spread. The shared indicator math (SMA-seeded EMA) lives in `Signals::Indicators`.
+Fees are priced at taker (`CostModel.taker_fee_rate`, default 15 bps/side) — momentum entries cross the spread. The 15 bps default approximates dated CDE contracts, where the $0.15/contract per-side minimum floor binds for small nano notionals; US perps run ~3 bps taker / 0% maker (ADR 0002), so override the rate when modeling perps. The shared indicator math (SMA-seeded EMA) lives in `Signals::Indicators`.
 
 ### 4. Execution Services (1 service)
 

@@ -133,7 +133,7 @@ FORCE=true bin/rake realtime:cancel_all
 
 - Use paper-trading configuration until you trust strategy behavior.
 - Treat `.env.example` as shape only, not real credentials.
-- The repo centers on expiring futures contracts; use real contract/product ids where required.
+- Live trading today centers on expiring dated futures contracts (BIT/ET); perpetuals are the adopted primary venue per ADR 0002 but not yet live. Use real contract/product ids where required.
 
 ## Watch Positions
 

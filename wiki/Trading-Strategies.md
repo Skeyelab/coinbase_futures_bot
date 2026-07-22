@@ -4,6 +4,8 @@
 
 The coinbase_futures_bot implements sophisticated **multi-timeframe trading strategies** optimized for **day trading** operations. The system combines technical analysis, sentiment analysis, and risk management to generate high-confidence trading signals with rapid entry/exit cycles.
 
+**Venue note (ADR 0002)**: the strategy currently runs live/paper on dated BIT/ET contracts. Perpetual futures (BIP, nano BTC perp, first) are the adopted primary venue going forward, but perp trading is not live yet — every new symbol, perp or dated, stays suspended (`Trading::SymbolSuspension`) for data collection until it passes its own walk-forward calibration and net-of-costs gate. Edge measured on dated BTC does not transfer.
+
 ## Strategy Architecture
 
 ```

@@ -4,7 +4,7 @@
 
 The coinbase_futures_bot has one production strategy: `Strategy::MultiTimeframeSignal`. It is always built via `Trading::StrategyFactory`, which layers initializer config and the effective `TradingProfile` (global or per-symbol, including nightly-calibrated profiles) on top of the strategy defaults. The strategy combines technical analysis, risk management, and sentiment filtering to generate trading signals.
 
-**Important**: This system exclusively trades current month futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`) and does not support perpetual contracts. All strategies include automatic contract resolution and rollover management.
+**Important**: Live trading today runs on current-month dated futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`), with automatic contract resolution and rollover management. Per [ADR 0002](adr/0002-perpetual-futures-as-primary-venue.md), perpetual futures (BIP, the nano BTC perp, first) are the adopted primary venue going forward — but perp trading is not live yet: each new symbol must pass its own walk-forward calibration and net-of-costs gate before enablement, and stays suspended (`Trading::SymbolSuspension`) for data collection until then. Edge measured on dated BTC does not transfer.
 
 ## Strategy Architecture
 
