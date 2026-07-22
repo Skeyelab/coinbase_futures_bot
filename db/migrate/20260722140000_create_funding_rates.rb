@@ -14,7 +14,10 @@ class CreateFundingRates < ActiveRecord::Migration[8.1]
       # converges on the value actually applied at settlement.
       t.datetime :funding_time, null: false
       # Signed per-interval fraction (longs pay positive, shorts collect).
-      # 0.000021 = 2.1 bps/hour on BIP; scale 12 keeps sub-0.01bps resolution.
+      # Units are a FRACTION, not bps: 0.000014 = 0.14 bps/hour, the rate BIP
+      # advertised on 2026-07-22. Scale 12 keeps sub-0.01bps resolution.
+      # Getting this wrong by 10x is an easy mistake and would materially
+      # mis-model funding cost, so: divide by 0.0001 to reach bps.
       t.decimal :funding_rate, precision: 20, scale: 12, null: false
       t.integer :funding_interval_seconds, null: false
       t.decimal :open_interest, precision: 30, scale: 10
