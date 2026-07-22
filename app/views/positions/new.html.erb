@@ -1,64 +1,56 @@
-<div>
+<div class="wrap">
   <h2>Open New Position</h2>
 
   <% if params[:notice].present? %>
-    <div style="padding: 8px; margin-bottom: 10px; background: #fff4f4; border: 1px solid #ffd3d3; color: #8a1f1f;">
-      <%= params[:notice] %>
-    </div>
+    <div class="flash flash--error" role="alert"><%= params[:notice] %></div>
   <% end %>
 
-  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+  <section class="card form-card">
     <p>
-      <strong>Product:</strong> <%= @position["product_id"] %><br/>
+      <strong>Product:</strong> <span class="mono"><%= @position["product_id"] %></span><br/>
       <small>This will open a new futures position using the specified parameters.</small>
     </p>
-  </div>
+  </section>
 
   <h3>Position Details</h3>
-  <form action="<%= positions_path %>" method="post" style="max-width: 500px;">
-    <input type="hidden" name="product_id" value="<%= @position["product_id"] %>" />
+  <section class="card form-card">
+    <form action="<%= positions_path %>" method="post">
+      <input type="hidden" name="product_id" value="<%= @position["product_id"] %>" />
 
-    <div style="margin-bottom: 15px;">
-      <label for="side" style="display: block; margin-bottom: 5px; font-weight: bold;">Side:</label>
-      <select id="side" name="side" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
-        <option value="">Select side...</option>
-        <option value="long">LONG (Buy)</option>
-        <option value="short">SHORT (Sell)</option>
-      </select>
-      <small style="color: #666;">LONG = bullish, SHORT = bearish</small>
-    </div>
+      <div class="field">
+        <label for="side">Side:</label>
+        <select id="side" name="side" required>
+          <option value="">Select side...</option>
+          <option value="long">LONG (Buy)</option>
+          <option value="short">SHORT (Sell)</option>
+        </select>
+        <small>LONG = bullish, SHORT = bearish</small>
+      </div>
 
-    <div style="margin-bottom: 15px;">
-      <label for="size" style="display: block; margin-bottom: 5px; font-weight: bold;">Size (contracts):</label>
-      <input id="size" name="size" type="number" step="0.01" min="0.01" required
-             placeholder="e.g. 1.0" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" />
-      <small style="color: #666;">Number of futures contracts to trade</small>
-    </div>
+      <div class="field">
+        <label for="size">Size (contracts):</label>
+        <input id="size" name="size" type="number" step="0.01" min="0.01" required placeholder="e.g. 1.0" />
+        <small>Number of futures contracts to trade</small>
+      </div>
 
-    <div style="margin-bottom: 15px;">
-      <label for="order_type" style="display: block; margin-bottom: 5px; font-weight: bold;">Order Type:</label>
-      <select id="order_type" name="order_type" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
-        <option value="market">Market Order (immediate execution)</option>
-        <option value="limit">Limit Order (specify price)</option>
-      </select>
-    </div>
+      <div class="field">
+        <label for="order_type">Order Type:</label>
+        <select id="order_type" name="order_type" required>
+          <option value="market">Market Order (immediate execution)</option>
+          <option value="limit">Limit Order (specify price)</option>
+        </select>
+      </div>
 
-    <div id="price_field" style="margin-bottom: 15px; display: none;">
-      <label for="price" style="display: block; margin-bottom: 5px; font-weight: bold;">Limit Price (USD):</label>
-      <input id="price" name="price" type="number" step="0.01" min="0.01"
-             placeholder="e.g. 50000.00" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" />
-      <small style="color: #666;">Required for limit orders</small>
-    </div>
+      <div class="field" id="price_field" style="display: none;">
+        <label for="price">Limit Price (USD):</label>
+        <input id="price" name="price" type="number" step="0.01" min="0.01" placeholder="e.g. 50000.00" />
+        <small>Required for limit orders</small>
+      </div>
 
-    <div style="margin-top: 20px;">
-      <button type="submit" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
-        Open Position
-      </button>
-      <a class="button secondary" href="<%= positions_path %>" style="margin-left: 10px; padding: 12px 24px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">
-        Cancel
-      </a>
-    </div>
-  </form>
+      <button type="submit" class="btn btn--success btn--lg">Open Position</button>
+      <a class="btn btn--secondary btn--lg" href="<%= positions_path %>">Cancel</a>
+    </form>
+  </section>
 
   <script>
     document.getElementById('order_type').addEventListener('change', function() {
@@ -76,7 +68,7 @@
     });
   </script>
 
-  <p style="margin-top: 1rem;">
-    <a class="button secondary" href="<%= positions_path %>">← Back to Positions</a>
+  <p>
+    <a class="btn btn--secondary" href="<%= positions_path %>">← Back to Positions</a>
   </p>
 </div>
