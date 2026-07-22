@@ -133,6 +133,11 @@ systemctl --user list-timers 'cfb-backup*'
 **Always restore into a scratch database first.** Never `pg_restore` over a live
 one to "check something".
 
+> **Verified end-to-end on 2026-07-22.** A tier-1 snapshot restored into a
+> scratch database matched live exactly — `funding_rates` 56/56, `positions`
+> 3/3. The first attempt *failed* (wrong `restic dump` argument), which is the
+> entire argument for exercising this rather than assuming it.
+
 ```sh
 # Load the repo credentials from Doppler for an ad-hoc restic session
 export RESTIC_REPOSITORY=$(doppler secrets get RESTIC_REPOSITORY_HERMES \
@@ -140,8 +145,15 @@ export RESTIC_REPOSITORY=$(doppler secrets get RESTIC_REPOSITORY_HERMES \
 export RESTIC_PASSWORD=$(doppler secrets get RESTIC_PASSWORD_HERMES \
   --project coinbase-futures-bot --config dev --plain)
 
-restic snapshots --tag tier1                       # pick a snapshot id
-restic dump <snapshot-id> latest > /tmp/restore.dump
+SNAP=$(restic snapshots --tag tier1 --latest 1 --json \
+  | grep -o '"short_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+# Dump the SPECIFIC file path, not "/" — restic emits a tar archive when asked
+# for a directory, and pg_restore fails with "could not find header for file
+# toc.dat in tar archive". Verified the hard way on 2026-07-22.
+FILE=$(restic ls "$SNAP" --json | grep -o '"path":"[^"]*"' | tail -1 | cut -d'"' -f4)
+
+restic dump "$SNAP" "$FILE" > /tmp/restore.dump
 
 docker exec cfb-postgres createdb -U postgres cfb_restore_check
 docker cp /tmp/restore.dump cfb-postgres:/tmp/restore.dump
