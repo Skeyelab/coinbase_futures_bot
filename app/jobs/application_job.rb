@@ -1,6 +1,11 @@
 class ApplicationJob < ActiveJob::Base
-  # Automatically retry jobs that encountered a deadlock
-  retry_on ActiveRecord::Deadlocked, wait: :exponentially_longer, attempts: 3
+  # Automatically retry jobs that encountered a deadlock.
+  #
+  # :polynomially_longer, NOT :exponentially_longer — the latter was renamed in
+  # Rails 7.1 and REMOVED in Rails 8 (this app is on 8.1). Passing it makes
+  # ActiveJob raise "Couldn't determine a delay" while handling the original
+  # error, so the retry machinery itself becomes the failure.
+  retry_on ActiveRecord::Deadlocked, wait: :polynomially_longer, attempts: 3
 
   # Most jobs are safe to ignore if the underlying records are no longer available
   discard_on ActiveJob::DeserializationError

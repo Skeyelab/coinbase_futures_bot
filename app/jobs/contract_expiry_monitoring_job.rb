@@ -6,8 +6,15 @@ class ContractExpiryMonitoringJob < ApplicationJob
 
   queue_as :critical  # High priority for expiry management
 
-  # Retry configuration for critical expiry monitoring
-  retry_on StandardError, wait: :exponentially_longer, attempts: 3
+  # Retry configuration for critical expiry monitoring.
+  #
+  # :polynomially_longer, NOT :exponentially_longer — removed in Rails 8 (see
+  # ApplicationJob). Combined with `retry_on StandardError` it was catastrophic
+  # rather than merely broken: the "Couldn't determine a delay" RuntimeError
+  # raised while handling a failure is ITSELF a StandardError, so this rule
+  # re-caught its own error and span at ~10 executions/second — 896k failed
+  # executions in 24h, on the `critical` queue (max_threads 2).
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform(buffer_days: nil, emergency_check: false)
     logger = Rails.logger
