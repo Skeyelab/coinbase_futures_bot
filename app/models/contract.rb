@@ -7,6 +7,25 @@ class Contract < ApplicationRecord
 
   validates :product_id, presence: true, uniqueness: true
 
+  # Coinbase product-ID prefix => the asset the contract actually tracks.
+  # Dated contracts (BIT/ET/NOL) and CDE perps (BIP/XPP) share one product-ID
+  # shape — `PREFIX-DDMMMYY-CDE` — so only the prefix distinguishes them, and
+  # perps carry a 2030 dummy expiry rather than a real one.
+  #
+  # This map is the single source of truth for which products we ingest at all:
+  # MarketData::CoinbaseRest#upsert_products builds its filter from these keys,
+  # so adding a perp here starts candle collection for it. Enabling a symbol for
+  # TRADING is a separate decision — see Trading::SymbolSuspension and ADR 0002's
+  # no-evidence-inheritance rule: a new perp collects data while suspended until
+  # it earns enablement on its own walk-forward.
+  PREFIX_TO_BASE_CURRENCY = {
+    "BIT" => "BTC",   # dated nano BTC
+    "ET" => "ETH",    # dated nano ETH
+    "NOL" => "OIL",   # dated nano oil
+    "BIP" => "BTC",   # BTC perp — ADR 0002 home instrument
+    "XPP" => "XRP"    # XRP perp — ADR 0002 designated second seat
+  }.freeze
+
   scope :enabled, -> { where(enabled: true) }
   scope :current_month, -> { where("expiration_date >= ? AND expiration_date <= ?", Date.current.beginning_of_month, Date.current.end_of_month) }
   scope :upcoming_month, -> { where("expiration_date >= ? AND expiration_date <= ?", Date.current.next_month.beginning_of_month, Date.current.next_month.end_of_month) }
@@ -28,12 +47,11 @@ class Contract < ApplicationRecord
       return nil
     end
 
-    base_currency = case prefix
-    when "BIT" then "BTC"
-    when "ET" then "ETH"
-    when "NOL" then "OIL"
-    else prefix
-    end
+    # Unmapped prefixes fall back to the prefix itself. That is deliberately
+    # lossy but visible: an unmapped perp would resolve underlying_asset to
+    # e.g. "BIP" and silently get no spot reference feed, which is why
+    # PREFIX_TO_BASE_CURRENCY gates ingestion in the first place.
+    base_currency = PREFIX_TO_BASE_CURRENCY.fetch(prefix, prefix)
 
     {
       base_currency: base_currency,

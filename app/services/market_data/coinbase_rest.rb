@@ -73,7 +73,7 @@ module MarketData
 
     def upsert_products
       products = list_products
-      futures_products = products.select { |p| p["product_id"] =~ /^(BIT|ET|NOL)-/ && !p["trading_disabled"] }
+      futures_products = products.select { |p| ingestible_product_id?(p["product_id"]) && !p["trading_disabled"] }
 
       futures_products.each do |p|
         contract_info = build_contract_info(p)
@@ -452,6 +452,17 @@ module MarketData
     # Build contract info hash from API product object.
     # Prefers future_product_details.contract_expiry (RFC3339) over regex date parsing
     # from product_id. Falls back to Contract.parse_contract_info for legacy/unknown shapes.
+    # Which products become Contract rows, derived from Contract's prefix map so
+    # the list lives in exactly one place. Longest prefix first: "ET" would
+    # otherwise shadow a future "ETP", and the trailing hyphen is what keeps
+    # "ETP-20DEC30-CDE" from matching the dated "ET-" prefix today.
+    def ingestible_product_id?(product_id)
+      return false if product_id.blank?
+
+      prefixes = Contract::PREFIX_TO_BASE_CURRENCY.keys.sort_by { |p| -p.length }
+      product_id.match?(/\A(#{prefixes.join("|")})-/)
+    end
+
     def build_contract_info(product)
       parsed = Contract.parse_contract_info(product["product_id"])
       return nil unless parsed

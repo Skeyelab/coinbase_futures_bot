@@ -10,6 +10,17 @@ class GenerateSignalsJob < ApplicationJob
     strat = Trading::StrategyFactory.multi_timeframe
 
     Contract.enabled.find_each do |pair|
+      # Suspension must gate THIS job too (issue #411). RealTimeSignalEvaluator
+      # and RapidSignalEvaluationJob already check it; this one did not, so a
+      # suspended symbol still reached execute_order below whenever the bot was
+      # out of paper mode. That breaks ADR 0002's no-evidence-inheritance rule,
+      # which depends on a symbol collecting candles while barred from trading —
+      # exactly the state BIP/XPP are being added in.
+      if Trading::SymbolSuspension.suspended?(pair.product_id)
+        puts "[Signal] #{pair.product_id} suspended — skipping"
+        next
+      end
+
       puts "Analyzing #{pair.product_id}..."
       order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
       if order

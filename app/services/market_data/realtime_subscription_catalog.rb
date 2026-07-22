@@ -2,7 +2,15 @@
 
 module MarketData
   class RealtimeSubscriptionCatalog
-    KNOWN_SPOT_PRODUCT_IDS = %w[BTC-USD ETH-USD].freeze
+    # Spot markets that actually exist on Coinbase and can back a futures
+    # contract with a reference feed. Deliberately NOT derived from
+    # Contract::PREFIX_TO_BASE_CURRENCY: that map says what we ingest, this says
+    # what spot feeds are real. They diverge — OIL has no spot pair, so a
+    # derived list would subscribe to a nonexistent OIL-USD.
+    #
+    # A contract whose underlying is missing here degrades silently to no spot
+    # feed, so adding a perp (ADR 0002) means adding its underlying here too.
+    KNOWN_SPOT_PRODUCT_IDS = %w[BTC-USD ETH-USD XRP-USD].freeze
 
     def self.futures_contract?(product_id)
       product_id.to_s.end_with?("-CDE")
