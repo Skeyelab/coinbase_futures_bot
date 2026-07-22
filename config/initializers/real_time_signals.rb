@@ -39,6 +39,13 @@ Rails.application.config.real_time_signals = {
     }
   },
 
+  # Protections layer (issue #397, ADR 0003). Strategy-agnostic entry guards.
+  protections: {
+    # CooldownPeriod: block re-entry on a symbol for this many seconds after any
+    # exit. Per-symbol overrides may be resolved from a calibrated TradingProfile.
+    cooldown_seconds: ENV.fetch("PROTECTION_COOLDOWN_SECONDS", "300").to_i
+  },
+
   # API settings
   api_key: ENV["SIGNALS_API_KEY"],
   cors_origins: ENV.fetch("SIGNALS_CORS_ORIGINS", "*").split(","),
