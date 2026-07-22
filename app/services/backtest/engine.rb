@@ -22,13 +22,19 @@ module Backtest
     attr_reader :strategy
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
-      fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, logger: Rails.logger)
+      fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
+      logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
       @starting_equity = starting_equity.to_f
       @fee_rate = (fee_rate || CostModel.taker_fee_rate).to_f
       @slippage = slippage.to_f
+      # Protections (issue #397, ADR 0003) are evaluated inside the backtest on the
+      # simulated clock against a run-local in-memory store, so backtest metrics
+      # reflect the same cooldown/guard behavior as live without touching live state.
+      @protection_cooldown_seconds =
+        protection_cooldown_seconds || Trading::Protections::CooldownPeriod.default_cooldown_seconds
       # Signals size in CONTRACTS; the simulator prices in base units. Convert
       # via the strategy's own $-per-contract model or the PnL/fees are
       # inflated ~(price / contract_size_usd)x — ~1000x for BTC.
@@ -42,11 +48,12 @@ module Backtest
       equity_curve = [@starting_equity]
       entered_at = {}
       exited_at = {}
+      protection_store = Trading::ProtectionLock::MemoryStore.new
 
       step_candles(from, to).each do |candle|
-        maybe_enter(sim, candle, entered_at)
+        maybe_enter(sim, candle, entered_at, protection_store)
         sim.on_candle(candle)
-        stamp_exits(sim, candle, exited_at)
+        stamp_exits(sim, candle, exited_at, protection_store)
         equity_curve << sim.equity_usd
       end
 
@@ -62,11 +69,16 @@ module Backtest
     end
 
     # One position at a time: only ask the strategy while flat.
-    def maybe_enter(sim, candle, entered_at)
+    def maybe_enter(sim, candle, entered_at, protection_store)
       return if position_active?(sim)
 
       sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: candle.timestamp)
       return unless sig && sig[:quantity].to_f > 0
+
+      # Protections parity: a symbol/side under an active lock produces no entry,
+      # evaluated on the simulated clock against the run-local store.
+      return if Trading::Protections.blocked?(symbol: @symbol, side: sig[:side].to_s,
+        now: candle.timestamp, store: protection_store)
 
       base_qty = contracts_to_base_units(sig[:quantity], sig[:price])
       return unless base_qty > 0
@@ -94,9 +106,17 @@ module Backtest
       end
     end
 
-    def stamp_exits(sim, candle, exited_at)
+    def stamp_exits(sim, candle, exited_at, protection_store)
       sim.orders.values.each do |o|
-        exited_at[o.id] ||= candle.timestamp if o.status == :closed
+        next unless o.status == :closed
+        next if exited_at.key?(o.id) # already stamped; only act on the new exit
+
+        exited_at[o.id] = candle.timestamp
+        # Protections parity: a completed exit starts a cooldown on the simulated
+        # clock, mirroring PositionLifecycle#close in live trading.
+        Trading::Protections::CooldownPeriod.record_exit(symbol: @symbol,
+          cooldown_seconds: @protection_cooldown_seconds, now: candle.timestamp,
+          store: protection_store)
       end
     end
 

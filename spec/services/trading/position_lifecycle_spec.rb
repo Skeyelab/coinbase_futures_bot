@@ -38,6 +38,17 @@ RSpec.describe Trading::PositionLifecycle do
         result = lifecycle.close(position, reason: "Day trading closure")
         expect(result.fallback).to be false
       end
+
+      # Issue #397 (ADR 0003): a successful exit starts a CooldownPeriod so the
+      # bot does not immediately re-enter the symbol it just left.
+      it "starts a protection cooldown on the symbol" do
+        lifecycle.close(position, reason: "Day trading closure")
+
+        expect(Trading::Protections.blocked?(symbol: position.product_id, side: "long")).to be true
+        expect(Trading::Protections.blocked?(symbol: position.product_id, side: "short")).to be true
+      ensure
+        Trading::ProtectionLock.clear!
+      end
     end
 
     # A failed exchange close must NOT be reported as success and must NOT mark
@@ -62,6 +73,15 @@ RSpec.describe Trading::PositionLifecycle do
       it "logs an error" do
         expect(logger).to receive(:error).with(/close failed/i)
         lifecycle.close(position, reason: "Day trading closure")
+      end
+
+      # No exit happened (position stays OPEN), so no cooldown should start.
+      it "does not start a protection cooldown on a failed close" do
+        lifecycle.close(position, reason: "Day trading closure")
+
+        expect(Trading::Protections.blocked?(symbol: position.product_id, side: "long")).to be false
+      ensure
+        Trading::ProtectionLock.clear!
       end
     end
 

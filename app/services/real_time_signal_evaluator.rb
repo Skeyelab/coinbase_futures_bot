@@ -133,6 +133,13 @@ class RealTimeSignalEvaluator
     return {signals_created: 0, insufficient_data: 0} unless signal
     return {signals_created: 0, insufficient_data: 0} unless valid_signal?(signal)
 
+    # Protections layer (issue #397, ADR 0003): a symbol/side under an active
+    # protection lock (cooldown, stoploss guard, drawdown halt) produces no entry.
+    if Trading::Protections.blocked?(symbol: symbol, side: signal[:side])
+      @logger.debug("[RTSE] Skip #{strategy_name} #{symbol} #{signal[:side]}: protected (#{Trading::Protections.block_reason(symbol: symbol, side: signal[:side])})")
+      return {signals_created: 0, insufficient_data: 0, protected: 1}
+    end
+
     created = create_signal_alert(strategy_name, symbol, signal)
     {signals_created: created ? 1 : 0, insufficient_data: 0}
   rescue => e

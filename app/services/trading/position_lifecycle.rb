@@ -20,6 +20,10 @@ module Trading
       if api_success?(api_result)
         position.force_close!(current_price, reason)
         @logger.info("Closed position #{position.id} via API at #{current_price}: #{reason}")
+        # Protections layer (issue #397, ADR 0003): starting a cooldown here — the
+        # single funnel every day/swing/dollar/trailing exit passes through —
+        # blocks immediate re-entry on the symbol just exited.
+        Trading::Protections::CooldownPeriod.record_exit(symbol: position.product_id)
         Result.new(success: true, close_price: current_price, reason: reason, fallback: false)
       else
         # Do NOT mark the DB position CLOSED here. The exchange close failed, so

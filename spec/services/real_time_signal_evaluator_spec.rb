@@ -63,6 +63,49 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
     end
   end
 
+  describe "protections layer (issue #397, ADR 0003)" do
+    let(:contract) { instance_double(Contract, product_id: "BIT-29AUG25-CDE") }
+    let(:valid_signal) do
+      {side: "long", price: 100.0, confidence: 90.0, sl: 99.0, tp: 101.0, quantity: 5}
+    end
+
+    before do
+      allow(evaluator).to receive(:resolve_symbol).and_return("BIT-29AUG25-CDE")
+      allow(evaluator).to receive(:has_sufficient_data?).and_return(true)
+      create(:trading_profile, :active, name: "global")
+      allow_any_instance_of(Strategy::MultiTimeframeSignal).to receive(:signal).and_return(valid_signal)
+    end
+
+    after { Trading::ProtectionLock.clear! }
+
+    it "creates a signal when no protection lock is active" do
+      expect { evaluator.evaluate_pair(contract) }.to change(SignalAlert, :count).by(1)
+    end
+
+    it "does not create a signal when the symbol/side is blocked by a protection lock" do
+      Trading::Protections::CooldownPeriod.record_exit(symbol: "BIT-29AUG25-CDE")
+
+      expect { evaluator.evaluate_pair(contract) }.not_to change(SignalAlert, :count)
+    end
+
+    it "still allows the opposite side when only one side is locked" do
+      Trading::ProtectionLock.add(scope: "symbol", symbol: "BIT-29AUG25-CDE", side: "short",
+        source: "StoplossGuard", expires_at: 10.minutes.from_now)
+
+      expect { evaluator.evaluate_pair(contract) }.to change(SignalAlert, :count).by(1)
+    end
+
+    # Regression: the dedup guard read @deduplication_window (an Integer column,
+    # default 300) as `.ago`, raising NoMethodError on every create attempt —
+    # swallowed by create_signal_alert's rescue, so RTSE silently created zero
+    # signals in production. The only prior spec stubbed duplicate_signal?.
+    it "creates the signal through the real dedup guard without raising on an integer window" do
+      expect(evaluator.send(:duplicate_signal?, "MultiTimeframeSignal", "BIT-29AUG25-CDE", valid_signal))
+        .to be(false)
+      expect { evaluator.evaluate_pair(contract) }.to change(SignalAlert, :count).by(1)
+    end
+  end
+
   describe "#initialize" do
     it "initializes with provided logger" do
       expect(evaluator.logger).to eq(logger)
