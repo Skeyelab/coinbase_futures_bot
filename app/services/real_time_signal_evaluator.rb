@@ -219,7 +219,7 @@ class RealTimeSignalEvaluator
       side: SignalAlert.sides_for_duplicate_match(signal[:side]),
       signal_type: "entry",
       alert_status: "active"
-    ).where("alert_timestamp >= ?", @deduplication_window.ago)
+    ).where("alert_timestamp >= ?", @deduplication_window.seconds.ago)
       .where("confidence >= ?", signal[:confidence].to_f - 10) # Allow 10% confidence difference
       .exists?
   end
