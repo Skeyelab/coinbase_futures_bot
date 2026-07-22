@@ -185,9 +185,11 @@ RSpec.describe "Positions", type: :request do
 
       get "/positions/BIP-20DEC30-CDE/edit", headers: @auth_header
 
-      expect(response.body).to include("background: #f8f9fa")
-      expect(response.body).to include("color: #28a745")
-      expect(response.body).to include("background: #dc3545")
+      expect(response.body).to include('class="card"')          # details card
+      expect(response.body).to include("side--long")             # side coloring (LONG fixture)
+      expect(response.body).to include("pnl--pos")               # positive P&L coloring
+      expect(response.body).to include("card--danger")           # close section accent
+      expect(response.body).to include("btn--danger")            # Submit Close button
     end
   end
 
