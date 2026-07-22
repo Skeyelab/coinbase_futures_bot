@@ -8,6 +8,21 @@ Rails.application.configure do
   config.good_job.max_threads = ENV.fetch("GOOD_JOB_MAX_THREADS", 3).to_i
   config.good_job.poll_interval = ENV.fetch("GOOD_JOB_POLL_INTERVAL", 5).to_i
 
+  # Retention for preserved job records (issue #418).
+  #
+  # preserve_job_records = true keeps finished executions for observability, but
+  # nothing was ever pruning them. The #416/#417 retry loop turned that into
+  # 964,803 rows / 3.4 GB in a single day -- 6.6x the candles table, on a disk
+  # at 71%. Unbounded retention meant one misbehaving job could fill the volume.
+  #
+  # A rolling 7-day window keeps enough history to debug a bad night while
+  # bounding worst case. Cleanup runs hourly rather than per-job so a burst
+  # cannot amplify itself into cleanup churn.
+  config.good_job.cleanup_preserved_jobs_before_seconds_ago =
+    ENV.fetch("GOOD_JOB_RETENTION_SECONDS", 7.days.to_i).to_i
+  config.good_job.cleanup_interval_seconds =
+    ENV.fetch("GOOD_JOB_CLEANUP_INTERVAL_SECONDS", 1.hour.to_i).to_i
+
   config.good_job.cron = {
     candles_1h: {
       cron: ENV.fetch("CANDLES_CRON", "5 * * * *"), # at minute 5 each hour
