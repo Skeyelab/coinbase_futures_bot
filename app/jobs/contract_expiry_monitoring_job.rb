@@ -16,7 +16,19 @@ class ContractExpiryMonitoringJob < ApplicationJob
   # executions in 24h, on the `critical` queue (max_threads 2).
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
-  def perform(buffer_days: nil, emergency_check: false)
+  # Accepts a positional options Hash as well as keywords.
+  #
+  # Keywords alone do not survive the trip through GoodJob cron + ActiveJob
+  # serialization: cron `args` are splatted positionally and arguments are
+  # round-tripped through JSON, so a keyword call arrives as a positional Hash.
+  # Declaring keywords only meant `emergency_expiry_check` raised ArgumentError
+  # on every fire (see #416/#417) -- and because it raised inside a critical
+  # safety job, the failure was masked rather than obvious.
+  def perform(options = {}, **kwargs)
+    opts = normalize_options(options).merge(kwargs)
+    buffer_days = opts[:buffer_days]
+    emergency_check = opts.fetch(:emergency_check, false)
+
     logger = Rails.logger
     logger.info("Starting contract expiry monitoring job (emergency: #{emergency_check})")
     result = Trading::PositionManagement::ContractExpiryMonitoringWorkflow.new(logger: logger).call(
@@ -36,5 +48,24 @@ class ContractExpiryMonitoringJob < ApplicationJob
     )
 
     raise # Re-raise to trigger retry mechanism
+  end
+
+  private
+
+  # Tolerates every shape this job has actually been called with:
+  #   {emergency_check: true}          keywords / a plain Hash
+  #   {"emergency_check" => true}      after a JSON round-trip
+  #   [[:emergency_check, true]]       what `Array(hash)` produces — the exact
+  #                                    shape GoodJob built from `args: {..}`,
+  #                                    and the cause of the original failure
+  def normalize_options(options)
+    case options
+    when Hash then options.symbolize_keys
+    when Array then options.to_h.symbolize_keys
+    else {}
+    end
+  rescue TypeError, ArgumentError
+    Rails.logger.warn("[ContractExpiryMonitoringJob] Unrecognized options #{options.inspect}; using defaults")
+    {}
   end
 end
