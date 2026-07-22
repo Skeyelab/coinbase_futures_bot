@@ -1,0 +1,14 @@
+[Unit]
+Description=Coinbase Futures Bot - realtime WS + trading loop (paper)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/coinbase_futures_bot
+ExecStart=/bin/bash -lc "cd %h/coinbase_futures_bot && exec env INLINE=1 bundle exec rails real_time:start"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

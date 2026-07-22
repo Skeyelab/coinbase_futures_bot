@@ -1,0 +1,15 @@
+[Unit]
+Description=Coinbase Futures Bot - signal evaluation runner (RealTimeSignalJob loop -> SignalAlerts + eval heartbeat)
+# Needs market data; cfb-realtime provides the WS candle feed this loop reads.
+After=network-online.target cfb-realtime.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/coinbase_futures_bot
+ExecStart=/bin/bash -lc "cd %h/coinbase_futures_bot && exec bundle exec rails realtime:signal_job"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
