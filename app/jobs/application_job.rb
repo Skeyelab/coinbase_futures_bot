@@ -54,7 +54,11 @@ class ApplicationJob < ActiveJob::Base
   end
 
   # Add breadcrumb when job starts
-  def perform(*args)
+  # Keywords must be forwarded explicitly. With `perform(*args)` alone, `super`
+  # collapses a keyword call into a positional Hash, so any subclass declaring
+  # keyword parameters raises ArgumentError — and this wrapper sits in front of
+  # EVERY job in the app.
+  def perform(*args, **kwargs)
     SentryHelper.add_breadcrumb(
       message: "Job started",
       category: "job",
@@ -62,7 +66,8 @@ class ApplicationJob < ActiveJob::Base
       data: {
         job_class: self.class.name,
         job_id: job_id,
-        arguments: args
+        arguments: args,
+        keyword_arguments: kwargs
       }
     )
 
