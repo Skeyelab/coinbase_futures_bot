@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_21_215137) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_22_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -83,6 +83,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_21_215137) do
     t.index ["expiration_date"], name: "index_contracts_on_expiration_date"
     t.index ["product_id"], name: "index_contracts_on_product_id", unique: true
     t.index ["underlying_id"], name: "index_contracts_on_underlying_id"
+  end
+
+  create_table "funding_rates", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "funding_interval_seconds", null: false
+    t.decimal "funding_rate", precision: 20, scale: 12, null: false
+    t.datetime "funding_time", null: false
+    t.datetime "observed_at", null: false
+    t.decimal "open_interest", precision: 30, scale: 10
+    t.string "product_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id", "funding_time"], name: "index_funding_rates_on_product_id_and_funding_time", unique: true
   end
 
   create_table "good_job_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
