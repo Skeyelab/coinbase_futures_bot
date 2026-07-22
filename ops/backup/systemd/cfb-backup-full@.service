@@ -5,7 +5,9 @@ OnFailure=cfb-backup-alert@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=%h/coinbase_futures_bot/ops/backup/cfb-backup.sh full %i
+# Secrets are injected by Doppler rather than read from disk, so the
+# unrecoverable RESTIC_PASSWORD does not live only on the box it protects.
+ExecStart=/usr/bin/doppler run --project coinbase-futures-bot --config dev -- %h/coinbase_futures_bot/ops/backup/cfb-backup.sh full %i
 Nice=10
 IOSchedulingClass=idle
 # Full dump + prune + read-verify over WAN; candles make this the long one.

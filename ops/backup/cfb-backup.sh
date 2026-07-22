@@ -34,19 +34,38 @@ if [[ "$MODE" != "tier1" && "$MODE" != "full" ]] || [[ -z "$DEST" ]]; then
   exit 64
 fi
 
-CONFIG_DIR="${CFB_BACKUP_CONFIG_DIR:-$HOME/.config/cfb-backup}"
-CONFIG="$CONFIG_DIR/$DEST.env"
-if [[ ! -r "$CONFIG" ]]; then
-  echo "FATAL: no config for destination '$DEST' at $CONFIG" >&2
-  exit 78
-fi
-set -a
-# shellcheck disable=SC1090  # path is a runtime-chosen destination config
-source "$CONFIG"
-set +a
+# Secrets come from Doppler, injected by `doppler run` in the systemd unit.
+# Per-destination names (RESTIC_PASSWORD_HERMES, ...) keep multiple repos in one
+# Doppler config, and are mapped onto the plain names restic expects.
+#
+# The RESTIC_PASSWORD is unrecoverable by design: losing it makes the repository
+# permanently unreadable. Doppler is what stops that from being one `rm` on a
+# single box -- the secret must not live only where it is used.
+DEST_UPPER="$(tr '[:lower:]-' '[:upper:]_' <<<"$DEST")"
+repo_var="RESTIC_REPOSITORY_${DEST_UPPER}"
+pass_var="RESTIC_PASSWORD_${DEST_UPPER}"
 
-: "${RESTIC_REPOSITORY:?not set in $CONFIG}"
-: "${RESTIC_PASSWORD:?not set in $CONFIG}"
+if [[ -n "${!repo_var:-}" && -n "${!pass_var:-}" ]]; then
+  export RESTIC_REPOSITORY="${!repo_var}"
+  export RESTIC_PASSWORD="${!pass_var}"
+else
+  # Fallback: plaintext env file. Supports running without Doppler (recovery on
+  # a fresh box, where fetching secrets may be the thing that is broken).
+  CONFIG_DIR="${CFB_BACKUP_CONFIG_DIR:-$HOME/.config/cfb-backup}"
+  CONFIG="$CONFIG_DIR/$DEST.env"
+  if [[ ! -r "$CONFIG" ]]; then
+    echo "FATAL: no secrets for '$DEST'. Expected ${repo_var}/${pass_var} in the" >&2
+    echo "       environment (via doppler run), or a config file at $CONFIG" >&2
+    exit 78
+  fi
+  set -a
+  # shellcheck disable=SC1090  # path is a runtime-chosen destination config
+  source "$CONFIG"
+  set +a
+fi
+
+: "${RESTIC_REPOSITORY:?unresolved for destination '$DEST'}"
+: "${RESTIC_PASSWORD:?unresolved for destination '$DEST'}"
 
 PG_CONTAINER="${PG_CONTAINER:-cfb-postgres}"
 PG_USER="${PG_USER:-postgres}"

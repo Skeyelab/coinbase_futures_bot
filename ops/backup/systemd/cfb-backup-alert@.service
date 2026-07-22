@@ -3,4 +3,5 @@ Description=Report failed CFB backup unit %i to Sentry (issue #414)
 
 [Service]
 Type=oneshot
-ExecStart=%h/coinbase_futures_bot/ops/backup/cfb-backup-alert.sh %i
+# Needs SENTRY_DSN, which also lives in Doppler.
+ExecStart=/usr/bin/doppler run --project coinbase-futures-bot --config dev -- %h/coinbase_futures_bot/ops/backup/cfb-backup-alert.sh %i
