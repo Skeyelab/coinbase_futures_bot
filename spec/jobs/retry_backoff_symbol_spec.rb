@@ -18,7 +18,7 @@ require "rails_helper"
 # the failure is invisible until the worst moment.
 RSpec.describe "ActiveJob retry backoff symbols" do
   # Symbols ActiveJob 8 actually understands.
-  VALID_BACKOFF_SYMBOLS = %i[polynomially_longer].freeze
+  let(:valid_backoff_symbols) { %i[polynomially_longer] }
 
   it "does not use any backoff symbol removed in Rails 8, anywhere in app/jobs" do
     offenders = Dir[Rails.root.join("app/jobs/**/*.rb")].filter_map do |path|
@@ -40,7 +40,7 @@ RSpec.describe "ActiveJob retry backoff symbols" do
     # rather than merely 'not the removed one'.
     determine = ActiveJob::Exceptions.instance_method(:determine_delay)
 
-    VALID_BACKOFF_SYMBOLS.each do |sym|
+    valid_backoff_symbols.each do |sym|
       job = ContractExpiryMonitoringJob.new
       delay = determine.bind_call(job, seconds_or_duration_or_algorithm: sym, executions: 1)
       expect(delay).to be_a(Numeric), "#{sym} did not resolve to a numeric delay"
