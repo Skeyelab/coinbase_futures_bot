@@ -1,0 +1,15 @@
+[Unit]
+Description=Hourly CFB tier-1 backup -> %i (issue #414)
+
+[Timer]
+Unit=cfb-backup-tier1@%i.service
+# At :05, deliberately clear of the funding snapshot cron (:15/:30/:45/:55) so a
+# backup never overlaps the write it most needs to capture.
+OnCalendar=*-*-* *:05:00
+# Fire on boot if the box was down when a run was due — a missed window is the
+# exact thing this defends against.
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

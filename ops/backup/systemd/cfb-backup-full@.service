@@ -1,0 +1,12 @@
+[Unit]
+Description=CFB backup — full database + prune + verify -> %i (issue #414)
+Documentation=https://github.com/Skeyelab/coinbase_futures_bot/issues/414
+OnFailure=cfb-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/coinbase_futures_bot/ops/backup/cfb-backup.sh full %i
+Nice=10
+IOSchedulingClass=idle
+# Full dump + prune + read-verify over WAN; candles make this the long one.
+TimeoutStartSec=4h

@@ -1,0 +1,6 @@
+[Unit]
+Description=Report failed CFB backup unit %i to Sentry (issue #414)
+
+[Service]
+Type=oneshot
+ExecStart=%h/coinbase_futures_bot/ops/backup/cfb-backup-alert.sh %i

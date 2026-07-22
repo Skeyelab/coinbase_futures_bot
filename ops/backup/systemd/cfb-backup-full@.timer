@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly CFB full backup -> %i (issue #414)
+
+[Timer]
+Unit=cfb-backup-full@%i.service
+# 03:20 UTC — after the 02:00 calibration and 02:30 circuit-breaker crons.
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
