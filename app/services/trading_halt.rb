@@ -86,12 +86,28 @@ class TradingHalt
   def halt!(reason: nil)
     write_state(halted: true, reason: reason.to_s.presence)
     @logger.warn("[TradingHalt] Trading HALTED#{": #{reason}" if reason.present?}")
+
+    # PostHog: Track trading halt
+    PostHog.capture(
+      distinct_id: "system",
+      event: "trading_halted",
+      properties: {reason: reason.to_s.presence}
+    )
+
     status
   end
 
   def resume!
     write_state(halted: false, reason: nil)
     @logger.info("[TradingHalt] Trading RESUMED")
+
+    # PostHog: Track trading resume
+    PostHog.capture(
+      distinct_id: "system",
+      event: "trading_resumed",
+      properties: {}
+    )
+
     status
   end
 

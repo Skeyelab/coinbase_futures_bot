@@ -17,6 +17,13 @@ class PositionImportController < ActionController::Base
     @import_service = PositionImportService.new
     @result = @import_service.import_positions_from_coinbase
 
+    # PostHog: Track position import
+    PostHog.capture(
+      distinct_id: "system",
+      event: "position_import_completed",
+      properties: {mode: "import", imported: @result[:imported], updated: @result[:updated]}
+    )
+
     redirect_to position_import_index_path,
       notice: "Import complete! #{@result[:imported]} imported, #{@result[:updated]} updated"
   rescue => e
@@ -26,6 +33,13 @@ class PositionImportController < ActionController::Base
   def replace
     @import_service = PositionImportService.new
     @result = @import_service.import_and_replace
+
+    # PostHog: Track position replacement import
+    PostHog.capture(
+      distinct_id: "system",
+      event: "position_import_completed",
+      properties: {mode: "replace", cleared: @result[:cleared], imported: @result[:imported]}
+    )
 
     redirect_to position_import_index_path,
       notice: "Replacement complete! Cleared #{@result[:cleared]}, imported #{@result[:imported]}"

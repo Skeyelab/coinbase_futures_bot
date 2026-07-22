@@ -20,9 +20,38 @@ class PositionCloseJob < ApplicationJob
     if result.success?
       @logger.info("[PCJ] Successfully closed position #{position_id}: #{@reason}")
       send_closure_alert
+
+      # PostHog: Track successful position closure
+      pnl = @position.pnl&.to_f
+      PostHog.capture(
+        distinct_id: "system",
+        event: "position_closed",
+        properties: {
+          position_id: position_id,
+          product_id: @position.product_id,
+          side: @position.side,
+          size: @position.size,
+          reason: reason,
+          pnl: pnl,
+          pnl_status: (pnl && pnl > 0) ? "profit" : "loss",
+          paper: @position.paper
+        }
+      )
     else
       @logger.error("[PCJ] Failed to close position #{position_id}")
       retry_if_critical(position_id, reason, wait: 30.seconds, suffix: "_retry")
+
+      # PostHog: Track failed position closure
+      PostHog.capture(
+        distinct_id: "system",
+        event: "position_close_failed",
+        properties: {
+          position_id: position_id,
+          product_id: @position.product_id,
+          reason: reason,
+          will_retry: CRITICAL_REASONS.include?(reason)
+        }
+      )
     end
   rescue ActiveRecord::RecordNotFound
     @logger.warn("[PCJ] Position #{position_id} not found - may have been closed already")

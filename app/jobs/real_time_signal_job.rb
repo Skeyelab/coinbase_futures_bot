@@ -24,6 +24,17 @@ class RealTimeSignalJob < ApplicationJob
 
     elapsed = (Time.current.utc - job_started_at).round(2)
     Rails.logger.info("[RTSJ] Tick done: cycle_stats=#{cycle_stats.inspect} elapsed=#{elapsed}s")
+
+    # PostHog: Track real-time signal evaluation cycle
+    PostHog.capture(
+      distinct_id: "system",
+      event: "realtime_signal_tick_completed",
+      properties: {
+        elapsed_seconds: elapsed,
+        active_signals: SignalAlert.active.count,
+        cycle_stats: cycle_stats.to_s
+      }
+    )
   end
 
   private

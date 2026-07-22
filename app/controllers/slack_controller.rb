@@ -14,6 +14,16 @@ class SlackController < ApplicationController
     # Process command
     response = SlackCommandHandler.handle_command(slack_command_params)
 
+    # PostHog: Track Slack command received
+    PostHog.capture(
+      distinct_id: "system",
+      event: "slack_command_received",
+      properties: {
+        command: slack_command_params[:command],
+        channel_id: slack_command_params[:channel_id]
+      }
+    )
+
     render json: response
   rescue => e
     Rails.logger.error("[SlackController] Error handling command: #{e.message}")
