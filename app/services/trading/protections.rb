@@ -19,13 +19,13 @@ module Trading
   module Protections
     module_function
 
-    def blocked?(symbol:, side:)
-      matching_lock(symbol: symbol, side: side).present?
+    def blocked?(symbol:, side:, now: Time.current, store: Trading::ProtectionLock.default_store)
+      matching_lock(symbol: symbol, side: side, now: now, store: store).present?
     end
 
     # Human-readable reason for the blocking lock, or nil if not blocked.
-    def block_reason(symbol:, side:)
-      lock = matching_lock(symbol: symbol, side: side)
+    def block_reason(symbol:, side:, now: Time.current, store: Trading::ProtectionLock.default_store)
+      lock = matching_lock(symbol: symbol, side: side, now: now, store: store)
       return nil unless lock
 
       base = lock["source"].to_s
@@ -33,8 +33,9 @@ module Trading
       reason.present? ? "#{base}: #{reason}" : base
     end
 
-    def matching_lock(symbol:, side:)
-      Trading::ProtectionLock.active.find { |lock| matches?(lock, symbol: symbol, side: side) }
+    def matching_lock(symbol:, side:, now: Time.current, store: Trading::ProtectionLock.default_store)
+      Trading::ProtectionLock.active(now: now, store: store)
+        .find { |lock| matches?(lock, symbol: symbol, side: side) }
     end
 
     def matches?(lock, symbol:, side:)

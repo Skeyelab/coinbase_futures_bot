@@ -126,6 +126,38 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "protections parity (issue #397, ADR 0003)" do
+    # A flat series that round-trips repeatedly: enter long, TP hits next candle,
+    # re-enter, and so on. With no cooldown this yields many trades; with a
+    # cooldown spanning the whole series it yields exactly one — proving the
+    # protection is evaluated inside the backtest on the simulated clock.
+    def flat_scalp_engine(cooldown_seconds:)
+      insert_step_candles(Array.new(20, 100.0))
+      strategy = scripted_strategy do |_as_of|
+        {side: :long, price: 100.0, quantity: 1.0, tp: 100.4, sl: 99.6, confidence: 50.0}
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, protection_cooldown_seconds: cooldown_seconds)
+    end
+
+    after { Trading::ProtectionLock.clear! }
+
+    it "re-enters repeatedly with no cooldown" do
+      result = flat_scalp_engine(cooldown_seconds: 0).run(from: t0, to: t0 + 19 * 5.minutes)
+      expect(result.trade_count).to be >= 2
+    end
+
+    it "suppresses re-entry while a cooldown from the prior exit is active" do
+      result = flat_scalp_engine(cooldown_seconds: 100_000).run(from: t0, to: t0 + 19 * 5.minutes)
+      expect(result.trade_count).to eq(1)
+    end
+
+    it "does not write cooldown locks into the live DB store" do
+      flat_scalp_engine(cooldown_seconds: 100_000).run(from: t0, to: t0 + 19 * 5.minutes)
+      expect(BotRuntimeStat.find_by(key: Trading::ProtectionLock::STORE_KEY)).to be_nil
+    end
+  end
+
   describe "integration with the live strategy" do
     before do
       allow(ENV).to receive(:fetch).and_call_original

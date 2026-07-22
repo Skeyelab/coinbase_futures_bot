@@ -16,14 +16,16 @@ module Trading
 
       module_function
 
-      def record_exit(symbol:, cooldown_seconds: default_cooldown_seconds, now: Time.current)
+      def record_exit(symbol:, cooldown_seconds: default_cooldown_seconds, now: Time.current,
+        store: Trading::ProtectionLock.default_store)
         Trading::ProtectionLock.add(
           scope: "symbol",
           symbol: symbol,
           side: "both",
           source: SOURCE,
           reason: "cooldown after exit",
-          expires_at: now + cooldown_seconds.seconds
+          expires_at: now + cooldown_seconds.seconds,
+          store: store
         )
       end
 
