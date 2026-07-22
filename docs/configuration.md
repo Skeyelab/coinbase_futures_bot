@@ -169,7 +169,13 @@ SIGNAL_EQUITY_USD=10000        # default equity for signal generation ($10k defa
 # Live trading safety (Trading::ExecutionSafety)
 LIVE_TRADING_CONFIRMED=1       # REQUIRED on every live path; without it dry-run is forced ON
 
-# Fees (taker pricing; see CostModel)
+# Fees (taker pricing; see CostModel). Two regimes exist (ADR 0002):
+# dated CDE futures charge ~0.02%/contract with a $0.15/contract per-side
+# minimum — floor-bound for small nano notionals, hence the 15 bps default.
+# US perps run ~3 bps taker / 0% maker; override these when trading perps.
+# Perp funding is a separate position-time cost (charged when funding
+# timestamps are crossed while holding, never a fill cost) — instrumentation
+# is tracked in issue #391.
 TAKER_FEE_RATE=0.0015          # taker fee per side (default 15 bps)
 BACKTEST_TAKER_FEE_RATE=0.0015 # backtest-only override (takes precedence)
 TAKER_MIN_FEE_PER_CONTRACT=0.15 # flat per-contract per-side fee floor ($0.15)

@@ -9,16 +9,22 @@ The price spread between a futures Contract and the underlying spot price. Check
 A 0–100 score on a Signal representing combined certainty. Starts as a technical score (EMA alignment across timeframes, pattern clarity), then adjusted up or down by Sentiment. The Risk Profile defines a minimum threshold — Signals below it do not trigger entry.
 
 ### Contract
-A specific tradeable futures instrument on Coinbase, identified by product ID (e.g. `BIT-27JUN26-CDE` for BTC, `NOL-19JUN26-CDE` for crude oil). Covers both crypto and commodity underlyings. Carries an expiry date; the bot manages rollover before expiration. Maps to the `TradingPair` model (legacy name — industry term is Contract).
+A specific tradeable futures instrument on Coinbase, identified by product ID (e.g. `BIT-27JUN26-CDE` for BTC, `NOL-19JUN26-CDE` for crude oil). Covers both crypto and commodity underlyings. Dated Contracts carry an expiry date and the bot manages rollover before expiration; a Perpetual Future has neither. Maps to the `TradingPair` model (legacy name — industry term is Contract).
 
 ### Day Trade
 A Position tagged at entry as intraday — must be closed within 24 hours. The bot auto-closes these via `EndOfDayPositionClosureJob` to maintain compliance. A per-Position property; day trades and swing trades can coexist.
+
+### Funding Rate
+A periodic payment exchanged between longs and shorts on a Perpetual Future. A position-time cost — charged only when a funding timestamp is crossed while holding a Position, never a fill cost. Not yet modeled; rates are snapshotted live under [#391](https://github.com/Skeyelab/coinbase_futures_bot/issues/391) because funding history is not reconstructible. Must be modeled before the cost gate certifies any perp.
 
 ### Order
 An instruction sent to Coinbase to buy or sell a Contract. First-class domain concept — stored and tied to the Position it opens or closes. Enables slippage auditing (actual fill price vs Signal target), execution reconstruction after outages, and full trade lifecycle traceability. Currently not modelled in the code; the `Position` model tracks entry/exit prices but not the underlying exchange orders.
 
 ### Paper Trading
 A whole-bot simulation mode where Signals are evaluated and Positions tracked but no real orders are placed on Coinbase. Used to validate a Strategy or Risk Profile before going live. All Contracts trade in paper mode simultaneously — mixed paper/live operation is not supported.
+
+### Perpetual Future
+A Contract with no expiry date and therefore no Rollover; longs and shorts exchange a Funding Rate instead. The adopted primary Venue per ADR 0002 — BIP (nano BTC perp) first, XPP (XRP perp) the designated second seat. Not yet traded live: candidates stay suspended for data collection until they pass their gates (see Suspension-until-gates).
 
 ### Position
 The open futures exposure held by the bot — either LONG or SHORT. Represents the full round-trip lifecycle: opened when an entry order fills, closed when an exit order fills. Tracks entry price, exit price, side, PnL, stop-loss target, and take-profit target. Industry standard term; maps to the `Position` model.
@@ -38,6 +44,9 @@ A candidate trade opportunity produced by a Strategy. Carries a side (LONG/SHORT
 ### Strategy
 The algorithm that analyzes market data and produces Signals. Answers *when* to trade — entry and exit conditions, timeframe logic, confidence scoring. Distinct from Risk Profile. Maps to the `Strategy::*` service classes.
 
+### Suspension-until-gates
+The enablement pattern for new symbols (the ETH precedent): a symbol is enabled for data collection but suspended from trading (`Trading::SymbolSuspension` — blocks new entries only) until it passes its own walk-forward calibration and net-of-costs gate. No evidence inheritance — edge measured on one Contract does not transfer to another. Resume is always manual; a symbol re-earns its slot.
+
 ### Swing Trade
 A Position with no intraday closure requirement. Held across days until stop-loss, take-profit, or manual exit. A per-Position property; contrast with Day Trade.
 
@@ -46,3 +55,6 @@ The candlestick resolution used by a Strategy. Coinbase futures contracts (`BIT-
 
 ### Underlying
 The asset a Contract is based on — e.g. BTC, ETH, crude oil. A first-class grouping concept: Contracts sharing the same Underlying share sentiment sources, Strategy configuration, and Risk Profile assignment. Rollover moves between Contracts within the same Underlying. Not currently a model in the code — parsed implicitly from the Contract product ID prefix.
+
+### Venue
+The class of instrument the bot trades — spot, dated futures, or perpetual futures. Chosen for cost structure, not signal quality. ADR 0002 makes perpetuals primary, demotes dated futures to legacy plus a commodities research tier (GOL/SLR, revisited at ≥$10k equity), and rejects spot. Live trading today still runs on dated Contracts pending migration.

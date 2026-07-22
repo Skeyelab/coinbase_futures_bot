@@ -202,7 +202,12 @@ DEFAULT_DAY_TRADING=true                        # Default to day trading mode
 # Live trading safety (Trading::ExecutionSafety)
 LIVE_TRADING_CONFIRMED=1                        # REQUIRED on every live path; without it dry-run is forced ON
 
-# Fees (taker pricing — momentum entries cross the spread; see CostModel)
+# Fees (taker pricing — momentum entries cross the spread; see CostModel).
+# Two regimes exist (ADR 0002): dated CDE futures charge ~0.02%/contract with
+# a $0.15/contract per-side minimum (floor-bound for small nano notionals,
+# hence the 15 bps default); US perps run ~3 bps taker / 0% maker — override
+# these when trading perps. Perp funding is a separate position-time cost
+# (never a fill cost), being instrumented under issue #391.
 TAKER_FEE_RATE=0.0015                           # Taker fee per side (default 15 bps)
 BACKTEST_TAKER_FEE_RATE=0.0015                  # Backtest-only override (takes precedence)
 TAKER_MIN_FEE_PER_CONTRACT=0.15                 # Flat per-contract per-side fee floor ($0.15)

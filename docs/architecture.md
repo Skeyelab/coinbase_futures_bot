@@ -222,4 +222,4 @@ News APIs → Sentiment Events → Scoring → Aggregation → Signal Filtering
 
 ## Important Notes
 
-**Current Month Futures Only**: The project exclusively handles current month futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`). Perpetual contracts are not supported. The system includes automatic contract discovery, rollover management, and expiration handling for monthly futures.
+**Venues ([ADR 0002](adr/0002-perpetual-futures-as-primary-venue.md))**: Live and paper trading today run on current-month dated futures contracts (e.g., `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`), with automatic contract discovery, rollover management, and expiration handling. Per ADR 0002, perpetual futures are the adopted primary venue going forward — BIP (nano BTC perp) first, XPP (XRP perp) second — with dated BIT/ET demoted to legacy and GOL/SLR dated metals deferred to a commodities research tier (revisited at ≥$10k equity). Perp trading is **not live yet**: new candidate symbols stay enabled-but-suspended (`Trading::SymbolSuspension`) for data collection until each passes its own walk-forward calibration and net-of-costs gate (issues #390–#392).

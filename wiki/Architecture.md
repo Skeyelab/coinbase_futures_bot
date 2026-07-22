@@ -4,6 +4,8 @@
 
 The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes for positions/chat on top) designed for automated cryptocurrency futures trading. The system follows a modular architecture with clear separation of concerns optimized for **day trading** operations.
 
+**Venues (ADR 0002)**: live/paper trading today runs on dated BIT/ET contracts (automatic rollover, expiry handling). Perpetual futures (BIP first) are the adopted primary venue going forward but are not live yet — new candidate symbols stay enabled-but-suspended (`Trading::SymbolSuspension`) for data collection until each passes walk-forward calibration and a net-of-costs gate (#390–#392).
+
 ## High-Level Architecture Diagram
 
 ```

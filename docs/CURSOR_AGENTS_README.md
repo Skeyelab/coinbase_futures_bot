@@ -15,7 +15,7 @@
 
 ## Futures Contracts
 
-- Monthly Coinbase futures only (e.g. `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`) — **not** perpetuals
+- Live/legacy instruments: monthly dated Coinbase futures (e.g. `BIT-27JUN26-CDE`, `ET-27JUN26-CDE`). Perpetuals (BIP first) are the adopted primary venue per [ADR 0002](adr/0002-perpetual-futures-as-primary-venue.md) but are **not live yet** — do not document perp trading as operational
 - Sync catalog: `bin/rake market_data:upsert_futures_products`
 - Contract IDs roll; do not hardcode expired examples in docs or tests without reason
 

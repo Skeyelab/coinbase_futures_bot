@@ -311,6 +311,8 @@ Coinbase monthly futures use product IDs like `BIT-27JUN26-CDE` / `ET-27JUN26-CD
 bin/rake market_data:upsert_futures_products
 ```
 
+> **Venue direction ([ADR 0002](docs/adr/0002-perpetual-futures-as-primary-venue.md))**: dated BIT/ET contracts are the current live/legacy instruments. Perpetual futures (BIP, the nano BTC perp, first) are the adopted primary venue going forward — but perp trading is **not live yet**. New candidate symbols collect data while suspended (`Trading::SymbolSuspension`) until each passes its own walk-forward calibration and net-of-costs gate (#390–#392).
+
 ## Production Deployment
 
 ```bash

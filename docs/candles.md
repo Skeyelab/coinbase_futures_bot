@@ -23,7 +23,7 @@ volume: decimal(30,10)
   - `upsert_1m_candles_chunked`, `upsert_5m_candles_chunked`, `upsert_15m_candles_chunked`, and `upsert_1h_candles_chunked` fetch large ranges in chunks (the API truncates responses over ~300-350 candles).
 
 - Scheduled fetching is handled by `FetchCandlesJob` (GoodJob cron, hourly):
-  - Runs for **all enabled contracts**, and auto-disables contracts whose `expiration_date` has passed.
+  - Runs for **all enabled contracts**, and auto-disables contracts whose `expiration_date` has passed. Suspension (`Trading::SymbolSuspension`) does not affect this: suspended symbols keep collecting candles — that is how new venue candidates (perps per ADR 0002) accumulate the history their walk-forward calibration needs.
   - Normally incremental: starts just after the newest stored candle. When stored history is **shallower** than the requested `backfill_days` window, it refetches the whole window (backward fill) — upserts make the overlap idempotent, and once the deep window exists subsequent runs are incremental again.
   - Chunk sizes: 1m at 5 hours, 5m at 24 hours, 15m at 3 days, 1h at 14 days. 30m is capped at 7 days per run; 1d is a single request.
   - 1m history is capped at `MAX_1M_BACKFILL_DAYS` (default 3) unless a deeper value is passed explicitly — deep 1m backfill is API-expensive and nothing needs it by default.
