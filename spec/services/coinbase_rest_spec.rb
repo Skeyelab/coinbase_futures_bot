@@ -282,4 +282,42 @@ RSpec.describe MarketData::CoinbaseRest, type: :service do
       end
     end
   end
+
+  describe "streaming chunked upserts (backfill robustness)" do
+    let(:rest) { described_class.new }
+
+    it "persists each chunk before fetching the next (no accumulate-then-write)" do
+      counts_at_fetch = []
+      call = 0
+      allow(rest).to receive(:fetch_candles) do
+        counts_at_fetch << Candle.where(symbol: "STREAM-TEST", timeframe: "5m").count
+        call += 1
+        [[1_700_000_000 + call * 300, 1.0, 2.0, 1.5, 1.8, 10.0]]
+      end
+
+      rest.upsert_5m_candles_chunked(product_id: "STREAM-TEST",
+        start_time: Time.utc(2026, 1, 1), end_time: Time.utc(2026, 1, 4), chunk_hours: 24)
+
+      expect(counts_at_fetch.length).to eq(3)
+      # Each fetch after the first must see the prior chunk already persisted
+      expect(counts_at_fetch).to eq([0, 1, 2])
+      expect(Candle.where(symbol: "STREAM-TEST", timeframe: "5m").count).to eq(3)
+    end
+
+    it "a failing chunk loses only that chunk" do
+      call = 0
+      allow(rest).to receive(:fetch_candles) do
+        call += 1
+        raise "boom" if call == 2
+        [[1_700_000_000 + call * 60, 1.0, 2.0, 1.5, 1.8, 10.0]]
+      end
+      allow(Rails.logger).to receive(:error)
+
+      rest.upsert_1h_candles_chunked(product_id: "STREAM-TEST",
+        start_time: Time.utc(2026, 1, 1), end_time: Time.utc(2026, 2, 12), chunk_days: 14)
+
+      expect(Candle.where(symbol: "STREAM-TEST", timeframe: "1h").count).to eq(2)
+      expect(Rails.logger).to have_received(:error).with(/chunk/i)
+    end
+  end
 end

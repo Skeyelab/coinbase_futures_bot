@@ -74,6 +74,14 @@ RSpec.describe "market_data rake tasks", type: :task do
     end.to output(/Backfilling 60d/).to_stdout
   end
 
+  it "enqueues on the low queue when async is requested (deep backfills)" do
+    expect do
+      Rake::Task["market_data:backfill"].invoke("90", "BTC-USD", "90", "async")
+    end.to have_enqueued_job(FetchCandlesJob)
+      .with(backfill_days: 90, symbols: ["BTC-USD"], max_1m_days: 90)
+      .on_queue("low")
+  end
+
   it "backfills all enabled contracts when no products are given" do
     expect(FetchCandlesJob).to receive(:perform_now).with(backfill_days: 30, symbols: nil, max_1m_days: nil)
 
