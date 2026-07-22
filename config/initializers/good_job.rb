@@ -13,6 +13,17 @@ Rails.application.configure do
       cron: ENV.fetch("CANDLES_CRON", "5 * * * *"), # at minute 5 each hour
       class: "FetchCandlesJob"
     },
+    # Perp funding snapshot (issue #391). Funding settles hourly on the hour and
+    # the API only advertises the NEXT timestamp, so the :55 reading is the
+    # closest estimate of the rate that actually applies. History is not
+    # reconstructible — a missed hour is gone permanently — so the earlier runs
+    # are insurance, not precision: the upsert is idempotent on
+    # (product_id, funding_time) and converges on the last write, which is :55.
+    # One list_products call per run; redundancy is effectively free.
+    funding_snapshot: {
+      cron: ENV.fetch("FUNDING_SNAPSHOT_CRON", "15,30,45,55 * * * *"),
+      class: "FundingRateSnapshotJob"
+    },
     signals_15m: {
       # Run shortly after each 15m boundary to use fresh 15m candles
       # Default: minutes 1,16,31,46 of each hour
