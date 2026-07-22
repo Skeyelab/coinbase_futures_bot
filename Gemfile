@@ -66,8 +66,8 @@ group :test do
   gem "rspec_junit_formatter", "~> 0.6"
 
   # Code coverage analysis and reporting
-  gem "simplecov", "~> 0.22", require: false
-  gem "simplecov-cobertura", "~> 3.2", require: false
+  gem "simplecov", "~> 1.0", require: false
+  gem "simplecov-cobertura", "~> 4.0", require: false
   gem "simplecov-json", "~> 0.2", require: false
 end
 
