@@ -1,0 +1,14 @@
+[Unit]
+Description=Coinbase Futures Bot - GoodJob worker (cron + async jobs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/coinbase_futures_bot
+ExecStart=/bin/bash -lc "cd %h/coinbase_futures_bot && exec bundle exec good_job start"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

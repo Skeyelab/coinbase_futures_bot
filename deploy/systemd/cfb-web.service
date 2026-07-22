@@ -1,0 +1,14 @@
+[Unit]
+Description=Coinbase Futures Bot - web (dashboard + Slack inbound endpoint)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/coinbase_futures_bot
+ExecStart=/bin/bash -lc "cd %h/coinbase_futures_bot && exec env GOOD_JOB_EXECUTION_MODE=external bundle exec rails server -b 127.0.0.1 -p 3000"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
