@@ -110,7 +110,12 @@ Rails.application.configure do
     emergency_expiry_check: {
       cron: ENV.fetch("EMERGENCY_EXPIRY_CHECK_CRON", "0 9-17 * * 1-5"), # every hour during market hours
       class: "ContractExpiryMonitoringJob",
-      args: {emergency_check: true}
+      # Array-wrapped, NOT a bare Hash. GoodJob splats cron args, and
+      # `Array({emergency_check: true})` yields `[[:emergency_check, true]]` --
+      # an array of pairs passed as one positional argument, which raised
+      # ArgumentError on every fire from 09:00 UTC (#417). Wrapping keeps it a
+      # single Hash argument.
+      args: [{emergency_check: true}]
     }
   }
 end
