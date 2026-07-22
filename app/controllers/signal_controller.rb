@@ -70,6 +70,13 @@ class SignalController < ApplicationController
           }
         )
 
+        # PostHog: Track manual signal evaluation (single pair)
+        PostHog.capture(
+          distinct_id: "system",
+          event: "signal_evaluation_triggered",
+          properties: {evaluation_type: "single_pair", symbol: params[:symbol]}
+        )
+
         render json: {message: "Evaluated signals for #{params[:symbol]}"}
       else
         # Track trading pair not found errors
@@ -95,6 +102,13 @@ class SignalController < ApplicationController
         data: {
           evaluation_type: "all_pairs"
         }
+      )
+
+      # PostHog: Track manual bulk signal evaluation
+      PostHog.capture(
+        distinct_id: "system",
+        event: "signal_evaluation_triggered",
+        properties: {evaluation_type: "all_pairs"}
       )
 
       render json: {message: "Evaluated signals for all enabled trading pairs"}

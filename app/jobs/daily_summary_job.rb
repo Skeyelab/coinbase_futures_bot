@@ -9,6 +9,21 @@ class DailySummaryJob < ApplicationJob
   def perform(since: 24.hours.ago, notifier: SlackNotificationService)
     data = summary(since)
     notifier.alert("info", "📈 Daily Paper Summary (24h)", format_summary(data))
+
+    # PostHog: Track daily summary dispatch
+    PostHog.capture(
+      distinct_id: "system",
+      event: "daily_summary_dispatched",
+      properties: {
+        trades: data[:trades],
+        win_rate: data[:win_rate],
+        realized_pnl: data[:realized_pnl],
+        net_of_costs: data[:net_of_costs],
+        cost_gate_passed: data[:cost_gate_passed],
+        open_positions: data[:open],
+        equity: data[:equity]
+      }
+    )
   end
 
   private

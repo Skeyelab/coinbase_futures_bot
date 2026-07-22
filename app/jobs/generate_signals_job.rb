@@ -37,6 +37,22 @@ class GenerateSignalsJob < ApplicationJob
           confidence: order[:confidence]
         })
 
+        # PostHog: Track signal generation
+        PostHog.capture(
+          distinct_id: "system",
+          event: "signal_generated",
+          properties: {
+            symbol: pair.product_id,
+            side: order[:side],
+            price: order[:price].round(2),
+            quantity: order[:quantity],
+            tp: order[:tp].round(2),
+            sl: order[:sl].round(2),
+            confidence: order[:confidence],
+            paper_trading: paper_trading?
+          }
+        )
+
         execute_order(pair.product_id, order[:price]) unless paper_trading?
       else
         puts "[Signal] #{pair.product_id} no-entry"

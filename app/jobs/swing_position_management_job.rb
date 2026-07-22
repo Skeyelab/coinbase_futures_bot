@@ -32,6 +32,17 @@ class SwingPositionManagementJob < ApplicationJob
       "Critical swing position management job failed: #{e.message}"
     )
 
+    # PostHog: Track critical job failure
+    PostHog.capture(
+      distinct_id: "system",
+      event: "critical_job_failed",
+      properties: {
+        job_class: self.class.name,
+        error_class: e.class.to_s,
+        error_message: e.message
+      }
+    )
+
     raise
   end
 end

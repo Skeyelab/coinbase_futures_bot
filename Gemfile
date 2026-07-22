@@ -75,6 +75,10 @@ gem "good_job", "~> 4.19"
 gem "sentry-rails"
 gem "sentry-ruby"
 
+# PostHog analytics
+gem "posthog-ruby"
+gem "posthog-rails"
+
 # JWT for Coinbase App (Advanced Trade) ES256 authentication
 gem "jwt", "~> 3.2"
 

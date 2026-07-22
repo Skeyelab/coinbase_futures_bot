@@ -115,6 +115,18 @@ module Execution
       end
 
       @logger.info("[EXEC] Rollover completed: #{from_contract} -> #{to_contract}")
+
+      # PostHog: Track contract rollover completion
+      PostHog.capture(
+        distinct_id: "system",
+        event: "contract_rollover_completed",
+        properties: {
+          from_contract: from_contract,
+          to_contract: to_contract,
+          asset: asset,
+          positions_rolled: positions.size
+        }
+      )
     end
 
     # Resolve a product ID to the appropriate trading contract

@@ -1,0 +1,62 @@
+[
+  {
+    "event_name": "signal_generated",
+    "event_description": "A trading signal was produced for a futures contract with a confidence score.",
+    "file": "app/jobs/generate_signals_job.rb"
+  },
+  {
+    "event_name": "realtime_signal_tick_completed",
+    "event_description": "A real-time signal evaluation cycle completed across all enabled trading pairs.",
+    "file": "app/jobs/real_time_signal_job.rb"
+  },
+  {
+    "event_name": "position_closed",
+    "event_description": "A futures position was successfully closed with its PnL and closing reason.",
+    "file": "app/jobs/position_close_job.rb"
+  },
+  {
+    "event_name": "position_close_failed",
+    "event_description": "A position close attempt failed and will be retried.",
+    "file": "app/jobs/position_close_job.rb"
+  },
+  {
+    "event_name": "trading_halted",
+    "event_description": "The trading kill-switch was activated, halting all order placement.",
+    "file": "app/services/trading_halt.rb"
+  },
+  {
+    "event_name": "trading_resumed",
+    "event_description": "Trading was resumed after a halt.",
+    "file": "app/services/trading_halt.rb"
+  },
+  {
+    "event_name": "contract_rollover_completed",
+    "event_description": "A futures contract rollover was completed, moving positions from an expiring contract to the next.",
+    "file": "app/services/execution/futures_executor.rb"
+  },
+  {
+    "event_name": "position_import_completed",
+    "event_description": "Positions were imported (or replaced) from Coinbase via the admin UI.",
+    "file": "app/controllers/position_import_controller.rb"
+  },
+  {
+    "event_name": "signal_evaluation_triggered",
+    "event_description": "A manual signal evaluation was triggered via the signals API endpoint.",
+    "file": "app/controllers/signal_controller.rb"
+  },
+  {
+    "event_name": "slack_command_received",
+    "event_description": "A Slack slash command was received and processed by the bot.",
+    "file": "app/controllers/slack_controller.rb"
+  },
+  {
+    "event_name": "daily_summary_dispatched",
+    "event_description": "A daily paper-trading performance summary was sent to Slack.",
+    "file": "app/jobs/daily_summary_job.rb"
+  },
+  {
+    "event_name": "critical_job_failed",
+    "event_description": "A critical background job (swing position management) failed and raised an alert.",
+    "file": "app/jobs/swing_position_management_job.rb"
+  }
+]
