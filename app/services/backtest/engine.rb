@@ -23,7 +23,8 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
-      min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, logger: Rails.logger)
+      min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
+      logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
@@ -52,6 +53,9 @@ module Backtest
       # clock; its locks land in the run-local store the entry check consults, so
       # a loss cluster halts entries identically to live.
       @stoploss_guard = stoploss_guard || Trading::Protections::StoplossGuard.from_config(symbol: @symbol)
+      # MaxDrawdown (issue #401): global equity-drawdown halt, evaluated per candle
+      # against the run's equity curve on the simulated clock.
+      @max_drawdown = max_drawdown || Trading::Protections::MaxDrawdown.from_config
       @logger = logger
     end
 
@@ -64,6 +68,7 @@ module Backtest
       protection_store = Trading::ProtectionLock::MemoryStore.new
       losing_exits = []
       halts = []
+      equity_points = [{at: from, equity: @starting_equity}]
 
       step_candles(from, to).each do |candle|
         maybe_enter(sim, candle, entered_at, protection_store)
@@ -74,6 +79,8 @@ module Backtest
         maybe_min_roi_exit(sim, candle, entered_at)
         stamp_exits(sim, candle, exited_at, protection_store, losing_exits, halts)
         equity_curve << sim.equity_usd
+        equity_points << {at: candle.timestamp, equity: sim.equity_usd}
+        maybe_max_drawdown_halt(candle, equity_points, protection_store, halts)
       end
 
       Result.new(trades: build_trades(sim, entered_at, exited_at),
@@ -166,6 +173,23 @@ module Backtest
         next unless @min_roi.exit_reason(profit_ratio: profit_ratio, minutes_held: minutes_held)
 
         sim.force_close(o.id, price: candle.close.to_f, reason: :time_decay_roi)
+      end
+    end
+
+    # MaxDrawdown parity (issue #401): peak equity within the guard's lookback vs
+    # current, evaluated on the simulated clock. A breach writes a global lock the
+    # entry check consults and is recorded for attribution.
+    def maybe_max_drawdown_halt(candle, equity_points, protection_store, halts)
+      return unless @max_drawdown.enabled?
+
+      window_start = candle.timestamp - @max_drawdown.lookback_seconds
+      peak = equity_points.select { |p| p[:at] >= window_start }.map { |p| p[:equity] }.max
+      current = equity_points.last[:equity]
+
+      new_locks = @max_drawdown.evaluate(peak: peak, current: current,
+        now: candle.timestamp, store: protection_store)
+      new_locks.each do |lock|
+        halts << {source: lock["source"], symbol: nil, side: "both", at: candle.timestamp}
       end
     end
 

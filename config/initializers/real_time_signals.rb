@@ -78,6 +78,15 @@ Rails.application.config.real_time_signals = {
       scope: ENV.fetch("STOPLOSS_GUARD_SCOPE", "symbol"),
       lock_ttl_seconds: ENV.fetch("STOPLOSS_GUARD_LOCK_TTL_SECONDS", "1800").to_i,
       per_symbol: {}
+    },
+
+    # MaxDrawdown (issue #401): halt ALL new entries globally once equity falls
+    # `ceiling` (fraction) from its peak within `lookback_seconds`, for
+    # `lock_ttl_seconds`. Equity-curve drawdown. ceiling: 0 disables.
+    max_drawdown: {
+      ceiling: ENV.fetch("MAX_DRAWDOWN_CEILING", "0.15").to_f,
+      lookback_seconds: ENV.fetch("MAX_DRAWDOWN_LOOKBACK_SECONDS", "86400").to_i,
+      lock_ttl_seconds: ENV.fetch("MAX_DRAWDOWN_LOCK_TTL_SECONDS", "1800").to_i
     }
   },
 
