@@ -39,6 +39,17 @@ Rails.application.config.real_time_signals = {
     }
   },
 
+  # Minimum-ROI time-decay exit (issue #398, ADR 0003). A {minutes_held =>
+  # profit_ratio} schedule that lowers the take-profit bar as a position ages, so
+  # stalled winners are booked before round-tripping to break-even. Inert by
+  # default (empty schedule) — opt in globally via `schedule` or per symbol via
+  # `per_symbol`. Ratios are price returns, same units as tp_target.
+  #   Example: {schedule: {0 => 0.006, 20 => 0.004, 40 => 0.002, 60 => 0.0}}
+  min_roi: {
+    schedule: {},
+    per_symbol: {}
+  },
+
   # Protections layer (issue #397, ADR 0003). Strategy-agnostic entry guards.
   protections: {
     # CooldownPeriod: block re-entry on a symbol for this many seconds after any

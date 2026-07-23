@@ -104,6 +104,43 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  describe "#check_min_roi_exit (issue #398)" do
+    before { allow(handler).to receive(:trigger_position_close) }
+
+    around do |ex|
+      orig = Rails.application.config.real_time_signals
+      Rails.application.config.real_time_signals =
+        orig.merge(min_roi: {schedule: {0 => 0.006, 40 => 0.002}})
+      ex.run
+      Rails.application.config.real_time_signals = orig
+    end
+
+    it "closes an aged position once profit meets the decayed bar (fixed TP not hit)" do
+      # entry 100, no fixed TP; +0.3% at 45m: below 0.6% young bar, above 0.2% aged bar
+      position = create(:position, side: "LONG", entry_price: 100.0, take_profit: nil,
+        entry_time: 45.minutes.ago)
+
+      expect(handler).to receive(:trigger_position_close).with(position, "time_decay_roi")
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be true
+    end
+
+    it "does not close a young position below the un-decayed bar" do
+      position = create(:position, side: "LONG", entry_price: 100.0, entry_time: 5.minutes.ago)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be false
+    end
+
+    it "is inert when no schedule is configured" do
+      Rails.application.config.real_time_signals =
+        Rails.application.config.real_time_signals.merge(min_roi: {schedule: {}})
+      position = create(:position, side: "LONG", entry_price: 100.0, entry_time: 90.minutes.ago)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be false
+    end
+  end
+
   describe "#trigger_position_close debounce" do
     it "does not re-enqueue a close for the same position within the cooldown" do
       position = create(:position)

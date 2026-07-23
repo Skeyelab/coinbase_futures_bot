@@ -68,6 +68,10 @@ module RealtimeMonitoring
         # day-trading positions; if it closes, skip the bps threshold checks.
         next if check_dollar_pnl_exit(position, price)
 
+        # Time-decay take-profit (issue #398): book a stalled winner once the
+        # age-decayed profit bar is met. An earlier take-profit only — never a stop.
+        next if check_min_roi_exit(position, price)
+
         check_take_profit_stop_loss(position, price)
         check_day_trading_time_limits(position)
       end
@@ -92,6 +96,30 @@ module RealtimeMonitoring
 
     def dollar_exit_policy
       @dollar_exit_policy ||= Trading::DollarExitPolicy.from_env
+    end
+
+    # Time-decay take-profit exit (issue #398). Closes when the position's
+    # unrealized price return meets the age-decayed profit bar. Returns true if it
+    # triggered a close. Inert unless a min_roi schedule is configured. Never a
+    # stop — only an earlier take-profit, so it cannot widen risk.
+    def check_min_roi_exit(position, current_price)
+      policy = min_roi_policy(position.product_id)
+      return false unless policy.enabled?
+
+      reason = policy.exit_reason(
+        profit_ratio: position.unrealized_profit_ratio(current_price),
+        minutes_held: position.age_in_minutes
+      )
+      return false unless reason
+
+      @logger.info("[RTM] time_decay_roi for #{position.product_id} at $#{current_price} " \
+        "(#{(position.unrealized_profit_ratio(current_price) * 100).round(3)}% after #{position.age_in_minutes.to_i}m) — closing")
+      trigger_position_close(position, reason.to_s)
+      true
+    end
+
+    def min_roi_policy(symbol)
+      (@min_roi_policies ||= {})[symbol] ||= Trading::MinimumRoiExit.from_config(symbol: symbol)
     end
 
     def positions_for_tick(product_id)

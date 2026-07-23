@@ -151,6 +151,16 @@ class Position < ApplicationRecord
     unrealized_pnl_at(current_price) || 0
   end
 
+  # Unrealized PRICE return while open, side-adjusted (long: up is positive,
+  # short: down is positive). Same units as the strategy's tp_target/sl_target —
+  # consumed by Trading::MinimumRoiExit (issue #398).
+  def unrealized_profit_ratio(current_price)
+    return nil unless open? && entry_price && current_price && current_price.positive?
+
+    move = (current_price - entry_price) / entry_price
+    long? ? move : -move
+  end
+
   def unrealized_pnl_at(current_price)
     return nil unless open? && current_price && entry_price
 
