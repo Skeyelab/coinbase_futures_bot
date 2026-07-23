@@ -66,7 +66,19 @@ Rails.application.config.real_time_signals = {
   protections: {
     # CooldownPeriod: block re-entry on a symbol for this many seconds after any
     # exit. Per-symbol overrides may be resolved from a calibrated TradingProfile.
-    cooldown_seconds: ENV.fetch("PROTECTION_COOLDOWN_SECONDS", "300").to_i
+    cooldown_seconds: ENV.fetch("PROTECTION_COOLDOWN_SECONDS", "300").to_i,
+
+    # StoplossGuard (issue #400): after `threshold` losing exits within
+    # `lookback_seconds`, halt new entries for `lock_ttl_seconds`. Side-aware
+    # (only_per_side) and scoped per-symbol or global. threshold: 0 disables.
+    stoploss_guard: {
+      threshold: ENV.fetch("STOPLOSS_GUARD_THRESHOLD", "4").to_i,
+      lookback_seconds: ENV.fetch("STOPLOSS_GUARD_LOOKBACK_SECONDS", "3600").to_i,
+      only_per_side: ENV.fetch("STOPLOSS_GUARD_ONLY_PER_SIDE", "true").to_s.casecmp("true").zero?,
+      scope: ENV.fetch("STOPLOSS_GUARD_SCOPE", "symbol"),
+      lock_ttl_seconds: ENV.fetch("STOPLOSS_GUARD_LOCK_TTL_SECONDS", "1800").to_i,
+      per_symbol: {}
+    }
   },
 
   # API settings
