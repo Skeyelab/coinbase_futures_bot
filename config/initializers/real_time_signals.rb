@@ -50,6 +50,18 @@ Rails.application.config.real_time_signals = {
     per_symbol: {}
   },
 
+  # Liquidation buffer (issue #399, ADR 0003). Close a leveraged position before
+  # it reaches the exchange's liquidation price. `buffer` is the fraction of the
+  # entry→liq distance kept as a safety margin (default 0.05). Positions carry no
+  # real leverage yet, so an assumed `leverage` is used (documented gap). Set
+  # buffer: 0 to disable. Per-symbol overrides via `per_symbol`.
+  liquidation_buffer: {
+    buffer: ENV.fetch("LIQUIDATION_BUFFER", "0.05").to_f,
+    leverage: ENV.fetch("LIQUIDATION_ASSUMED_LEVERAGE", "10.0").to_f,
+    maintenance_margin_rate: ENV.fetch("LIQUIDATION_MAINTENANCE_MARGIN_RATE", "0.005").to_f,
+    per_symbol: {}
+  },
+
   # Protections layer (issue #397, ADR 0003). Strategy-agnostic entry guards.
   protections: {
     # CooldownPeriod: block re-entry on a symbol for this many seconds after any

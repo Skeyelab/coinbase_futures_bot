@@ -126,6 +126,40 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "liquidation-buffer exit (issue #399, ADR 0003)" do
+    # Long entry 100, leverage 10, buffer 0.05 -> buffered exit 90.975. A candle
+    # whose low pierces it should force-close at that price with a
+    # liquidation_buffer reason, ahead of the fixed SL.
+    def liq_engine(buffer:)
+      # enter at 100, hold flat, then a candle that dumps to 90 (low 89.5)
+      insert_step_candles([100.0, 100.0, 90.0, 90.0])
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0,
+        liquidation_buffer: Trading::LiquidationBuffer.new(buffer: buffer, leverage: 10))
+    end
+
+    it "force-closes at the buffered price with a liquidation_buffer reason" do
+      result = liq_engine(buffer: 0.05).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      trade = result.trades.first
+      expect(trade[:exit_reason]).to eq(:liquidation_buffer)
+      expect(trade[:exit_price]).to be_within(1e-9).of(90.975)
+      expect(result.exit_reason_breakdown[:liquidation_buffer]).to eq(1)
+    end
+
+    it "does not fire when the buffer is disabled" do
+      result = liq_engine(buffer: 0.0).run(from: t0, to: t0 + 3 * 5.minutes)
+      # sl=1 never hit, no liq buffer -> position rides to end -> no completed trade
+      expect(result.trade_count).to eq(0)
+    end
+  end
+
   describe "minimum-ROI time-decay exit (issue #398, ADR 0003)" do
     # Flat price, fixed TP unreachable: the position stalls at ~0 profit. With a
     # schedule that decays the bar to break-even at 40m, it should book a

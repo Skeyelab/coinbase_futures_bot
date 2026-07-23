@@ -64,6 +64,10 @@ module RealtimeMonitoring
         # check, so the excursion is captured even on the tick that closes it.
         position.track_adverse_excursion!(price)
 
+        # Liquidation buffer (issue #399): the highest-precedence safety exit —
+        # close before the exchange liquidates, ahead of every other policy.
+        next if check_liquidation_buffer_exit(position, price)
+
         # Dollar-PnL exit ($20-50 target + hard dollar stop) takes precedence for
         # day-trading positions; if it closes, skip the bps threshold checks.
         next if check_dollar_pnl_exit(position, price)
@@ -120,6 +124,29 @@ module RealtimeMonitoring
 
     def min_roi_policy(symbol)
       (@min_roi_policies ||= {})[symbol] ||= Trading::MinimumRoiExit.from_config(symbol: symbol)
+    end
+
+    # Liquidation-buffer exit (issue #399). Closes a leveraged position once price
+    # reaches the buffered pre-liquidation level. Highest-precedence safety exit;
+    # surfaces a Slack warning because a near-liquidation event is notable.
+    # Returns true if it triggered a close.
+    def check_liquidation_buffer_exit(position, current_price)
+      calc = liquidation_buffer(position.product_id)
+      return false unless calc.enabled?
+      return false unless calc.breached?(entry_price: position.entry_price,
+        side: position.side, current_price: current_price)
+
+      @logger.warn("[RTM] liquidation_buffer for #{position.product_id} #{position.side} " \
+        "entry $#{position.entry_price} at $#{current_price} — closing before liquidation")
+      trigger_position_close(position, "liquidation_buffer")
+      SlackNotificationService.alert("warning", "Liquidation buffer exit",
+        "Closed #{position.product_id} #{position.side} at $#{current_price} (entry $#{position.entry_price}) " \
+        "before reaching liquidation.")
+      true
+    end
+
+    def liquidation_buffer(symbol)
+      (@liquidation_buffers ||= {})[symbol] ||= Trading::LiquidationBuffer.from_config(symbol: symbol)
     end
 
     def positions_for_tick(product_id)
