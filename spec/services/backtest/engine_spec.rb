@@ -126,6 +126,41 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "minimum-ROI time-decay exit (issue #398, ADR 0003)" do
+    # Flat price, fixed TP unreachable: the position stalls at ~0 profit. With a
+    # schedule that decays the bar to break-even at 40m, it should book a
+    # time-decay-roi exit; with no schedule it rides to end-of-replay (no trade).
+    def flat_stall_engine(min_roi_schedule:)
+      insert_step_candles(Array.new(20, 100.0))
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, min_roi_schedule: min_roi_schedule)
+    end
+
+    it "closes a stalled position with a time_decay_roi exit reason once the bar decays" do
+      result = flat_stall_engine(min_roi_schedule: {0 => 0.006, 40 => 0.0})
+        .run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      trade = result.trades.first
+      expect(trade[:exit_reason]).to eq(:time_decay_roi)
+      # 40 minutes = 8 * 5m steps -> exits on the candle at t0 + 40 min
+      expect(trade[:exited_at]).to eq(t0 + 8 * 5.minutes)
+    end
+
+    it "does not force a min-roi exit when no schedule is configured" do
+      result = flat_stall_engine(min_roi_schedule: {})
+        .run(from: t0, to: t0 + 19 * 5.minutes)
+
+      # Fixed TP never hits, no decay -> position never closes -> no completed trade
+      expect(result.trade_count).to eq(0)
+    end
+  end
+
   describe "protections parity (issue #397, ADR 0003)" do
     # A flat series that round-trips repeatedly: enter long, TP hits next candle,
     # re-enter, and so on. With no cooldown this yields many trades; with a

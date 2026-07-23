@@ -3,7 +3,7 @@
 module PaperTrading
   class ExchangeSimulator
     Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
-      :entry_fill)
+      :entry_fill, :exit_reason)
 
     attr_reader :orders, :fills, :equity_usd
 
@@ -25,6 +25,18 @@ module PaperTrading
         Order.new(id: id, symbol: symbol, side: side, price: price.to_f, quantity: quantity.to_f, status: :open,
           filled_qty: 0.0, created_at: Time.now.utc, tp: tp, sl: sl)
       id
+    end
+
+    # Force-close a filled position at an explicit price with an exit reason
+    # (issue #398 — min-ROI time-decay exit in backtests). No-op unless the order
+    # is currently a filled, open position.
+    def force_close(id, price:, reason:)
+      o = orders[id]
+      return unless o && o.status == :filled
+
+      realize_pnl(o, price)
+      o.exit_reason = reason
+      o.status = :closed
     end
 
     def cancel(id)

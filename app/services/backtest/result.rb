@@ -19,6 +19,15 @@ module Backtest
       trades.size
     end
 
+    # Exit-reason attribution (issue #398): how many trades each exit path booked
+    # (e.g. {fixed_tp_sl: 8, time_decay_roi: 3}). Lets a run show what the
+    # time-decay exit actually contributed vs fixed TP/SL.
+    def exit_reason_breakdown
+      trades.each_with_object(Hash.new(0)) do |t, acc|
+        acc[t[:exit_reason] || :fixed_tp_sl] += 1
+      end
+    end
+
     def total_pnl
       trades.sum { |t| t[:pnl].to_f }
     end
