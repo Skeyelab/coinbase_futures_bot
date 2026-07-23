@@ -160,6 +160,40 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "StoplossGuard parity (issue #400, ADR 0003)" do
+    # A saw-tooth series: enter long at 100, the next candle dips to 99 (low 98.5)
+    # and hits the 99.5 stop -> a losing round-trip -> re-enter -> repeat. With the
+    # guard tripping at 2 losses, entries halt after the 2nd loss; disabled, it
+    # keeps losing across the whole series.
+    def sawtooth_engine(guard)
+      strategy = scripted_strategy do |_as_of|
+        {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 99.5, confidence: 50.0}
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, stoploss_guard: guard)
+    end
+
+    before { insert_step_candles([100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0]) }
+
+    let(:tripping_guard) do
+      Trading::Protections::StoplossGuard.new(threshold: 2, lookback_seconds: 100_000,
+        only_per_side: true, scope: "symbol", lock_ttl_seconds: 100_000)
+    end
+    let(:disabled_guard) { Trading::Protections::StoplossGuard.new(threshold: 0, lookback_seconds: 1) }
+
+    it "halts entries after the loss threshold and records the halt" do
+      guarded = sawtooth_engine(tripping_guard).run(from: t0, to: t0 + 9 * 5.minutes)
+      unguarded = sawtooth_engine(disabled_guard).run(from: t0, to: t0 + 9 * 5.minutes)
+
+      # The guard halts long entries after the 2nd loss, so the guarded run makes
+      # strictly fewer (losing) trades than the unguarded run — and records it.
+      expect(guarded.trade_count).to be < unguarded.trade_count
+      expect(guarded.trade_count).to be <= 3
+      expect(guarded.protection_halts).to be_present
+      expect(guarded.protection_halts.first).to include(source: "StoplossGuard", side: "long")
+    end
+  end
+
   describe "minimum-ROI time-decay exit (issue #398, ADR 0003)" do
     # Flat price, fixed TP unreachable: the position stalls at ~0 profit. With a
     # schedule that decays the bar to break-even at 40m, it should book a
