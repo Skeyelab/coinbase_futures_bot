@@ -29,6 +29,17 @@ symbols:
     lexicon: oil
 
 sources:
+  # Donald Trump's TRUTH Social posts (issue #433). Frequently market-moving on
+  # oil (OPEC/Houthis/Saudi/sanctions), Iran/geopolitics, and crypto. Standard
+  # RSS 2.0 with full post text; scoped to all tradable symbols so the keyword
+  # router attributes each post — off-topic political posts match nothing and are
+  # dropped. Single-author = high variance, so weight is moderate; sentiment is a
+  # gate (not a trigger), which bounds the downside.
+  trumpstruth_rss:
+    client: rss
+    url: https://trumpstruth.org/feed
+    symbols: [OIL-USD, BTC-USD, ETH-USD]
+    weight: 1.0
   cryptopanic:
     client: cryptopanic
     symbols: [BTC-USD, ETH-USD]

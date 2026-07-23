@@ -45,4 +45,35 @@ RSpec.describe Sentiment::GenericRssClient, type: :service do
     expect(symbols).to include("OIL-USD")
     expect(symbols).not_to include("BTC-USD")
   end
+
+  # Issue #433: Trump TRUTH Social posts as a sentiment source. Scoped to the
+  # three tradable symbols; the keyword router attributes each post (oil posts ->
+  # OIL, crypto -> BTC/ETH, off-topic political posts -> dropped).
+  describe "trumpstruth_rss source" do
+    subject(:trump) { described_class.new(url: "https://trumpstruth.org/feed", source_name: "trumpstruth_rss") }
+
+    it "is registered and scoped to the tradable symbols" do
+      expect(Sentiment::SourceConfig.default.symbols_for("trumpstruth_rss"))
+        .to contain_exactly("OIL-USD", "BTC-USD", "ETH-USD")
+    end
+
+    it "routes an oil-catalyst post (Houthis/ships/Saudi) to OIL-USD only" do
+      item = item_for("Houthi attacks on ships must stop", "Damage to tankers and cargo in the Red Sea; Saudi energy talks continue")
+      symbols = trump.send(:normalize_rss_item, item).map { |r| r[:symbol] }
+      expect(symbols).to include("OIL-USD")
+      expect(symbols).not_to include("BTC-USD", "ETH-USD")
+    end
+
+    it "routes a crypto post to BTC-USD" do
+      item = item_for("Bitcoin is doing incredibly well", "Crypto and Bitcoin, tremendous")
+      symbols = trump.send(:normalize_rss_item, item).map { |r| r[:symbol] }
+      expect(symbols).to include("BTC-USD")
+    end
+
+    it "drops an off-topic political post (no market keyword)" do
+      item = item_for("Thank you to the great people of Ohio", "What a rally, the best ever")
+      symbols = trump.send(:normalize_rss_item, item).map { |r| r[:symbol] }
+      expect(symbols.compact).to be_empty
+    end
+  end
 end
