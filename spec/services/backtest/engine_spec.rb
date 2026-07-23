@@ -160,6 +160,32 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "MaxDrawdown parity (issue #401, ADR 0003)" do
+    # Saw-tooth losing series; each loss drops equity. A tiny ceiling trips the
+    # global drawdown halt after the first loss, so the guarded run makes fewer
+    # trades than a disabled run and records the halt.
+    def dd_engine(guard)
+      strategy = scripted_strategy do |_as_of|
+        {side: :long, price: 100.0, quantity: 10.0, tp: 200.0, sl: 99.5, confidence: 50.0}
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, contract_size_usd: 100.0, max_drawdown: guard)
+    end
+
+    before { insert_step_candles([100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0]) }
+
+    it "halts all entries once equity drawdown exceeds the ceiling, and records it" do
+      tripping = Trading::Protections::MaxDrawdown.new(ceiling: 0.0001, lookback_seconds: 100_000, lock_ttl_seconds: 100_000)
+      disabled = Trading::Protections::MaxDrawdown.new(ceiling: 0)
+
+      guarded = dd_engine(tripping).run(from: t0, to: t0 + 7 * 5.minutes)
+      unguarded = dd_engine(disabled).run(from: t0, to: t0 + 7 * 5.minutes)
+
+      expect(guarded.trade_count).to be < unguarded.trade_count
+      expect(guarded.protection_halts.map { |h| h[:source] }).to include("MaxDrawdown")
+    end
+  end
+
   describe "StoplossGuard parity (issue #400, ADR 0003)" do
     # A saw-tooth series: enter long at 100, the next candle dips to 99 (low 98.5)
     # and hits the 99.5 stop -> a losing round-trip -> re-enter -> repeat. With the

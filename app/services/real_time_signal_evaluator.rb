@@ -32,6 +32,15 @@ class RealTimeSignalEvaluator
     cycle_started_at = Time.current.utc
     @logger.info("[RTSE] Evaluating #{enabled_pairs.count} enabled trading pairs (cycle start)")
 
+    # MaxDrawdown (issue #401): once per cycle, evaluate the equity-drawdown halt.
+    # A breach writes a global ProtectionLock, so the per-pair valid_signal? checks
+    # below suppress all new entries. Guarded so an analytics error never aborts a cycle.
+    begin
+      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: Trading::SignalEquity.usd)
+    rescue => e
+      @logger.error("[RTSE] MaxDrawdown evaluation error: #{e.message}")
+    end
+
     cycle_stats = {
       pairs_total: enabled_pairs.count,
       pairs_evaluated: 0,
