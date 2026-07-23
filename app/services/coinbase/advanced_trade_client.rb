@@ -194,15 +194,28 @@ module Coinbase
         @logger.warn("current_margin_window endpoint not accessible (403), using balance summary data")
         balance_data = get_futures_balance_summary
 
-        # Extract margin window information from balance summary
+        # Extract margin window information from balance summary.
         intraday_data = balance_data.dig("intraday_margin_window_measure")
-        balance_data.dig("overnight_margin_window_measure")
+        overnight_data = balance_data.dig("overnight_margin_window_measure")
 
-        # Determine current margin window type based on available data
-        # This is a simplified approach - in reality you'd need to check time-based logic
+        # Classify only from data actually present. The balance summary does not
+        # reliably indicate the ACTIVE window, so when neither measure is present
+        # (the case for this account — the dedicated endpoint 403s and the summary
+        # carries no measure) we return UNKNOWN rather than fabricating a
+        # confident OVERNIGHT, which produced false hourly "overnight active"
+        # alerts. Callers must treat UNKNOWN_MARGIN as "no actionable signal".
+        window_type =
+          if intraday_data
+            "INTRADAY_MARGIN"
+          elsif overnight_data
+            "OVERNIGHT_MARGIN"
+          else
+            "UNKNOWN_MARGIN"
+          end
+
         {
           "margin_window" => {
-            "margin_window_type" => intraday_data ? "INTRADAY_MARGIN" : "OVERNIGHT_MARGIN",
+            "margin_window_type" => window_type,
             "end_time" => nil
           },
           "is_intraday_margin_killswitch_enabled" => true,
