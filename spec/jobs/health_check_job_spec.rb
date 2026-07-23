@@ -243,7 +243,11 @@ RSpec.describe HealthCheckJob, type: :job do
       end
     end
 
-    context "when exchange API fails" do
+    # The legacy Coinbase Exchange (Pro) API is not used anywhere in the trading
+    # path — only probed here. Coinbase has it returning 5xx, which used to drag
+    # overall health to Warning every hour even though trading (advanced_trade) is
+    # fine. Health must track advanced_trade only; exchange is informational.
+    context "when only the legacy exchange API fails" do
       let(:mock_result) do
         {
           advanced_trade: {ok: true},
@@ -251,8 +255,8 @@ RSpec.describe HealthCheckJob, type: :job do
         }
       end
 
-      it "returns false" do
-        expect(job.send(:check_coinbase_api_health)).to be false
+      it "stays healthy (trading runs on advanced_trade)" do
+        expect(job.send(:check_coinbase_api_health)).to be true
       end
     end
 
@@ -265,6 +269,20 @@ RSpec.describe HealthCheckJob, type: :job do
         expect(logger).to receive(:warn).with("Coinbase API health check failed: API timeout")
         expect(job.send(:check_coinbase_api_health)).to be false
       end
+    end
+  end
+
+  # Previously a hardcoded `0` placeholder, so the Slack card always showed
+  # "WebSocket Connections 0" — a permanent false alarm. Report real liveness
+  # from the market_data heartbeat instead.
+  describe "#count_websocket_connections" do
+    it "is 1 when the market-data feed heartbeat is fresh" do
+      Heartbeat.beat!("market_data")
+      expect(job.send(:count_websocket_connections)).to eq(1)
+    end
+
+    it "is 0 when the market-data heartbeat is stale/absent" do
+      expect(job.send(:count_websocket_connections)).to eq(0)
     end
   end
 
@@ -314,12 +332,6 @@ RSpec.describe HealthCheckJob, type: :job do
         expect(logger).to receive(:warn).with("Background jobs health check failed: DB error")
         expect(job.send(:check_background_jobs_health)).to be false
       end
-    end
-  end
-
-  describe "#count_websocket_connections" do
-    it "returns 0 as placeholder" do
-      expect(job.send(:count_websocket_connections)).to eq(0)
     end
   end
 

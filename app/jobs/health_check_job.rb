@@ -125,7 +125,11 @@ class HealthCheckJob < ApplicationJob
   def check_coinbase_api_health
     client = Coinbase::Client.new
     result = client.test_auth
-    api_healthy = result[:advanced_trade][:ok] == true && result[:exchange][:ok] == true
+    # Health tracks advanced_trade only — that is the API the bot trades on. The
+    # legacy Exchange (Pro) API is not used anywhere in the trading path (only
+    # probed here) and Coinbase currently returns 5xx for it, so gating health on
+    # it produced a permanent hourly false-Warning. Exchange stays informational.
+    api_healthy = result[:advanced_trade][:ok] == true
 
     # Track API health status
     SentryHelper.add_breadcrumb(
@@ -134,7 +138,7 @@ class HealthCheckJob < ApplicationJob
       level: api_healthy ? "info" : "warning",
       data: {
         advanced_trade_ok: result[:advanced_trade][:ok],
-        exchange_ok: result[:exchange][:ok],
+        exchange_ok: result[:exchange][:ok], # informational only
         overall_healthy: api_healthy
       }
     )
@@ -177,9 +181,10 @@ class HealthCheckJob < ApplicationJob
   end
 
   def count_websocket_connections
-    # This would count active WebSocket connections
-    # For now, return a placeholder
-    0
+    # Real liveness: the market-data WS subscriber beats the "market_data"
+    # heartbeat every tick. Fresh beat => feed connected. (Was a hardcoded 0
+    # placeholder, which showed a permanent false "0" in the Slack card.)
+    Heartbeat.status("market_data")[:stale] ? 0 : 1
   end
 
   def get_memory_usage
