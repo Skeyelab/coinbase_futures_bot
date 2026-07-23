@@ -125,6 +125,29 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
           )
         end
       end
+
+      # This account's margin-window data is indeterminate: the dedicated endpoint
+      # 403s and the balance summary carries no measure, so the client returns
+      # UNKNOWN_MARGIN. The monitor must stay quiet — no false "overnight active"
+      # Slack alert (the bug that fired hourly at 11:30am ET).
+      context "with unknown / indeterminate margin window" do
+        let(:margin_window_data) do
+          {"margin_window" => {"margin_window_type" => "UNKNOWN_MARGIN"}}
+        end
+
+        it "does not send a margin-window-change Slack alert" do
+          described_class.perform_now
+
+          expect(SlackNotificationService).not_to have_received(:alert)
+            .with("info", "Margin Window Change", anything)
+        end
+
+        it "logs the indeterminate state at info, not as an unknown-type warning" do
+          described_class.perform_now
+
+          expect(logger).not_to have_received(:warn).with(/Unknown margin window type/)
+        end
+      end
     end
 
     context "when authentication is not available" do

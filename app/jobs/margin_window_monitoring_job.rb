@@ -87,6 +87,11 @@ class MarginWindowMonitoringJob < ApplicationJob
       handle_intraday_margin_window(margin_window)
     when "OVERNIGHT_MARGIN"
       handle_overnight_margin_window(margin_window)
+    when "UNKNOWN_MARGIN"
+      # Expected for this account: the dedicated margin-window endpoint 403s and
+      # the balance-summary fallback carries no measure, so the active window is
+      # indeterminate. Stay quiet — do NOT alert or fabricate a window change.
+      @logger.info("Margin window indeterminate (no data from Coinbase) - skipping margin window handling")
     else
       @logger.warn("Unknown margin window type: #{margin_window_type}")
     end
