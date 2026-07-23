@@ -23,7 +23,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
-      min_roi_schedule: nil, logger: Rails.logger)
+      min_roi_schedule: nil, liquidation_buffer: nil, logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
@@ -44,6 +44,10 @@ module Backtest
       # tests; otherwise resolved from config (inert by default).
       @min_roi = min_roi_schedule ? Trading::MinimumRoiExit.new(min_roi_schedule)
         : Trading::MinimumRoiExit.from_config(symbol: @symbol)
+      # Liquidation buffer (issue #399): highest-precedence safety exit, evaluated
+      # per candle against the candle's extreme so the backtest closes before the
+      # exchange would liquidate. Explicit for tests; else from config.
+      @liq_buffer = liquidation_buffer || Trading::LiquidationBuffer.from_config(symbol: @symbol)
       @logger = logger
     end
 
@@ -57,6 +61,9 @@ module Backtest
 
       step_candles(from, to).each do |candle|
         maybe_enter(sim, candle, entered_at, protection_store)
+        # Liquidation buffer takes precedence over the sim's TP/SL pass — a candle
+        # that would liquidate closes at the buffered price first.
+        maybe_liquidation_exit(sim, candle)
         sim.on_candle(candle)
         maybe_min_roi_exit(sim, candle, entered_at)
         stamp_exits(sim, candle, exited_at, protection_store)
@@ -109,6 +116,26 @@ module Backtest
     def position_active?(sim)
       sim.orders.values.any? do |o|
         o.status == :open || (o.status == :filled && (o.tp || o.sl))
+      end
+    end
+
+    # Liquidation-buffer exit (issue #399): if the candle's extreme reaches the
+    # buffered pre-liquidation price for the open position, force-close there —
+    # before the sim's TP/SL pass. Uses candle low for longs, high for shorts.
+    def maybe_liquidation_exit(sim, candle)
+      return unless @liq_buffer.enabled?
+
+      sim.orders.values.each do |o|
+        next unless o.status == :filled
+
+        entry = (o.entry_fill || o.price).to_f
+        side = (o.side == :buy) ? "long" : "short"
+        extreme = (o.side == :buy) ? candle.low.to_f : candle.high.to_f
+
+        next unless @liq_buffer.breached?(entry_price: entry, side: side, current_price: extreme)
+
+        exit_price = @liq_buffer.buffered_exit_price(entry_price: entry, side: side)
+        sim.force_close(o.id, price: exit_price, reason: :liquidation_buffer)
       end
     end
 
