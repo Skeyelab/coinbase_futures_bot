@@ -23,7 +23,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
-      logger: Rails.logger)
+      min_roi_schedule: nil, logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
@@ -39,6 +39,11 @@ module Backtest
       # via the strategy's own $-per-contract model or the PnL/fees are
       # inflated ~(price / contract_size_usd)x — ~1000x for BTC.
       @contract_size_usd = (contract_size_usd || strategy_contract_size_usd || 100.0).to_f
+      # Min-ROI time-decay exit (issue #398), evaluated per candle on the simulated
+      # clock so backtest exit mix reflects live behavior. Explicit schedule for
+      # tests; otherwise resolved from config (inert by default).
+      @min_roi = min_roi_schedule ? Trading::MinimumRoiExit.new(min_roi_schedule)
+        : Trading::MinimumRoiExit.from_config(symbol: @symbol)
       @logger = logger
     end
 
@@ -53,6 +58,7 @@ module Backtest
       step_candles(from, to).each do |candle|
         maybe_enter(sim, candle, entered_at, protection_store)
         sim.on_candle(candle)
+        maybe_min_roi_exit(sim, candle, entered_at)
         stamp_exits(sim, candle, exited_at, protection_store)
         equity_curve << sim.equity_usd
       end
@@ -106,6 +112,29 @@ module Backtest
       end
     end
 
+    # Min-ROI time-decay exit (issue #398): after the simulator's TP/SL pass, if a
+    # position is still open, force-close it at the candle close when its
+    # age-decayed profit bar is met. Uses the simulated clock (candle.timestamp -
+    # entered_at) for minutes_held. Only an earlier take-profit — never a stop.
+    def maybe_min_roi_exit(sim, candle, entered_at)
+      return unless @min_roi.enabled?
+
+      sim.orders.values.each do |o|
+        next unless o.status == :filled
+
+        entry = (o.entry_fill || o.price).to_f
+        next unless entry.positive?
+
+        move = (candle.close.to_f - entry) / entry
+        profit_ratio = (o.side == :buy) ? move : -move
+        minutes_held = ((candle.timestamp - entered_at[o.id]) / 60.0)
+
+        next unless @min_roi.exit_reason(profit_ratio: profit_ratio, minutes_held: minutes_held)
+
+        sim.force_close(o.id, price: candle.close.to_f, reason: :time_decay_roi)
+      end
+    end
+
     def stamp_exits(sim, candle, exited_at, protection_store)
       sim.orders.values.each do |o|
         next unless o.status == :closed
@@ -140,7 +169,9 @@ module Backtest
           pnl: gross - fees,
           fees: fees,
           entered_at: entered_at[order.id],
-          exited_at: exited_at[order.id]
+          exited_at: exited_at[order.id],
+          # nil exit_reason = closed by the simulator's fixed TP/SL pass.
+          exit_reason: order.exit_reason || :fixed_tp_sl
         }
       end
     end
