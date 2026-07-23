@@ -48,6 +48,29 @@ RSpec.describe Sentiment::BaseNewsClient do
     it "still tags bitcoin articles" do
       expect(client.symbols_in("Bitcoin rallies to new high")).to include("BTC-USD")
     end
+
+    # Issue #431: geopolitical/supply-disruption headlines that move crude but
+    # never say "oil/crude" must still route to OIL-USD (the feeds are already
+    # oil-scoped; these were being dropped by the commodity-only keyword filter).
+    it "tags geopolitical oil catalysts even without a commodity word" do
+      [
+        "Houthi attacks disrupt Red Sea tanker traffic",
+        "Strait of Hormuz tensions escalate as tankers reroute",
+        "New Iran sanctions announced by Washington",
+        "Refinery outage and pipeline sabotage roil supply",
+        "Saudi output decision awaited after supply disruption fears"
+      ].each do |headline|
+        expect(client.symbols_in(headline)).to include("OIL-USD"), "expected #{headline.inspect} to tag OIL-USD"
+      end
+    end
+
+    it "does not route these oil catalysts to BTC/ETH" do
+      expect(client.symbols_in("Strait of Hormuz tensions escalate")).not_to include("BTC-USD", "ETH-USD")
+    end
+
+    it "still ignores an unrelated non-oil headline" do
+      expect(client.symbols_in("Local bakery wins small business award")).to eq([nil])
+    end
   end
 
   describe "#generate_content_hash" do

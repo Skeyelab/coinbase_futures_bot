@@ -18,7 +18,14 @@ symbols:
     keywords: [ETH, ETHEREUM]
     lexicon: crypto
   OIL-USD:
-    keywords: [OIL, CRUDE, WTI, BRENT, OPEC, PETROLEUM, BARREL]
+    # Commodity terms + high-signal geopolitical/supply-disruption terms (issue
+    # #431) so oil catalysts that never say "oil/crude" (Hormuz, Houthi, Red Sea,
+    # sanctions, Iran) still route to OIL-USD. Deliberately omits low-precision
+    # terms (bare "war"/"strike"/"Israel") that false-positive off oil. Sources
+    # are oil-scoped, so recall gains here don't leak into other symbols.
+    keywords: [OIL, CRUDE, WTI, BRENT, OPEC, PETROLEUM, BARREL,
+      HORMUZ, HOUTHI, "RED SEA", TANKER, REFINERY, PIPELINE,
+      SANCTIONS, SANCTION, EMBARGO, IRAN, SAUDI, "SUPPLY DISRUPTION"]
     lexicon: oil
 
 sources:
@@ -39,6 +46,13 @@ sources:
     url: https://oilprice.com/rss/main
     symbols: [OIL-USD]
     weight: 1.0
+  # Additional energy-news source (issue #431) to raise oil inflow beyond the
+  # existing feeds. Validated 200/valid-RSS 2026-07-23.
+  rigzone_rss:
+    client: rss
+    url: https://www.rigzone.com/news/rss/rigzone_latest.aspx
+    symbols: [OIL-USD]
+    weight: 0.8
   investing_commodities_rss:
     client: rss
     url: https://www.investing.com/rss/news_11.rss
