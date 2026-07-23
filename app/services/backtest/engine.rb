@@ -23,7 +23,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
-      min_roi_schedule: nil, liquidation_buffer: nil, logger: Rails.logger)
+      min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
@@ -48,6 +48,10 @@ module Backtest
       # per candle against the candle's extreme so the backtest closes before the
       # exchange would liquidate. Explicit for tests; else from config.
       @liq_buffer = liquidation_buffer || Trading::LiquidationBuffer.from_config(symbol: @symbol)
+      # StoplossGuard (issue #400): fed the run's losing exits on the simulated
+      # clock; its locks land in the run-local store the entry check consults, so
+      # a loss cluster halts entries identically to live.
+      @stoploss_guard = stoploss_guard || Trading::Protections::StoplossGuard.from_config(symbol: @symbol)
       @logger = logger
     end
 
@@ -58,6 +62,8 @@ module Backtest
       entered_at = {}
       exited_at = {}
       protection_store = Trading::ProtectionLock::MemoryStore.new
+      losing_exits = []
+      halts = []
 
       step_candles(from, to).each do |candle|
         maybe_enter(sim, candle, entered_at, protection_store)
@@ -66,12 +72,13 @@ module Backtest
         maybe_liquidation_exit(sim, candle)
         sim.on_candle(candle)
         maybe_min_roi_exit(sim, candle, entered_at)
-        stamp_exits(sim, candle, exited_at, protection_store)
+        stamp_exits(sim, candle, exited_at, protection_store, losing_exits, halts)
         equity_curve << sim.equity_usd
       end
 
       Result.new(trades: build_trades(sim, entered_at, exited_at),
-        equity_curve: equity_curve, starting_equity: @starting_equity, from: from, to: to)
+        equity_curve: equity_curve, starting_equity: @starting_equity, from: from, to: to,
+        protection_halts: halts)
     end
 
     private
@@ -162,7 +169,9 @@ module Backtest
       end
     end
 
-    def stamp_exits(sim, candle, exited_at, protection_store)
+    def stamp_exits(sim, candle, exited_at, protection_store, losing_exits, halts)
+      fills_by_order = sim.fills.group_by { |f| f[:order_id] }
+
       sim.orders.values.each do |o|
         next unless o.status == :closed
         next if exited_at.key?(o.id) # already stamped; only act on the new exit
@@ -173,7 +182,28 @@ module Backtest
         Trading::Protections::CooldownPeriod.record_exit(symbol: @symbol,
           cooldown_seconds: @protection_cooldown_seconds, now: candle.timestamp,
           store: protection_store)
+
+        # StoplossGuard parity: feed losing exits to the guard on the simulated
+        # clock; new locks (a halt) are recorded for attribution.
+        next unless realized_pnl(fills_by_order[o.id], o.side).negative?
+
+        losing_exits << {side: (o.side == :buy) ? "long" : "short", at: candle.timestamp}
+        new_locks = @stoploss_guard.evaluate(symbol: @symbol, exits: losing_exits,
+          now: candle.timestamp, store: protection_store)
+        new_locks.each do |lock|
+          halts << {source: lock["source"], symbol: lock["symbol"], side: lock["side"], at: candle.timestamp}
+        end
       end
+    end
+
+    # Realized PnL for a closed order from its entry/exit fills (fees included).
+    def realized_pnl(fills, side)
+      entry, exit_fill = fills
+      return 0.0 unless entry && exit_fill
+
+      direction = (side == :buy) ? 1 : -1
+      gross = (exit_fill[:price] - entry[:price]) * entry[:qty] * direction
+      gross - entry[:fee] - exit_fill[:fee]
     end
 
     # Pair entry/exit fills per order into round-trip trade records. Trades
