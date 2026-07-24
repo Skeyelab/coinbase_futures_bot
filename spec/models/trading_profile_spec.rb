@@ -158,6 +158,22 @@ RSpec.describe TradingProfile do
       end
     end
 
+    # The default floor of 5 contracts over-leverages small accounts and
+    # high-notional contracts (e.g. ~21x a $1k account on one GOL entry): the
+    # strategy floors risk-based sizing at min_position_size, so a risk sizing of
+    # 1 contract is silently bumped to 5. Default to 1; opt into larger via env.
+    it "min_position_size defaults to 1, not the over-leverage-prone 5" do
+      ClimateControl.modify(MIN_POSITION_SIZE: nil) do
+        expect(described_class.default_profile.min_position_size).to eq(1)
+      end
+    end
+
+    it "min_position_size still honors the MIN_POSITION_SIZE env override" do
+      ClimateControl.modify(MIN_POSITION_SIZE: "3") do
+        expect(described_class.default_profile.min_position_size).to eq(3)
+      end
+    end
+
     it "default profile has sensible values" do
       result = described_class.effective
       expect(result.tp_target).to be > 0

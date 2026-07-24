@@ -62,7 +62,10 @@ class TradingProfile < ApplicationRecord
       sl_target: ENV.fetch("STRATEGY_SL_TARGET", "0.004").to_f,
       risk_fraction: ENV.fetch("STRATEGY_RISK_FRACTION", "0.02").to_f,
       max_position_size: ENV.fetch("MAX_POSITION_SIZE", "15").to_i,
-      min_position_size: ENV.fetch("MIN_POSITION_SIZE", "5").to_i,
+      # Default 1: the strategy floors risk-based sizing at min_position_size, so
+      # a larger floor silently over-leverages small accounts / high-notional
+      # contracts (a 5-contract floor is ~21x a $1k account on one GOL entry).
+      min_position_size: ENV.fetch("MIN_POSITION_SIZE", "1").to_i,
       min_confidence_threshold: ENV.fetch("REALTIME_SIGNAL_MIN_CONFIDENCE", "60").to_f,
       max_signals_per_hour: ENV.fetch("REALTIME_SIGNAL_MAX_PER_HOUR", "10").to_i,
       deduplication_window: ENV.fetch("REALTIME_SIGNAL_DEDUPE_WINDOW", "300").to_i
