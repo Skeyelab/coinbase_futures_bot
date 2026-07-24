@@ -24,7 +24,18 @@ class OperatorSnapshot
       loop: Heartbeat.status("realtime_signal", now: @now),
       market_data: Heartbeat.status("market_data", now: @now),
       eval: eval_info,
-      paper: paper_info
+      paper: paper_info,
+      indicators: indicators
+    }
+  end
+
+  # Why the bot is (or isn't) acting (issue #436): precomputed sentiment
+  # predictiveness (from PredictivenessSnapshotJob — cheap read) plus live
+  # protection state. Single source of truth for the CLI/TUI/web surfaces.
+  def indicators
+    {
+      predictiveness: predictiveness_info,
+      protections: protections_info
     }
   end
 
@@ -114,6 +125,40 @@ class OperatorSnapshot
       strategy: signal.strategy_name,
       timestamp: iso(signal.alert_timestamp)
     }
+  end
+
+  def predictiveness_info
+    value = BotRuntimeStat.find_by(key: PredictivenessSnapshotJob::KEY)&.value
+    return {"computed_at" => nil, "symbols" => []} if value.blank?
+
+    value.slice("computed_at", "symbols")
+  end
+
+  def protections_info
+    {
+      active: Trading::ProtectionLock.active(now: @now).map { |lock| protection_row(lock) },
+      drawdown: drawdown_info
+    }
+  end
+
+  def protection_row(lock)
+    {
+      scope: lock["scope"],
+      symbol: lock["symbol"],
+      side: lock["side"],
+      source: lock["source"],
+      reason: lock["reason"],
+      expires_at: lock["expires_at"]
+    }
+  end
+
+  def drawdown_info
+    peak = BotRuntimeStat.find_by(key: Trading::Protections::MaxDrawdownMonitor::PEAK_KEY)&.value&.dig("peak")
+    current = paper_info[:equity]
+    pct = if peak.to_f.positive? && current
+      ((peak.to_f - current.to_f) / peak.to_f * 100).round(2)
+    end
+    {peak: peak&.to_f, current: current, drawdown_pct: pct}
   end
 
   def eval_info
