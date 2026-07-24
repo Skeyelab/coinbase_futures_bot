@@ -6,84 +6,59 @@ module MarketData
   class CoinbaseFuturesSubscriber
     include SentryServiceTracking
 
-    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true)
+    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true,
+      url: ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com"),
+      stale_after: ENV.fetch("MARKET_DATA_WS_STALE_SECONDS", "60").to_f,
+      connect: WebsocketSupervisor::DEFAULT_CONNECT, sleeper: WebsocketSupervisor::DEFAULT_SLEEPER)
       @product_ids = Array(product_ids)
       @logger = logger
       @on_ticker = on_ticker
-      @ws = nil
       @candle_aggregator = enable_candle_aggregation ? RealTimeCandleAggregator.new(logger: logger) : nil
+      @url = url
+      @stale_after = stale_after
+      @connect = connect
+      @sleeper = sleeper
     end
 
+    # Delegates the connection lifecycle to WebsocketSupervisor, which reconnects
+    # on drop and on silence (a dead socket the :close event never reported —
+    # the failure that silently froze the market-data feed). This subscriber
+    # only supplies the subscribe message and tick parsing.
     def start
-      url = ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com")
-
       SentryHelper.add_breadcrumb(
         message: "Starting Coinbase futures WebSocket connection",
         category: "websocket",
         level: "info",
-        data: {
-          service: "coinbase_futures_subscriber",
-          url: url,
-          product_ids: @product_ids
-        }
+        data: {service: "coinbase_futures_subscriber", url: @url, product_ids: @product_ids}
       )
 
-      begin
-        socket = WebSocket::Client::Simple.connect(url)
-        @ws = socket
-
-        # Capture external references because the event_emitter uses instance_exec
-        # which changes self inside the blocks to the socket instance.
-        subscriber = self
-        log = @logger
-
-        socket.on(:open) { subscriber.__send__(:subscribe) }
-        socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
-        socket.on(:error) { |e| subscriber.__send__(:handle_error, e) }
-        socket.on(:close) do
-          log.info("[MD] closed")
-          subscriber.__send__(:mark_ws_as_closed)
-        end
-
-        # Keep the job alive until the websocket closes
-        sleep 0.1 while @ws
-      rescue => e
-        Sentry.with_scope do |scope|
-          scope.set_tag("service", "coinbase_futures_subscriber")
-          scope.set_tag("operation", "websocket_connection")
-          scope.set_tag("error_type", "connection_error")
-
-          scope.set_context("websocket", {
-            url: url,
-            product_ids: @product_ids,
-            enable_candle_aggregation: @candle_aggregator.present?
-          })
-
-          Sentry.capture_exception(e)
-        end
-
-        raise
-      end
+      subscriber = self
+      @supervisor = WebsocketSupervisor.new(
+        url: @url,
+        on_open: ->(socket) { subscriber.__send__(:subscribe, socket) },
+        on_message: ->(msg) { subscriber.__send__(:handle_message, msg) },
+        on_error: ->(e) { subscriber.__send__(:handle_error, e) },
+        stale_after: @stale_after,
+        logger: @logger,
+        connect: @connect,
+        sleeper: @sleeper
+      )
+      @supervisor.run
     end
 
     def stop
-      mark_ws_as_closed
+      @supervisor&.stop
     end
 
     private
 
-    def mark_ws_as_closed
-      @ws&.close if @ws&.respond_to?(:close)
-      @ws = nil
-    end
-
-    def subscribe
+    def subscribe(socket)
       msg = {
         type: "subscribe",
         channel: "ticker",
         product_ids: @product_ids
       }
-      @ws.send(msg.to_json)
+      socket.send(msg.to_json)
       @logger.info("[MD] subscribed: #{msg}")
     end
 
@@ -177,7 +152,6 @@ module MarketData
 
         scope.set_context("websocket", {
           product_ids: @product_ids,
-          connection_active: @ws.present?,
           error_message: error.to_s
         })
 
