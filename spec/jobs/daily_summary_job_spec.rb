@@ -29,14 +29,14 @@ RSpec.describe DailySummaryJob, type: :job do
     create(:position, paper: true, status: "CLOSED", pnl: -20.0, size: 2.0,
       entry_price: 50_000.0, entry_time: now - 300, close_time: now)
 
-    # per-trade round trip at taker 15 bps on both sides of the contract-size
-    # notional (exit approximated by entry): 2 * 50_000 * 0.01 * 2.0 * 0.0015 = 3.0
+    # per-trade round trip at perp taker 3 bps on both sides of the contract-size
+    # notional (exit approximated by entry): 2 * 50_000 * 0.01 * 2.0 * 0.0003 = 0.6
     expect(notifier).to receive(:alert).with(
       "info",
       anything,
       a_string_including(
-        "Est. cost/round-trip: $3.0 (10.0% of avg win)",
-        "Net of costs: $4.0 → PASS"
+        "Est. cost/round-trip: $0.6 (2.0% of avg win)",
+        "Net of costs: $8.8 → PASS"
       )
     )
 
@@ -80,7 +80,9 @@ RSpec.describe DailySummaryJob, type: :job do
   it "fails the cost gate when costs exceed the realized edge" do
     now = Time.current
     allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
-    create(:position, paper: true, status: "CLOSED", pnl: 2.0, size: 2.0,
+    # Round-trip cost at perp taker 3 bps: 2 * 50_000 * 0.01 * 2.0 * 0.0003 = $0.6.
+    # A thinner $0.4 edge is cost-dominated -> net -$0.2 -> FAIL.
+    create(:position, paper: true, status: "CLOSED", pnl: 0.4, size: 2.0,
       entry_price: 50_000.0, entry_time: now - 600, close_time: now)
 
     expect(notifier).to receive(:alert).with(

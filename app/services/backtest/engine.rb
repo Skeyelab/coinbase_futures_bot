@@ -8,9 +8,9 @@ module Backtest
   # exits.
   #
   # Costs default to TAKER pricing (issue #353): momentum entries cross the
-  # spread. The default rate approximates Coinbase CDE taker fees
-  # (~$0.15/side per $100-notional contract = 15 bps); override via
-  # BACKTEST_TAKER_FEE_RATE or fee_rate: to match the current fee schedule.
+  # spread. The default rate is the ~3 bps US-perp taker fee (ADR 0002 / issue
+  # #391); override via BACKTEST_TAKER_FEE_RATE or fee_rate: to match the current
+  # fee schedule.
   class Engine
     STEP_SCOPES = {
       "1m" => :one_minute,

@@ -653,8 +653,8 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       end
 
       position = Position.where(paper: true).last
-      # max(50_000 * 2 * 0.0015, 2 * 0.15) = $150 proportional dominates here
-      expect(position.entry_fee.to_f).to be_within(1e-6).of(150.0)
+      # max(50_000 * 2 * 0.0003, 2 * 0.15) = $30 proportional dominates here (perp taker 3 bps)
+      expect(position.entry_fee.to_f).to be_within(1e-6).of(30.0)
     end
 
     it "records the exit fee when a paper position closes" do
