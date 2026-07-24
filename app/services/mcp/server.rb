@@ -28,6 +28,8 @@ module Mcp
        inputSchema: {type: "object", properties: {}}},
       {name: "get_halt_status", description: "Trading halt / kill-switch state (active, halted, reason).",
        inputSchema: {type: "object", properties: {}}},
+      {name: "get_fee_truth", description: "Compare modeled fees (CostModel taker/maker defaults) against REAL Coinbase commissions from recent fills; flags perp-taker drift once perp fills exist (issue #391). Read-only.",
+       inputSchema: {type: "object", properties: {limit: {type: "integer"}}}},
       {name: "halt_trading", description: "Halt trading (kill switch). Stops signal generation; places no orders.",
        inputSchema: {type: "object", properties: {reason: {type: "string"}}}},
       {name: "resume_trading", description: "Resume trading after a halt.",
@@ -89,6 +91,7 @@ module Mcp
       when "get_signals" then tool_result(id, OperatorSnapshot.new.signals)
       when "get_sentiment" then tool_result(id, OperatorSnapshot.new.sentiment)
       when "get_halt_status" then tool_result(id, OperatorSnapshot.new.halt_status)
+      when "get_fee_truth" then tool_result(id, Trading::FeeTruth.call(limit: args["limit"] || 250))
       when "halt_trading" then tool_result(id, TradingHalt.halt!(reason: args["reason"]))
       when "resume_trading" then tool_result(id, TradingHalt.resume!)
       when "close_position" then close_position(id, args)
