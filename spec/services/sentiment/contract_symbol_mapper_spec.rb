@@ -41,4 +41,23 @@ RSpec.describe Sentiment::ContractSymbolMapper do
       expect(described_class.sentiment_symbols_for_enabled_contracts).to eq([])
     end
   end
+
+  describe ".price_symbol_for" do
+    it "uses the spot series when the sentiment symbol has its own 1h candles (BTC/ETH)" do
+      create(:candle, symbol: "BTC-USD", timeframe: "1h", timestamp: 1.hour.ago)
+      expect(described_class.price_symbol_for("BTC-USD")).to eq("BTC-USD")
+    end
+
+    it "picks the contract with the most 1h history when there is no spot series (OIL)" do
+      create(:candle, symbol: "NOL-19AUG26-CDE", timeframe: "1h", timestamp: 3.hours.ago)
+      create(:candle, symbol: "NOL-19AUG26-CDE", timeframe: "1h", timestamp: 2.hours.ago)
+      create(:candle, symbol: "NOL-21SEP26-CDE", timeframe: "1h", timestamp: 1.hour.ago)
+
+      expect(described_class.price_symbol_for("OIL-USD")).to eq("NOL-19AUG26-CDE")
+    end
+
+    it "returns nil when the symbol maps to no usable price series" do
+      expect(described_class.price_symbol_for("DOGE-USD")).to be_nil
+    end
+  end
 end

@@ -69,6 +69,12 @@ Rails.application.configure do
       cron: ENV.fetch("SENTIMENT_AGG_CRON", "*/5 * * * *"), # every 5 minutes
       class: "AggregateSentimentJob"
     },
+    # Sentiment predictiveness snapshot for OperatorSnapshot#indicators (#436).
+    # Hourly is ample — predictiveness moves slowly (needs weeks of data).
+    predictiveness_snapshot: {
+      cron: ENV.fetch("PREDICTIVENESS_SNAPSHOT_CRON", "20 * * * *"), # hourly at :20
+      class: "PredictivenessSnapshotJob"
+    },
     # Day trading position management - run every 15 minutes during trading hours
     day_trading_management: {
       # Crypto trades 24/7 (issue #366): positions opened nights/weekends need

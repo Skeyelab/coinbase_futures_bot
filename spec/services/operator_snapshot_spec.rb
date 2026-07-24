@@ -125,4 +125,31 @@ RSpec.describe OperatorSnapshot do
       expect(row[:timestamp]).to eq("2026-07-17T17:59:00Z")
     end
   end
+
+  describe "#indicators (issue #436)" do
+    it "reads precomputed predictiveness and builds live protections" do
+      BotRuntimeStat.create!(key: "indicators:predictiveness", recorded_at: Time.current,
+        value: {"computed_at" => "2026-07-24T00:00:00Z",
+                "symbols" => [{"sentiment_symbol" => "OIL-USD", "price_symbol" => "NOL-19AUG26-CDE", "maturity" => "low"}]})
+      Trading::ProtectionLock.add(scope: "symbol", source: "cooldown", symbol: "NOL-19AUG26-CDE",
+        side: "both", reason: "post-exit cooldown", expires_at: 1.hour.from_now)
+      BotRuntimeStat.create!(key: "protection:max_drawdown_peak", recorded_at: Time.current,
+        value: {"peak" => 10_000.0})
+
+      ind = OperatorSnapshot.new.indicators
+
+      expect(ind[:predictiveness]["computed_at"]).to eq("2026-07-24T00:00:00Z")
+      expect(ind[:predictiveness]["symbols"].first).to include("sentiment_symbol" => "OIL-USD", "maturity" => "low")
+      expect(ind[:protections][:active].first).to include(scope: "symbol", source: "cooldown", reason: "post-exit cooldown")
+      expect(ind[:protections][:drawdown][:peak]).to eq(10_000.0)
+    end
+
+    it "reports empty predictiveness before the job has ever run" do
+      expect(OperatorSnapshot.new.indicators[:predictiveness]).to eq({"computed_at" => nil, "symbols" => []})
+    end
+
+    it "is embedded in the status document" do
+      expect(OperatorSnapshot.new.status).to have_key(:indicators)
+    end
+  end
 end

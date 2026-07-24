@@ -113,6 +113,7 @@ module Cli
       puts "─" * 40
       print_paper_section
       print_sentiment_section
+      print_indicators_section
       puts "─" * 40
       puts "  #{WHITE}Status:#{RESET} #{GREEN}#{BOLD}operational#{RESET}"
     end
@@ -335,6 +336,15 @@ module Cli
       end
 
       puts "    #{sentiment_freshness(snap)}"
+    end
+
+    # Why the bot is (or isn't) acting (issue #436): sentiment predictiveness +
+    # active protections. Full 1/4/24h detail is in `status --json`.
+    def print_indicators_section
+      puts "  #{WHITE}Indicators:#{RESET}"
+      Cli::IndicatorsPresenter.lines(OperatorSnapshot.new.indicators).each { |line| puts "  #{line}" }
+    rescue => e
+      puts "    #{YELLOW}indicators unavailable: #{e.message}#{RESET}"
     end
 
     def sentiment_freshness(snap)

@@ -28,6 +28,22 @@ module Sentiment
       Contract.enabled.filter_map { |contract| sentiment_symbol_for(contract.product_id) }.uniq.sort
     end
 
+    # The price series to measure a sentiment symbol's predictiveness against
+    # (issue #436). Prefers the symbol's own continuous spot candles (BTC-USD /
+    # ETH-USD); when none exist (OIL has no spot), falls back to the contract for
+    # its underlying with the most candle history. nil when nothing maps.
+    def self.price_symbol_for(sentiment_symbol, timeframe: "1h")
+      symbol = sentiment_symbol.to_s.strip.upcase
+      return symbol if Candle.where(symbol: symbol, timeframe: timeframe).exists?
+
+      underlying = UNDERLYING_TO_SENTIMENT.key(symbol)
+      prefix = PREFIX_TO_UNDERLYING.key(underlying)
+      return nil if prefix.blank?
+
+      Candle.where("symbol LIKE ?", "#{prefix}%").where(timeframe: timeframe)
+        .group(:symbol).order(Arel.sql("COUNT(*) DESC")).limit(1).count.keys.first
+    end
+
     def self.underlying_from_product_id(product_id)
       prefix = product_id.match(/\A([A-Z]+)-/)&.captures&.first
       PREFIX_TO_UNDERLYING[prefix] || Contract.parse_contract_info(product_id)&.dig(:base_currency)
