@@ -22,6 +22,33 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     allow(service).to receive(:build_jwt_token).and_return("mock.jwt.token")
   end
 
+  describe "#list_fills" do
+    it "raises when not authenticated" do
+      service.instance_variable_set(:@authenticated, false)
+      expect { service.list_fills }.to raise_error("Authentication required")
+    end
+
+    it "fetches and returns the parsed fills array (issue #391 fee truth)" do
+      body = {fills: [
+        {"product_id" => "BIP-PERP", "commission" => "0.30", "size" => "1", "price" => "100",
+         "liquidity_indicator" => "TAKER", "side" => "BUY", "trade_time" => "2026-07-23T00:00:00Z"}
+      ]}.to_json
+      allow(service).to receive(:authenticated_get)
+        .with("/api/v3/brokerage/orders/historical/fills", hash_including(limit: 50))
+        .and_return(instance_double(Faraday::Response, body: body))
+
+      fills = service.list_fills(limit: 50)
+      expect(fills.size).to eq(1)
+      expect(fills.first["product_id"]).to eq("BIP-PERP")
+    end
+
+    it "returns an empty array when the account has no fills" do
+      allow(service).to receive(:authenticated_get)
+        .and_return(instance_double(Faraday::Response, body: {fills: []}.to_json))
+      expect(service.list_fills).to eq([])
+    end
+  end
+
   describe "authentication" do
     it "loads credentials from cdp_api_key.json" do
       service = described_class.new

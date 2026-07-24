@@ -95,6 +95,20 @@ module Trading
       positions
     end
 
+    # Real executed fills with true commissions (issue #391 fee truth). Read-only.
+    # Coinbase returns the most-recent fills; `commission` is the actual fee paid
+    # and `liquidity_indicator` is MAKER/TAKER. Returns the raw fills array.
+    def list_fills(limit: 100, product_id: nil)
+      raise "Authentication required" unless @authenticated
+
+      params = {limit: limit}
+      params[:product_id] = product_id if product_id
+      resp = authenticated_get("/api/v3/brokerage/orders/historical/fills", params)
+      data = JSON.parse(resp.body)
+      fills = data.is_a?(Hash) ? (data["fills"] || []) : Array(data)
+      fills.is_a?(Array) ? fills : [fills]
+    end
+
     # Open a position by placing an order. By default uses market order.
     # side: :buy or :sell
     # size: String or Numeric quantity in base units
