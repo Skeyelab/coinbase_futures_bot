@@ -8,9 +8,9 @@ module Backtest
   # exits.
   #
   # Costs default to TAKER pricing (issue #353): momentum entries cross the
-  # spread. The default rate approximates Coinbase CDE taker fees
-  # (~$0.15/side per $100-notional contract = 15 bps); override via
-  # BACKTEST_TAKER_FEE_RATE or fee_rate: to match the current fee schedule.
+  # spread. The default rate is the ~3 bps US-perp taker fee (ADR 0002 / issue
+  # #391); override via BACKTEST_TAKER_FEE_RATE or fee_rate: to match the current
+  # fee schedule.
   class Engine
     STEP_SCOPES = {
       "1m" => :one_minute,
@@ -23,6 +23,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
+      funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
       logger: Rails.logger)
       @symbol = symbol
@@ -31,6 +32,13 @@ module Backtest
       @starting_equity = starting_equity.to_f
       @fee_rate = (fee_rate || CostModel.taker_fee_rate).to_f
       @slippage = slippage.to_f
+      # Perp funding (issue #391): a constant *adverse* sensitivity knob, ON by
+      # default so backtests stop silently pricing funding as free (ADR 0002).
+      # Default 2 bps/interval, hourly; set funding_bps_per_interval: 0 to disable.
+      funding_bps = (funding_bps_per_interval || ENV["BACKTEST_FUNDING_BPS_PER_INTERVAL"] || 2.0).to_f
+      @funding_rate_per_interval = (funding_bps > 0) ? funding_bps / 10_000.0 : nil
+      @funding_interval_seconds =
+        (funding_interval_seconds || ENV["BACKTEST_FUNDING_INTERVAL_SECONDS"] || 3600).to_i
       # Protections (issue #397, ADR 0003) are evaluated inside the backtest on the
       # simulated clock against a run-local in-memory store, so backtest metrics
       # reflect the same cooldown/guard behavior as live without touching live state.
@@ -61,7 +69,9 @@ module Backtest
 
     def run(from:, to:)
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
-        fee_rate: @fee_rate, slippage: @slippage)
+        fee_rate: @fee_rate, slippage: @slippage,
+        funding_interval_seconds: @funding_interval_seconds,
+        funding_rate_per_interval: @funding_rate_per_interval)
       equity_curve = [@starting_equity]
       entered_at = {}
       exited_at = {}
@@ -149,7 +159,7 @@ module Backtest
         next unless @liq_buffer.breached?(entry_price: entry, side: side, current_price: extreme)
 
         exit_price = @liq_buffer.buffered_exit_price(entry_price: entry, side: side)
-        sim.force_close(o.id, price: exit_price, reason: :liquidation_buffer)
+        sim.force_close(o.id, price: exit_price, reason: :liquidation_buffer, candle: candle)
       end
     end
 
@@ -172,7 +182,7 @@ module Backtest
 
         next unless @min_roi.exit_reason(profit_ratio: profit_ratio, minutes_held: minutes_held)
 
-        sim.force_close(o.id, price: candle.close.to_f, reason: :time_decay_roi)
+        sim.force_close(o.id, price: candle.close.to_f, reason: :time_decay_roi, candle: candle)
       end
     end
 
@@ -242,13 +252,15 @@ module Backtest
         direction = (order.side == :buy) ? 1 : -1
         gross = (exit_fill[:price] - entry[:price]) * entry[:qty] * direction
         fees = entry[:fee] + exit_fill[:fee]
+        funding = order.funding_cost.to_f
         {
           side: (order.side == :buy) ? :long : :short,
           entry_price: entry[:price],
           exit_price: exit_fill[:price],
           quantity: entry[:qty],
-          pnl: gross - fees,
+          pnl: gross - fees - funding,
           fees: fees,
+          funding: funding,
           entered_at: entered_at[order.id],
           exited_at: exited_at[order.id],
           # nil exit_reason = closed by the simulator's fixed TP/SL pass.

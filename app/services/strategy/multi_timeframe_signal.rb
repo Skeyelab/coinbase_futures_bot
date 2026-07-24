@@ -22,6 +22,13 @@ module Strategy
       sl_target: 0.003, # 30 bps (tighter for day trading)
       fee_rate: nil, # resolved to CostModel.taker_fee_rate in initialize; momentum entries cross the spread
       slippage: 0.0002,
+      # Perp funding in the ex-ante break-even gate (issue #391): expected funding
+      # over the hold = (expected_hold / interval) x rate, added to break-even so
+      # the gate does not approve a trade that only clears fees. Set the rate to 0
+      # to disable. Defaults: adverse 2 bps/interval, hourly, ~1 interval hold.
+      funding_rate_per_interval: 0.0002,
+      funding_interval_seconds: 3600,
+      funding_expected_hold_seconds: 3600,
       risk_fraction: 0.005,
       # Futures-specific settings
       contract_size_usd: 100.0, # USD value per contract (e.g., $100 for BTC-USD)
@@ -109,7 +116,7 @@ module Strategy
         if interacted_with_5m_ema && last_close_5m > ema5 && micro_timing_ok
           entry = last_close_1m # Use 1m close for precise entry
           be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
-            slippage_rate: @config[:slippage])
+            slippage_rate: @config[:slippage], funding_rate: funding_break_even_fraction)
           tp = [entry * (1.0 + @config[:tp_target]), be * 1.001].max
           sl = entry * (1.0 - @config[:sl_target])
           qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
@@ -120,7 +127,7 @@ module Strategy
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
         be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
-          slippage_rate: @config[:slippage])
+          slippage_rate: @config[:slippage], funding_rate: funding_break_even_fraction)
         tp = [entry * (1.0 - @config[:tp_target]), be * 0.999].min
         sl = entry * (1.0 + @config[:sl_target])
         qty = position_size(equity_usd: equity_usd, entry: entry, sl: sl, risk_fraction: @config[:risk_fraction])
@@ -133,6 +140,17 @@ module Strategy
     end
 
     private
+
+    # Expected funding over the hold as a fraction of notional (issue #391):
+    # (expected_hold / interval) x adverse rate. Feeds the break-even gate so it
+    # clears funding, not just fees. Zero when the rate/interval is disabled.
+    def funding_break_even_fraction
+      rate = @config[:funding_rate_per_interval].to_f
+      interval = @config[:funding_interval_seconds].to_f
+      return 0.0 unless rate.positive? && interval.positive?
+
+      (@config[:funding_expected_hold_seconds].to_f / interval) * rate
+    end
 
     def candle_scope(timeframe)
       scope = Candle.for_symbol(@current_symbol).public_send(timeframe).order(:timestamp)

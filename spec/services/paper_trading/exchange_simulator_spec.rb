@@ -54,6 +54,61 @@ RSpec.describe PaperTrading::ExchangeSimulator, type: :service do
     end
   end
 
+  # Funding is a position-TIME cost charged to open perp positions at each
+  # funding timestamp crossed during the hold (issue #391). Default: OFF — a
+  # constant *adverse* knob (always a cost, either side) that callers opt into,
+  # so existing candle doubles that carry no timestamp are untouched.
+  describe "funding accrual (issue #391)" do
+    let(:funded) do
+      described_class.new(starting_equity_usd: 10_000.0, fee_rate: 0.0, slippage: 0.0,
+        funding_interval_seconds: 3600, funding_rate_per_interval: 0.0002)
+    end
+
+    def candle(close, high, low, at)
+      double("Candle", close: close, high: high, low: low, timestamp: at)
+    end
+
+    it "charges a long adverse funding for each boundary crossed, on top of PnL" do
+      id = funded.place_limit(symbol: "BIP", side: :buy, price: 100.0, quantity: 1.0, tp: 110.0)
+      funded.on_candle(candle(100.0, 100.5, 99.5, Time.utc(2026, 7, 22, 8, 30))) # fill @08:30
+      funded.on_candle(candle(111.0, 112.0, 110.0, Time.utc(2026, 7, 22, 10, 30))) # TP @10:30
+
+      # Boundaries 09:00 + 10:00 = 2 intervals; notional = entry 100 * qty 1.
+      expected_funding = 2 * 0.0002 * 100.0
+      gross = (110.0 - 100.0) * 1.0
+      expect(funded.orders[id].funding_cost).to be_within(1e-9).of(expected_funding)
+      expect(funded.equity_usd).to be_within(1e-9).of(10_000.0 + gross - expected_funding)
+    end
+
+    it "charges a short adversely too (the knob is always a cost)" do
+      id = funded.place_limit(symbol: "BIP", side: :sell, price: 100.0, quantity: 1.0, tp: 90.0)
+      funded.on_candle(candle(100.0, 100.5, 99.5, Time.utc(2026, 7, 22, 8, 30))) # fill @08:30
+      funded.on_candle(candle(89.0, 90.0, 88.0, Time.utc(2026, 7, 22, 10, 30))) # TP @10:30
+
+      expected_funding = 2 * 0.0002 * 100.0
+      expect(funded.orders[id].funding_cost).to be_within(1e-9).of(expected_funding)
+    end
+
+    it "charges nothing when the hold crosses no funding boundary" do
+      id = funded.place_limit(symbol: "BIP", side: :buy, price: 100.0, quantity: 1.0, tp: 110.0)
+      funded.on_candle(candle(100.0, 100.5, 99.5, Time.utc(2026, 7, 22, 8, 5)))  # fill @08:05
+      funded.on_candle(candle(111.0, 112.0, 110.0, Time.utc(2026, 7, 22, 8, 50))) # TP @08:50
+
+      expect(funded.orders[id].funding_cost).to eq(0.0)
+      expect(funded.equity_usd).to be_within(1e-9).of(10_000.0 + 10.0)
+    end
+
+    it "leaves funding off by default (candles need no timestamp)" do
+      sim = described_class.new(starting_equity_usd: 1_000.0, fee_rate: 0.0, slippage: 0.0)
+      id = sim.place_limit(symbol: "BIP", side: :buy, price: 100.0, quantity: 1.0, tp: 110.0)
+      sim.on_candle(double("Candle", close: 100.0, high: 100.5, low: 99.5))
+      sim.on_candle(double("Candle", close: 111.0, high: 112.0, low: 110.0))
+
+      expect(sim.orders[id].funding_cost).to eq(0.0)
+      expect(sim.equity_usd).to be_within(1e-9).of(1_000.0 + 10.0)
+    end
+  end
+
   describe "#initialize" do
     it "sets initial equity" do
       expect(simulator.equity_usd).to eq(10_000.0)

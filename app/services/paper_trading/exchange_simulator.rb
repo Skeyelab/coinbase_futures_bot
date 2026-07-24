@@ -3,20 +3,31 @@
 module PaperTrading
   class ExchangeSimulator
     Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
-      :entry_fill, :exit_reason)
+      :entry_fill, :entry_time, :funding_cost, :exit_reason)
 
     attr_reader :orders, :fills, :equity_usd
 
     # fee_rate is the canonical per-side fee; maker_fee is kept as a legacy
     # alias. Slippage is applied adversely to every fill (issue #353: entries
     # from momentum signals cross the spread, so fills are taker-priced).
-    def initialize(starting_equity_usd: 10_000.0, maker_fee: nil, fee_rate: nil, slippage: 0.0002)
+    #
+    # Funding (issue #391) is OFF unless both funding_interval_seconds and a
+    # positive funding_rate_per_interval are supplied. When active it is a
+    # constant *adverse* charge (a cost to either side) applied at position
+    # close for every funding timestamp the hold crossed; this is the
+    # sensitivity knob ADR 0002 specifies "until history accrues". Active
+    # funding reads candle.timestamp, so callers must pass timestamped candles.
+    def initialize(starting_equity_usd: 10_000.0, maker_fee: nil, fee_rate: nil, slippage: 0.0002,
+      funding_interval_seconds: nil, funding_rate_per_interval: nil)
       @equity_usd = starting_equity_usd.to_f
       @orders = {}
       @fills = []
       @id_seq = 0
       @fee_rate = (fee_rate || maker_fee || 0.0005).to_f
       @slippage = slippage.to_f
+      @funding_interval_seconds = funding_interval_seconds.to_i
+      @funding_rate_per_interval = funding_rate_per_interval.to_f
+      @funding_active = @funding_interval_seconds.positive? && @funding_rate_per_interval.positive?
     end
 
     def place_limit(symbol:, side:, price:, quantity:, tp: nil, sl: nil)
@@ -30,11 +41,14 @@ module PaperTrading
     # Force-close a filled position at an explicit price with an exit reason
     # (issue #398 — min-ROI time-decay exit in backtests). No-op unless the order
     # is currently a filled, open position.
-    def force_close(id, price:, reason:)
+    # candle carries the exit timestamp so a force-closed perp position still
+    # accrues funding for the boundaries it crossed (issue #391). Optional: a
+    # nil candle (non-backtest callers) simply skips funding.
+    def force_close(id, price:, reason:, candle: nil)
       o = orders[id]
       return unless o && o.status == :filled
 
-      realize_pnl(o, price)
+      realize_pnl(o, price, candle)
       o.exit_reason = reason
       o.status = :closed
     end
@@ -55,12 +69,12 @@ module PaperTrading
         when :buy
           if candle.low.to_f <= o.price.to_f
             fill_price = [o.price.to_f, bid].min
-            apply_fill(o, fill_price)
+            apply_fill(o, fill_price, candle)
           end
         when :sell
           if candle.high.to_f >= o.price.to_f
             fill_price = [o.price.to_f, ask].max
-            apply_fill(o, fill_price)
+            apply_fill(o, fill_price, candle)
           end
         end
       end
@@ -81,7 +95,7 @@ module PaperTrading
         end
         next unless exit_price
 
-        realize_pnl(o, exit_price)
+        realize_pnl(o, exit_price, candle)
         o.status = :closed
       end
     end
@@ -93,18 +107,20 @@ module PaperTrading
       @id_seq
     end
 
-    def apply_fill(order, fill_price)
+    def apply_fill(order, fill_price, candle)
       slipped = slip(fill_price, order.side)
       order.status = :filled
       order.filled_qty = order.quantity
       order.entry_fill = slipped
+      order.funding_cost = 0.0
+      order.entry_time = candle.timestamp if @funding_active
       fee = slipped * order.filled_qty * @fee_rate
       @equity_usd -= fee
       @fills << {order_id: order.id, side: order.side, price: slipped, qty: order.filled_qty, fee: fee,
                   time: Time.now.utc}
     end
 
-    def realize_pnl(order, exit_price)
+    def realize_pnl(order, exit_price, candle)
       exit_side = (order.side == :buy) ? :sell : :buy
       slipped_exit = slip(exit_price.to_f, exit_side)
       entry_price = (order.entry_fill || order.price).to_f
@@ -116,8 +132,25 @@ module PaperTrading
       when :sell then entry_value - exit_value - fee
       end
       @equity_usd += pnl
+      @equity_usd -= charge_funding(order, candle, entry_value)
       @fills << {order_id: order.id, side: exit_side, price: slipped_exit,
                   qty: order.filled_qty, fee: fee, time: Time.now.utc}
+    end
+
+    # Constant *adverse* funding: a cost to either side for each funding
+    # timestamp the hold crossed (issue #391). Charged on entry notional at
+    # position close. Returns the dollars charged (0.0 when funding is off, or
+    # when no candle is available to date the exit — e.g. a nil-candle force_close).
+    def charge_funding(order, candle, entry_notional)
+      return 0.0 unless @funding_active && candle && order.entry_time
+
+      intervals = CostModel.funding_intervals_crossed(
+        entry_time: order.entry_time, exit_time: candle.timestamp,
+        interval: @funding_interval_seconds
+      )
+      funding = intervals * @funding_rate_per_interval * entry_notional
+      order.funding_cost = funding
+      funding
     end
 
     # Adverse slippage: buys fill higher, sells fill lower.
