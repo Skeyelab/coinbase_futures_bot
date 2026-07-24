@@ -37,6 +37,12 @@ module Strategy
       resolve_symbols: true # false in backtests: use the symbol as-is, no contract lookup
     }.freeze
 
+    # Optional Funding::Schedule shared with the backtest accrual (issue #391).
+    # When set, the break-even gate clears the funding rate the venue actually
+    # advertised (snapshotted live) instead of the constant knob — the same
+    # object the simulator accrues from, so gate and accrual never desync.
+    attr_accessor :funding_schedule
+
     def initialize(config = {})
       @config = DEFAULTS.merge(config)
       # Break-even must be priced at the fees fills actually pay (taker) or
@@ -142,11 +148,18 @@ module Strategy
     private
 
     # Expected funding over the hold as a fraction of notional (issue #391):
-    # (expected_hold / interval) x adverse rate. Feeds the break-even gate so it
-    # clears funding, not just fees. Zero when the rate/interval is disabled.
+    # (expected_hold / interval) x rate. Feeds the break-even gate so it clears
+    # funding, not just fees. When a Funding::Schedule is attached it uses the
+    # live-snapshotted forward rate (magnitude — the gate stays conservative and
+    # does not bank expected funding income) and the venue's interval; otherwise
+    # the constant config knob. Zero when funding is disabled.
     def funding_break_even_fraction
       rate = @config[:funding_rate_per_interval].to_f
       interval = @config[:funding_interval_seconds].to_f
+      if funding_schedule&.active?
+        rate = funding_schedule.expected_forward_rate(as_of: @as_of)
+        interval = funding_schedule.interval_seconds.to_f
+      end
       return 0.0 unless rate.positive? && interval.positive?
 
       (@config[:funding_expected_hold_seconds].to_f / interval) * rate

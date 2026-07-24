@@ -21,6 +21,17 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     it "is zero when the funding rate is disabled" do
       expect(described_class.new(funding_rate_per_interval: 0).send(:funding_break_even_fraction)).to eq(0.0)
     end
+
+    # When a Funding::Schedule is attached (by the backtest engine), the gate uses
+    # the venue's live-advertised forward rate MAGNITUDE, not the constant knob.
+    it "uses the attached schedule's forward rate over the constant knob" do
+      schedule = Funding::Schedule.new(product_id: "X-PERP", observations: [],
+        constant_rate_per_interval: 0.0009, constant_interval_seconds: 3600)
+      strategy = described_class.new
+      strategy.funding_schedule = schedule
+      # expected_forward_rate falls back to the constant magnitude (9 bps) x 1 interval.
+      expect(strategy.send(:funding_break_even_fraction)).to be_within(1e-12).of(0.0009)
+    end
   end
 
   # Test helper method to create bulk candle data efficiently

@@ -159,6 +159,38 @@ RSpec.describe Backtest::Engine, type: :service do
       trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
       expect(trade[:funding]).to eq(0.0)
     end
+
+    # End-to-end: the engine prices accrual from the live FundingRate history via
+    # Funding::Schedule, using the OBSERVED rate (not the 2 bps constant) and
+    # SIGNED (longs pay, shorts collect) — ADR 0002's "rates snapshotted live".
+    it "charges a long the OBSERVED funding rate when a snapshot covers the boundary" do
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i })
+      FundingRate.create!(product_id: "TEST-USD", funding_time: t0 + 1.hour, funding_rate: 0.0005,
+        funding_interval_seconds: 3600, observed_at: t0 + 1.hour)
+      engine = described_class.new(symbol: "TEST-USD", strategy: long_at_t0,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0)
+
+      trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
+      # 01:00 boundary at the observed 5 bps (not the 2 bps constant) on $100.
+      expect(trade[:funding]).to be_within(1e-9).of(0.0005 * 100.0)
+    end
+
+    it "credits a short (signed funding) at the observed rate" do
+      short_at_t0 = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :short, price: 100.0, quantity: 1.0, tp: 95.0, sl: 105.0, confidence: 50.0}
+        end
+      end
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 - i })
+      FundingRate.create!(product_id: "TEST-USD", funding_time: t0 + 1.hour, funding_rate: 0.0005,
+        funding_interval_seconds: 3600, observed_at: t0 + 1.hour)
+      engine = described_class.new(symbol: "TEST-USD", strategy: short_at_t0,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0)
+
+      trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
+      # A short in a positive-funding regime COLLECTS: signed negative cost.
+      expect(trade[:funding]).to be_within(1e-9).of(-0.0005 * 100.0)
+    end
   end
 
   describe "liquidation-buffer exit (issue #399, ADR 0003)" do
