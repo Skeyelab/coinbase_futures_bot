@@ -105,10 +105,14 @@ class CostModel
     entry_side + exit_side
   end
 
-  # Rates per-side in decimal. Example: 0.0005 = 5 bps
-  def self.break_even_exit(entry_price:, fee_rate:, slippage_rate: 0.0)
+  # Rates per-side in decimal. Example: 0.0005 = 5 bps. funding_rate is the
+  # expected funding cost over the hold as a fraction of notional (issue #391):
+  # (expected_hold / interval) x rate. It widens the break-even so the ex-ante
+  # gate does not approve a trade that only clears fees but then loses to
+  # funding. Defaults to 0 (funding-free break-even).
+  def self.break_even_exit(entry_price:, fee_rate:, slippage_rate: 0.0, funding_rate: 0.0)
     r = fee_rate.to_f + slippage_rate.to_f
-    entry_price.to_f * (1.0 + r) / (1.0 - r)
+    entry_price.to_f * (1.0 + r + funding_rate.to_f) / (1.0 - r)
   end
 
   def self.round_trip_net_pnl(entry_price:, exit_price:, quantity:, fee_rate:, slippage_rate: 0.0)

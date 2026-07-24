@@ -33,6 +33,28 @@ RSpec.describe CostModel do
     end
   end
 
+  describe ".break_even_exit" do
+    it "prices the exit where fees+slippage net to zero" do
+      be = described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003, slippage_rate: 0.0002)
+      r = 0.0005
+      expect(be).to be_within(1e-9).of(100.0 * (1.0 + r) / (1.0 - r))
+    end
+
+    # The ex-ante gate must also clear expected funding over the hold (issue
+    # #391): a position that only breaks even on fees still loses to funding.
+    it "widens the break-even exit to also clear an expected funding fraction" do
+      base = described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003)
+      with_funding = described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003, funding_rate: 0.0002)
+      expect(with_funding).to be > base
+      expect(with_funding).to be_within(1e-9).of(100.0 * (1.0 + 0.0003 + 0.0002) / (1.0 - 0.0003))
+    end
+
+    it "defaults funding_rate to 0 (break-even unchanged)" do
+      expect(described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003))
+        .to be_within(1e-12).of(described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003, funding_rate: 0.0))
+    end
+  end
+
   describe ".round_trip_cost" do
     it "sums per-side fees plus slippage on entry and exit notional" do
       cost = described_class.round_trip_cost(

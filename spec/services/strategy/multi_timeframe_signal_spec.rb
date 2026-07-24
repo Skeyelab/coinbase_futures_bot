@@ -5,6 +5,24 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
     allow(ENV).to receive(:fetch).and_call_original
   end
 
+  # The ex-ante break-even gate adds expected funding over the hold (issue #391):
+  # (expected_hold / interval) x adverse rate, fed to CostModel.break_even_exit.
+  describe "funding term in the break-even gate (#391)" do
+    it "defaults to one interval of the adverse rate (2 bps)" do
+      fraction = described_class.new.send(:funding_break_even_fraction)
+      expect(fraction).to be_within(1e-12).of((3600.0 / 3600.0) * 0.0002)
+    end
+
+    it "scales with the expected hold" do
+      strategy = described_class.new(funding_expected_hold_seconds: 3 * 3600)
+      expect(strategy.send(:funding_break_even_fraction)).to be_within(1e-12).of(3 * 0.0002)
+    end
+
+    it "is zero when the funding rate is disabled" do
+      expect(described_class.new(funding_rate_per_interval: 0).send(:funding_break_even_fraction)).to eq(0.0)
+    end
+  end
+
   # Test helper method to create bulk candle data efficiently
   def create_candle_data(symbol:, base_price: 100.0, trend: :up)
     candle_data = []
