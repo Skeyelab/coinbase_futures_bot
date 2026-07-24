@@ -39,7 +39,7 @@ RSpec.describe Mcp::Server do
       names = tools.map { |t| t[:name] }
 
       expect(names).to include("get_status", "get_positions", "get_signals", "get_sentiment",
-        "get_halt_status", "halt_trading", "resume_trading", "close_position")
+        "get_halt_status", "get_fee_truth", "halt_trading", "resume_trading", "close_position")
       expect(tools.find { |t| t[:name] == "halt_trading" }[:inputSchema]).to be_present
     end
   end
@@ -60,6 +60,18 @@ RSpec.describe Mcp::Server do
 
       expect(result[:data]).to include("symbols", "recent_events", "sources")
       expect(result[:data]["recent_events"].first).to include("title" => "Oil rises 4%")
+    end
+
+    it "get_fee_truth returns the modeled-vs-real fee comparison (issue #391)" do
+      allow(Trading::FeeTruth).to receive(:call).and_return({status: "ok", perp_fills: 0})
+
+      expect(tool_call("get_fee_truth")[:data]).to include("status" => "ok", "perp_fills" => 0)
+    end
+
+    it "get_fee_truth passes the limit argument through" do
+      expect(Trading::FeeTruth).to receive(:call).with(hash_including(limit: 50)).and_return({status: "ok"})
+
+      tool_call("get_fee_truth", {"limit" => 50})
     end
   end
 
