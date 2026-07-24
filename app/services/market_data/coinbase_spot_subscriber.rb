@@ -6,79 +6,57 @@ module MarketData
   class CoinbaseSpotSubscriber
     include SentryServiceTracking
 
-    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true)
+    def initialize(product_ids:, logger: Rails.logger, on_ticker: nil, enable_candle_aggregation: true,
+      url: ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com"),
+      stale_after: ENV.fetch("MARKET_DATA_WS_STALE_SECONDS", "60").to_f,
+      connect: WebsocketSupervisor::DEFAULT_CONNECT, sleeper: WebsocketSupervisor::DEFAULT_SLEEPER)
       @product_ids = Array(product_ids)
       @logger = logger
       @on_ticker = on_ticker
-      @ws = nil
       @candle_aggregator = enable_candle_aggregation ? RealTimeCandleAggregator.new(logger: logger) : nil
+      @url = url
+      @stale_after = stale_after
+      @connect = connect
+      @sleeper = sleeper
     end
 
+    # Connection lifecycle (reconnect + silence detection) is owned by
+    # WebsocketSupervisor; this subscriber supplies the subscribe message and
+    # tick parsing only.
     def start
-      url = ENV.fetch("COINBASE_WS_URL", "wss://advanced-trade-ws.coinbase.com")
-      @logger.info("[MD-Spot] Connecting to #{url}...")
+      @logger.info("[MD-Spot] Connecting to #{@url}...")
 
-      begin
-        socket = WebSocket::Client::Simple.connect(url)
-        @ws = socket
-
-        # Preserve self inside event handlers
-        subscriber = self
-        log = @logger
-
-        socket.on(:open) do
+      subscriber = self
+      log = @logger
+      @supervisor = WebsocketSupervisor.new(
+        url: @url,
+        on_open: lambda { |socket|
           log.info("[MD-Spot] WebSocket connected successfully")
-          subscriber.__send__(:subscribe)
-        end
-
-        socket.on(:message) { |msg| subscriber.__send__(:handle_message, msg) }
-
-        socket.on(:error) do |e|
-          log.error("[MD-Spot] WebSocket error: #{e}")
-          subscriber.__send__(:mark_ws_as_closed)
-        end
-
-        socket.on(:close) do
-          log.info("[MD-Spot] WebSocket closed")
-          subscriber.__send__(:mark_ws_as_closed)
-        end
-
-        # Keep the connection alive - don't exit the method
-        # The WebSocket will run in its own thread
-        @logger.info("[MD-Spot] WebSocket connection established, monitoring for messages...")
-
-        # Keep the subscriber alive for the full websocket lifecycle.
-        # We intentionally gate on @ws presence (not open?) to avoid a race
-        # where open? can still be false before the :open callback fires.
-        sleep 0.1 while @ws
-      rescue => e
-        @logger.error("[MD-Spot] Failed to establish WebSocket connection: #{e.message}")
-        @ws = nil
-      end
+          subscriber.__send__(:subscribe, socket)
+        },
+        on_message: ->(msg) { subscriber.__send__(:handle_message, msg) },
+        on_error: ->(e) { log.error("[MD-Spot] WebSocket error: #{e}") },
+        stale_after: @stale_after,
+        logger: @logger,
+        connect: @connect,
+        sleeper: @sleeper
+      )
+      @supervisor.run
     end
 
     def stop
-      mark_ws_as_closed
+      @supervisor&.stop
     end
 
     private
 
-    def mark_ws_as_closed
-      @ws&.close if @ws&.open?
-      @ws = nil
-    end
-
-    def ws_connected?
-      @ws&.open?
-    end
-
-    def subscribe
+    def subscribe(socket)
       msg = {
         type: "subscribe",
         channel: "ticker",
         product_ids: @product_ids
       }
-      @ws&.send(msg.to_json)
+      socket.send(msg.to_json)
       @logger.info("[MD-Spot] subscribed: #{msg}")
     end
 

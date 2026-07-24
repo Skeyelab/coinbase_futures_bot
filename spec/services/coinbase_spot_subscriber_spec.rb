@@ -85,49 +85,27 @@ RSpec.describe MarketData::CoinbaseSpotSubscriber, type: :service do
     expect(io.read).to eq("")
   end
 
-  it "does not exit before websocket open callback can run" do
-    io = StringIO.new
-    logger = build_logger(io)
-    service = described_class.new(product_ids: "BTC-USD", logger: logger)
+  it "closes the websocket when stopped" do
+    logger = build_logger(StringIO.new)
+    socket = Class.new do
+      attr_reader :closed
 
-    fake_socket = Class.new do
-      def on(_event, &_block)
-      end
+      def initialize = @closed = false
 
-      def send(_msg)
-      end
+      def on(*) = nil
 
-      def open?
-        false
-      end
+      def send(*) = nil
 
-      def close
-      end
+      def close = (@closed = true)
     end.new
 
-    allow(WebSocket::Client::Simple).to receive(:connect).and_return(fake_socket)
-
-    sleep_calls = 0
-    allow(service).to receive(:sleep) do |_seconds|
-      sleep_calls += 1
-      service.instance_variable_set(:@ws, nil)
-    end
+    driver = nil
+    service = described_class.new(product_ids: "BTC-USD", logger: logger,
+      connect: ->(_url) { socket }, sleeper: ->(dt) { driver.call(dt) })
+    driver = ->(_dt) { service.stop } # stop on the first supervise poll
 
     service.start
 
-    expect(sleep_calls).to be >= 1
-  end
-
-  it "closes the websocket on stop" do
-    io = StringIO.new
-    logger = build_logger(io)
-    service = described_class.new(product_ids: "BTC-USD", logger: logger)
-    fake_socket = double("WebSocket", open?: true, close: true)
-    service.instance_variable_set(:@ws, fake_socket)
-
-    service.stop
-
-    expect(fake_socket).to have_received(:close)
-    expect(service.instance_variable_get(:@ws)).to be_nil
+    expect(socket.closed).to be(true)
   end
 end

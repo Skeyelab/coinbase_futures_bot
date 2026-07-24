@@ -59,16 +59,27 @@ RSpec.describe MarketData::CoinbaseFuturesSubscriber, type: :service do
     expect(io.read).to include("[MD] JSON parse error: unexpected token 'not' at line 1 column 1")
   end
 
-  it "closes the websocket on stop" do
-    io = StringIO.new
-    logger = build_logger(io)
-    service = described_class.new(product_ids: "BTC-USD", logger: logger)
-    fake_socket = double("WebSocket", close: true)
-    service.instance_variable_set(:@ws, fake_socket)
+  it "closes the websocket when stopped" do
+    logger = build_logger(StringIO.new)
+    socket = Class.new do
+      attr_reader :closed
 
-    service.stop
+      def initialize = @closed = false
 
-    expect(fake_socket).to have_received(:close)
-    expect(service.instance_variable_get(:@ws)).to be_nil
+      def on(*) = nil
+
+      def send(*) = nil
+
+      def close = (@closed = true)
+    end.new
+
+    driver = nil
+    service = described_class.new(product_ids: "BTC-USD", logger: logger,
+      connect: ->(_url) { socket }, sleeper: ->(dt) { driver.call(dt) })
+    driver = ->(_dt) { service.stop } # stop on the first supervise poll
+
+    service.start
+
+    expect(socket.closed).to be(true)
   end
 end
