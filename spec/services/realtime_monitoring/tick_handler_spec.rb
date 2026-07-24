@@ -81,7 +81,9 @@ RSpec.describe RealtimeMonitoring::TickHandler do
 
     it "checks exact futures contract positions" do
       product_id = "NOL-19JUN26-CDE"
-      position = create(:position, product_id: product_id, take_profit: 92.0)
+      # Realistic entry near the tick price so the liquidation buffer (#399) does
+      # not incidentally fire — this test is about TP/SL routing.
+      position = create(:position, product_id: product_id, entry_price: 91.0, take_profit: 92.0)
 
       expect(handler).to receive(:check_take_profit_stop_loss).with(position, price)
       allow(handler).to receive(:check_day_trading_time_limits)
@@ -101,6 +103,82 @@ RSpec.describe RealtimeMonitoring::TickHandler do
       expect(handler).to receive(:trigger_position_close).with(position, "take_profit")
 
       handler.send(:check_take_profit_stop_loss, position, 92.0)
+    end
+  end
+
+  describe "#check_min_roi_exit (issue #398)" do
+    before { allow(handler).to receive(:trigger_position_close) }
+
+    around do |ex|
+      orig = Rails.application.config.real_time_signals
+      Rails.application.config.real_time_signals =
+        orig.merge(min_roi: {schedule: {0 => 0.006, 40 => 0.002}})
+      ex.run
+      Rails.application.config.real_time_signals = orig
+    end
+
+    it "closes an aged position once profit meets the decayed bar (fixed TP not hit)" do
+      # entry 100, no fixed TP; +0.3% at 45m: below 0.6% young bar, above 0.2% aged bar
+      position = create(:position, side: "LONG", entry_price: 100.0, take_profit: nil,
+        entry_time: 45.minutes.ago)
+
+      expect(handler).to receive(:trigger_position_close).with(position, "time_decay_roi")
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be true
+    end
+
+    it "does not close a young position below the un-decayed bar" do
+      position = create(:position, side: "LONG", entry_price: 100.0, entry_time: 5.minutes.ago)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be false
+    end
+
+    it "is inert when no schedule is configured" do
+      Rails.application.config.real_time_signals =
+        Rails.application.config.real_time_signals.merge(min_roi: {schedule: {}})
+      position = create(:position, side: "LONG", entry_price: 100.0, entry_time: 90.minutes.ago)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_min_roi_exit, position, 100.3)).to be false
+    end
+  end
+
+  describe "#check_liquidation_buffer_exit (issue #399)" do
+    around do |ex|
+      orig = Rails.application.config.real_time_signals
+      ex.run
+      Rails.application.config.real_time_signals = orig
+    end
+
+    before do
+      allow(handler).to receive(:trigger_position_close)
+      allow(SlackNotificationService).to receive(:alert)
+    end
+
+    # Default config: buffer 0.05, assumed leverage 10 -> long entry 100 buffered
+    # exit at 90.975.
+    it "closes a long that has fallen to the buffered pre-liquidation price and alerts" do
+      position = create(:position, side: "LONG", entry_price: 100.0)
+
+      expect(handler).to receive(:trigger_position_close).with(position, "liquidation_buffer")
+      expect(SlackNotificationService).to receive(:alert).with("warning", /liquidation/i, anything)
+      expect(handler.send(:check_liquidation_buffer_exit, position, 90.9)).to be true
+    end
+
+    it "does not close a position comfortably above the buffered price" do
+      position = create(:position, side: "LONG", entry_price: 100.0)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_liquidation_buffer_exit, position, 98.0)).to be false
+    end
+
+    it "is inert when the buffer is disabled" do
+      Rails.application.config.real_time_signals =
+        Rails.application.config.real_time_signals.merge(liquidation_buffer: {buffer: 0.0})
+      position = create(:position, side: "LONG", entry_price: 100.0)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_liquidation_buffer_exit, position, 50.0)).to be false
     end
   end
 

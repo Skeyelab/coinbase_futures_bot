@@ -64,9 +64,17 @@ module RealtimeMonitoring
         # check, so the excursion is captured even on the tick that closes it.
         position.track_adverse_excursion!(price)
 
+        # Liquidation buffer (issue #399): the highest-precedence safety exit —
+        # close before the exchange liquidates, ahead of every other policy.
+        next if check_liquidation_buffer_exit(position, price)
+
         # Dollar-PnL exit ($20-50 target + hard dollar stop) takes precedence for
         # day-trading positions; if it closes, skip the bps threshold checks.
         next if check_dollar_pnl_exit(position, price)
+
+        # Time-decay take-profit (issue #398): book a stalled winner once the
+        # age-decayed profit bar is met. An earlier take-profit only — never a stop.
+        next if check_min_roi_exit(position, price)
 
         check_take_profit_stop_loss(position, price)
         check_day_trading_time_limits(position)
@@ -92,6 +100,53 @@ module RealtimeMonitoring
 
     def dollar_exit_policy
       @dollar_exit_policy ||= Trading::DollarExitPolicy.from_env
+    end
+
+    # Time-decay take-profit exit (issue #398). Closes when the position's
+    # unrealized price return meets the age-decayed profit bar. Returns true if it
+    # triggered a close. Inert unless a min_roi schedule is configured. Never a
+    # stop — only an earlier take-profit, so it cannot widen risk.
+    def check_min_roi_exit(position, current_price)
+      policy = min_roi_policy(position.product_id)
+      return false unless policy.enabled?
+
+      reason = policy.exit_reason(
+        profit_ratio: position.unrealized_profit_ratio(current_price),
+        minutes_held: position.age_in_minutes
+      )
+      return false unless reason
+
+      @logger.info("[RTM] time_decay_roi for #{position.product_id} at $#{current_price} " \
+        "(#{(position.unrealized_profit_ratio(current_price) * 100).round(3)}% after #{position.age_in_minutes.to_i}m) — closing")
+      trigger_position_close(position, reason.to_s)
+      true
+    end
+
+    def min_roi_policy(symbol)
+      (@min_roi_policies ||= {})[symbol] ||= Trading::MinimumRoiExit.from_config(symbol: symbol)
+    end
+
+    # Liquidation-buffer exit (issue #399). Closes a leveraged position once price
+    # reaches the buffered pre-liquidation level. Highest-precedence safety exit;
+    # surfaces a Slack warning because a near-liquidation event is notable.
+    # Returns true if it triggered a close.
+    def check_liquidation_buffer_exit(position, current_price)
+      calc = liquidation_buffer(position.product_id)
+      return false unless calc.enabled?
+      return false unless calc.breached?(entry_price: position.entry_price,
+        side: position.side, current_price: current_price)
+
+      @logger.warn("[RTM] liquidation_buffer for #{position.product_id} #{position.side} " \
+        "entry $#{position.entry_price} at $#{current_price} — closing before liquidation")
+      trigger_position_close(position, "liquidation_buffer")
+      SlackNotificationService.alert("warning", "Liquidation buffer exit",
+        "Closed #{position.product_id} #{position.side} at $#{current_price} (entry $#{position.entry_price}) " \
+        "before reaching liquidation.")
+      true
+    end
+
+    def liquidation_buffer(symbol)
+      (@liquidation_buffers ||= {})[symbol] ||= Trading::LiquidationBuffer.from_config(symbol: symbol)
     end
 
     def positions_for_tick(product_id)

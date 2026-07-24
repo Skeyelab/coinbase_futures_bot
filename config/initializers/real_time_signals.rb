@@ -39,11 +39,55 @@ Rails.application.config.real_time_signals = {
     }
   },
 
+  # Minimum-ROI time-decay exit (issue #398, ADR 0003). A {minutes_held =>
+  # profit_ratio} schedule that lowers the take-profit bar as a position ages, so
+  # stalled winners are booked before round-tripping to break-even. Inert by
+  # default (empty schedule) — opt in globally via `schedule` or per symbol via
+  # `per_symbol`. Ratios are price returns, same units as tp_target.
+  #   Example: {schedule: {0 => 0.006, 20 => 0.004, 40 => 0.002, 60 => 0.0}}
+  min_roi: {
+    schedule: {},
+    per_symbol: {}
+  },
+
+  # Liquidation buffer (issue #399, ADR 0003). Close a leveraged position before
+  # it reaches the exchange's liquidation price. `buffer` is the fraction of the
+  # entry→liq distance kept as a safety margin (default 0.05). Positions carry no
+  # real leverage yet, so an assumed `leverage` is used (documented gap). Set
+  # buffer: 0 to disable. Per-symbol overrides via `per_symbol`.
+  liquidation_buffer: {
+    buffer: ENV.fetch("LIQUIDATION_BUFFER", "0.05").to_f,
+    leverage: ENV.fetch("LIQUIDATION_ASSUMED_LEVERAGE", "10.0").to_f,
+    maintenance_margin_rate: ENV.fetch("LIQUIDATION_MAINTENANCE_MARGIN_RATE", "0.005").to_f,
+    per_symbol: {}
+  },
+
   # Protections layer (issue #397, ADR 0003). Strategy-agnostic entry guards.
   protections: {
     # CooldownPeriod: block re-entry on a symbol for this many seconds after any
     # exit. Per-symbol overrides may be resolved from a calibrated TradingProfile.
-    cooldown_seconds: ENV.fetch("PROTECTION_COOLDOWN_SECONDS", "300").to_i
+    cooldown_seconds: ENV.fetch("PROTECTION_COOLDOWN_SECONDS", "300").to_i,
+
+    # StoplossGuard (issue #400): after `threshold` losing exits within
+    # `lookback_seconds`, halt new entries for `lock_ttl_seconds`. Side-aware
+    # (only_per_side) and scoped per-symbol or global. threshold: 0 disables.
+    stoploss_guard: {
+      threshold: ENV.fetch("STOPLOSS_GUARD_THRESHOLD", "4").to_i,
+      lookback_seconds: ENV.fetch("STOPLOSS_GUARD_LOOKBACK_SECONDS", "3600").to_i,
+      only_per_side: ENV.fetch("STOPLOSS_GUARD_ONLY_PER_SIDE", "true").to_s.casecmp("true").zero?,
+      scope: ENV.fetch("STOPLOSS_GUARD_SCOPE", "symbol"),
+      lock_ttl_seconds: ENV.fetch("STOPLOSS_GUARD_LOCK_TTL_SECONDS", "1800").to_i,
+      per_symbol: {}
+    },
+
+    # MaxDrawdown (issue #401): halt ALL new entries globally once equity falls
+    # `ceiling` (fraction) from its peak within `lookback_seconds`, for
+    # `lock_ttl_seconds`. Equity-curve drawdown. ceiling: 0 disables.
+    max_drawdown: {
+      ceiling: ENV.fetch("MAX_DRAWDOWN_CEILING", "0.15").to_f,
+      lookback_seconds: ENV.fetch("MAX_DRAWDOWN_LOOKBACK_SECONDS", "86400").to_i,
+      lock_ttl_seconds: ENV.fetch("MAX_DRAWDOWN_LOCK_TTL_SECONDS", "1800").to_i
+    }
   },
 
   # API settings

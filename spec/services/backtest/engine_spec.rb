@@ -161,6 +161,135 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "liquidation-buffer exit (issue #399, ADR 0003)" do
+    # Long entry 100, leverage 10, buffer 0.05 -> buffered exit 90.975. A candle
+    # whose low pierces it should force-close at that price with a
+    # liquidation_buffer reason, ahead of the fixed SL.
+    def liq_engine(buffer:)
+      # enter at 100, hold flat, then a candle that dumps to 90 (low 89.5)
+      insert_step_candles([100.0, 100.0, 90.0, 90.0])
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0,
+        liquidation_buffer: Trading::LiquidationBuffer.new(buffer: buffer, leverage: 10))
+    end
+
+    it "force-closes at the buffered price with a liquidation_buffer reason" do
+      result = liq_engine(buffer: 0.05).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      trade = result.trades.first
+      expect(trade[:exit_reason]).to eq(:liquidation_buffer)
+      expect(trade[:exit_price]).to be_within(1e-9).of(90.975)
+      expect(result.exit_reason_breakdown[:liquidation_buffer]).to eq(1)
+    end
+
+    it "does not fire when the buffer is disabled" do
+      result = liq_engine(buffer: 0.0).run(from: t0, to: t0 + 3 * 5.minutes)
+      # sl=1 never hit, no liq buffer -> position rides to end -> no completed trade
+      expect(result.trade_count).to eq(0)
+    end
+  end
+
+  describe "MaxDrawdown parity (issue #401, ADR 0003)" do
+    # Saw-tooth losing series; each loss drops equity. A tiny ceiling trips the
+    # global drawdown halt after the first loss, so the guarded run makes fewer
+    # trades than a disabled run and records the halt.
+    def dd_engine(guard)
+      strategy = scripted_strategy do |_as_of|
+        {side: :long, price: 100.0, quantity: 10.0, tp: 200.0, sl: 99.5, confidence: 50.0}
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, contract_size_usd: 100.0, max_drawdown: guard)
+    end
+
+    before { insert_step_candles([100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0]) }
+
+    it "halts all entries once equity drawdown exceeds the ceiling, and records it" do
+      tripping = Trading::Protections::MaxDrawdown.new(ceiling: 0.0001, lookback_seconds: 100_000, lock_ttl_seconds: 100_000)
+      disabled = Trading::Protections::MaxDrawdown.new(ceiling: 0)
+
+      guarded = dd_engine(tripping).run(from: t0, to: t0 + 7 * 5.minutes)
+      unguarded = dd_engine(disabled).run(from: t0, to: t0 + 7 * 5.minutes)
+
+      expect(guarded.trade_count).to be < unguarded.trade_count
+      expect(guarded.protection_halts.map { |h| h[:source] }).to include("MaxDrawdown")
+    end
+  end
+
+  describe "StoplossGuard parity (issue #400, ADR 0003)" do
+    # A saw-tooth series: enter long at 100, the next candle dips to 99 (low 98.5)
+    # and hits the 99.5 stop -> a losing round-trip -> re-enter -> repeat. With the
+    # guard tripping at 2 losses, entries halt after the 2nd loss; disabled, it
+    # keeps losing across the whole series.
+    def sawtooth_engine(guard)
+      strategy = scripted_strategy do |_as_of|
+        {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 99.5, confidence: 50.0}
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, stoploss_guard: guard)
+    end
+
+    before { insert_step_candles([100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0, 100.0, 99.0]) }
+
+    let(:tripping_guard) do
+      Trading::Protections::StoplossGuard.new(threshold: 2, lookback_seconds: 100_000,
+        only_per_side: true, scope: "symbol", lock_ttl_seconds: 100_000)
+    end
+    let(:disabled_guard) { Trading::Protections::StoplossGuard.new(threshold: 0, lookback_seconds: 1) }
+
+    it "halts entries after the loss threshold and records the halt" do
+      guarded = sawtooth_engine(tripping_guard).run(from: t0, to: t0 + 9 * 5.minutes)
+      unguarded = sawtooth_engine(disabled_guard).run(from: t0, to: t0 + 9 * 5.minutes)
+
+      # The guard halts long entries after the 2nd loss, so the guarded run makes
+      # strictly fewer (losing) trades than the unguarded run — and records it.
+      expect(guarded.trade_count).to be < unguarded.trade_count
+      expect(guarded.trade_count).to be <= 3
+      expect(guarded.protection_halts).to be_present
+      expect(guarded.protection_halts.first).to include(source: "StoplossGuard", side: "long")
+    end
+  end
+
+  describe "minimum-ROI time-decay exit (issue #398, ADR 0003)" do
+    # Flat price, fixed TP unreachable: the position stalls at ~0 profit. With a
+    # schedule that decays the bar to break-even at 40m, it should book a
+    # time-decay-roi exit; with no schedule it rides to end-of-replay (no trade).
+    def flat_stall_engine(min_roi_schedule:)
+      insert_step_candles(Array.new(20, 100.0))
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, slippage: 0.0, min_roi_schedule: min_roi_schedule)
+    end
+
+    it "closes a stalled position with a time_decay_roi exit reason once the bar decays" do
+      result = flat_stall_engine(min_roi_schedule: {0 => 0.006, 40 => 0.0})
+        .run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      trade = result.trades.first
+      expect(trade[:exit_reason]).to eq(:time_decay_roi)
+      # 40 minutes = 8 * 5m steps -> exits on the candle at t0 + 40 min
+      expect(trade[:exited_at]).to eq(t0 + 8 * 5.minutes)
+    end
+
+    it "does not force a min-roi exit when no schedule is configured" do
+      result = flat_stall_engine(min_roi_schedule: {})
+        .run(from: t0, to: t0 + 19 * 5.minutes)
+
+      # Fixed TP never hits, no decay -> position never closes -> no completed trade
+      expect(result.trade_count).to eq(0)
+    end
+  end
+
   describe "protections parity (issue #397, ADR 0003)" do
     # A flat series that round-trips repeatedly: enter long, TP hits next candle,
     # re-enter, and so on. With no cooldown this yields many trades; with a

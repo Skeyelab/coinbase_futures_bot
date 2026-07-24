@@ -3,7 +3,7 @@
 module PaperTrading
   class ExchangeSimulator
     Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
-      :entry_fill, :entry_time, :funding_cost)
+      :entry_fill, :entry_time, :funding_cost, :exit_reason)
 
     attr_reader :orders, :fills, :equity_usd
 
@@ -36,6 +36,21 @@ module PaperTrading
         Order.new(id: id, symbol: symbol, side: side, price: price.to_f, quantity: quantity.to_f, status: :open,
           filled_qty: 0.0, created_at: Time.now.utc, tp: tp, sl: sl)
       id
+    end
+
+    # Force-close a filled position at an explicit price with an exit reason
+    # (issue #398 — min-ROI time-decay exit in backtests). No-op unless the order
+    # is currently a filled, open position.
+    # candle carries the exit timestamp so a force-closed perp position still
+    # accrues funding for the boundaries it crossed (issue #391). Optional: a
+    # nil candle (non-backtest callers) simply skips funding.
+    def force_close(id, price:, reason:, candle: nil)
+      o = orders[id]
+      return unless o && o.status == :filled
+
+      realize_pnl(o, price, candle)
+      o.exit_reason = reason
+      o.status = :closed
     end
 
     def cancel(id)
@@ -124,9 +139,10 @@ module PaperTrading
 
     # Constant *adverse* funding: a cost to either side for each funding
     # timestamp the hold crossed (issue #391). Charged on entry notional at
-    # position close. Returns the dollars charged (0.0 when funding is off).
+    # position close. Returns the dollars charged (0.0 when funding is off, or
+    # when no candle is available to date the exit — e.g. a nil-candle force_close).
     def charge_funding(order, candle, entry_notional)
-      return 0.0 unless @funding_active
+      return 0.0 unless @funding_active && candle && order.entry_time
 
       intervals = CostModel.funding_intervals_crossed(
         entry_time: order.entry_time, exit_time: candle.timestamp,

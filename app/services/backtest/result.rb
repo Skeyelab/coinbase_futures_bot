@@ -5,18 +5,30 @@ module Backtest
   # Trades are hashes: {side:, entry_price:, exit_price:, quantity:, pnl:,
   # fees:, entered_at:, exited_at:}.
   class Result
-    attr_reader :trades, :equity_curve, :starting_equity, :from, :to
+    attr_reader :trades, :equity_curve, :starting_equity, :from, :to, :protection_halts
 
-    def initialize(trades:, equity_curve:, starting_equity:, from:, to:)
+    def initialize(trades:, equity_curve:, starting_equity:, from:, to:, protection_halts: [])
       @trades = trades
       @equity_curve = equity_curve
       @starting_equity = starting_equity.to_f
       @from = from
       @to = to
+      # Protection halts during the run (issue #400): [{source:, symbol:, side:, at:}].
+      # Attributes which guard halted trading and when.
+      @protection_halts = protection_halts
     end
 
     def trade_count
       trades.size
+    end
+
+    # Exit-reason attribution (issue #398): how many trades each exit path booked
+    # (e.g. {fixed_tp_sl: 8, time_decay_roi: 3}). Lets a run show what the
+    # time-decay exit actually contributed vs fixed TP/SL.
+    def exit_reason_breakdown
+      trades.each_with_object(Hash.new(0)) do |t, acc|
+        acc[t[:exit_reason] || :fixed_tp_sl] += 1
+      end
     end
 
     def total_pnl
