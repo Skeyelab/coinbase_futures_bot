@@ -11,23 +11,28 @@ module PaperTrading
     # alias. Slippage is applied adversely to every fill (issue #353: entries
     # from momentum signals cross the spread, so fills are taker-priced).
     #
-    # Funding (issue #391) is OFF unless both funding_interval_seconds and a
-    # positive funding_rate_per_interval are supplied. When active it is a
-    # constant *adverse* charge (a cost to either side) applied at position
-    # close for every funding timestamp the hold crossed; this is the
-    # sensitivity knob ADR 0002 specifies "until history accrues". Active
-    # funding reads candle.timestamp, so callers must pass timestamped candles.
+    # Funding (issue #391). Prefer a Funding::Schedule, which prices each hold
+    # from the live-snapshotted FundingRate history (SIGNED: longs pay, shorts
+    # collect) and satisfies ADR 0002's "rates snapshotted live" guardrail. When
+    # no schedule is given it falls back to the legacy constant *adverse* knob
+    # (funding_interval_seconds + positive funding_rate_per_interval), the
+    # sensitivity model ADR 0002 allows "until history accrues". Either way,
+    # active funding reads candle.timestamp, so callers must pass timestamped
+    # candles.
     def initialize(starting_equity_usd: 10_000.0, maker_fee: nil, fee_rate: nil, slippage: 0.0002,
-      funding_interval_seconds: nil, funding_rate_per_interval: nil)
+      funding_interval_seconds: nil, funding_rate_per_interval: nil, funding_schedule: nil)
       @equity_usd = starting_equity_usd.to_f
       @orders = {}
       @fills = []
       @id_seq = 0
       @fee_rate = (fee_rate || maker_fee || 0.0005).to_f
       @slippage = slippage.to_f
+      @funding_schedule = funding_schedule
       @funding_interval_seconds = funding_interval_seconds.to_i
       @funding_rate_per_interval = funding_rate_per_interval.to_f
-      @funding_active = @funding_interval_seconds.positive? && @funding_rate_per_interval.positive?
+      @funding_active =
+        @funding_schedule&.active? ||
+        (@funding_interval_seconds.positive? && @funding_rate_per_interval.positive?)
     end
 
     def place_limit(symbol:, side:, price:, quantity:, tp: nil, sl: nil)
@@ -137,18 +142,27 @@ module PaperTrading
                   qty: order.filled_qty, fee: fee, time: Time.now.utc}
     end
 
-    # Constant *adverse* funding: a cost to either side for each funding
-    # timestamp the hold crossed (issue #391). Charged on entry notional at
-    # position close. Returns the dollars charged (0.0 when funding is off, or
-    # when no candle is available to date the exit — e.g. a nil-candle force_close).
+    # Funding charged on entry notional at position close (issue #391). Returns
+    # SIGNED dollars: positive = a cost, negative = funding collected (a short in
+    # a positive-funding regime). Prefers the Funding::Schedule (observed,
+    # per-boundary, signed); otherwise the legacy constant-adverse fallback. 0.0
+    # when funding is off, or when no candle dates the exit (nil-candle force_close).
     def charge_funding(order, candle, entry_notional)
       return 0.0 unless @funding_active && candle && order.entry_time
 
-      intervals = CostModel.funding_intervals_crossed(
-        entry_time: order.entry_time, exit_time: candle.timestamp,
-        interval: @funding_interval_seconds
-      )
-      funding = intervals * @funding_rate_per_interval * entry_notional
+      funding =
+        if @funding_schedule
+          @funding_schedule.funding_cost(
+            notional: entry_notional, side: order.side,
+            entry_time: order.entry_time, exit_time: candle.timestamp
+          )
+        else
+          intervals = CostModel.funding_intervals_crossed(
+            entry_time: order.entry_time, exit_time: candle.timestamp,
+            interval: @funding_interval_seconds
+          )
+          intervals * @funding_rate_per_interval * entry_notional
+        end
       order.funding_cost = funding
       funding
     end

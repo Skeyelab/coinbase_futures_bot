@@ -68,10 +68,19 @@ module Backtest
     end
 
     def run(from:, to:)
+      # One funding source for the whole run: prices accrual from the live
+      # FundingRate snapshots (issue #391, ADR 0002 guardrail), falling back to
+      # the constant knob for boundaries with no observation. Candle.symbol IS the
+      # product_id, so @symbol keys FundingRate directly. The SAME object feeds the
+      # strategy's break-even gate below, so accrual and the gate can never desync.
+      funding_schedule = Funding::Schedule.for(product_id: @symbol,
+        constant_rate_per_interval: @funding_rate_per_interval,
+        constant_interval_seconds: @funding_interval_seconds, logger: @logger)
+      @strategy.funding_schedule = funding_schedule if @strategy.respond_to?(:funding_schedule=)
+
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
         fee_rate: @fee_rate, slippage: @slippage,
-        funding_interval_seconds: @funding_interval_seconds,
-        funding_rate_per_interval: @funding_rate_per_interval)
+        funding_schedule: funding_schedule)
       equity_curve = [@starting_equity]
       entered_at = {}
       exited_at = {}
