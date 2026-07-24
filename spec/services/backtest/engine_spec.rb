@@ -49,14 +49,17 @@ RSpec.describe Backtest::Engine, type: :service do
       expect(result.trade_count).to eq(1)
 
       trade = result.trades.first
-      # entry 100 (fee 0.1), exit at TP 105 (fee 0.105): pnl = 5 - 0.205
+      # entry 100 (fee 0.1), exit at TP 105 (fee 0.105): pnl = 5 - 0.205 - funding.
+      # Held t0 00:00 -> 01:10 crosses one hourly boundary (01:00): funding at the
+      # default 2 bps/interval on $100 notional = 0.02, so pnl = 4.795 - 0.02.
       expect(trade[:side]).to eq(:long)
-      expect(trade[:pnl]).to be_within(1e-9).of(4.795)
+      expect(trade[:pnl]).to be_within(1e-9).of(4.775)
       expect(trade[:fees]).to be_within(1e-9).of(0.205)
+      expect(trade[:funding]).to be_within(1e-9).of(0.02)
       expect(trade[:entered_at]).to eq(t0)
       # TP 105 first reachable on the candle whose high (close+0.5) >= 105: close 104.6? closes hit 105 at i=14 (high 105.5); i=14 -> t0 + 14*5min
       expect(trade[:exited_at]).to eq(t0 + 14 * 5.minutes)
-      expect(result.final_equity).to be_within(1e-9).of(10_004.795)
+      expect(result.final_equity).to be_within(1e-9).of(10_004.775)
     end
 
     it "drives the strategy once per step candle with as_of, skipping steps while a position is open" do
@@ -120,9 +123,41 @@ RSpec.describe Backtest::Engine, type: :service do
       result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
 
       trade = result.trades.first
-      # base qty = 5 * 100 / 50_000 = 0.01; TP at 51_000 -> pnl = 1_000 * 0.01 = $10
+      # base qty = 5 * 100 / 50_000 = 0.01; TP at 51_000 -> gross = 1_000 * 0.01 = $10.
+      # Held t0 00:00 -> 01:10 crosses one hourly boundary: funding at 2 bps on
+      # $500 notional = 0.10, so net pnl = 10 - 0.10.
       expect(trade[:quantity]).to be_within(1e-9).of(0.01)
-      expect(trade[:pnl]).to be_within(1e-6).of(10.0)
+      expect(trade[:pnl]).to be_within(1e-6).of(9.90)
+      expect(trade[:funding]).to be_within(1e-9).of(0.10)
+    end
+  end
+
+  describe "funding accrual (issue #391)" do
+    let(:long_at_t0) do
+      scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 50.0}
+        end
+      end
+    end
+
+    it "charges adverse funding by default for boundaries the hold crosses" do
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i })
+      engine = described_class.new(symbol: "TEST-USD", strategy: long_at_t0,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0)
+
+      trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
+      # Held 00:00 -> 01:10 crosses 01:00 = 1 interval; 2 bps on $100 notional.
+      expect(trade[:funding]).to be_within(1e-9).of(1 * 0.0002 * 100.0)
+    end
+
+    it "can be disabled with funding_bps_per_interval: 0" do
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i })
+      engine = described_class.new(symbol: "TEST-USD", strategy: long_at_t0,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0, funding_bps_per_interval: 0)
+
+      trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
+      expect(trade[:funding]).to eq(0.0)
     end
   end
 
