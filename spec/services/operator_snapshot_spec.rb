@@ -166,6 +166,31 @@ RSpec.describe OperatorSnapshot do
     end
   end
 
+  describe "#indicators strategy state (issue #447)" do
+    it "reports per-symbol EMA trend + advisory RSI/MACD from MarketAnalysisService" do
+      create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+      base = Time.utc(2026, 6, 1, 0, 0)
+      60.times { |i| Candle.create!(symbol: "NOL-19AUG26-CDE", timeframe: "1h", timestamp: base + i.hours, open: 90 + i, high: 90 + i, low: 90 + i, close: 90 + i, volume: 1) }
+
+      row = OperatorSnapshot.new.indicators[:strategy][:symbols].find { |s| s[:sentiment_symbol] == "OIL-USD" }
+
+      expect(row[:price_symbol]).to eq("NOL-19AUG26-CDE")
+      expect(row[:insufficient]).to be(false)
+      expect(row[:strategy_trend]).to eq("up") # rising series -> ema_short > ema_long
+      expect(row[:rsi]).to be_a(Numeric)
+      expect(row[:ema_short]).to be > row[:ema_long] # 12 vs 26 on an uptrend
+      expect(row).to have_key(:macd_histogram)
+    end
+
+    it "flags insufficient data when a symbol lacks candle history" do
+      create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+      Candle.create!(symbol: "NOL-19AUG26-CDE", timeframe: "1h", timestamp: Time.utc(2026, 6, 1), open: 90, high: 90, low: 90, close: 90, volume: 1)
+
+      row = OperatorSnapshot.new.indicators[:strategy][:symbols].find { |s| s[:sentiment_symbol] == "OIL-USD" }
+      expect(row[:insufficient]).to be(true)
+    end
+  end
+
   describe "#indicators sentiment detail (issue #446)" do
     it "reports per-symbol z trend, inflow (items/hr), and an undersampled flag" do
       create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)

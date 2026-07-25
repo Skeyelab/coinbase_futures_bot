@@ -10,7 +10,19 @@ module Cli
     def self.lines(indicators)
       ind = indicators.with_indifferent_access
       predictiveness_lines(ind[:predictiveness]) + sentiment_lines(ind[:sentiment]) +
-        [protections_line(ind[:protections]), exits_line(ind[:exits])]
+        strategy_lines(ind[:strategy]) + [protections_line(ind[:protections]), exits_line(ind[:exits])]
+    end
+
+    def self.strategy_lines(strategy)
+      symbols = strategy&.dig(:symbols) || []
+      return [] if symbols.empty?
+
+      ["  Strategy:"] + symbols.map do |s|
+        next "    #{s[:sentiment_symbol]}: insufficient data" if s[:insufficient]
+
+        macd_sign = (s[:macd_histogram].to_f >= 0) ? "+" : "-"
+        "    #{s[:sentiment_symbol]} trend=#{s[:strategy_trend]} rsi=#{num(s[:rsi])} macd=#{macd_sign}"
+      end
     end
 
     def self.sentiment_lines(sentiment)
@@ -78,6 +90,6 @@ module Cli
       value.nil? ? "n/a" : "#{(value.to_f * 100).round}%"
     end
 
-    private_class_method :predictiveness_lines, :sentiment_lines, :trend_arrow, :protections_line, :exits_line, :usd, :num, :pct
+    private_class_method :predictiveness_lines, :sentiment_lines, :trend_arrow, :strategy_lines, :protections_line, :exits_line, :usd, :num, :pct
   end
 end

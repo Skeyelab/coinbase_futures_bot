@@ -36,6 +36,7 @@ class OperatorSnapshot
     {
       predictiveness: predictiveness_info,
       sentiment: sentiment_detail_info,
+      strategy: strategy_state_info,
       protections: protections_info,
       exits: exits_info
     }
@@ -185,6 +186,35 @@ class OperatorSnapshot
       trend: trend,
       inflow_per_hr: inflow,
       undersampled: inflow < UNDERSAMPLED_PER_HR
+    }
+  end
+
+  # Strategy indicator state (issue #447): per symbol, the 1h EMA trend the
+  # strategy keys on (ema_short vs ema_long, config 12/26) plus advisory
+  # RSI/MACD from MarketAnalysisService. Bounded to the sentiment symbols'
+  # price series. (Full cross-timeframe alignment + Bollinger deferred.)
+  def strategy_state_info
+    symbols = Sentiment::ContractSymbolMapper.sentiment_symbols_for_enabled_contracts
+    {symbols: symbols.filter_map { |s| strategy_state_row(s) }}
+  end
+
+  def strategy_state_row(sentiment_symbol)
+    price_symbol = Sentiment::ContractSymbolMapper.price_symbol_for(sentiment_symbol)
+    return nil if price_symbol.blank?
+
+    ta = MarketAnalysisService.new(symbol: price_symbol).technical_indicators
+    return {sentiment_symbol: sentiment_symbol, price_symbol: price_symbol, insufficient: true} if ta[:error]
+
+    {
+      sentiment_symbol: sentiment_symbol,
+      price_symbol: price_symbol,
+      strategy_trend: (ta[:ema_12].to_f > ta[:ema_26].to_f) ? "up" : "down",
+      ema_short: ta[:ema_12]&.round(2),
+      ema_long: ta[:ema_26]&.round(2),
+      rsi: ta[:rsi]&.round(1),
+      macd_histogram: ta.dig(:macd, :histogram),
+      trend_direction: ta[:trend_direction],
+      insufficient: false
     }
   end
 

@@ -3,8 +3,24 @@
 require "rails_helper"
 
 RSpec.describe Cli::IndicatorsPresenter do
-  def indicators(predictiveness:, protections:, exits: nil, sentiment: nil)
-    {predictiveness: predictiveness, protections: protections, exits: exits, sentiment: sentiment}
+  def indicators(predictiveness:, protections:, exits: nil, sentiment: nil, strategy: nil)
+    {predictiveness: predictiveness, protections: protections, exits: exits, sentiment: sentiment, strategy: strategy}
+  end
+
+  it "renders a strategy line per symbol: trend, rsi, macd sign; insufficient flagged (#447)" do
+    ind = indicators(
+      predictiveness: {"symbols" => []}, protections: {active: [], drawdown: {}},
+      strategy: {symbols: [
+        {sentiment_symbol: "OIL-USD", price_symbol: "NOL", strategy_trend: "up", rsi: 58.0, macd_histogram: 0.4, insufficient: false},
+        {sentiment_symbol: "ETH-USD", price_symbol: "ETH-USD", insufficient: true}
+      ]}
+    )
+
+    text = described_class.lines(ind).join("\n")
+    expect(text).to match(/Strategy:/)
+    expect(text).to match(/OIL-USD trend=up rsi=58/)
+    expect(text).to match(/macd=\+/)
+    expect(text).to match(/ETH-USD: insufficient data/)
   end
 
   it "renders a sentiment line per symbol: z, trend arrow, inflow, undersampled flag (#446)" do
