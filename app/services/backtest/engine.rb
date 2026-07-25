@@ -73,8 +73,13 @@ module Backtest
       # the constant knob for boundaries with no observation. Candle.symbol IS the
       # product_id, so @symbol keys FundingRate directly. The SAME object feeds the
       # strategy's break-even gate below, so accrual and the gate can never desync.
+      # Only PERPS have funding. Coinbase has no oil/metals perp — those trade as
+      # dated futures (NOL/GOL/SLR...) with zero funding. A product is a perp iff
+      # it has snapshotted FundingRate history; for dated products the constant
+      # fallback is suppressed so we never charge phantom funding (fee truth #391).
+      constant_rate = perp?(@symbol) ? @funding_rate_per_interval : nil
       funding_schedule = Funding::Schedule.for(product_id: @symbol,
-        constant_rate_per_interval: @funding_rate_per_interval,
+        constant_rate_per_interval: constant_rate,
         constant_interval_seconds: @funding_interval_seconds, logger: @logger)
       @strategy.funding_schedule = funding_schedule if @strategy.respond_to?(:funding_schedule=)
 
@@ -108,6 +113,12 @@ module Backtest
     end
 
     private
+
+    # A perp iff Coinbase advertised funding for it (snapshotted FundingRate rows
+    # exist). Dated futures never have funding.
+    def perp?(symbol)
+      FundingRate.for_product(symbol).exists?
+    end
 
     def step_candles(from, to)
       Candle.for_symbol(@symbol).public_send(@step_scope)

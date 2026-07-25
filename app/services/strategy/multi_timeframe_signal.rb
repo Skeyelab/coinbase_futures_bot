@@ -156,7 +156,10 @@ module Strategy
     def funding_break_even_fraction
       rate = @config[:funding_rate_per_interval].to_f
       interval = @config[:funding_interval_seconds].to_f
-      if funding_schedule&.active?
+      # When a schedule is attached (backtest), it decides: a perp yields its
+      # forward rate; a dated future yields 0 (no funding) — so the gate never
+      # widens for a non-perp. Only the scheduleless live path uses the config knob.
+      if funding_schedule
         rate = funding_schedule.expected_forward_rate(as_of: @as_of)
         interval = funding_schedule.interval_seconds.to_f
       end
