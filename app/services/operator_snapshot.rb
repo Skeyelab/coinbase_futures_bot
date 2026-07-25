@@ -179,7 +179,9 @@ class OperatorSnapshot
     zs = SentimentAggregate.for_symbol(symbol).where(window: "1h")
       .order(window_end_at: :desc).limit(SENTIMENT_TREND_POINTS).pluck(:z_score).map { |z| z.to_f.round(2) }
     trend = zs.reverse # oldest -> newest
-    inflow = SentimentEvent.where(symbol: symbol).where("published_at >= ?", @now - 1.hour).count
+    # Ingestion throughput, not publish time: RSS published_at lags (a fresh
+    # article can carry a weeks-old date), so created_at is the pipeline signal.
+    inflow = SentimentEvent.where(symbol: symbol).where("created_at >= ?", @now - 1.hour).count
     {
       symbol: symbol,
       z: trend.last,
