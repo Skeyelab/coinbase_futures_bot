@@ -16,6 +16,39 @@ class CostModel
     (ENV["BACKTEST_MAKER_FEE_RATE"] || ENV["MAKER_FEE_RATE"] || "0.0").to_f
   end
 
+  # Dated-futures fees (issue #458): Coinbase has NO oil/metals perp — oil trades
+  # dated NOL futures whose real fee is ~$0.85/contract (measured from fills),
+  # NOT the perp ~3 bps. Effective rate ~9 bps (≈ $0.85 / ~$930 notional). These
+  # are seeded from observed fills; a later job (#462) auto-updates them.
+  def self.dated_taker_rate
+    (ENV["DATED_TAKER_RATE"] || "0.0009").to_f
+  end
+
+  def self.dated_maker_rate
+    (ENV["DATED_MAKER_RATE"] || "0.0009").to_f
+  end
+
+  def self.dated_fee_per_contract
+    (ENV["DATED_FEE_PER_CONTRACT"] || "0.85").to_f
+  end
+
+  # Per-venue fee params for a symbol (issue #458). A product is a PERP iff
+  # Coinbase advertised funding for it (snapshotted FundingRate rows exist,
+  # reusing the #457 signal); otherwise it is a dated future. Returns
+  # {taker_rate:, maker_rate:, per_contract_fee:} so the engine and the cost
+  # gates price each venue correctly instead of the global perp default.
+  def self.fee_for(symbol)
+    if perp?(symbol)
+      {taker_rate: taker_fee_rate, maker_rate: maker_fee_rate, per_contract_fee: min_fee_per_contract}
+    else
+      {taker_rate: dated_taker_rate, maker_rate: dated_maker_rate, per_contract_fee: dated_fee_per_contract}
+    end
+  end
+
+  def self.perp?(symbol)
+    FundingRate.for_product(symbol.to_s).exists?
+  end
+
   # The perp taker default (3 bps) is a published-schedule estimate — ADR 0002 /
   # issue #391 — not a measured rate: no perp fill has been executed yet. This
   # guards against it silently drifting from reality once real perp commissions

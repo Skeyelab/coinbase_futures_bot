@@ -33,6 +33,26 @@ RSpec.describe CostModel do
     end
   end
 
+  describe ".fee_for (per-venue fees, issue #458)" do
+    it "returns perp fees (proportional taker + $0.15/contract floor) for a perp" do
+      FundingRate.create!(product_id: "BIP-PERP", funding_time: Time.utc(2026, 7, 1),
+        funding_rate: 0.0001, funding_interval_seconds: 3600, observed_at: Time.utc(2026, 7, 1))
+
+      ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil) do
+        fee = described_class.fee_for("BIP-PERP")
+        expect(fee[:taker_rate]).to eq(0.0003)
+        expect(fee[:per_contract_fee]).to eq(0.15)
+      end
+    end
+
+    it "returns dated fees (measured per-contract $, higher effective rate) for a dated future" do
+      # No FundingRate rows -> dated (Coinbase has no oil perp; NOL real fee ~$0.85/contract).
+      fee = described_class.fee_for("NOL-19AUG26-CDE")
+      expect(fee[:taker_rate]).to be > 0.0003    # dated > perp 3 bps
+      expect(fee[:per_contract_fee]).to be > 0.15 # real ~$0.85 >> $0.15 perp floor
+    end
+  end
+
   describe ".break_even_exit" do
     it "prices the exit where fees+slippage net to zero" do
       be = described_class.break_even_exit(entry_price: 100.0, fee_rate: 0.0003, slippage_rate: 0.0002)

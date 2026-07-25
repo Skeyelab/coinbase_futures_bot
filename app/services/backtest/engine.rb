@@ -30,7 +30,9 @@ module Backtest
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
       @starting_equity = starting_equity.to_f
-      @fee_rate = (fee_rate || CostModel.taker_fee_rate).to_f
+      # Per-venue fee (issue #458): dated futures (oil NOL, metals) pay their real
+      # per-contract fee, not the perp ~3 bps. fee_for resolves it from @symbol.
+      @fee_rate = (fee_rate || CostModel.fee_for(@symbol)[:taker_rate]).to_f
       @slippage = slippage.to_f
       # Perp funding (issue #391): a constant *adverse* sensitivity knob, ON by
       # default so backtests stop silently pricing funding as free (ADR 0002).

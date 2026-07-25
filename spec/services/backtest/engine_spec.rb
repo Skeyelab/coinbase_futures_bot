@@ -101,6 +101,19 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "per-venue fee default (issue #458)" do
+    it "defaults a dated future to the dated fee rate, not perp 3 bps" do
+      dated = described_class.new(symbol: "NOL-19AUG26-CDE")
+      expect(dated.instance_variable_get(:@fee_rate)).to eq(CostModel.dated_taker_rate)
+    end
+
+    it "defaults a perp to the perp taker rate" do
+      mark_perp("BIP-PERP")
+      perp = described_class.new(symbol: "BIP-PERP")
+      expect(perp.instance_variable_get(:@fee_rate)).to eq(CostModel.taker_fee_rate)
+    end
+  end
+
   describe "defaults" do
     it "runs the live strategy (MultiTimeframeSignal) with symbol resolution off" do
       engine = described_class.new(symbol: "TEST-USD")
