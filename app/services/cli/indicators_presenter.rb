@@ -9,7 +9,28 @@ module Cli
 
     def self.lines(indicators)
       ind = indicators.with_indifferent_access
-      predictiveness_lines(ind[:predictiveness]) + [protections_line(ind[:protections]), exits_line(ind[:exits])]
+      predictiveness_lines(ind[:predictiveness]) + sentiment_lines(ind[:sentiment]) +
+        [protections_line(ind[:protections]), exits_line(ind[:exits])]
+    end
+
+    def self.sentiment_lines(sentiment)
+      symbols = sentiment&.dig(:symbols) || []
+      return [] if symbols.empty?
+
+      ["  Sentiment:"] + symbols.map do |s|
+        flag = s[:undersampled] ? " ⚠undersampled" : ""
+        "    #{s[:symbol]} z=#{num(s[:z])} #{trend_arrow(s[:trend])} (#{s[:inflow_per_hr]}/hr)#{flag}"
+      end
+    end
+
+    def self.trend_arrow(trend)
+      return "→" if trend.nil? || trend.size < 2
+
+      delta = trend.last.to_f - trend.first.to_f
+      return "↑" if delta > 0.05
+      return "↓" if delta < -0.05
+
+      "→"
     end
 
     def self.predictiveness_lines(predictiveness)
@@ -57,6 +78,6 @@ module Cli
       value.nil? ? "n/a" : "#{(value.to_f * 100).round}%"
     end
 
-    private_class_method :predictiveness_lines, :protections_line, :exits_line, :usd, :num, :pct
+    private_class_method :predictiveness_lines, :sentiment_lines, :trend_arrow, :protections_line, :exits_line, :usd, :num, :pct
   end
 end

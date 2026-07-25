@@ -35,6 +35,7 @@ class OperatorSnapshot
   def indicators
     {
       predictiveness: predictiveness_info,
+      sentiment: sentiment_detail_info,
       protections: protections_info,
       exits: exits_info
     }
@@ -162,6 +163,29 @@ class OperatorSnapshot
       ((peak.to_f - current.to_f) / peak.to_f * 100).round(2)
     end
     {peak: peak&.to_f, current: current, drawdown_pct: pct}
+  end
+
+  # Sentiment detail beyond raw z (issue #446): recent z trend + inflow rate, so
+  # undersampling (#431) is visible at a glance.
+  UNDERSAMPLED_PER_HR = ENV.fetch("SENTIMENT_UNDERSAMPLED_PER_HR", "3").to_i
+  SENTIMENT_TREND_POINTS = 6
+
+  def sentiment_detail_info
+    {symbols: Sentiment::ContractSymbolMapper.sentiment_symbols_for_enabled_contracts.map { |s| sentiment_detail_row(s) }}
+  end
+
+  def sentiment_detail_row(symbol)
+    zs = SentimentAggregate.for_symbol(symbol).where(window: "1h")
+      .order(window_end_at: :desc).limit(SENTIMENT_TREND_POINTS).pluck(:z_score).map { |z| z.to_f.round(2) }
+    trend = zs.reverse # oldest -> newest
+    inflow = SentimentEvent.where(symbol: symbol).where("published_at >= ?", @now - 1.hour).count
+    {
+      symbol: symbol,
+      z: trend.last,
+      trend: trend,
+      inflow_per_hr: inflow,
+      undersampled: inflow < UNDERSAMPLED_PER_HR
+    }
   end
 
   # Which exits are armed (issue #448): global dollar exit + per-symbol min-ROI

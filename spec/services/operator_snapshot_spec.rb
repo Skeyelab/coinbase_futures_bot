@@ -166,6 +166,27 @@ RSpec.describe OperatorSnapshot do
     end
   end
 
+  describe "#indicators sentiment detail (issue #446)" do
+    it "reports per-symbol z trend, inflow (items/hr), and an undersampled flag" do
+      create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+      [[3, 0.5], [2, 1.0], [1, 1.5]].each do |ago_h, z|
+        SentimentAggregate.create!(symbol: "OIL-USD", window: "1h", window_end_at: now - ago_h.hours,
+          z_score: z, avg_score: 0, weighted_score: 0, count: 3)
+      end
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: now - 10.minutes,
+        raw_text_hash: "e1", title: "t", score: 1.0)
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: now - 40.minutes,
+        raw_text_hash: "e2", title: "t2", score: 1.0)
+
+      row = OperatorSnapshot.new(now: now).indicators[:sentiment][:symbols].find { |s| s[:symbol] == "OIL-USD" }
+
+      expect(row[:z]).to eq(1.5)                 # latest
+      expect(row[:trend]).to eq([0.5, 1.0, 1.5]) # oldest -> newest
+      expect(row[:inflow_per_hr]).to eq(2)       # 2 events in the last hour
+      expect(row[:undersampled]).to be(true)     # below default threshold
+    end
+  end
+
   describe "#indicators exit-policy posture (issue #448)" do
     it "reports the global dollar exit and per-symbol armed exits" do
       create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
