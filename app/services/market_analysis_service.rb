@@ -143,6 +143,12 @@ class MarketAnalysisService
     end
   end
 
+  # Public read of the technical indicators for @symbol (issue #447): EMAs, RSI,
+  # MACD, trend direction. Returns {error:} when candle history is insufficient.
+  def technical_indicators
+    analyze_technical_indicators
+  end
+
   private
 
   def analyze_price_data
