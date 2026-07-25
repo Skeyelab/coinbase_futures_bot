@@ -3,8 +3,24 @@
 require "rails_helper"
 
 RSpec.describe Cli::IndicatorsPresenter do
-  def indicators(predictiveness:, protections:, exits: nil)
-    {predictiveness: predictiveness, protections: protections, exits: exits}
+  def indicators(predictiveness:, protections:, exits: nil, sentiment: nil)
+    {predictiveness: predictiveness, protections: protections, exits: exits, sentiment: sentiment}
+  end
+
+  it "renders a sentiment line per symbol: z, trend arrow, inflow, undersampled flag (#446)" do
+    ind = indicators(
+      predictiveness: {"symbols" => []}, protections: {active: [], drawdown: {}},
+      sentiment: {symbols: [
+        {symbol: "OIL-USD", z: 1.5, trend: [0.5, 1.0, 1.5], inflow_per_hr: 2, undersampled: true}
+      ]}
+    )
+
+    text = described_class.lines(ind).join("\n")
+    expect(text).to match(/Sentiment:/)
+    expect(text).to match(/OIL-USD z=1\.5/)
+    expect(text).to match(/↑/) # rising trend
+    expect(text).to match(/\(2\/hr\)/)
+    expect(text).to match(/undersampled/)
   end
 
   it "renders a compact per-symbol 4h headline with maturity, and a protections line" do
