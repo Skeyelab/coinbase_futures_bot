@@ -29,6 +29,8 @@ module Trading
       nil
     end
 
+    attr_reader :profit_target, :stop_loss
+
     def initialize(profit_target:, stop_loss:)
       @profit_target = profit_target
       @stop_loss = stop_loss

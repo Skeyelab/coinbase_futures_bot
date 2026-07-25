@@ -39,6 +39,8 @@ module Trading
       )
     end
 
+    attr_reader :buffer
+
     def initialize(buffer: 0.05, maintenance_margin_rate: DEFAULT_MAINTENANCE_MARGIN_RATE,
       leverage: DEFAULT_LEVERAGE)
       @buffer = buffer.to_f

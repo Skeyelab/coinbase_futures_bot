@@ -22,6 +22,8 @@ module Trading
       new(schedule)
     end
 
+    attr_reader :rungs
+
     def initialize(schedule = {})
       # Normalize to integer minutes => float ratio, sorted descending by minute
       # so threshold_for can pick the first (largest) key <= minutes_held.
