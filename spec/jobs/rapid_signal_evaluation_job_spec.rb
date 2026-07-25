@@ -475,7 +475,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         expect(Strategy::MultiTimeframeSignal).to have_received(:new).with(
           hash_including(
             contract_size_usd: 100.0,
-            max_position_size: 5,
+            max_position_size: 2,
             min_position_size: 1
           )
         )
@@ -820,12 +820,25 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         expect(job_instance.send(:max_concurrent_positions_for_asset, "ETH")).to eq(3)
       end
 
-      it "applies default limits for unknown assets" do
+      # Issue #340: an unlisted asset must fall to the CONSERVATIVE default, not
+      # the old crypto-shaped `else` (max_contracts 5, max_concurrent 2) that
+      # silently over-exposed every non-BTC/ETH asset.
+      it "applies conservative default limits for unknown assets" do
         job_instance = described_class.new
 
         expect(job_instance.send(:legacy_contract_size_for_asset, "UNKNOWN")).to eq(100.0)
-        expect(job_instance.send(:max_contracts_for_asset, "UNKNOWN")).to eq(5)
-        expect(job_instance.send(:max_concurrent_positions_for_asset, "UNKNOWN")).to eq(2)
+        expect(job_instance.send(:max_contracts_for_asset, "UNKNOWN")).to eq(2)
+        expect(job_instance.send(:max_concurrent_positions_for_asset, "UNKNOWN")).to eq(1)
+      end
+
+      # OIL (NOL) has ~9x a BTC nano's per-contract notional, so it is capped
+      # tighter than crypto rather than inheriting the crypto shape (issue #340).
+      it "applies conservative OIL-specific limits" do
+        job_instance = described_class.new
+
+        expect(job_instance.send(:legacy_contract_size_for_asset, "OIL")).to eq(930.0)
+        expect(job_instance.send(:max_contracts_for_asset, "OIL")).to eq(1)
+        expect(job_instance.send(:max_concurrent_positions_for_asset, "OIL")).to eq(1)
       end
 
       it "validates sufficient buying power" do

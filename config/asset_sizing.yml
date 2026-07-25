@@ -1,0 +1,32 @@
+# Per-asset sizing (issue #340). Data-driven so adding a tradable asset is a
+# config edit, not a code change. Before this, RapidSignalEvaluationJob `case`d
+# only BTC/ETH and every other asset (OIL, metals, any expansion pair) fell to
+# crypto-shaped defaults -> mis-sized caps and risk.
+#
+#   contract_size_usd : FALLBACK $ notional/contract, used only when the exchange
+#                       contract-size lookup (ContractSizeResolver) fails.
+#   max_contracts     : max contracts per signal for the asset.
+#   max_concurrent    : max concurrent open positions for the asset.
+#
+# `default` applies to any asset without an entry — deliberately conservative
+# (never the crypto shape).
+default:
+  contract_size_usd: 100.0
+  max_contracts: 2
+  max_concurrent: 1
+
+assets:
+  BTC:
+    contract_size_usd: 100.0
+    max_contracts: 5
+    max_concurrent: 2
+  ETH:
+    contract_size_usd: 10.0
+    max_contracts: 10
+    max_concurrent: 3
+  OIL:
+    # NOL notional ~$930/contract (~9x a BTC nano), so cap contracts low to keep
+    # risk comparable. Conservative — review as oil trading ramps.
+    contract_size_usd: 930.0
+    max_contracts: 1
+    max_concurrent: 1

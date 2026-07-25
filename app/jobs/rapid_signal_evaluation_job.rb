@@ -152,20 +152,16 @@ class RapidSignalEvaluationJob < ApplicationJob
     (contract_size * @current_price).round(2)
   end
 
+  # Sizing knobs come from the per-asset registry (issue #340), not a hardcoded
+  # BTC/ETH `case`. An unlisted asset (OIL, metals, any expansion pair) now
+  # resolves to the conservative `default` block instead of silently inheriting
+  # the crypto shape.
   def legacy_contract_size_for_asset(asset)
-    case asset
-    when "BTC" then 100.0  # $100 per BTC contract
-    when "ETH" then 10.0   # $10 per ETH contract
-    else 100.0
-    end
+    Trading::AssetSizing.for(asset).contract_size_usd
   end
 
   def max_contracts_for_asset(asset)
-    case asset
-    when "BTC" then 5      # Max 5 BTC contracts (reduced from 10)
-    when "ETH" then 10     # Max 10 ETH contracts (reduced from 20)
-    else 5
-    end
+    Trading::AssetSizing.for(asset).max_contracts
   end
 
   # Total open positions allowed across all products. Defaults to 3 (the top of
@@ -176,11 +172,7 @@ class RapidSignalEvaluationJob < ApplicationJob
   end
 
   def max_concurrent_positions_for_asset(asset)
-    case asset
-    when "BTC" then 2      # Max 2 concurrent BTC positions (reduced from 3)
-    when "ETH" then 3      # Max 3 concurrent ETH positions (reduced from 5)
-    else 2
-    end
+    Trading::AssetSizing.for(asset).max_concurrent
   end
 
   def sufficient_buying_power?(quantity)
