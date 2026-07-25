@@ -198,16 +198,18 @@ RSpec.describe OperatorSnapshot do
         SentimentAggregate.create!(symbol: "OIL-USD", window: "1h", window_end_at: now - ago_h.hours,
           z_score: z, avg_score: 0, weighted_score: 0, count: 3)
       end
+      # Inflow = ingestion throughput (created_at). RSS published_at lags badly —
+      # a just-ingested article can have a weeks-old publish date.
       SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: now - 10.minutes,
-        raw_text_hash: "e1", title: "t", score: 1.0)
-      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: now - 40.minutes,
-        raw_text_hash: "e2", title: "t2", score: 1.0)
+        raw_text_hash: "e1", title: "t", score: 1.0, created_at: now - 5.minutes)
+      SentimentEvent.create!(source: "oilprice_rss", symbol: "OIL-USD", published_at: 2.months.ago,
+        raw_text_hash: "e2", title: "t2", score: 1.0, created_at: now - 20.minutes)
 
       row = OperatorSnapshot.new(now: now).indicators[:sentiment][:symbols].find { |s| s[:symbol] == "OIL-USD" }
 
       expect(row[:z]).to eq(1.5)                 # latest
       expect(row[:trend]).to eq([0.5, 1.0, 1.5]) # oldest -> newest
-      expect(row[:inflow_per_hr]).to eq(2)       # 2 events in the last hour
+      expect(row[:inflow_per_hr]).to eq(2)       # both ingested in the last hour, despite old publish date
       expect(row[:undersampled]).to be(true)     # below default threshold
     end
   end
