@@ -154,9 +154,9 @@ class OperatorSnapshot
 
   def drawdown_info
     peak = BotRuntimeStat.find_by(key: Trading::Protections::MaxDrawdownMonitor::PEAK_KEY)&.value&.dig("peak")
-    # Must match the equity the guard tracks its peak against, or the % is
-    # meaningless (issue #436): MaxDrawdownMonitor is fed Trading::SignalEquity.usd.
-    current = Trading::SignalEquity.usd
+    # Same actual-equity source the guard tracks its peak against (issue #451),
+    # or the % is meaningless: paper equity in dry-run, live balance when live.
+    current = Trading::CurrentEquity.usd
     pct = if peak.to_f.positive? && current
       ((peak.to_f - current.to_f) / peak.to_f * 100).round(2)
     end

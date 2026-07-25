@@ -36,7 +36,7 @@ class RealTimeSignalEvaluator
     # A breach writes a global ProtectionLock, so the per-pair valid_signal? checks
     # below suppress all new entries. Guarded so an analytics error never aborts a cycle.
     begin
-      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: Trading::SignalEquity.usd)
+      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: Trading::CurrentEquity.usd)
     rescue => e
       @logger.error("[RTSE] MaxDrawdown evaluation error: #{e.message}")
     end

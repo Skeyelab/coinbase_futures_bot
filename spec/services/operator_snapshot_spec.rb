@@ -144,18 +144,17 @@ RSpec.describe OperatorSnapshot do
       expect(ind[:protections][:drawdown][:peak]).to eq(10_000.0)
     end
 
-    it "computes drawdown from the guard's equity source (SignalEquity), not paper equity" do
-      # The MaxDrawdown guard tracks its peak against Trading::SignalEquity.usd;
-      # comparing that peak to a different source (paper equity) yields a bogus %.
+    it "computes drawdown from the guard's actual-equity source (Trading::CurrentEquity)" do
+      # The % must use the same equity the guard tracks its peak against, or it is
+      # meaningless (issues #436/#451).
       BotRuntimeStat.create!(key: "protection:max_drawdown_peak", recorded_at: Time.current,
         value: {"peak" => 25_000.0})
+      allow(Trading::CurrentEquity).to receive(:usd).and_return(20_000.0)
 
-      ClimateControl.modify(SIGNAL_EQUITY_USD: "20000") do
-        dd = OperatorSnapshot.new.indicators[:protections][:drawdown]
-        expect(dd[:peak]).to eq(25_000.0)
-        expect(dd[:current]).to eq(20_000.0) # SignalEquity.usd, matching the guard
-        expect(dd[:drawdown_pct]).to eq(20.0) # (25000 - 20000) / 25000
-      end
+      dd = OperatorSnapshot.new.indicators[:protections][:drawdown]
+      expect(dd[:peak]).to eq(25_000.0)
+      expect(dd[:current]).to eq(20_000.0)
+      expect(dd[:drawdown_pct]).to eq(20.0) # (25000 - 20000) / 25000
     end
 
     it "reports empty predictiveness before the job has ever run" do
