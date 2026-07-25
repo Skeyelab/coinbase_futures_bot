@@ -35,7 +35,8 @@ class OperatorSnapshot
   def indicators
     {
       predictiveness: predictiveness_info,
-      protections: protections_info
+      protections: protections_info,
+      exits: exits_info
     }
   end
 
@@ -161,6 +162,26 @@ class OperatorSnapshot
       ((peak.to_f - current.to_f) / peak.to_f * 100).round(2)
     end
     {peak: peak&.to_f, current: current, drawdown_pct: pct}
+  end
+
+  # Which exits are armed (issue #448): global dollar exit + per-symbol min-ROI
+  # and liquidation buffer, so "what will close this position?" is answerable.
+  def exits_info
+    dollar = Trading::DollarExitPolicy.from_env
+    {
+      dollar_exit: {enabled: dollar.enabled?, profit_target: dollar.profit_target, stop_loss: dollar.stop_loss},
+      symbols: Contract.enabled.pluck(:product_id).map { |symbol| exit_symbol_row(symbol) }
+    }
+  end
+
+  def exit_symbol_row(symbol)
+    roi = Trading::MinimumRoiExit.from_config(symbol: symbol)
+    liq = Trading::LiquidationBuffer.from_config(symbol: symbol)
+    {
+      symbol: symbol,
+      min_roi: {enabled: roi.enabled?, rungs: roi.rungs},
+      liquidation_buffer: {enabled: liq.enabled?, buffer: liq.buffer}
+    }
   end
 
   def eval_info

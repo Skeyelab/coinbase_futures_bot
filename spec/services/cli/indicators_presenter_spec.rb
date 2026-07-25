@@ -3,8 +3,8 @@
 require "rails_helper"
 
 RSpec.describe Cli::IndicatorsPresenter do
-  def indicators(predictiveness:, protections:)
-    {predictiveness: predictiveness, protections: protections}
+  def indicators(predictiveness:, protections:, exits: nil)
+    {predictiveness: predictiveness, protections: protections, exits: exits}
   end
 
   it "renders a compact per-symbol 4h headline with maturity, and a protections line" do
@@ -54,5 +54,25 @@ RSpec.describe Cli::IndicatorsPresenter do
 
     text = described_class.lines(ind).join("\n")
     expect(text).to match(/r=n\/a hit=n\/a/)
+  end
+
+  it "renders an exits line: global dollar exit + per-symbol liq/min-roi counts (#448)" do
+    ind = indicators(
+      predictiveness: {"symbols" => []},
+      protections: {active: [], drawdown: {}},
+      exits: {
+        dollar_exit: {enabled: true, profit_target: 50.0, stop_loss: nil},
+        symbols: [
+          {symbol: "NOL-19AUG26-CDE", min_roi: {enabled: false, rungs: []}, liquidation_buffer: {enabled: true, buffer: 0.05}},
+          {symbol: "BIT-25SEP26-CDE", min_roi: {enabled: false, rungs: []}, liquidation_buffer: {enabled: true, buffer: 0.05}}
+        ]
+      }
+    )
+
+    text = described_class.lines(ind).join("\n")
+    expect(text).to match(/Exits:/)
+    expect(text).to match(/dollar tgt=\$50/)
+    expect(text).to match(/liq-buffer 2\/2/)
+    expect(text).to match(/min-roi 0\/2/)
   end
 end

@@ -9,7 +9,7 @@ module Cli
 
     def self.lines(indicators)
       ind = indicators.with_indifferent_access
-      predictiveness_lines(ind[:predictiveness]) + [protections_line(ind[:protections])]
+      predictiveness_lines(ind[:predictiveness]) + [protections_line(ind[:protections]), exits_line(ind[:exits])]
     end
 
     def self.predictiveness_lines(predictiveness)
@@ -36,6 +36,19 @@ module Cli
       line
     end
 
+    def self.exits_line(exits)
+      dollar = exits&.dig(:dollar_exit) || {}
+      symbols = exits&.dig(:symbols) || []
+      liq_on = symbols.count { |s| s.dig(:liquidation_buffer, :enabled) }
+      roi_on = symbols.count { |s| s.dig(:min_roi, :enabled) }
+      dollar_desc = dollar[:enabled] ? "tgt=#{usd(dollar[:profit_target])}/sl=#{usd(dollar[:stop_loss])}" : "off"
+      "  Exits: dollar #{dollar_desc} | liq-buffer #{liq_on}/#{symbols.size} | min-roi #{roi_on}/#{symbols.size}"
+    end
+
+    def self.usd(value)
+      value.nil? ? "off" : "$#{value.to_f.round(2)}"
+    end
+
     def self.num(value)
       value.nil? ? "n/a" : value.to_f.round(2).to_s
     end
@@ -44,6 +57,6 @@ module Cli
       value.nil? ? "n/a" : "#{(value.to_f * 100).round}%"
     end
 
-    private_class_method :predictiveness_lines, :protections_line, :num, :pct
+    private_class_method :predictiveness_lines, :protections_line, :exits_line, :usd, :num, :pct
   end
 end

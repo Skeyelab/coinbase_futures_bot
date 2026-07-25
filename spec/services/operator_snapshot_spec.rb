@@ -165,4 +165,19 @@ RSpec.describe OperatorSnapshot do
       expect(OperatorSnapshot.new.status).to have_key(:indicators)
     end
   end
+
+  describe "#indicators exit-policy posture (issue #448)" do
+    it "reports the global dollar exit and per-symbol armed exits" do
+      create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+
+      ClimateControl.modify(DOLLAR_PROFIT_TARGET_USD: "50", DOLLAR_STOP_LOSS_USD: nil) do
+        exits = OperatorSnapshot.new.indicators[:exits]
+
+        expect(exits[:dollar_exit]).to include(enabled: true, profit_target: 50.0, stop_loss: nil)
+        sym = exits[:symbols].find { |s| s[:symbol] == "NOL-19AUG26-CDE" }
+        expect(sym[:liquidation_buffer]).to include(enabled: true) # default buffer 0.05
+        expect(sym[:min_roi]).to include(:enabled)
+      end
+    end
+  end
 end
