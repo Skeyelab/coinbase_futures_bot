@@ -30,10 +30,19 @@ RSpec.describe Backtest::Engine, type: :service do
     end)
   end
 
+  # Marks a symbol as a perp (funding applies) via a FundingRate row placed AFTER
+  # the test window, so crossed boundaries fall back to the constant knob. Only
+  # perps have funding — dated futures (no rows) accrue none.
+  def mark_perp(symbol)
+    FundingRate.create!(product_id: symbol, funding_time: t0 + 100.days, funding_rate: 0.0002,
+      funding_interval_seconds: 3600, observed_at: t0)
+  end
+
   describe "event-driven replay mechanics" do
     it "produces the expected trade and PnL for a known price series (no randomness)" do
       closes = Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i }
       insert_step_candles(closes)
+      mark_perp("TEST-USD")
 
       strategy = scripted_strategy do |as_of|
         if as_of == t0
@@ -110,6 +119,7 @@ RSpec.describe Backtest::Engine, type: :service do
   describe "contract-size-aware units (drift audit: PnL was ~1000x inflated)" do
     it "converts contract quantity to base units using the strategy's contract_size_usd" do
       insert_step_candles(Array.new(10, 50_000.0) + (1..10).map { |i| 50_000.0 + i * 200 })
+      mark_perp("TEST-USD")
 
       strategy = scripted_strategy do |as_of|
         if as_of == t0
@@ -143,12 +153,24 @@ RSpec.describe Backtest::Engine, type: :service do
 
     it "charges adverse funding by default for boundaries the hold crosses" do
       insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i })
+      mark_perp("TEST-USD")
       engine = described_class.new(symbol: "TEST-USD", strategy: long_at_t0,
         starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0)
 
       trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
       # Held 00:00 -> 01:10 crosses 01:00 = 1 interval; 2 bps on $100 notional.
       expect(trade[:funding]).to be_within(1e-9).of(1 * 0.0002 * 100.0)
+    end
+
+    it "charges NO funding on a dated future (not a perp -> no FundingRate rows)" do
+      # Coinbase has no oil/metals perp; NOL/GOL/SLR trade as dated futures with
+      # zero funding. Without a FundingRate row the constant fallback is suppressed.
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i }, symbol: "NOL-19AUG26-CDE")
+      engine = described_class.new(symbol: "NOL-19AUG26-CDE", strategy: long_at_t0,
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0)
+
+      trade = engine.run(from: t0, to: t0 + 19 * 5.minutes).trades.first
+      expect(trade[:funding]).to eq(0.0)
     end
 
     it "can be disabled with funding_bps_per_interval: 0" do
