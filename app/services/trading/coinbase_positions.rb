@@ -13,6 +13,43 @@ module Trading
 
     DEFAULT_BASE = "https://api.coinbase.com"
 
+    # How entries should be placed (issue #374/#377). Defaults to :market so
+    # nothing changes until deliberately switched — the maker fill rate has never
+    # been observed (zero perp fills), and #486 exists to measure it.
+    #
+    # Degrades to :market on any venue without a maker discount: only perps are
+    # 0% maker. On a dated contract both sides are ~9 bps, so a maker entry buys
+    # nothing and adds the risk of not filling at all.
+    def self.entry_order_type(symbol: nil)
+      preferred = ENV.fetch("ENTRY_ORDER_TYPE", "market").to_s.downcase.to_sym
+      return :market unless preferred == :maker
+      return :maker if symbol.nil?
+
+      fees = CostModel.fee_for(symbol)
+      (fees[:maker_rate].to_f < fees[:taker_rate].to_f) ? :maker : :market
+    end
+
+    # How long a resting maker entry may live before the EXCHANGE expires it.
+    # Deliberately exchange-side (good-till-date) rather than a local timer: a
+    # post-only GTC order would otherwise sit on the book indefinitely if the
+    # process died between placing and cancelling it.
+    # A maker entry must REST on the book, so it is posted passively — below the
+    # market to buy, above it to sell. Posting at the signal price would mostly
+    # be rejected for crossing, since a momentum entry fires precisely when price
+    # is moving toward it. The offset is the price improvement bought in
+    # exchange for accepting that the order may never fill.
+    def self.maker_price(reference_price, side)
+      offset = ENV.fetch("MAKER_PRICE_OFFSET_BPS", "5").to_f / 10_000.0
+      buying = %w[buy long].include?(SideNormalizer.order(side).to_s.downcase) ||
+        %i[buy long].include?(side.to_s.downcase.to_sym)
+      buying ? reference_price.to_f * (1 - offset) : reference_price.to_f * (1 + offset)
+    end
+
+    def self.maker_ttl_seconds
+      value = ENV.fetch("MAKER_ORDER_TTL_SECONDS", "60").to_i
+      value.positive? ? value : 60
+    end
+
     def initialize(base_url: ENV.fetch("COINBASE_AT_REST_URL", DEFAULT_BASE), logger: Rails.logger)
       @logger = logger
       @conn = Faraday.new(base_url) do |f|
@@ -431,6 +468,21 @@ module Trading
             "base_size" => size.to_s,
             "limit_price" => price.to_s,
             "post_only" => false
+          }
+        }
+      when :maker
+        raise ArgumentError, "price is required for limit orders" unless price
+
+        # post_only is what makes this a maker order at all: the exchange
+        # REJECTS it rather than crossing the spread, so it can never silently
+        # pay taker. Paired with an end_time so an unfilled order cannot rest
+        # forever — the two belong together.
+        {
+          "limit_limit_gtd" => {
+            "base_size" => size.to_s,
+            "limit_price" => price.to_s,
+            "post_only" => true,
+            "end_time" => self.class.maker_ttl_seconds.seconds.from_now.utc.iso8601
           }
         }
       else
