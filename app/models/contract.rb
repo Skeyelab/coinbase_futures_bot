@@ -33,6 +33,23 @@ class Contract < ApplicationRecord
   scope :active, -> { enabled.not_expired }
   scope :tradeable, -> { enabled.where("expiration_date > ?", Date.current + 1.day) }
 
+  # Is this product itself something we can trade right now (issue #484)?
+  #
+  # Matters because month resolution is wrong for a perp: BIP carries a 2030
+  # dummy expiry, so current_month_for_asset("BTC") skips it and returns the
+  # DATED BIT contract instead. A BIP tick would then be evaluated on BIP's
+  # price feed and executed on BIT — wrong instrument, mismatched feed.
+  #
+  # When the tick already names a tradeable contract there is nothing to
+  # resolve, perp or dated. Falls through to month resolution otherwise, which
+  # is what a spot tick (BTC-USD) needs and what keeps dated rollover working.
+  def self.tradeable_product?(product_id)
+    return false if product_id.blank?
+    return false unless MarketData::RealtimeSubscriptionCatalog.futures_contract?(product_id)
+
+    tradeable.exists?(product_id: product_id)
+  end
+
   def self.parse_contract_info(product_id)
     return nil unless product_id
 
