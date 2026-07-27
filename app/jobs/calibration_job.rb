@@ -109,6 +109,17 @@ class CalibrationJob < ApplicationJob
         step: @step
       }
     )
+    # Issue #483: while an evidence window is open, calibration keeps searching
+    # and keeps RECORDING its winner — it just stops rewriting what the live
+    # strategy reads. Activating mid-sample silently unfreezes the config that
+    # #376 gate 2 requires to be frozen, which invalidates the sample.
+    if Trading::CalibrationFreeze.frozen?
+      Rails.logger.info("[Calibrate] #{symbol}: profile #{profile.id} recorded but NOT activated " \
+                        "(calibration frozen: #{Trading::CalibrationFreeze.reason || "no reason given"}) " \
+                        "tp=#{best[:tp_target]} sl=#{best[:sl_target]} score=#{best[:score].round(2)}")
+      return profile
+    end
+
     profile.activate!
     Rails.logger.info("[Calibrate] #{symbol}: activated profile #{profile.id} " \
                       "tp=#{best[:tp_target]} sl=#{best[:sl_target]} score=#{best[:score].round(2)}")
