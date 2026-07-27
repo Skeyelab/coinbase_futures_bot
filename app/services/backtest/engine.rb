@@ -25,10 +25,10 @@ module Backtest
     # several of these are RESOLVED here rather than passed in (fee_rate falls
     # back to CostModel, contract_size_usd to the strategy's own model). Exposed
     # so BacktestRun can record what was actually used (issue #406).
-    attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd
+    attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd, :per_contract_fee
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
-      fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
+      fee_rate: nil, per_contract_fee: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
       logger: Rails.logger)
@@ -39,7 +39,29 @@ module Backtest
       @starting_equity = starting_equity.to_f
       # Per-venue fee (issue #458): dated futures (oil NOL, metals) pay their real
       # per-contract fee, not the perp ~3 bps. fee_for resolves it from @symbol.
-      @fee_rate = (fee_rate || CostModel.fee_for(@symbol)[:taker_rate]).to_f
+      venue_fee = CostModel.fee_for(@symbol)
+      @fee_rate = (fee_rate || venue_fee[:taker_rate]).to_f
+      # Issue #471: the venue fee is a SHAPE, not a rate. fee_for returns a
+      # per-contract dollar floor for BOTH venues — $0.85 on dated (measured
+      # from real fills, #458) and $0.15 on perps — and keeping only :taker_rate
+      # threw it away.
+      #
+      # The rates are calibrated so the floor roughly matches the proportional
+      # fee at each venue's TYPICAL notional (9 bps on a ~$930 oil contract is
+      # ~$0.84 against a $0.85 floor). It binds hard on SMALL-notional
+      # contracts: a ~$100 nano pays $0.09 proportional against that same $0.85
+      # floor — 9x — which is exactly the structural expense ADR 0002 found
+      # when taker costs consumed the edge.
+      # An explicit fee override replaces the venue's fee model WHOLESALE, not
+      # half of it: passing fee_rate: 0.0 to isolate PnL mechanics must mean
+      # zero fees, not "zero rate but still pay the floor". Callers who want a
+      # floor with a custom rate pass per_contract_fee: explicitly.
+      @per_contract_fee =
+        if per_contract_fee
+          per_contract_fee.to_f
+        elsif fee_rate.nil?
+          venue_fee[:per_contract_fee]&.to_f
+        end
       @slippage = slippage.to_f
       # Perp funding (issue #391): a constant *adverse* sensitivity knob, ON by
       # default so backtests stop silently pricing funding as free (ADR 0002).
@@ -93,7 +115,8 @@ module Backtest
       @strategy.funding_schedule = funding_schedule if @strategy.respond_to?(:funding_schedule=)
 
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
-        fee_rate: @fee_rate, slippage: @slippage,
+        fee_rate: @fee_rate, per_contract_fee: @per_contract_fee,
+        contract_size_usd: @contract_size_usd, slippage: @slippage,
         funding_schedule: funding_schedule)
       equity_curve = [@starting_equity]
       entered_at = {}

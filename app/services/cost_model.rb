@@ -1,6 +1,17 @@
 # frozen_string_literal: true
 
 class CostModel
+  # AUTHORITATIVE fee model. Everything that prices a trade — the backtest
+  # engine, the simulator, the #353 cost gate — resolves fees here.
+  #
+  # Trading::FeeTruth is NOT a second model and must not be used to price
+  # anything (issue #471 asked whether the two had diverged; they had not).
+  # It is a read-only observer: it compares these modeled numbers against the
+  # commissions Coinbase actually charged on recent fills and flags drift via
+  # check_taker_fee_drift!. CostModel decides what a trade costs; FeeTruth
+  # decides whether CostModel is still telling the truth. Corrections flow
+  # FeeTruth -> here (via the ENV knobs below), never the other way.
+
   # Taker fee per side (issue #353): momentum entries cross the spread.
   # Default ~3 bps is the US-perp taker rate (ADR 0002); the retired 15 bps
   # default was the dated-CDE number and left every un-overridden perp backtest
