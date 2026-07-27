@@ -25,6 +25,7 @@ class SignalDecision < ApplicationRecord
     global_position_cap
     asset_position_cap
     insufficient_buying_power
+    account_notional_cap
     order_failed
   ].freeze
 

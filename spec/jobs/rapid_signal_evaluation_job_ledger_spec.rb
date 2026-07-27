@@ -23,6 +23,9 @@ RSpec.describe RapidSignalEvaluationJob, "decision ledger", type: :job do
     Position.destroy_all
     SignalDecision.delete_all
     Trading::ProtectionLock.clear!
+    # This file is about ledger lineage, not exposure — #437's cap has its own
+    # specs and would otherwise gate these examples on paper-account equity.
+    allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end
 
   after { Trading::ProtectionLock.clear! }
