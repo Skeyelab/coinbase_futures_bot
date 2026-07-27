@@ -8,18 +8,11 @@ class FetchCryptopanicJob < ApplicationJob
     return unless client.enabled?
 
     events = client.fetch_recent(max_pages: max_pages)
-    events.each do |attrs|
-      SentimentEvent.upsert({
-        source: attrs[:source],
-        symbol: attrs[:symbol],
-        url: attrs[:url],
-        title: attrs[:title],
-        published_at: attrs[:published_at],
-        raw_text_hash: attrs[:raw_text_hash],
-        meta: attrs[:meta],
-        created_at: Time.now.utc,
-        updated_at: Time.now.utc
-      }, unique_by: :index_sentiment_events_on_source_and_raw_text_hash)
-    end
+    result = Sentiment::EventIngest.call(events)
+
+    Rails.logger.info(
+      "FetchCryptopanicJob: stored #{result.inserted} new events " \
+      "(#{result.skipped} already seen)"
+    )
   end
 end
