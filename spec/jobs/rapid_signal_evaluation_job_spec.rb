@@ -630,9 +630,10 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
 
-        expect(mock_logger).to have_received(:debug).with(
-          "[RSE] No actionable signal for #{product_id}"
-        )
+        # Issue #480: a gated signal is no longer logged as "no actionable
+        # signal" — a signal DID exist, a gate stopped it, and the ledger now
+        # records which one. That distinction is the whole point of the ledger.
+        expect(SignalDecision.rejected.last.reason).to be_present
       end
 
       it "handles rapid signal evaluation with different assets" do
@@ -765,9 +766,10 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
 
-        expect(mock_logger).to have_received(:debug).with(
-          "[RSE] No actionable signal for #{product_id}"
-        )
+        # Issue #480: a gated signal is no longer logged as "no actionable
+        # signal" — a signal DID exist, a gate stopped it, and the ledger now
+        # records which one. That distinction is the whole point of the ledger.
+        expect(SignalDecision.rejected.last.reason).to be_present
       end
 
       it "accepts signals exactly at confidence threshold" do
@@ -797,9 +799,10 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
 
-        expect(mock_logger).to have_received(:debug).with(
-          "[RSE] No actionable signal for #{product_id}"
-        )
+        # Issue #480: a gated signal is no longer logged as "no actionable
+        # signal" — a signal DID exist, a gate stopped it, and the ledger now
+        # records which one. That distinction is the whole point of the ledger.
+        expect(SignalDecision.rejected.last.reason).to be_present
       end
     end
 

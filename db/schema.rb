@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_27_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -322,6 +322,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_27_180000) do
     t.string "timeframe"
     t.datetime "triggered_at"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "signal_decisions", force: :cascade do |t|
+    t.string "asset"
+    t.decimal "confidence", precision: 6, scale: 2
+    t.jsonb "context", default: {}
+    t.string "contract_id"
+    t.datetime "created_at", null: false
+    t.string "disposition", null: false
+    t.datetime "evaluated_at", null: false
+    t.bigint "position_id"
+    t.string "product_id", null: false
+    t.decimal "quantity", precision: 20, scale: 8
+    t.string "reason", null: false
+    t.string "side"
+    t.datetime "updated_at", null: false
+    t.index ["position_id"], name: "index_signal_decisions_on_position_id"
+    t.index ["product_id", "evaluated_at"], name: "index_signal_decisions_on_product_id_and_evaluated_at"
+    t.index ["reason", "evaluated_at"], name: "index_signal_decisions_on_reason_and_evaluated_at"
   end
 
   create_table "ticks", force: :cascade do |t|

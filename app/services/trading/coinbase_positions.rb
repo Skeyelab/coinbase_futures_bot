@@ -127,7 +127,7 @@ module Trading
 
       # If order was successful, create local Position record
       if result["success"] || result["order_id"]
-        create_local_position_record(
+        position = create_local_position_record(
           product_id: product_id,
           side: side,
           size: size,
@@ -138,6 +138,10 @@ module Trading
           order_result: result,
           paper: DryRun.active?
         )
+        # Surfaced so callers can link the order to what it created (issue #480
+        # lineage). Merged rather than returned separately so every existing
+        # caller keeps reading the same result hash.
+        result = result.merge("position_id" => position.id) if result.is_a?(Hash) && position.is_a?(Position)
       end
 
       result
