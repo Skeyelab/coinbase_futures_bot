@@ -49,6 +49,15 @@ module Strategy
     # replaying this exact strategy, keeping #297's live/backtest parity.
     attr_writer :candle_source
 
+    # Pins the rate the break-even gate prices at (issue #459). The backtest
+    # engine sets this to whatever it charges the simulator, so the gate that
+    # AUTHORIZES a trade and the fill that PAYS for it can never disagree — an
+    # engine-level fee override would otherwise leave the gate pricing the
+    # venue model instead.
+    def fee_rate=(rate)
+      @config[:fee_rate] = rate
+    end
+
     def candle_source
       @candle_source ||= Signals::CandleSource::Database.new
     end
@@ -68,7 +77,15 @@ module Strategy
       @config = DEFAULTS.merge(config)
       # Break-even must be priced at the fees fills actually pay (taker) or
       # the TP floor sits below true break-even. maker_fee kept as legacy key.
-      @config[:fee_rate] ||= @config[:maker_fee] || CostModel.taker_fee_rate
+      #
+      # NOT defaulted here any more (issue #459): the fee depends on the VENUE,
+      # and the traded symbol is not known until #signal. Defaulting at
+      # construction priced every symbol at the global perp rate — 3 bps — while
+      # oil trades dated NOL at 9 bps with a $0.85/contract floor, so the live
+      # break-even gate understated cost on the only asset being traded and set
+      # the TP floor below true break-even. An explicitly configured rate still
+      # wins; only the fallback became symbol-aware.
+      @config[:fee_rate] ||= @config[:maker_fee]
     end
 
     # Decide on a potential entry.
@@ -142,7 +159,7 @@ module Strategy
       if trend == :up
         if interacted_with_5m_ema && last_close_5m > ema5 && micro_timing_ok
           entry = last_close_1m # Use 1m close for precise entry
-          be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
+          be = CostModel.break_even_exit(entry_price: entry, fee_rate: effective_fee_rate,
             slippage_rate: @config[:slippage], funding_rate: funding_break_even_fraction)
           tp = [entry * (1.0 + @config[:tp_target]), be * 1.001].max
           sl = entry * (1.0 - @config[:sl_target])
@@ -153,7 +170,7 @@ module Strategy
         end
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
-        be = CostModel.break_even_exit(entry_price: entry, fee_rate: @config[:fee_rate],
+        be = CostModel.break_even_exit(entry_price: entry, fee_rate: effective_fee_rate,
           slippage_rate: @config[:slippage], funding_rate: funding_break_even_fraction)
         tp = [entry * (1.0 - @config[:tp_target]), be * 0.999].min
         sl = entry * (1.0 + @config[:sl_target])
@@ -187,6 +204,18 @@ module Strategy
       return 0.0 unless rate.positive? && interval.positive?
 
       (@config[:funding_expected_hold_seconds].to_f / interval) * rate
+    end
+
+    # Per-side taker rate for the symbol being traded (issue #459), with the
+    # per-contract dollar floor folded in as a rate — break_even_exit reasons in
+    # prices and cannot take a dollar floor directly, so without this the
+    # dominant cost term on a small-notional contract was simply ignored.
+    def effective_fee_rate
+      configured = @config[:fee_rate]
+      return configured.to_f if configured
+
+      CostModel.effective_taker_rate(symbol: @current_symbol,
+        contract_notional_usd: @config[:contract_size_usd])
     end
 
     def recent_candles(timeframe, limit)

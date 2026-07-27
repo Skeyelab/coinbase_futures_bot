@@ -77,11 +77,14 @@ class DailySummaryJob < ApplicationJob
     return actual if position.entry_fee && position.exit_fee
 
     notional_price = position.entry_price.to_f * contract_size(position.product_id)
-    CostModel.round_trip_cost(
+    # Per-venue (issue #459): a dated position pays its own rate and floor. The
+    # global perp rate made the net-of-costs verdict read better than reality on
+    # exactly the contracts being traded.
+    CostModel.round_trip_cost_for(
+      symbol: position.product_id,
       entry_price: notional_price,
       exit_price: notional_price,
       quantity: position.size.to_f,
-      fee_rate: CostModel.taker_fee_rate,
       contracts: position.size.to_f
     )
   end

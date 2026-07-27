@@ -116,6 +116,18 @@ module Backtest
       )
     end
 
+    # The per-side rate the break-even gate should use: the engine's resolved
+    # rate, with the per-contract floor folded in as a rate (break-even reasons
+    # in prices and cannot take a dollar floor). Mirrors
+    # CostModel.effective_taker_rate, but off the engine's OWN resolved values so
+    # an override applies to the gate too.
+    def break_even_fee_rate
+      return @fee_rate if @per_contract_fee.nil? || @per_contract_fee <= 0
+      return @fee_rate if @contract_size_usd.nil? || @contract_size_usd <= 0
+
+      [@fee_rate, @per_contract_fee / @contract_size_usd].max
+    end
+
     def run(from:, to:)
       # One funding source for the whole run: prices accrual from the live
       # FundingRate snapshots (issue #391, ADR 0002 guardrail), falling back to
@@ -132,6 +144,10 @@ module Backtest
         constant_interval_seconds: @funding_interval_seconds, logger: @logger)
       @strategy.funding_schedule = funding_schedule if @strategy.respond_to?(:funding_schedule=)
       preload_candles!(from, to)
+      # The gate and the fill must price the same fee (issue #459). Without
+      # this, an engine-level fee override changed what fills cost but not what
+      # the break-even gate demanded.
+      @strategy.fee_rate = break_even_fee_rate if @strategy.respond_to?(:fee_rate=)
 
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
         fee_rate: @fee_rate, per_contract_fee: @per_contract_fee,

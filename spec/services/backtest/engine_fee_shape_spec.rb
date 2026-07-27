@@ -55,4 +55,43 @@ RSpec.describe Backtest::Engine, "venue fee shape" do
     expect(e.fee_rate).to eq(0.001)
     expect(e.per_contract_fee).to eq(2.50)
   end
+
+  # Issue #459: the break-even gate authorizes a trade; the simulated fill pays
+  # for it. If they price different fees the run is incoherent — the gate can
+  # wave through trades the fills then lose money on, or refuse trades that
+  # would clear.
+  describe "gate and fill agree on price" do
+    # The real MultiTimeframeSignal, not the silent stub: this is about what
+    # the strategy's own break-even config ends up holding.
+    def real_engine_for(symbol, **overrides)
+      described_class.new(symbol: symbol, step: "5m", **overrides)
+    end
+
+    def strategy_fee_rate(engine)
+      engine.strategy.instance_variable_get(:@config)[:fee_rate]
+    end
+
+    it "pins the strategy's break-even rate to what the engine charges" do
+      e = real_engine_for("NOL-19AUG26-CDE", contract_size_usd: 930.0)
+      e.run(from: Time.utc(2026, 6, 1), to: Time.utc(2026, 6, 2))
+
+      expect(strategy_fee_rate(e)).to eq(e.send(:break_even_fee_rate))
+    end
+
+    it "folds the per-contract floor in when it dominates the rate" do
+      e = real_engine_for("NOL-19AUG26-CDE", contract_size_usd: 100.0)
+
+      # $0.85 on a $100 contract is 85 bps, far above the 9 bps dated rate.
+      expect(e.send(:break_even_fee_rate)).to be_within(1e-9).of(CostModel.dated_fee_per_contract / 100.0)
+    end
+
+    it "carries an explicit fee override through to the gate" do
+      e = real_engine_for("NOL-19AUG26-CDE", fee_rate: 0.0015, contract_size_usd: 100.0)
+      e.run(from: Time.utc(2026, 6, 1), to: Time.utc(2026, 6, 2))
+
+      # #471: an explicit rate replaces the venue model wholesale, floor included.
+      expect(e.send(:break_even_fee_rate)).to eq(0.0015)
+      expect(strategy_fee_rate(e)).to eq(0.0015)
+    end
+  end
 end

@@ -34,14 +34,18 @@ class SymbolCircuitBreakerJob < ApplicationJob
 
   # Same cost model as DailySummaryJob: taker fees on both sides of the
   # contract-size notional; exit approximated by entry (not recorded).
+  #
+  # Priced at the POSITION's venue (issue #459). Using the global perp rate here
+  # understated every dated position, so the breaker needed a bigger loss before
+  # it would trip on exactly the contracts whose costs are highest.
   def estimated_round_trip_cost(position)
     notional_price = position.entry_price.to_f *
       Trading::ContractSizeResolver.for_product(position.product_id).to_f
-    CostModel.round_trip_cost(
+    CostModel.round_trip_cost_for(
+      symbol: position.product_id,
       entry_price: notional_price,
       exit_price: notional_price,
       quantity: position.size.to_f,
-      fee_rate: CostModel.taker_fee_rate,
       contracts: position.size.to_f
     )
   end
