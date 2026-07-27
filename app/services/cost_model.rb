@@ -49,11 +49,25 @@ class CostModel
   # {taker_rate:, maker_rate:, per_contract_fee:} so the engine and the cost
   # gates price each venue correctly instead of the global perp default.
   def self.fee_for(symbol)
-    if perp?(symbol)
-      {taker_rate: taker_fee_rate, maker_rate: maker_fee_rate, per_contract_fee: min_fee_per_contract}
-    else
-      {taker_rate: dated_taker_rate, maker_rate: dated_maker_rate, per_contract_fee: dated_fee_per_contract}
-    end
+    seeded =
+      if perp?(symbol)
+        {taker_rate: taker_fee_rate, maker_rate: maker_fee_rate, per_contract_fee: min_fee_per_contract}
+      else
+        {taker_rate: dated_taker_rate, maker_rate: dated_maker_rate, per_contract_fee: dated_fee_per_contract}
+      end
+
+    # A real measurement for THIS product beats a constant (issue #462). The
+    # seeded dated fee was measured from oil fills and then applied to every
+    # dated contract — right for oil, a guess for a BTC nano on a different
+    # schedule, and #459 carried that guess into the live gates.
+    #
+    # Only per_contract_fee is overridden. Commission per contract needs no
+    # contract multiplier and is exact; the effective bps depends on
+    # ContractSizeResolver, which FeeTruth documents as unreliable for some
+    # dated contracts. Measuring the exact number and leaving the approximate
+    # one seeded is the honest split.
+    measured = ProductFee.measured_per_contract(symbol)
+    measured ? seeded.merge(per_contract_fee: measured) : seeded
   end
 
   def self.perp?(symbol)
