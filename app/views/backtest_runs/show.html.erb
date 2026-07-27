@@ -1,0 +1,121 @@
+<p><%= link_to "← all runs", backtest_runs_path %></p>
+<h1><%= @run.symbol %> <small>(<%= @run.kind %>, <%= @run.step %>)</small></h1>
+
+<p style="font-size:1.2rem;">
+  <%= render "gate_badge", passed: @run.cost_gate_passed %>
+  <span style="margin-left:1rem;">status: <strong><%= @run.status %></strong></span>
+  <% if @run.running? && @run.started_at %>
+    <span style="margin-left:1rem;">elapsed: <%= distance_of_time_in_words(@run.started_at, Time.current) %></span>
+  <% elsif @run.duration %>
+    <span style="margin-left:1rem;">took: <%= @run.duration.round(1) %>s</span>
+  <% end %>
+</p>
+
+<% if @run.failed? && @run.error_message.present? %>
+  <%# Show the error plainly rather than an empty metrics panel. %>
+  <h2>Error</h2>
+  <pre style="background:#fee;border:1px solid #d73a4a;padding:1rem;"><%= @run.error_message %></pre>
+<% end %>
+
+<h2>Inputs</h2>
+<%# Everything needed to reproduce the run — after ADR 0002 a set of metrics is
+    only interpretable alongside the fee and sizing assumptions it ran under. %>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>window</th><td><%= @run.from_time %> → <%= @run.to_time %></td></tr>
+  <tr><th>fee_rate</th><td><%= @run.fee_rate %></td></tr>
+  <tr><th>per_contract_fee</th><td><%= @run.per_contract_fee || "—" %></td></tr>
+  <tr><th>slippage</th><td><%= @run.slippage %></td></tr>
+  <tr><th>starting_equity</th><td><%= @run.starting_equity %></td></tr>
+  <tr><th>contract_size_usd</th><td><%= @run.contract_size_usd %></td></tr>
+  <% if @run.walk_forward? %>
+    <tr><th>train / eval days</th><td><%= @run.train_days %> / <%= @run.eval_days %></td></tr>
+  <% end %>
+</table>
+
+<% if @run.metrics.present? %>
+  <h2>Metrics</h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <% BacktestRun::HEADLINE_METRICS.each do |name| %>
+      <% value = @run.public_send(name) %>
+      <tr><th><%= name %></th><td><%= value.is_a?(Float) ? value.round(4) : value.inspect %></td></tr>
+    <% end %>
+  </table>
+<% elsif !@run.failed? %>
+  <p><em>No metrics yet — run is <%= @run.status %>.</em></p>
+<% end %>
+
+<% if @curve.any? %>
+  <h2>Equity curve <small>(<%= @run.equity_curve.size %> points, downsampled to <%= @curve.size %>)</small></h2>
+  <%
+    values = @curve.map(&:to_f)
+    lo, hi = values.min, values.max
+    span = (hi - lo).abs < 1e-9 ? 1.0 : (hi - lo)
+    pts = values.each_with_index.map { |v, i|
+      x = (i.to_f / [values.size - 1, 1].max) * 600
+      y = 150 - ((v - lo) / span * 140)
+      "#{x.round(1)},#{y.round(1)}"
+    }.join(" ")
+  %>
+  <svg width="620" height="160" style="border:1px solid #ccc;background:#fafafa;">
+    <polyline points="<%= pts %>" fill="none" stroke="#0366d6" stroke-width="1.5" />
+  </svg>
+  <p><small>low <%= lo.round(2) %> · high <%= hi.round(2) %></small></p>
+<% end %>
+
+<% if @run.walk_forward? && @run.windows.present? %>
+  <h2>Walk-forward windows</h2>
+  <%# data_coverage matters (#378): a zero-trade window with low 1m coverage is
+      DATA-STARVED, not a signal result, and the two must not read alike. %>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr><th>eval from</th><th>eval to</th><th>trades</th><th>pnl</th><th>data coverage</th></tr>
+    <% Array(@run.windows).each do |w| %>
+      <% m = w["metrics"] || {} %>
+      <tr>
+        <td><%= w["eval_from"] %></td>
+        <td><%= w["eval_to"] %></td>
+        <td><%= m["trade_count"] %></td>
+        <td><%= m["total_pnl"]&.round(2) %></td>
+        <td>
+          <% cov = w["data_coverage"] %>
+          <% if cov.is_a?(Hash) %>
+            <% cov.each do |tf, frac| %>
+              <span style="<%= "color:#d73a4a;font-weight:700;" if frac.to_f < 0.9 %>">
+                <%= tf %>: <%= frac %>
+              </span>
+            <% end %>
+          <% else %>
+            <%= cov %>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </table>
+<% end %>
+
+<% if @trades.any? %>
+  <h2>Trades <small>(<%= @trades.size %>)</small></h2>
+  <table border="1" cellpadding="6" cellspacing="0">
+    <tr><th>side</th><th>entry</th><th>exit</th><th>qty</th><th>pnl</th><th>fees</th><th>entered</th><th>exited</th></tr>
+    <% @trades_page.each do |t| %>
+      <tr>
+        <td><%= t["side"] %></td>
+        <td><%= t["entry_price"] %></td>
+        <td><%= t["exit_price"] %></td>
+        <td><%= t["quantity"] %></td>
+        <td style="<%= "color:#d73a4a;" if t["pnl"].to_f < 0 %>"><%= t["pnl"]&.round(4) %></td>
+        <td><%= t["fees"]&.round(4) %></td>
+        <td><%= t["entered_at"] %></td>
+        <td><%= t["exited_at"] %></td>
+      </tr>
+    <% end %>
+  </table>
+  <% if @trades.size > BacktestRunsController::PER_PAGE %>
+    <p>
+      <% if @trade_page > 1 %><%= link_to "← prev", trade_page: @trade_page - 1 %><% end %>
+      trades page <%= @trade_page %>
+      <% if @trade_page * BacktestRunsController::PER_PAGE < @trades.size %>
+        <%= link_to "next →", trade_page: @trade_page + 1 %>
+      <% end %>
+    </p>
+  <% end %>
+<% end %>
