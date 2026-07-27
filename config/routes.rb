@@ -26,6 +26,9 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+  # Read-only backtest run surface (issue #408).
+  resources :backtest_runs, only: %i[index show]
+
   resources :positions, only: %i[index new create edit update], param: :product_id do
     member do
       post :close

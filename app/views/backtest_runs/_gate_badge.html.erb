@@ -1,0 +1,11 @@
+<%# cost_gate_passed (#353) is the hard pass/fail — rendered unmissable rather
+    than as another number in a row of numbers. nil means the run has no
+    metrics yet (pending/running/failed), which is distinct from failing. %>
+<% case passed %>
+<% when true %>
+  <span style="background:#0e8a16;color:#fff;padding:2px 8px;border-radius:3px;font-weight:700;">PASS</span>
+<% when false %>
+  <span style="background:#d73a4a;color:#fff;padding:2px 8px;border-radius:3px;font-weight:700;">FAIL</span>
+<% else %>
+  <span style="color:#888;">—</span>
+<% end %>

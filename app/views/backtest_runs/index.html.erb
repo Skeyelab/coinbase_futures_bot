@@ -1,0 +1,59 @@
+<h1>Backtest runs</h1>
+
+<form method="get" style="margin-bottom:1rem;">
+  <select name="symbol">
+    <option value="">all symbols</option>
+    <% @symbols.each do |s| %>
+      <option value="<%= s %>" <%= "selected" if params[:symbol] == s %>><%= s %></option>
+    <% end %>
+  </select>
+  <select name="status">
+    <option value="">any status</option>
+    <% BacktestRun::STATUSES.each do |st| %>
+      <option value="<%= st %>" <%= "selected" if params[:status] == st %>><%= st %></option>
+    <% end %>
+  </select>
+  <select name="cost_gate">
+    <option value="">any gate</option>
+    <option value="pass" <%= "selected" if params[:cost_gate] == "pass" %>>gate: pass</option>
+    <option value="fail" <%= "selected" if params[:cost_gate] == "fail" %>>gate: fail</option>
+  </select>
+  <button type="submit">filter</button>
+</form>
+
+<p><%= @total %> run<%= "s" unless @total == 1 %></p>
+
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr>
+    <th>gate</th><th>symbol</th><th>kind</th><th>step</th><th>window</th>
+    <th>status</th><th>trades</th><th>win%</th><th>expectancy</th><th>max DD</th>
+    <th>fee rate</th><th>ran</th>
+  </tr>
+  <% @runs.each do |run| %>
+    <tr>
+      <td><%= render "gate_badge", passed: run.cost_gate_passed %></td>
+      <td><%= link_to run.symbol, backtest_run_path(run) %></td>
+      <td><%= run.kind %></td>
+      <td><%= run.step %></td>
+      <td><%= run.from_time&.to_date %> → <%= run.to_time&.to_date %></td>
+      <td><%= run.status %></td>
+      <td><%= run.trade_count %></td>
+      <td><%= run.win_rate ? "#{(run.win_rate.to_f * 100).round(1)}%" : "—" %></td>
+      <td><%= run.expectancy&.round(3) %></td>
+      <td><%= run.max_drawdown ? "#{(run.max_drawdown.to_f * 100).round(1)}%" : "—" %></td>
+      <%# fee_rate makes pre/post ADR 0002 runs distinguishable at a glance %>
+      <td><%= run.fee_rate %></td>
+      <td><%= run.created_at&.strftime("%Y-%m-%d %H:%M") %></td>
+    </tr>
+  <% end %>
+</table>
+
+<% if @total > BacktestRunsController::PER_PAGE %>
+  <p>
+    <% if @page > 1 %><%= link_to "← prev", request.query_parameters.merge(page: @page - 1) %><% end %>
+    page <%= @page %>
+    <% if @page * BacktestRunsController::PER_PAGE < @total %>
+      <%= link_to "next →", request.query_parameters.merge(page: @page + 1) %>
+    <% end %>
+  </p>
+<% end %>
