@@ -229,7 +229,14 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
         allow(Rails.application.config).to receive(:default_day_trading).and_return(false)
       end
 
+      # Venue-aware now: the global flag only decides when the venue is unknown.
+      # A perp is held (no session to be flat before); a dated contract stays
+      # intraday regardless. Asserting via a perp so this tests the default
+      # rather than the venue rule.
       it "creates swing trading positions by default" do
+        FundingRate.create!(product_id: product_id, funding_time: 1.hour.ago,
+          funding_rate: 0.000013, funding_interval_seconds: 3600, observed_at: 1.hour.ago)
+
         service.open_position(
           product_id: product_id,
           side: "LONG",

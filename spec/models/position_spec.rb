@@ -226,10 +226,15 @@ RSpec.describe Position, type: :model do
       expect(position.day_trading).to be true
     end
 
+    # Venue-aware now (Trading::HoldHorizon): the global flag decides only when
+    # the venue is unknown. A dated contract stays intraday regardless, so this
+    # asserts the default through a perp.
     it "sets day_trading via callback to false when DEFAULT_DAY_TRADING is false" do
       allow(Rails.application.config).to receive(:default_day_trading).and_return(false)
+      FundingRate.create!(product_id: "BIP-20DEC30-CDE", funding_time: 1.hour.ago,
+        funding_rate: 0.000013, funding_interval_seconds: 3600, observed_at: 1.hour.ago)
       position = Position.new(
-        product_id: "BIT-29AUG25-CDE",
+        product_id: "BIP-20DEC30-CDE",
         side: "LONG",
         size: 2.0,
         entry_price: 50000.0,

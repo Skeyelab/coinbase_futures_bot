@@ -28,7 +28,7 @@ class RapidSignalEvaluationJob < ApplicationJob
     @product_id = product_id
     @current_price = current_price.to_f
     @asset = asset
-    @day_trading = day_trading.nil? ? Rails.application.config.default_day_trading : day_trading
+    @day_trading_override = day_trading
 
     # Issue #480: one row per evaluation, whatever the outcome. Recording is
     # best-effort and never blocks an order.
@@ -61,6 +61,16 @@ class RapidSignalEvaluationJob < ApplicationJob
     # exits under position.product_id), so the entry gate needs it too.
     @target_contract = target_contract
     @decisions.contract_id = target_contract
+    # Venue-aware, and resolved from the CONTRACT rather than the tick product:
+    # a BIP tick and a BIT tick can arrive for the same asset and want opposite
+    # answers. A perp has no session to be flat before, and the measured 200/120
+    # config (#496) holds ~16.6h — flattening at 20:00 UTC would truncate
+    # exactly the trades the walk-forward found profitable.
+    @day_trading = if @day_trading_override.nil?
+      Trading::HoldHorizon.day_trading?(target_contract)
+    else
+      @day_trading_override
+    end
 
     # LIVE-configured strategy via the shared factory so calibrated per-symbol
     # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
