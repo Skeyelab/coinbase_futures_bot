@@ -15,6 +15,9 @@ class OperatorSnapshot
       as_of: iso(@now),
       halt: TradingHalt.status.slice(:active, :halted, :reason),
       dry_run: {active: DryRun.active?},
+      # Issue #483: a frozen config must be visible, or an operator reads a
+      # stale tp/sl and cannot tell why calibration stopped moving it.
+      calibration_freeze: Trading::CalibrationFreeze.status.slice(:frozen, :reason),
       positions: {
         day: Position.open.day_trading.count,
         swing: Position.open.swing_trading.count,
