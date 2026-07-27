@@ -58,4 +58,44 @@ RSpec.describe Sentiment::PredictivenessStudy, type: :service do
     expect(r[:n]).to eq(1)
     expect(r[:hit_rate]).to eq(0.0)
   end
+
+  # Issue #468: raw `n` counts overlapping observations. Aggregates are hourly,
+  # so at a 4h horizon consecutive samples share three quarters of their forward
+  # return — the maturity label needs the count of INDEPENDENT observations and
+  # the calendar span, not the row count.
+  describe "independent-evidence reporting" do
+    subject(:study) do
+      described_class.new(sentiment_symbol: "OIL-USD-TEST", price_symbol: "NOL-TEST",
+        window: "1h", horizon_hours: 4, z_threshold: 1.0)
+    end
+
+    before do
+      (0..24).each { |h| candle(h, 100.0 + h) }
+      (0..20).each { |h| agg(h, 2.0) }
+    end
+
+    it "counts only observations spaced at least one horizon apart" do
+      r = study.run(from: t0, to: t0 + 24.hours)
+
+      # 21 hourly samples over a 20h span, scored against a 4h horizon.
+      expect(r[:n]).to eq(21)
+      expect(r[:effective_n]).to eq(6)
+      expect(r[:effective_n]).to be < r[:n]
+    end
+
+    it "reports the calendar span the samples actually cover" do
+      r = study.run(from: t0, to: t0 + 24.hours)
+
+      expect(r[:span_days]).to be_within(0.01).of(20 / 24.0)
+    end
+
+    it "reports zero span and no independent observations when there are no samples" do
+      r = described_class.new(sentiment_symbol: "NONE", price_symbol: "NONE",
+        horizon_hours: 4).run(from: t0, to: t0 + 24.hours)
+
+      expect(r[:n]).to eq(0)
+      expect(r[:effective_n]).to eq(0)
+      expect(r[:span_days]).to eq(0.0)
+    end
+  end
 end

@@ -27,7 +27,11 @@ class PredictivenessSnapshotJob < ApplicationJob
       result = Sentiment::PredictivenessStudy.new(
         sentiment_symbol: sentiment_symbol, price_symbol: price_symbol, horizon_hours: hours
       ).run(from: from, to: to)
-      [hours.to_s, result.slice(:correlation, :hit_rate, :n, :signal_count).transform_keys(&:to_s)]
+      # effective_n / span_days ride along per horizon (issue #468) so an
+      # operator can see WHY a reading is labelled the way it is — a bare label
+      # is exactly what let `high` sit unexamined on six days of data.
+      [hours.to_s, result.slice(:correlation, :hit_rate, :n, :signal_count,
+        :effective_n, :effective_signal_count, :span_days).transform_keys(&:to_s)]
     end
 
     headline = horizons.fetch(HEADLINE_HORIZON.to_s)
@@ -35,7 +39,13 @@ class PredictivenessSnapshotJob < ApplicationJob
       "sentiment_symbol" => sentiment_symbol,
       "price_symbol" => price_symbol,
       "horizons" => horizons,
-      "maturity" => Sentiment::PredictivenessMaturity.label(n: headline["n"], signal_count: headline["signal_count"])
+      # Keyed off INDEPENDENT observations and calendar span, not row counts:
+      # raw `n` counts overlapping windows and saturated within days (#468).
+      "maturity" => Sentiment::PredictivenessMaturity.label(
+        effective_n: headline["effective_n"],
+        signal_count: headline["effective_signal_count"],
+        span_days: headline["span_days"]
+      )
     }
   end
 

@@ -39,11 +39,41 @@ module Sentiment
         correlation: pearson(zs, rets),
         signal_count: signals.size,
         hit_rate: hit_rate(signals),
-        mean_forward_return: (rets.empty? ? nil : rets.sum / rets.size)
+        mean_forward_return: (rets.empty? ? nil : rets.sum / rets.size),
+        # Issue #468: `n` counts OVERLAPPING observations — aggregates are spaced
+        # far tighter than the horizon, so consecutive samples share most of
+        # their forward return and the errors are autocorrelated. These two say
+        # how much genuinely independent evidence is behind the numbers above,
+        # and the maturity label keys off them rather than off `n`.
+        effective_n: independent_count(samples),
+        effective_signal_count: independent_count(signals),
+        span_days: span_days(samples)
       }
     end
 
     private
+
+    # Observations spaced at least one horizon apart, so no two share any of
+    # their forward window. Greedy over time-ordered samples, which is optimal
+    # for this (always taking the earliest admissible point leaves the most room
+    # for the rest) and, unlike span/horizon arithmetic, respects gaps in data.
+    def independent_count(samples)
+      cutoff = nil
+      samples.count do |s|
+        next false if cutoff && s[:at] < cutoff
+
+        cutoff = s[:at] + @horizon_hours.hours
+        true
+      end
+    end
+
+    # Calendar time the samples actually cover. No amount of data inside one
+    # quiet week makes that week representative of other regimes.
+    def span_days(samples)
+      return 0.0 if samples.size < 2
+
+      (samples.last[:at] - samples.first[:at]) / 1.day.to_f
+    end
 
     def build_samples(from, to)
       aggregates = SentimentAggregate
@@ -55,7 +85,7 @@ module Sentiment
         later = price_at(a.window_end_at + @horizon_hours.hours)
         next if now.nil? || later.nil? || now.to_f <= 0
 
-        {z: a.z_score.to_f, forward_return: (later.to_f - now.to_f) / now.to_f}
+        {at: a.window_end_at, z: a.z_score.to_f, forward_return: (later.to_f - now.to_f) / now.to_f}
       end
     end
 

@@ -51,8 +51,13 @@ module Cli
 
       symbols.map do |s|
         h = s.dig(:horizons, HEADLINE_HORIZON) || {}
+        # n alone reads as more evidence than there is: samples overlap, so the
+        # independent count and the calendar span are what justify the label
+        # (issue #468). Show them next to it rather than making the operator
+        # trust the tag.
         "  #{s[:sentiment_symbol]} → #{s[:price_symbol]}  4h: " \
-          "r=#{num(h[:correlation])} hit=#{pct(h[:hit_rate])} n=#{h[:n] || 0} [#{s[:maturity]}]"
+          "r=#{num(h[:correlation])} hit=#{pct(h[:hit_rate])} " \
+          "n=#{h[:n] || 0} (eff #{h[:effective_n] || 0} over #{days(h[:span_days])}) [#{s[:maturity]}]"
       end
     end
 
@@ -90,6 +95,15 @@ module Cli
       value.nil? ? "n/a" : "#{(value.to_f * 100).round}%"
     end
 
-    private_class_method :predictiveness_lines, :sentiment_lines, :trend_arrow, :strategy_lines, :protections_line, :exits_line, :usd, :num, :pct
+    # Calendar span behind a reading. Sub-day spans round to 0d and would read
+    # as missing, so keep one decimal until a day has actually accrued.
+    def self.days(value)
+      return "n/a" if value.nil?
+
+      d = value.to_f
+      (d < 1) ? "#{d.round(1)}d" : "#{d.round}d"
+    end
+
+    private_class_method :predictiveness_lines, :sentiment_lines, :trend_arrow, :strategy_lines, :protections_line, :exits_line, :usd, :num, :pct, :days
   end
 end
