@@ -78,7 +78,41 @@ class OperatorSnapshot
     }
   end
 
+  # Persisted backtest runs (#406) for the terminal — the CLI reads the same
+  # data the web index does (#408), through one snapshot rather than a second
+  # query with its own idea of what a run looks like.
+  def backtests(limit: 15)
+    {as_of: iso(@now), runs: backtest_scope.limit(limit).map { |r| backtest_row(r) }}
+  end
+
   private
+
+  # Never ships equity_curve/trades: a 30-day 5m curve is ~8,600 points and a
+  # terminal listing needs none of them.
+  def backtest_scope
+    BacktestRun.without_payloads.recent
+  end
+
+  def backtest_row(run)
+    {
+      id: run.id,
+      symbol: run.symbol,
+      kind: run.kind,
+      step: run.step,
+      status: run.status,
+      from: iso(run.from_time),
+      to: iso(run.to_time),
+      # nil is "no verdict yet" — distinct from a failed gate, and the caller
+      # must be able to tell them apart.
+      cost_gate_passed: run.cost_gate_passed,
+      trade_count: run.trade_count,
+      win_rate: run.win_rate,
+      expectancy: run.expectancy,
+      max_drawdown: run.max_drawdown,
+      fee_rate: run.fee_rate,
+      created_at: iso(run.created_at)
+    }
+  end
 
   def sentiment_symbol_row(symbol)
     {

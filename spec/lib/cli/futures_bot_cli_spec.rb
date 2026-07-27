@@ -525,4 +525,63 @@ RSpec.describe FuturesBotCli, type: :model do
       run_cli("chat")
     end
   end
+
+  describe "#backtests" do
+    def run!(**overrides)
+      BacktestRun.create!({
+        symbol: "BIP-20DEC30-CDE", kind: "walk_forward", step: "5m",
+        from_time: 30.days.ago, to_time: Time.current, status: "succeeded",
+        fee_rate: 0.0003,
+        metrics: {"expectancy" => 23.57, "cost_gate_passed" => true,
+                  "win_rate" => 0.46, "trade_count" => 153}
+      }.merge(overrides))
+    end
+
+    before { BacktestRun.delete_all }
+
+    it "prints a PASS verdict and the headline metrics" do
+      run!
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {}) }
+
+      expect(out).to include("PASS", "BIP-20DEC30-CDE", "153", "23.57")
+    end
+
+    it "prints FAIL when the cost gate failed" do
+      run!(metrics: {"cost_gate_passed" => false, "expectancy" => -5.0, "trade_count" => 2})
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {}) }
+
+      expect(out).to include("FAIL")
+    end
+
+    # nil is "no verdict yet" and must not read as a failure.
+    it "shows no verdict for a run still in flight" do
+      run!(status: "running", metrics: nil)
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {}) }
+
+      expect(out).not_to include("FAIL")
+      expect(out).not_to include("PASS")
+    end
+
+    it "emits JSON on demand" do
+      run!
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {json: true}) }
+      parsed = JSON.parse(out)
+
+      expect(parsed["runs"].first).to include("symbol" => "BIP-20DEC30-CDE", "cost_gate_passed" => true)
+    end
+
+    it "filters by symbol" do
+      run!(symbol: "NOL-19AUG26-CDE")
+      run!(symbol: "BIP-20DEC30-CDE")
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {json: true, symbol: "NOL-19AUG26-CDE"}) }
+
+      expect(JSON.parse(out)["runs"].map { |r| r["symbol"] }).to eq(["NOL-19AUG26-CDE"])
+    end
+
+    it "says so plainly when nothing has run" do
+      out = capture_stdout { described_class.new.invoke(:backtests, [], {}) }
+
+      expect(out).to match(/none recorded/i)
+    end
+  end
 end
