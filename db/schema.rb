@@ -10,9 +10,35 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_22_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "backtest_runs", force: :cascade do |t|
+    t.decimal "contract_size_usd", precision: 20, scale: 8
+    t.datetime "created_at", null: false
+    t.jsonb "equity_curve"
+    t.text "error_message"
+    t.integer "eval_days"
+    t.decimal "fee_rate", precision: 12, scale: 8
+    t.datetime "finished_at"
+    t.datetime "from_time", null: false
+    t.string "kind", null: false
+    t.jsonb "metrics"
+    t.decimal "slippage", precision: 12, scale: 8
+    t.datetime "started_at"
+    t.decimal "starting_equity", precision: 20, scale: 8
+    t.string "status", default: "pending", null: false
+    t.string "step", null: false
+    t.string "symbol", null: false
+    t.datetime "to_time", null: false
+    t.jsonb "trades"
+    t.integer "train_days"
+    t.datetime "updated_at", null: false
+    t.jsonb "windows"
+    t.index ["status"], name: "index_backtest_runs_on_status"
+    t.index ["symbol", "created_at"], name: "index_backtest_runs_on_symbol_and_created_at"
+  end
 
   create_table "bot_runtime_stats", force: :cascade do |t|
     t.datetime "created_at", null: false

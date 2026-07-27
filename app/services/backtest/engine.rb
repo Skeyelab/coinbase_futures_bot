@@ -21,6 +21,12 @@ module Backtest
 
     attr_reader :strategy
 
+    # A run is only interpretable alongside the assumptions it ran under, and
+    # several of these are RESOLVED here rather than passed in (fee_rate falls
+    # back to CostModel, contract_size_usd to the strategy's own model). Exposed
+    # so BacktestRun can record what was actually used (issue #406).
+    attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd
+
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
@@ -28,6 +34,7 @@ module Backtest
       logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
+      @step = step
       @step_scope = STEP_SCOPES.fetch(step) { raise ArgumentError, "unknown step #{step.inspect}" }
       @starting_equity = starting_equity.to_f
       # Per-venue fee (issue #458): dated futures (oil NOL, metals) pay their real
