@@ -27,6 +27,16 @@ module Trading
         # StoplossGuard (issue #400): a losing close may trip the guard and halt
         # the offending side after a cluster of losses.
         evaluate_stoploss_guard(position)
+        # Loss caps (issue #482, #392 condition 3): evaluated here because this
+        # is the moment a loss becomes REALIZED, so the cap trips on the trade
+        # that breached it rather than whenever a periodic job next happens to
+        # run. Never allowed to fail the close — the position is already flat
+        # and raising here would misreport a successful exit.
+        begin
+          Trading::LossLimits.evaluate!(logger: @logger)
+        rescue => e
+          @logger.error("[PositionLifecycle] loss-limit evaluation failed: #{e.class}: #{e.message}")
+        end
         Result.new(success: true, close_price: current_price, reason: reason, fallback: false)
       else
         # Do NOT mark the DB position CLOSED here. The exchange close failed, so
