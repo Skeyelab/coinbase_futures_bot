@@ -63,4 +63,41 @@ RSpec.describe Trading::FeeTruth, type: :service do
     # $1.50 / 3 contracts = $0.50 per contract.
     expect(result[:by_liquidity]["TAKER"][:avg_commission_per_contract]).to be_within(1e-9).of(0.50)
   end
+
+  # Issue #462: by_product collapses liquidity, which would average a maker fill
+  # into what taker entries actually pay. The stored measurement keys on both.
+  describe "#by_product_liquidity" do
+    it "separates taker and maker commissions for the same product" do
+      fills = [
+        fill(product: "NOL-19AUG26-CDE", commission: "0.85", liquidity: "TAKER"),
+        fill(product: "NOL-19AUG26-CDE", commission: "0.95", liquidity: "TAKER"),
+        fill(product: "NOL-19AUG26-CDE", commission: "0.20", liquidity: "MAKER")
+      ]
+
+      rows = described_class.new(client: client(fills: fills), resolver: resolver)
+        .call[:by_product_liquidity]
+
+      taker = rows.find { |r| r[:liquidity] == "TAKER" }
+      maker = rows.find { |r| r[:liquidity] == "MAKER" }
+
+      expect(taker[:count]).to eq(2)
+      expect(taker[:avg_commission_per_contract]).to be_within(1e-9).of(0.90)
+      expect(maker[:count]).to eq(1)
+      expect(maker[:avg_commission_per_contract]).to be_within(1e-9).of(0.20)
+    end
+
+    it "keeps products apart so one does not inherit another's fee" do
+      fills = [
+        fill(product: "NOL-19AUG26-CDE", commission: "0.85"),
+        fill(product: "BIT-29AUG25-CDE", commission: "0.11")
+      ]
+
+      rows = described_class.new(client: client(fills: fills), resolver: resolver)
+        .call[:by_product_liquidity]
+
+      expect(rows.map { |r| r[:product] }).to match_array(%w[NOL-19AUG26-CDE BIT-29AUG25-CDE])
+      expect(rows.find { |r| r[:product] == "BIT-29AUG25-CDE" }[:avg_commission_per_contract])
+        .to be_within(1e-9).of(0.11)
+    end
+  end
 end

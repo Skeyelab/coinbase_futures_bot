@@ -45,6 +45,7 @@ module Trading
         model_maker_rate: CostModel.maker_fee_rate,
         by_liquidity: by_liquidity(rows),
         by_product: by_product(rows),
+        by_product_liquidity: by_product_liquidity(rows),
         perp_taker_drift: perp_taker_drift(perp),
         note: NOTE
       }
@@ -88,6 +89,23 @@ module Trading
           count: group.size,
           avg_commission_per_contract: avg(group.map { |r| r[:commission_per_contract] }),
           avg_effective_bps: rated.empty? ? nil : (avg(rated) * 10_000)
+        }
+      end
+    end
+
+    # Per (product, liquidity) — the shape FeeMeasurementSnapshotJob stores
+    # (issue #462). by_product collapses liquidity, which would average a maker
+    # fill into what taker entries actually pay: the exact class of error the
+    # drift audit found when strategies gated TP on maker fees.
+    def by_product_liquidity(rows)
+      rows.group_by { |r| [r[:product], (r[:liquidity].presence || "TAKER").to_s.upcase] }
+        .map do |(product, liquidity), group|
+        {
+          product: product,
+          liquidity: liquidity,
+          count: group.size,
+          avg_commission_per_contract: avg(group.map { |r| r[:commission_per_contract] }),
+          avg_effective_rate: avg(group.filter_map { |r| r[:effective_rate] })
         }
       end
     end

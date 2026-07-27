@@ -81,4 +81,49 @@ RSpec.describe CostModel, "per-venue live pricing" do
       expect(cost).to be_within(1e-9).of(2 * described_class.min_fee_per_contract)
     end
   end
+
+  # Issue #462: the seeded dated fee was measured from OIL fills and then applied
+  # to every dated contract — right for oil, a guess for a BTC nano on a
+  # different schedule, and #459 carried that guess into the live gates.
+  describe "measured fees override the seeded constant" do
+    def measure!(product, per_contract, samples: 25)
+      ProductFee.create!(product_id: product, liquidity: "TAKER",
+        commission_per_contract: per_contract, sample_size: samples, measured_at: Time.current)
+    end
+
+    it "prefers a product's own measured commission over oil's" do
+      measure!("BIT-29AUG25-CDE", 0.11)
+
+      fee = described_class.fee_for("BIT-29AUG25-CDE")[:per_contract_fee]
+
+      expect(fee).to eq(0.11)
+      expect(fee).not_to eq(described_class.dated_fee_per_contract)
+    end
+
+    # Commission per contract needs no contract multiplier and is exact; the
+    # effective bps depends on a resolver FeeTruth documents as unreliable for
+    # some dated contracts. Measure the exact number, leave the approximate one.
+    it "overrides only the exact number, leaving the rate seeded" do
+      measure!(dated, 1.25)
+
+      fees = described_class.fee_for(dated)
+
+      expect(fees[:per_contract_fee]).to eq(1.25)
+      expect(fees[:taker_rate]).to eq(described_class.dated_taker_rate)
+    end
+
+    it "falls back to the seeded constant when nothing has been measured" do
+      expect(described_class.fee_for(dated)[:per_contract_fee])
+        .to eq(described_class.dated_fee_per_contract)
+    end
+
+    it "reaches what the live gates actually charge" do
+      measure!(dated, 2.00)
+
+      cost = described_class.round_trip_cost_for(symbol: dated, entry_price: 100.0,
+        exit_price: 100.0, quantity: 1.0, contracts: 1.0)
+
+      expect(cost).to be_within(1e-9).of(4.00)
+    end
+  end
 end

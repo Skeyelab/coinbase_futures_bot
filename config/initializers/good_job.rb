@@ -39,6 +39,15 @@ Rails.application.configure do
       cron: ENV.fetch("FUNDING_SNAPSHOT_CRON", "15,30,45,55 * * * *"),
       class: "FundingRateSnapshotJob"
     },
+    # Measured per-contract fees (issue #462). Unlike funding, commissions are
+    # recoverable from fill history, so this does not need to chase every
+    # boundary — daily keeps the live cost gates current as the fee schedule or
+    # contract mix changes, without spending an API call an hour on a number
+    # that moves a few times a year.
+    fee_measurement: {
+      cron: ENV.fetch("FEE_MEASUREMENT_CRON", "40 3 * * *"),
+      class: "FeeMeasurementSnapshotJob"
+    },
     signals_15m: {
       # Run shortly after each 15m boundary to use fresh 15m candles
       # Default: minutes 1,16,31,46 of each hour

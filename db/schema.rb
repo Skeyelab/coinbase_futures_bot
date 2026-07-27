@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_27_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -255,6 +255,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_27_170000) do
     t.jsonb "trailing_stop_state", default: {}, null: false
     t.datetime "updated_at", null: false
     t.index ["status", "trailing_stop_enabled"], name: "index_positions_on_status_and_trailing_stop_enabled"
+  end
+
+  create_table "product_fees", force: :cascade do |t|
+    t.decimal "commission_per_contract", precision: 20, scale: 8, null: false
+    t.datetime "created_at", null: false
+    t.decimal "effective_rate", precision: 12, scale: 8
+    t.string "liquidity", default: "TAKER", null: false
+    t.datetime "measured_at", null: false
+    t.string "product_id", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id", "liquidity"], name: "index_product_fees_on_product_id_and_liquidity", unique: true
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|
