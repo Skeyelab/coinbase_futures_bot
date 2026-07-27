@@ -136,17 +136,50 @@ class CostModel
   end
 
   # Total round-trip cost in dollars: fees + slippage on both sides' notional.
-  # Pass contracts: to apply the flat per-contract floor per side.
-  def self.round_trip_cost(entry_price:, exit_price:, quantity:, fee_rate:, slippage_rate: 0.0, contracts: nil)
+  # Pass contracts: to apply the flat per-contract floor per side, and
+  # per_contract_fee: to use the VENUE's floor rather than the perp minimum
+  # (issue #459 — a dated contract's floor is $0.85, not $0.15).
+  def self.round_trip_cost(entry_price:, exit_price:, quantity:, fee_rate:, slippage_rate: 0.0,
+    contracts: nil, per_contract_fee: nil)
     r = fee_rate.to_f + slippage_rate.to_f
     entry_side = entry_price.to_f * quantity.to_f * r
     exit_side = exit_price.to_f * quantity.to_f * r
     if contracts
-      floor = contracts.to_f * min_fee_per_contract
+      floor = contracts.to_f * (per_contract_fee || min_fee_per_contract).to_f
       entry_side = [entry_side, floor].max
       exit_side = [exit_side, floor].max
     end
     entry_side + exit_side
+  end
+
+  # Round-trip cost priced at the SYMBOL's venue (issue #459). The live gates
+  # used to call round_trip_cost with the global perp rate and the perp floor,
+  # which understated every dated position — oil most of all, since oil is the
+  # only thing being traded and Coinbase has no oil perp.
+  def self.round_trip_cost_for(symbol:, entry_price:, exit_price:, quantity:,
+    slippage_rate: 0.0, contracts: nil)
+    fees = fee_for(symbol)
+    round_trip_cost(entry_price: entry_price, exit_price: exit_price, quantity: quantity,
+      fee_rate: fees[:taker_rate], slippage_rate: slippage_rate,
+      contracts: contracts, per_contract_fee: fees[:per_contract_fee])
+  end
+
+  # Per-side taker rate for a symbol, with the per-contract floor folded in.
+  #
+  # break_even_exit reasons in PRICES, so it cannot take a dollar floor
+  # directly — but a floor is just a rate once you know what one contract is
+  # worth (floor / notional). Folding it in is what lets the break-even gate
+  # price the floor at all; without this it silently ignored the dominant cost
+  # term on small-notional contracts. Falls back to the bare venue rate when
+  # notional is unknown, which is the old behavior rather than a guess.
+  def self.effective_taker_rate(symbol:, contract_notional_usd: nil)
+    fees = fee_for(symbol)
+    rate = fees[:taker_rate].to_f
+    floor = fees[:per_contract_fee].to_f
+    notional = contract_notional_usd.to_f
+    return rate if notional <= 0 || floor <= 0
+
+    [rate, floor / notional].max
   end
 
   # Rates per-side in decimal. Example: 0.0005 = 5 bps. funding_rate is the
