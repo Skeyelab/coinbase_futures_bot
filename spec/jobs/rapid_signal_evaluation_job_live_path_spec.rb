@@ -43,6 +43,9 @@ RSpec.describe RapidSignalEvaluationJob, "live entry path", type: :job do
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
     Position.destroy_all
     Trading::ProtectionLock.clear!
+    # Exposure is #437's concern and has its own specs; these examples are not
+    # about it and would otherwise gate on paper-account equity.
+    allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end
 
   after { Trading::ProtectionLock.clear! }

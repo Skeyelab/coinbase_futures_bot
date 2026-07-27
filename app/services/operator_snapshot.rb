@@ -18,6 +18,9 @@ class OperatorSnapshot
       # Issue #483: a frozen config must be visible, or an operator reads a
       # stale tp/sl and cannot tell why calibration stopped moving it.
       calibration_freeze: Trading::CalibrationFreeze.status.slice(:frozen, :reason),
+      # Issue #437: exposure has to be visible, not just capped — an operator
+      # needs to see how much room is left before entries start being refused.
+      notional_cap: Trading::NotionalCap.status,
       positions: {
         day: Position.open.day_trading.count,
         swing: Position.open.swing_trading.count,

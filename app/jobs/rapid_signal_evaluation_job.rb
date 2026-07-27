@@ -175,6 +175,21 @@ class RapidSignalEvaluationJob < ApplicationJob
       return false
     end
 
+    # Account-level notional cap (issue #437, #392 condition 2). The count caps
+    # above bound how MANY positions, not how much exposure — and one NOL
+    # contract is ~$930 against a BTC nano's ~$100, so a count cap means two
+    # different things. This is the only check that sees the stack.
+    unless Trading::NotionalCap.allows?(product_id: @target_contract,
+      quantity: signal[:quantity], price: signal[:price] || @current_price)
+      cap = Trading::NotionalCap.status
+      @logger.info("[RSE] Skipping signal - account notional cap " \
+                   "(open $#{cap[:open_notional_usd]} of $#{cap[:limit_usd]}, " \
+                   "room $#{cap[:room_usd]})")
+      @decisions&.rejected(:account_notional_cap, signal: signal,
+        open_notional: cap[:open_notional_usd], limit: cap[:limit_usd])
+      return false
+    end
+
     # Check if we have sufficient buying power
     unless sufficient_buying_power?(signal[:quantity])
       @decisions&.rejected(:insufficient_buying_power, signal: signal)

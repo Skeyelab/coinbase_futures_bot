@@ -36,6 +36,9 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     allow(Strategy::MultiTimeframeSignal).to receive(:new).and_return(mock_strategy)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(mock_contract_manager)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(mock_positions_service)
+    # Exposure is #437's concern and has dedicated specs; these examples cover
+    # sizing, routing and gating, and would otherwise gate on paper equity.
+    allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end
 
   describe "#perform" do

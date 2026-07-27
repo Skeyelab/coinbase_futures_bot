@@ -21,6 +21,8 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
     allow(positions).to receive(:open_position).and_return({"success" => true})
     Position.destroy_all
+    # Exposure is #437's concern with its own specs; routing is not about it.
+    allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end
 
   def perform!(product_id:)

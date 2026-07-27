@@ -34,6 +34,8 @@ RSpec.describe RapidSignalEvaluationJob, "confidence threshold", type: :job do
       allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
       Position.destroy_all
       SignalDecision.delete_all
+      # About the confidence bar, not exposure — #437's cap has its own specs.
+      allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
     end
 
     def perform! = described_class.new.perform(product_id: "BTC-USD", current_price: 64_000.0, asset: "BTC")
