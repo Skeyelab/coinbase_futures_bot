@@ -18,15 +18,31 @@
 # should call TradingHalt.active? / assert_active! before submitting any order.
 # Rake tasks, the CLI, and chat surface halt/resume/status via TradingHalt.
 #
-# A halt auto-expires after a TTL so it does not stay on forever if forgotten.
-# Because the state is DB-backed, the halt now survives a process restart within
-# that window (a restart no longer silently re-enables trading). Set
-# TRADING_HALT_TTL_HOURS to override (default 24 hours).
+# Halts come in two kinds, because they answer different questions (issue #481):
+#
+#   OPERATIONAL — "pause while the CPI print lands". Auto-expires after a TTL so
+#                 it does not stay on forever if someone forgets. This was the
+#                 only kind, and the TTL is correct for it.
+#   RISK        — "the loss cap tripped". NEVER expires, and clearing it takes an
+#                 explicit acknowledgement that is recorded.
+#
+# The distinction exists because a 24h TTL on a risk halt is not a control: a
+# halt triggered by hitting a loss limit would silently self-resume and trade
+# again the next day. #392 condition 3 asks for "auto-halt to paper, no
+# override", which is unbuildable on a primitive that forgets.
+#
+# Because the state is DB-backed, a halt survives a process restart either way.
+# Set TRADING_HALT_TTL_HOURS to override the operational TTL (default 24 hours).
 class TradingHalt
   STORE_KEY = "trading_halt"
   DEFAULT_TTL_HOURS = 24
 
+  OPERATIONAL = "operational"
+  RISK = "risk"
+
   HaltedError = Class.new(StandardError)
+  # Raised when something tries to clear a risk halt without acknowledging it.
+  RiskHaltError = Class.new(StandardError)
 
   # Returns true when trading is enabled (default state).
   def self.active?
@@ -43,9 +59,19 @@ class TradingHalt
     new(logger: logger).halt!(reason: reason)
   end
 
-  # Resume trading after a halt.
-  def self.resume!(logger: Rails.logger)
-    new(logger: logger).resume!
+  # Halt on a risk trigger: never expires, and clearing it requires an
+  # acknowledged, recorded operator action.
+  def self.halt_for_risk!(reason:, logger: Rails.logger)
+    new(logger: logger).halt_for_risk!(reason: reason)
+  end
+
+  def self.risk_halted?
+    new.risk_halted?
+  end
+
+  # Resume trading after a halt. A risk halt requires acknowledge_risk: true.
+  def self.resume!(acknowledge_risk: false, operator: nil, logger: Rails.logger)
+    new(logger: logger).resume!(acknowledge_risk: acknowledge_risk, operator: operator)
   end
 
   # Returns a status hash suitable for display or JSON serialisation.
@@ -68,11 +94,28 @@ class TradingHalt
     return true if record.nil?
     return true unless halted_value?(record)
 
-    # Auto-expire a stale halt so it does not linger forever.
+    # A risk halt never expires — that is the entire point of the distinction.
+    return false if kind_value(record) == RISK
+
+    # Auto-expire a stale OPERATIONAL halt so it does not linger forever.
     recorded_at = record.recorded_at
     return true if recorded_at.present? && recorded_at < ttl.ago
 
     false
+  end
+
+  def risk_halted?
+    record = read_record
+    return false if record.nil? || !halted_value?(record)
+
+    kind_value(record) == RISK
+  end
+
+  def kind
+    record = read_record
+    return nil if record.nil? || !halted_value?(record)
+
+    kind_value(record)
   end
 
   def halted?
@@ -84,7 +127,11 @@ class TradingHalt
   end
 
   def halt!(reason: nil)
-    write_state(halted: true, reason: reason.to_s.presence)
+    # An operational halt must not downgrade an active risk halt — otherwise a
+    # routine pause/resume cycle would quietly clear a loss-cap trip.
+    return status if risk_halted?
+
+    write_state(halted: true, reason: reason.to_s.presence, kind: OPERATIONAL)
     @logger.warn("[TradingHalt] Trading HALTED#{": #{reason}" if reason.present?}")
 
     # PostHog: Track trading halt
@@ -97,9 +144,37 @@ class TradingHalt
     status
   end
 
-  def resume!
-    write_state(halted: false, reason: nil)
-    @logger.info("[TradingHalt] Trading RESUMED")
+  def halt_for_risk!(reason:)
+    write_state(halted: true, reason: reason.to_s.presence, kind: RISK)
+    @logger.error("[TradingHalt] RISK HALT — trading stopped until explicitly cleared: #{reason}")
+
+    PostHog.capture(
+      distinct_id: "system",
+      event: "trading_risk_halted",
+      properties: {reason: reason.to_s.presence}
+    )
+
+    status
+  end
+
+  def resume!(acknowledge_risk: false, operator: nil)
+    record = read_record
+    prior_reason = record&.value&.dig("reason")
+    prior_kind = (record && halted_value?(record)) ? kind_value(record) : nil
+
+    if prior_kind == RISK && !acknowledge_risk
+      raise RiskHaltError,
+        "Trading is under a RISK halt (#{prior_reason}). Clearing it requires " \
+        "acknowledge_risk: true and an operator — this is deliberate, see issue #481."
+    end
+
+    cleared = if prior_kind == RISK
+      {"at" => Time.current.utc.iso8601, "operator" => operator.to_s.presence,
+       "prior_reason" => prior_reason, "prior_kind" => prior_kind}
+    end
+
+    write_state(halted: false, reason: nil, kind: nil, last_cleared: cleared)
+    @logger.info("[TradingHalt] Trading RESUMED#{" (risk halt cleared by #{operator})" if cleared}")
 
     # PostHog: Track trading resume
     PostHog.capture(
@@ -127,6 +202,7 @@ class TradingHalt
       active: !halted,
       halted: halted,
       reason: reason,
+      kind: kind,
       as_of: Time.current.utc.iso8601
     }
   end
@@ -142,9 +218,20 @@ class TradingHalt
     !!value["halted"]
   end
 
-  def write_state(halted:, reason:)
+  # Absent kind means a halt written before #481 — treat it as operational so
+  # existing state keeps its old expiry behaviour rather than becoming permanent.
+  def kind_value(record)
+    (record.value || {})["kind"].presence || OPERATIONAL
+  end
+
+  def write_state(halted:, reason:, kind: nil, last_cleared: nil)
     record = BotRuntimeStat.find_or_initialize_by(key: STORE_KEY)
-    record.value = {"halted" => halted, "reason" => reason}
+    value = {"halted" => halted, "reason" => reason, "kind" => kind}
+    # Preserve the clearing record across subsequent writes so the audit trail
+    # is not erased by the next ordinary halt.
+    prior_cleared = (record.value || {})["last_cleared"]
+    value["last_cleared"] = last_cleared || prior_cleared
+    record.value = value.compact
     record.recorded_at = Time.current.utc
     record.save!
   rescue ActiveRecord::RecordNotUnique
