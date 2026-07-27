@@ -23,7 +23,16 @@ class Contract < ApplicationRecord
     "ET" => "ETH",    # dated nano ETH
     "NOL" => "OIL",   # dated nano oil
     "BIP" => "BTC",   # BTC perp — ADR 0002 home instrument
-    "XPP" => "XRP"    # XRP perp — ADR 0002 designated second seat
+    "XPP" => "XRP",   # XRP perp — ADR 0002 designated second seat
+    # PAXG perp — gold exposure via a PERP rather than the dated GOL contract.
+    # Measured 2026-07-27: same $4k notional and 20x margin either way, but
+    # 3 bps taker vs dated gold's 9, no monthly roll, 24/7, and a 2030 expiry.
+    # Dated gold is the worst cost-to-volatility on the venue (~18% of a daily
+    # move vs the perp's ~8%), because gold's 1h sigma is ~25 bps — half of BTC
+    # — so a 9 bps dated fee eats a large share of the move it is trying to
+    # capture. Ingesting only: PAU stays SymbolSuspension-suspended and earns
+    # enablement on its own walk-forward, per ADR 0002 / 0004.
+    "PAU" => "PAXG"
   }.freeze
 
   scope :enabled, -> { where(enabled: true) }
