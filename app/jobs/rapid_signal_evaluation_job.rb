@@ -3,6 +3,26 @@
 class RapidSignalEvaluationJob < ApplicationJob
   queue_as :default
 
+  # Minimum confidence to execute (issue #496).
+  #
+  # This was hardcoded at 75 — ABOVE the maximum the scorer has ever produced.
+  # Across a year of BIP history the strategy emitted 311 signals with a maximum
+  # confidence of 68.2 and a p99 of 63.6, so the trading path could not fire
+  # under any market condition. 40 of the scorer's 100 points require a 5%
+  # spread between the 1h EMA12 and EMA26, which on BTC essentially never
+  # happens, so the scale never approaches its nominal ceiling.
+  #
+  # 30 is chosen from the measured joint distribution of confidence and realised
+  # outcome, not from a trade count. Out-of-sample at 200/120 bps: >=0 gives
+  # +11.36 bps/trade, >=30 gives +23.57 over 153 trades/yr, >=50 gives +59.02
+  # over 37. >=30 is the point where per-trade edge and a sample large enough to
+  # ever validate (#376 gate 2a wants 100/symbol) both hold.
+  DEFAULT_MIN_CONFIDENCE = 30
+
+  def self.min_confidence
+    ENV.fetch("RSE_MIN_CONFIDENCE", DEFAULT_MIN_CONFIDENCE).to_f
+  end
+
   def perform(product_id:, current_price:, asset:, day_trading: nil)
     @logger = Rails.logger
     @product_id = product_id
@@ -99,8 +119,8 @@ class RapidSignalEvaluationJob < ApplicationJob
     return false unless signal
 
     # Only execute high-confidence signals (>75%) for rapid execution
-    if signal[:confidence] < 75
-      @decisions&.rejected(:low_confidence, signal: signal, threshold: 75)
+    if signal[:confidence] < self.class.min_confidence
+      @decisions&.rejected(:low_confidence, signal: signal, threshold: self.class.min_confidence)
       return false
     end
 

@@ -58,12 +58,14 @@ RSpec.describe RapidSignalEvaluationJob, "decision ledger", type: :job do
   end
 
   it "records the gate that stopped a signal" do
-    allow(strategy).to receive(:signal).and_return(signal.merge(confidence: 60))
+    # Below the measured bar (#496), which is well under the old literal 75.
+    allow(strategy).to receive(:signal)
+      .and_return(signal.merge(confidence: described_class.min_confidence - 1))
 
     perform!
 
     expect(SignalDecision.last.reason).to eq("low_confidence")
-    expect(SignalDecision.last.context["threshold"]).to eq(75)
+    expect(SignalDecision.last.context["threshold"]).to eq(described_class.min_confidence)
   end
 
   it "records a protection block distinctly from a confidence rejection" do
@@ -95,7 +97,8 @@ RSpec.describe RapidSignalEvaluationJob, "decision ledger", type: :job do
   end
 
   it "produces a histogram that names the binding gate" do
-    allow(strategy).to receive(:signal).and_return(signal.merge(confidence: 60))
+    allow(strategy).to receive(:signal)
+      .and_return(signal.merge(confidence: described_class.min_confidence - 1))
     3.times { perform! }
 
     expect(SignalDecision.rejection_histogram(product_id: "BTC-USD"))
