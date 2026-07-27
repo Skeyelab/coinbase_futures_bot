@@ -42,4 +42,44 @@ RSpec.describe PredictivenessSnapshotJob do
     stat = BotRuntimeStat.find_by(key: "indicators:predictiveness")
     expect(stat.value["symbols"]).to eq([])
   end
+
+  # Issue #468: this is the exact shape of the 2026-07-27 production reading —
+  # six days of hourly aggregates producing n=134, which the old row-count
+  # thresholds labelled "high". A dense week is not a seasoned dataset, and
+  # oil read a 0.25 hit rate under that label.
+  it "refuses to call six days of dense hourly data seasoned" do
+    create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+    price = "NOL-19AUG26-CDE"
+    hours = 6 * 24
+    (0..(hours + 24)).each { |h| candle(h, 90 + (h % 7), symbol: price) }
+    (0..hours).each { |h| agg(h, (h.even? ? 2.0 : -2.0)) }
+
+    described_class.new.perform(now: t0 + (hours + 24).hours)
+
+    oil = BotRuntimeStat.find_by(key: "indicators:predictiveness")
+      .value["symbols"].find { |s| s["sentiment_symbol"] == "OIL-USD" }
+    headline = oil["horizons"]["4"]
+
+    expect(headline["n"]).to be > 100          # plenty of rows...
+    expect(headline["effective_n"]).to be < 40 # ...but few independent ones
+    expect(headline["span_days"]).to be_within(0.1).of(6.0)
+    expect(oil["maturity"]).not_to eq("high")
+  end
+
+  it "surfaces the independent count and span behind every horizon" do
+    create(:contract, product_id: "NOL-19AUG26-CDE", base_currency: "OIL", enabled: true)
+    (0..29).each { |h| candle(h, 90 + h, symbol: "NOL-19AUG26-CDE") }
+    (0..20).each { |h| agg(h, 2.0) }
+
+    described_class.new.perform(now: t0 + 30.hours)
+
+    oil = BotRuntimeStat.find_by(key: "indicators:predictiveness")
+      .value["symbols"].find { |s| s["sentiment_symbol"] == "OIL-USD" }
+
+    oil["horizons"].each_value do |h|
+      expect(h).to include("effective_n", "effective_signal_count", "span_days")
+    end
+    # A longer horizon consumes the same span in bigger bites.
+    expect(oil["horizons"]["24"]["effective_n"]).to be < oil["horizons"]["1"]["effective_n"]
+  end
 end
