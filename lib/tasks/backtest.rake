@@ -15,8 +15,26 @@ namespace :backtest do
     to = Time.parse(args[:to] || ENV.fetch("TO"))
     step = args[:step] || ENV["STEP"] || "5m"
 
-    result = Backtest::Engine.new(symbol: symbol, step: step).run(from: from, to: to)
+    engine = Backtest::Engine.new(symbol: symbol, step: step)
+    started_at = Time.current
+
+    begin
+      result = engine.run(from: from, to: to)
+    rescue => e
+      # A run that blew up is still history worth keeping (issue #406) —
+      # otherwise failures reproduce the write-only hole this closes.
+      Backtest::RunRecorder.record_failure(engine: engine, from: from, to: to, kind: "single",
+        error: e, started_at: started_at, finished_at: Time.current)
+      raise
+    end
+
+    run = Backtest::RunRecorder.record_single(engine: engine, result: result,
+      started_at: started_at, finished_at: Time.current)
+
+    # JSON on stdout is unchanged — existing muscle memory and any scripts
+    # piping this keep working; the run just also lands in history now.
     puts JSON.pretty_generate(result.to_h)
+    warn "recorded as BacktestRun ##{run.id}"
   end
 
   desc "Walk-forward evaluation: rolling out-of-sample windows; prints JSON report"
@@ -28,8 +46,25 @@ namespace :backtest do
     eval_days = (args[:eval_days] || ENV["EVAL_DAYS"] || 7).to_i
     step = args[:step] || ENV["STEP"] || "5m"
 
-    report = Backtest::WalkForward.new(symbol: symbol, step: step)
-      .run(from: from, to: to, train_span: train_days.days, eval_span: eval_days.days)
+    # WalkForward builds one Engine per window from these same options, so a
+    # matching instance resolves the identical fee/sizing assumptions to record.
+    engine = Backtest::Engine.new(symbol: symbol, step: step)
+    started_at = Time.current
+
+    begin
+      report = Backtest::WalkForward.new(symbol: symbol, step: step)
+        .run(from: from, to: to, train_span: train_days.days, eval_span: eval_days.days)
+    rescue => e
+      Backtest::RunRecorder.record_failure(engine: engine, from: from, to: to, kind: "walk_forward",
+        error: e, started_at: started_at, finished_at: Time.current)
+      raise
+    end
+
+    run = Backtest::RunRecorder.record_walk_forward(engine: engine, report: report,
+      from: from, to: to, train_days: train_days, eval_days: eval_days,
+      started_at: started_at, finished_at: Time.current)
+
     puts JSON.pretty_generate(report)
+    warn "recorded as BacktestRun ##{run.id}"
   end
 end
