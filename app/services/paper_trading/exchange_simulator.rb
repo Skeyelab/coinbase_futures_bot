@@ -3,7 +3,7 @@
 module PaperTrading
   class ExchangeSimulator
     Order = Struct.new(:id, :symbol, :side, :price, :quantity, :status, :filled_qty, :created_at, :tp, :sl,
-      :entry_fill, :entry_time, :funding_cost, :exit_reason)
+      :entry_fill, :entry_time, :funding_cost, :exit_reason, :contracts)
 
     attr_reader :orders, :fills, :equity_usd
 
@@ -20,13 +20,22 @@ module PaperTrading
     # active funding reads candle.timestamp, so callers must pass timestamped
     # candles.
     def initialize(starting_equity_usd: 10_000.0, maker_fee: nil, fee_rate: nil, slippage: 0.0002,
-      funding_interval_seconds: nil, funding_rate_per_interval: nil, funding_schedule: nil)
+      funding_interval_seconds: nil, funding_rate_per_interval: nil, funding_schedule: nil,
+      per_contract_fee: nil, contract_size_usd: nil)
       @equity_usd = starting_equity_usd.to_f
       @orders = {}
       @fills = []
       @id_seq = 0
       @fee_rate = (fee_rate || maker_fee || 0.0005).to_f
       @slippage = slippage.to_f
+      # Per-contract dollar floor (issue #471). Coinbase US futures charge
+      # ~0.02%/contract with a $0.15/contract MINIMUM per side, so on a
+      # ~$100-notional nano the floor ($0.15) dwarfs the proportional fee
+      # (~$0.02) and IS the cost. Pricing dated contracts as pure bps
+      # understated them ~7.5x and could pass the #353 cost gate on a window
+      # that loses money live. nil for perps, which are genuinely proportional.
+      @per_contract_fee = per_contract_fee&.to_f
+      @contract_size_usd = contract_size_usd&.to_f
       @funding_schedule = funding_schedule
       @funding_interval_seconds = funding_interval_seconds.to_i
       @funding_rate_per_interval = funding_rate_per_interval.to_f
@@ -107,6 +116,26 @@ module PaperTrading
 
     private
 
+    # One side's fee: proportional, or the per-contract floor when that binds.
+    # Mirrors CostModel.round_trip_cost's floor semantics rather than
+    # reimplementing them, so backtest costs and the cost gate agree.
+    def side_fee(notional, contracts)
+      proportional = notional.to_f * @fee_rate
+      return proportional if @per_contract_fee.nil? || @per_contract_fee <= 0 || contracts.nil?
+
+      [proportional, contracts.to_f * @per_contract_fee].max
+    end
+
+    # Contract count is fixed at fill and does NOT drift with price: a position
+    # is one contract whether it is up or down. Deriving it from exit notional
+    # instead would silently inflate the exit-side floor as price rose, so the
+    # round trip would stop matching CostModel.round_trip_cost.
+    def contracts_at_fill(notional)
+      return nil if @contract_size_usd.nil? || @contract_size_usd <= 0
+
+      notional.to_f / @contract_size_usd
+    end
+
     def next_id
       @id_seq += 1
       @id_seq
@@ -119,7 +148,8 @@ module PaperTrading
       order.entry_fill = slipped
       order.funding_cost = 0.0
       order.entry_time = candle.timestamp if @funding_active
-      fee = slipped * order.filled_qty * @fee_rate
+      order.contracts = contracts_at_fill(slipped * order.filled_qty)
+      fee = side_fee(slipped * order.filled_qty, order.contracts)
       @equity_usd -= fee
       @fills << {order_id: order.id, side: order.side, price: slipped, qty: order.filled_qty, fee: fee,
                   time: Time.now.utc}
@@ -131,7 +161,7 @@ module PaperTrading
       entry_price = (order.entry_fill || order.price).to_f
       entry_value = entry_price * order.filled_qty
       exit_value = slipped_exit * order.filled_qty
-      fee = slipped_exit * order.filled_qty * @fee_rate
+      fee = side_fee(slipped_exit * order.filled_qty, order.contracts)
       pnl = case order.side
       when :buy then exit_value - entry_value - fee
       when :sell then entry_value - exit_value - fee

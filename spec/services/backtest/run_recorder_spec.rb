@@ -104,4 +104,26 @@ RSpec.describe Backtest::RunRecorder, type: :service do
     expect { row.trades }.to raise_error(ActiveModel::MissingAttributeError)
     expect { row.equity_curve }.to raise_error(ActiveModel::MissingAttributeError)
   end
+
+  # Issue #471: fee_rate alone is a lossy projection of the venue's fee shape.
+  # A stored run has to carry the per-contract floor or it cannot be re-costed
+  # faithfully — which is exactly what the #408/#409 re-costing UI will do.
+  it "records the whole fee shape, not just the rate" do
+    run = described_class.record_single(engine: engine, result: result_with(trades: [trade])).reload
+
+    expect(run.fee_rate.to_f).to eq(CostModel.fee_for("BTC-USD")[:taker_rate].to_f)
+    expect(run.per_contract_fee.to_f).to eq(CostModel.fee_for("BTC-USD")[:per_contract_fee].to_f)
+  end
+
+  it "reproduces the engine's costing from the stored row alone" do
+    run = described_class.record_single(engine: engine, result: result_with(trades: [trade])).reload
+
+    rebuilt = Backtest::Engine.new(symbol: run.symbol, strategy: silent_strategy, step: run.step,
+      fee_rate: run.fee_rate, per_contract_fee: run.per_contract_fee,
+      contract_size_usd: run.contract_size_usd, starting_equity: run.starting_equity)
+
+    expect(rebuilt.fee_rate).to eq(run.fee_rate.to_f)
+    expect(rebuilt.per_contract_fee).to eq(run.per_contract_fee.to_f)
+    expect(rebuilt.contract_size_usd).to eq(run.contract_size_usd.to_f)
+  end
 end

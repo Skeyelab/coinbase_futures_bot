@@ -72,6 +72,10 @@ module Backtest
           step: engine.step,
           starting_equity: engine.starting_equity,
           fee_rate: engine.fee_rate,
+          # The per-contract floor too (issue #471): fee_rate alone is a lossy
+          # projection of the venue's fee shape, so a run stored without this
+          # cannot be re-costed faithfully later.
+          per_contract_fee: engine.per_contract_fee,
           slippage: engine.slippage,
           contract_size_usd: engine.contract_size_usd
         }
