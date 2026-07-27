@@ -561,24 +561,26 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         expect(size_tight).to be >= size_wide
       end
 
-      it "adapts to market condition via sentiment filtering" do
-        # Test sentiment threshold adaptation
+      # Issue #494: this previously asserted that a reading BELOW the threshold
+      # blocks the trade — the fail-closed behaviour that vetoed 313 of 313
+      # technically-complete signals over a year. A reading too weak to say
+      # anything is neutral; only a strong reading pointing the other way vetoes.
+      it "treats a below-threshold reading as neutral, not as a veto" do
         strategy = described_class.new
 
-        # High threshold for volatile markets
-        allow(ENV).to receive(:fetch).with("SENTIMENT_Z_THRESHOLD", anything).and_return("2.0")
-
-        # Enable sentiment filtering for the test
-        allow(ENV).to receive(:fetch).with("SENTIMENT_ENABLE", anything).and_return("true")
-
-        # Low sentiment should be filtered out
         SentimentAggregate.create!(
           symbol: "BTC-USD", window: "15m", window_end_at: Time.now.utc.change(sec: 0),
           avg_score: 0.1, z_score: 1.5
         )
 
-        result = strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :long)
-        expect(result).to be false
+        ClimateControl.modify(SENTIMENT_ENABLE: "true", SENTIMENT_Z_THRESHOLD: "2.0") do
+          expect(strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :long)).to be true
+        end
+
+        # ...and the same reading DOES veto once it is strong enough to object.
+        ClimateControl.modify(SENTIMENT_ENABLE: "true", SENTIMENT_Z_THRESHOLD: "1.0") do
+          expect(strategy.send(:sentiment_gate_allows?, symbol: "BTC-USD", side: :short)).to be false
+        end
       end
 
       it "resolves futures contract ids to sentiment symbols when gating" do
