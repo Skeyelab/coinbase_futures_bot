@@ -231,24 +231,30 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
       end
 
-      it "creates position tracking record on successful execution" do
+      # Issue #479: persistence belongs to open_position, which writes the
+      # Position with the paper flag, entry fee and a linked Order row. The job
+      # used to write a SECOND record — but only in this spec's fiction, because
+      # the mock returned symbol keys ({success: true}) while the real
+      # open_position returns string keys, so the branch never ran in
+      # production. The suite was validating a path that could not execute.
+      it "delegates position persistence to open_position rather than writing its own" do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
-        allow(mock_positions_service).to receive(:open_position).and_return({success: true})
+        allow(mock_positions_service).to receive(:open_position).and_return({"success" => true})
 
         expect {
           job.perform(product_id: product_id, current_price: current_price, asset: asset)
-        }.to change(Position, :count).by(1)
+        }.not_to change(Position, :count)
 
-        position = Position.last
-        expect(position.product_id).to eq(contract_id)
-        expect(position.side).to eq("LONG")
-        expect(position.size).to eq(2)
-        expect(position.entry_price).to eq(current_price)
-        expect(position.status).to eq("OPEN")
-        expect(position.day_trading).to be true
-        expect(position.take_profit).to eq(50_200.0)
-        expect(position.stop_loss).to eq(49_800.0)
+        expect(mock_positions_service).to have_received(:open_position).with(
+          hash_including(
+            product_id: contract_id,
+            side: "LONG",
+            size: 2,
+            take_profit: 50_200.0,
+            stop_loss: 49_800.0
+          )
+        )
       end
 
       it "logs successful signal execution" do
@@ -684,9 +690,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         expect(mock_positions_service).to have_received(:open_position).with(
           hash_including(day_trading: true)
         )
-
-        position = Position.last
-        expect(position.day_trading).to be true
       end
 
       it "uses swing trading configuration when day_trading is false" do
@@ -713,9 +716,6 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         expect(mock_positions_service).to have_received(:open_position).with(
           hash_including(day_trading: false)
         )
-
-        position = Position.last
-        expect(position.day_trading).to be false
       end
 
       it "uses application default when day_trading is nil" do
@@ -927,12 +927,13 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         allow(Trading::CoinbasePositions).to receive(:new).and_return(mock_positions_service)
       end
 
+      # String keys: what open_position actually returns (issue #479).
       it "handles successful position opening" do
-        allow(mock_positions_service).to receive(:open_position).and_return({success: true})
+        allow(mock_positions_service).to receive(:open_position).and_return({"success" => true})
 
         expect {
           job_instance.send(:execute_futures_signal, contract_id, signal)
-        }.to change(Position, :count).by(1)
+        }.not_to change(Position, :count)
 
         expect(mock_logger).to have_received(:info).with(
           /Successfully opened LONG position: 2 contracts of #{contract_id}/

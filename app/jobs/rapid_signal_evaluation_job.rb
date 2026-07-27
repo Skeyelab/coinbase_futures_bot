@@ -31,6 +31,10 @@ class RapidSignalEvaluationJob < ApplicationJob
       return
     end
 
+    # Protection locks are keyed on the contract id (PositionLifecycle records
+    # exits under position.product_id), so the entry gate needs it too.
+    @target_contract = target_contract
+
     # LIVE-configured strategy via the shared factory so calibrated per-symbol
     # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
     # silently bypassing calibration). Rapid-path overrides: shorter min-candle
@@ -74,6 +78,24 @@ class RapidSignalEvaluationJob < ApplicationJob
     # Only execute high-confidence signals (>75%) for rapid execution
     return false if signal[:confidence] < 75
 
+    # Protections (issue #479, ADR 0003). This job is the ONLY path that reaches
+    # open_position — the realtime evaluator writes signal_alerts and places no
+    # orders — so until now the entire #396-#401 protections epic wrote locks
+    # that nothing on the trading path ever read. Cooldown, StoplossGuard and
+    # MaxDrawdown bound the backtest and not production, which is a parity break
+    # in the dangerous direction: the simulation was SAFER than live.
+    #
+    # Keyed on the contract id because that is what PositionLifecycle records
+    # exits under, and on a normalized long/short because side matching is an
+    # exact string compare — passing the raw "BUY" would silently miss a
+    # side-scoped StoplossGuard lock.
+    protection_side = SideNormalizer.position(signal[:side]).to_s.downcase
+    if Trading::Protections.blocked?(symbol: @target_contract, side: protection_side)
+      reason = Trading::Protections.block_reason(symbol: @target_contract, side: protection_side)
+      @logger.info("[RSE] Skipping signal - protection active for #{@target_contract} (#{reason})")
+      return false
+    end
+
     # GLOBAL concurrent-position cap across ALL products. The per-asset cap below
     # does not bound total exposure — with many pairs enabled the bot could open
     # one position per asset and blow past the operator's intended 1-3 total. This
@@ -114,26 +136,14 @@ class RapidSignalEvaluationJob < ApplicationJob
       stop_loss: signal[:sl]
     )
 
-    if result[:success]
+    if order_succeeded?(result)
       @logger.info("[RSE] Successfully opened #{signal[:side]} position: #{signal[:quantity]} contracts of #{contract_id}")
-
-      # Create position tracking record
-      Position.create!(
-        product_id: contract_id,
-        side: SideNormalizer.position(signal[:side]),
-        size: signal[:quantity],
-        entry_price: signal[:price],
-        entry_time: Time.current,
-        status: "OPEN",
-        day_trading: @day_trading,
-        take_profit: signal[:tp],
-        stop_loss: signal[:sl]
-      )
-
-      # Send alert
+      # No Position.create! here: open_position already persisted the record via
+      # create_local_position_record, with the paper flag, the entry fee and a
+      # linked Order row. Writing a second one would double-count every entry.
       send_position_alert("OPENED", contract_id, signal)
     else
-      @logger.error("[RSE] Failed to open position: #{result[:error]}")
+      @logger.error("[RSE] Failed to open position: #{order_error(result)}")
     end
   rescue => e
     @logger.error("[RSE] Error executing futures signal: #{e.message}")
@@ -173,6 +183,23 @@ class RapidSignalEvaluationJob < ApplicationJob
 
   def max_concurrent_positions_for_asset(asset)
     Trading::AssetSizing.for(asset).max_concurrent
+  end
+
+  # open_position returns the raw exchange (or dry-run) payload, which is
+  # STRING keyed. This job used to test result[:success] — a symbol — which was
+  # always nil, so every successful open was logged as a failure, no alert was
+  # ever sent, and the branch that followed was dead code. Mirrors
+  # open_position's own success test rather than inventing a second one.
+  def order_succeeded?(result)
+    return false unless result.is_a?(Hash)
+
+    !!(result["success"] || result[:success] || result["order_id"] || result[:order_id])
+  end
+
+  def order_error(result)
+    return "unknown error" unless result.is_a?(Hash)
+
+    result["error"] || result[:error] || "unknown error"
   end
 
   def sufficient_buying_power?(quantity)
