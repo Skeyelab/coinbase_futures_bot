@@ -347,7 +347,7 @@ class Position < ApplicationRecord
   def set_defaults
     self.status ||= "OPEN"
     self.entry_time ||= Time.current
-    self.day_trading = Rails.application.config.default_day_trading if day_trading.nil?
+    self.day_trading = Trading::HoldHorizon.day_trading?(product_id) if day_trading.nil?
   end
 
   def log_position_opened

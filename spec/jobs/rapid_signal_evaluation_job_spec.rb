@@ -723,7 +723,11 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         )
       end
 
-      it "uses application default when day_trading is nil" do
+      # Venue-aware now, and resolved from the traded CONTRACT. A dated contract
+      # keeps intraday treatment (session hours, overnight margin step-ups, roll
+      # risk) even when the global default says otherwise — that global flag was
+      # what made intraday-only universal in the first place.
+      it "resolves the hold horizon from the contract, overriding the global default" do
         allow(Rails.application.config).to receive(:default_day_trading).and_return(false)
 
         high_confidence_signal = {
@@ -747,7 +751,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         )
 
         expect(mock_positions_service).to have_received(:open_position).with(
-          hash_including(day_trading: false)
+          hash_including(day_trading: true) # BIT-*-CDE is dated -> intraday
         )
       end
     end

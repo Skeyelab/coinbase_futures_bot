@@ -156,7 +156,7 @@ module Trading
       stop_loss: nil)
       TradingHalt.assert_active!(context: "CoinbasePositions#open_position")
       # Use configuration default if not specified
-      day_trading = Rails.application.config.default_day_trading if day_trading.nil?
+      day_trading = Trading::HoldHorizon.day_trading?(product_id) if day_trading.nil?
       raise "Authentication required" unless @authenticated || DryRun.active?
 
       order_body = build_order_body(product_id: product_id, side: side, size: size, type: type, price: price)
