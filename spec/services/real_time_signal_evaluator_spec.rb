@@ -23,6 +23,11 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
     it "evaluates a symbol with its calibrated profile's params instead of the global profile" do
       create(:trading_profile, :active, name: "global", tp_target: 0.006)
+      # The outer `before` stubs resolve_symbol on `evaluator`, which builds it
+      # BEFORE this profile exists — and strategies are cached per profile key.
+      # Without this refresh the example asserted against the env fallback and
+      # passed only because that default used to be the same 0.006 (#496).
+      evaluator.send(:refresh_profile_settings)
       create(:trading_profile, name: "cal-btc", symbol: "BIT-29AUG25-CDE", active: true,
         tp_target: 0.011, sl_target: 0.005)
 
@@ -50,6 +55,11 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
     it "falls back to the global profile when the symbol has no calibrated profile" do
       create(:trading_profile, :active, name: "global", tp_target: 0.006)
+      # The outer `before` stubs resolve_symbol on `evaluator`, which builds it
+      # BEFORE this profile exists — and strategies are cached per profile key.
+      # Without this refresh the example asserted against the env fallback and
+      # passed only because that default used to be the same 0.006 (#496).
+      evaluator.send(:refresh_profile_settings)
 
       captured = nil
       allow_any_instance_of(Strategy::MultiTimeframeSignal).to receive(:signal) do |strat, **|
@@ -59,7 +69,7 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
 
       evaluator.evaluate_pair(contract)
 
-      expect(captured).to eq(0.006)
+      expect(captured).to eq(TradingProfile.effective.tp_target.to_f) # #496: 200 bps default
     end
   end
 
@@ -204,14 +214,15 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
       it "passes default tp_target to the strategy" do
         ev = described_class.new(logger: logger)
         strategy = ev.strategies["MultiTimeframeSignal"]
-        expected = ENV.fetch("STRATEGY_TP_TARGET", "0.006").to_f
+        # Source of truth, not a duplicated literal (#496 moved 0.006 -> 0.020).
+        expected = TradingProfile.default_profile.tp_target.to_f
         expect(strategy.instance_variable_get(:@config)[:tp_target]).to eq(expected)
       end
 
       it "passes default sl_target to the strategy" do
         ev = described_class.new(logger: logger)
         strategy = ev.strategies["MultiTimeframeSignal"]
-        expected = ENV.fetch("STRATEGY_SL_TARGET", "0.004").to_f
+        expected = TradingProfile.default_profile.sl_target.to_f
         expect(strategy.instance_variable_get(:@config)[:sl_target]).to eq(expected)
       end
     end

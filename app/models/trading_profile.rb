@@ -58,8 +58,15 @@ class TradingProfile < ApplicationRecord
   def self.default_profile
     new(
       name: "default (env)",
-      tp_target: ENV.fetch("STRATEGY_TP_TARGET", "0.006").to_f,
-      sl_target: ENV.fetch("STRATEGY_SL_TARGET", "0.004").to_f,
+      # 200/120 bps, from walk-forward on a year of BIP history (#496). The old
+      # 60/40 needed a 50.0% win rate and delivered 46.3% — and 40/30 needed
+      # 57.1% against 49.8%. Both were structurally unable to win: a fixed cost
+      # against a small target is a large fraction of it. Widening drops
+      # break-even faster than it drops the win rate, and expectancy crosses
+      # zero between 60/40 and 120/80. Out-of-sample net was monotonically
+      # better at every step: -0.68 (60/40) -> +3.03 (120/80) -> +11.36 (200/120).
+      tp_target: ENV.fetch("STRATEGY_TP_TARGET", "0.020").to_f,
+      sl_target: ENV.fetch("STRATEGY_SL_TARGET", "0.012").to_f,
       risk_fraction: ENV.fetch("STRATEGY_RISK_FRACTION", "0.02").to_f,
       max_position_size: ENV.fetch("MAX_POSITION_SIZE", "15").to_i,
       # Default 1: the strategy floors risk-based sizing at min_position_size, so

@@ -415,8 +415,14 @@ RSpec.describe Backtest::Engine, type: :service do
       end
       Candle.insert_all!(candle_data)
 
-      engine = described_class.new(symbol: "TREND-USD", starting_equity: 10_000.0,
-        fee_rate: 0.0015, slippage: 0.0002)
+      # Explicit tp/sl so this exercises the ENGINE, not whatever the global
+      # default happens to be — #496 widened it to 200/120 bps, which a
+      # 300-minute synthetic trend cannot reach inside the window.
+      strategy = Trading::StrategyFactory.multi_timeframe(
+        resolve_symbols: false, tp_target: 0.006, sl_target: 0.004
+      )
+      engine = described_class.new(symbol: "TREND-USD", strategy: strategy,
+        starting_equity: 10_000.0, fee_rate: 0.0015, slippage: 0.0002)
 
       allow(engine.strategy).to receive(:signal).and_call_original
       result = engine.run(from: t_end - 300.minutes, to: t_end)

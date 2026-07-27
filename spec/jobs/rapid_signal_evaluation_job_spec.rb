@@ -55,7 +55,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
           hash_including(
             ema_1h_short: 21, ema_1h_long: 50,
             min_5m_candles: 60, min_1m_candles: 30,
-            tp_target: 0.006, sl_target: 0.004,
+            tp_target: 0.020, sl_target: 0.012,
             contract_size_usd: 100.0, max_position_size: 5, min_position_size: 1
           )
         )
@@ -552,12 +552,16 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         expect(mock_positions_service).to have_received(:open_position).exactly(3).times
       end
 
-      it "respects high confidence threshold (>75%) for rapid execution" do
+      # Issue #496: the bar was 75, which the scorer never reaches (max observed
+      # 68.2 over a year), so this previously asserted a threshold that made the
+      # trading path unfireable. Now expressed relative to the configured bar.
+      it "respects the configured confidence threshold for rapid execution" do
+        bar = described_class.min_confidence
         signals_with_confidence = [
-          {confidence: 74, should_execute: false},
-          {confidence: 75, should_execute: true},
-          {confidence: 80, should_execute: true},
-          {confidence: 90, should_execute: true}
+          {confidence: bar - 1, should_execute: false},
+          {confidence: bar, should_execute: true},
+          {confidence: bar + 5, should_execute: true},
+          {confidence: bar + 20, should_execute: true}
         ]
 
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
@@ -754,7 +758,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
           side: "LONG",
           quantity: 2,
           price: current_price,
-          confidence: 60, # Below 75% threshold
+          confidence: described_class.min_confidence - 1, # below the measured bar (#496)
           tp: 50_200.0,
           sl: 49_800.0
         }
@@ -879,7 +883,9 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       end
 
       it "returns false for low confidence signals" do
-        low_confidence_signal = signal.merge(confidence: 60)
+        # Below the measured bar (#496), not below a literal 75 the scorer can
+        # never reach.
+        low_confidence_signal = signal.merge(confidence: described_class.min_confidence - 1)
         expect(job_instance.send(:should_execute_signal?, low_confidence_signal)).to be false
       end
 
