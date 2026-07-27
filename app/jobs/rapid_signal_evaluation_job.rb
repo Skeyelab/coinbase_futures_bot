@@ -10,8 +10,13 @@ class RapidSignalEvaluationJob < ApplicationJob
     @asset = asset
     @day_trading = day_trading.nil? ? Rails.application.config.default_day_trading : day_trading
 
+    # Issue #480: one row per evaluation, whatever the outcome. Recording is
+    # best-effort and never blocks an order.
+    @decisions = Trading::DecisionRecorder.new(product_id: @product_id, asset: @asset, logger: @logger)
+
     if Trading::SymbolSuspension.suspended?(@product_id)
       @logger.info("[RSE] #{@product_id} is suspended (#{Trading::SymbolSuspension.all.dig(@product_id, "reason")}) — skipping evaluation")
+      @decisions.rejected(:symbol_suspended)
       return
     end
 
@@ -28,12 +33,14 @@ class RapidSignalEvaluationJob < ApplicationJob
 
     unless target_contract
       @logger.warn("[RSE] No current month contract found for #{@asset}")
+      @decisions.rejected(:no_contract)
       return
     end
 
     # Protection locks are keyed on the contract id (PositionLifecycle records
     # exits under position.product_id), so the entry gate needs it too.
     @target_contract = target_contract
+    @decisions.contract_id = target_contract
 
     # LIVE-configured strategy via the shared factory so calibrated per-symbol
     # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
@@ -58,13 +65,19 @@ class RapidSignalEvaluationJob < ApplicationJob
       return
     end
 
-    if signal && should_execute_signal?(signal)
+    unless signal
+      # The strategy's own reason, not an undifferentiated "no signal" — this is
+      # what distinguishes an over-selective strategy from a data-starved one.
+      @decisions.rejected(:strategy_no_signal, strategy_reason: strategy.try(:last_rejection)&.to_s)
+      @logger.debug("[RSE] No actionable signal for #{@product_id}")
+      return
+    end
+
+    if should_execute_signal?(signal)
       @logger.info("[RSE] Rapid signal generated for #{@product_id}: #{signal[:side]} #{signal[:quantity]} contracts")
 
       # Execute signal on futures contract
       execute_futures_signal(target_contract, signal)
-    else
-      @logger.debug("[RSE] No actionable signal for #{@product_id}")
     end
   rescue => e
     @logger.error("[RSE] Unexpected error in rapid signal evaluation: #{e.message}")
@@ -76,7 +89,10 @@ class RapidSignalEvaluationJob < ApplicationJob
     return false unless signal
 
     # Only execute high-confidence signals (>75%) for rapid execution
-    return false if signal[:confidence] < 75
+    if signal[:confidence] < 75
+      @decisions&.rejected(:low_confidence, signal: signal, threshold: 75)
+      return false
+    end
 
     # Protections (issue #479, ADR 0003). This job is the ONLY path that reaches
     # open_position — the realtime evaluator writes signal_alerts and places no
@@ -93,6 +109,7 @@ class RapidSignalEvaluationJob < ApplicationJob
     if Trading::Protections.blocked?(symbol: @target_contract, side: protection_side)
       reason = Trading::Protections.block_reason(symbol: @target_contract, side: protection_side)
       @logger.info("[RSE] Skipping signal - protection active for #{@target_contract} (#{reason})")
+      @decisions&.rejected(:protection_active, signal: signal, protection: reason)
       return false
     end
 
@@ -104,6 +121,7 @@ class RapidSignalEvaluationJob < ApplicationJob
     total_open = Position.open.count
     if total_open >= global_max_concurrent_positions
       @logger.info("[RSE] Skipping signal - at global max positions (#{total_open}/#{global_max_concurrent_positions})")
+      @decisions&.rejected(:global_position_cap, signal: signal, open: total_open, cap: global_max_concurrent_positions)
       return false
     end
 
@@ -113,11 +131,15 @@ class RapidSignalEvaluationJob < ApplicationJob
 
     if existing_positions >= max_positions
       @logger.info("[RSE] Skipping signal - already at max positions (#{existing_positions}/#{max_positions}) for #{@asset}")
+      @decisions&.rejected(:asset_position_cap, signal: signal, open: existing_positions, cap: max_positions)
       return false
     end
 
     # Check if we have sufficient buying power
-    return false unless sufficient_buying_power?(signal[:quantity])
+    unless sufficient_buying_power?(signal[:quantity])
+      @decisions&.rejected(:insufficient_buying_power, signal: signal)
+      return false
+    end
 
     true
   end
@@ -141,9 +163,11 @@ class RapidSignalEvaluationJob < ApplicationJob
       # No Position.create! here: open_position already persisted the record via
       # create_local_position_record, with the paper flag, the entry fee and a
       # linked Order row. Writing a second one would double-count every entry.
+      @decisions&.traded(signal: signal, position_id: result["position_id"] || result[:position_id])
       send_position_alert("OPENED", contract_id, signal)
     else
       @logger.error("[RSE] Failed to open position: #{order_error(result)}")
+      @decisions&.rejected(:order_failed, signal: signal, error: order_error(result))
     end
   rescue => e
     @logger.error("[RSE] Error executing futures signal: #{e.message}")

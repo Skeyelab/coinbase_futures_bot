@@ -93,24 +93,31 @@ module Strategy
     # nil means live behavior (latest data).
     # Returns:
     #   { side: :long | :short, price:, quantity:, tp:, sl:, confidence: } or nil
+    # Why the last call to #signal returned nil (issue #480). Without this,
+    # every non-trade collapses into one undifferentiated bucket and there is no
+    # way to tell an over-selective strategy from a data-starved one — which is
+    # the difference between tuning thresholds and backfilling candles.
+    attr_reader :last_rejection
+
     def signal(symbol:, equity_usd: 10_000.0, as_of: nil)
       @as_of = as_of
+      @last_rejection = nil
       # Support current month contracts only
       # For current month contracts, use the symbol directly
       # For asset symbols (BTC, ETH), find the current month contract
       @current_symbol = resolve_trading_symbol(symbol)
 
-      return nil unless @current_symbol
+      return reject(:unresolved_symbol) unless @current_symbol
 
       candles_1h = recent_candles(:hourly, @config[:min_1h_candles])
       candles_15m = recent_candles(:fifteen_minute, @config[:min_15m_candles])
       candles_5m = recent_candles(:five_minute, @config[:min_5m_candles])
       candles_1m = recent_candles(:one_minute, @config[:min_1m_candles])
 
-      return nil if candles_1h.size < @config[:min_1h_candles]
-      return nil if candles_15m.size < @config[:min_15m_candles]
-      return nil if candles_5m.size < @config[:min_5m_candles]
-      return nil if candles_1m.size < @config[:min_1m_candles]
+      return reject(:insufficient_1h_candles) if candles_1h.size < @config[:min_1h_candles]
+      return reject(:insufficient_15m_candles) if candles_15m.size < @config[:min_15m_candles]
+      return reject(:insufficient_5m_candles) if candles_5m.size < @config[:min_5m_candles]
+      return reject(:insufficient_1m_candles) if candles_1m.size < @config[:min_1m_candles]
 
       # 1h trend analysis (dominant trend)
       closes_1h = candles_1h.map { |c| c.close.to_f }
@@ -133,17 +140,17 @@ module Strategy
       last_1m = candles_1m.last
 
       # nil when a configured EMA period exceeds the candles available
-      return nil if [ema1h_s, ema1h_l, ema15, ema5, ema1].any?(&:nil?)
+      return reject(:indicators_unavailable) if [ema1h_s, ema1h_l, ema15, ema5, ema1].any?(&:nil?)
 
       trend = (ema1h_s > ema1h_l) ? :up : :down
 
       # Multi-timeframe confirmation logic
-      return nil unless confirm_trend_alignment(trend, ema15, ema5, ema1, last_15m, last_5m, last_1m)
+      return reject(:trend_misaligned) unless confirm_trend_alignment(trend, ema15, ema5, ema1, last_15m, last_5m, last_1m)
 
       # Entry logic on 5m relative to its EMA with 1m micro-timing
       recent_5m = candles_5m.last(8)
       recent_1m = candles_1m.last(5)
-      return nil if recent_5m.size < 8 || recent_1m.size < 5
+      return reject(:insufficient_recent_candles) if recent_5m.size < 8 || recent_1m.size < 5
 
       last_close_5m = last_5m.close.to_f
       last_close_1m = last_1m.close.to_f
@@ -167,6 +174,8 @@ module Strategy
           conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5,
             ema1: ema1, last_price: last_close_1m)
           return order_hash(:long, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :long)
+
+          return reject(:sentiment_gate)
         end
       elsif interacted_with_5m_ema && last_close_5m < ema5 && micro_timing_ok
         entry = last_close_1m # Use 1m close for precise entry
@@ -178,12 +187,25 @@ module Strategy
         conf = confidence_score(trend: trend, ema1h_s: ema1h_s, ema1h_l: ema1h_l, ema15: ema15, ema5: ema5, ema1: ema1,
           last_price: last_close_1m)
         return order_hash(:short, entry, qty, tp, sl, conf) if sentiment_gate_allows?(symbol: symbol, side: :short)
+
+        return reject(:sentiment_gate)
       end
 
-      nil
+      # Fell through the entry block: the trend was aligned but the 5m pullback
+      # or the 1m micro-timing did not line up. Separated because these are the
+      # two conditions most likely to be over-tight, and lumping them into one
+      # "no signal" bucket is what hid the trade-frequency problem.
+      reject(micro_timing_ok ? :no_pullback : :micro_timing)
     end
 
     private
+
+    # Records why no signal was produced and returns nil, so every early exit
+    # stays a one-liner and no rejection path can silently forget to report.
+    def reject(code)
+      @last_rejection = code
+      nil
+    end
 
     # Expected funding over the hold as a fraction of notional (issue #391):
     # (expected_hold / interval) x rate. Feeds the break-even gate so it clears
