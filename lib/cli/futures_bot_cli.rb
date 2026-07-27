@@ -270,6 +270,30 @@ module Cli
       end
     end
 
+    # ─── backtests ──────────────────────────────────────────────────────────────
+    desc "backtests", "List persisted backtest runs (metrics + cost-gate verdict)"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    method_option :limit, type: :numeric, default: 15, desc: "How many runs to show"
+    method_option :symbol, type: :string, desc: "Filter by symbol"
+    def backtests
+      data = OperatorSnapshot.new.backtests(limit: options[:limit].to_i)
+      rows = data[:runs]
+      rows = rows.select { |r| r[:symbol] == options[:symbol] } if options[:symbol].present?
+      return emit_json(data.merge(runs: rows)) if json_mode?
+
+      puts "#{BOLD}#{CYAN}🧪  Backtest runs#{RESET}"
+      puts "─" * 92
+      if rows.empty?
+        puts "  #{YELLOW}none recorded#{RESET}"
+        return
+      end
+      puts "  #{WHITE}#{"id".ljust(5)}#{"gate".ljust(7)}#{"symbol".ljust(19)}#{"kind".ljust(14)}" \
+           "#{"step".ljust(6)}#{"trades".ljust(8)}#{"win%".ljust(7)}#{"expectancy".ljust(12)}ran#{RESET}"
+      rows.each { |r| puts backtest_line(r) }
+      puts "─" * 92
+      puts "  #{WHITE}detail:#{RESET} /backtest_runs/<id> in the web UI"
+    end
+
     # ─── mcp ────────────────────────────────────────────────────────────────────
     desc "mcp", "Run the MCP server (stdio JSON-RPC) exposing bot state and control tools to Claude Code"
     def mcp
@@ -317,6 +341,23 @@ module Cli
     # Prints a sentiment pipeline summary for `status`: per enabled-contract
     # symbol z-score/count, plus last-event age and a stale/missing warning.
     # Read-only (Sentiment::Snapshot performs no writes).
+    # cost_gate_passed (#353) is the verdict that matters, so it leads the row.
+    # nil means no verdict yet (pending/running/failed) — shown distinctly from
+    # a failure rather than collapsed into one.
+    def backtest_line(run)
+      gate = case run[:cost_gate_passed]
+      when true then "#{GREEN}PASS#{RESET}   "
+      when false then "#{RED}FAIL#{RESET}   "
+      else "#{YELLOW}—#{RESET}      "
+      end
+      win = run[:win_rate] ? "#{(run[:win_rate].to_f * 100).round(1)}%" : "—"
+      exp = run[:expectancy] ? run[:expectancy].to_f.round(3).to_s : "—"
+      ran = run[:created_at].to_s[5, 11].to_s.tr("T", " ")
+      "  #{run[:id].to_s.ljust(5)}#{gate}#{run[:symbol].to_s.ljust(19)}" \
+        "#{run[:kind].to_s.ljust(14)}#{run[:step].to_s.ljust(6)}" \
+        "#{run[:trade_count].to_s.ljust(8)}#{win.ljust(7)}#{exp.ljust(12)}#{ran}"
+    end
+
     def print_sentiment_section
       snap = Sentiment::Snapshot.new.call
       puts "  #{WHITE}Sentiment:#{RESET}"
