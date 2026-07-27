@@ -386,24 +386,59 @@ module Strategy
       end
     end
 
-    def latest_sentiment_z(symbol, window: "15m")
+    # The observation itself, or nil when there is none (issue #494). This used
+    # to return `z || 0.0`, which made a MISSING reading indistinguishable from a
+    # genuine z of 0.0 — and the gate then vetoed on it. Absence and neutrality
+    # are different facts and the caller has to be able to tell them apart.
+    def latest_sentiment_observation(symbol, window: "15m")
       scope = SentimentAggregate.where(symbol: symbol, window: window)
       scope = scope.where(window_end_at: ..@as_of) if @as_of # no future leak in replay
-      rec = scope.order(window_end_at: :desc).first
-      rec&.z_score&.to_f || 0.0
+      scope.order(window_end_at: :desc).first
     end
 
+    def latest_sentiment_z(symbol, window: "15m")
+      latest_sentiment_observation(symbol, window: window)&.z_score&.to_f || 0.0
+    end
+
+    # An observation is only evidence about NOW for so long. A reading from
+    # hours ago must not be able to veto — that would reintroduce the same
+    # failure with extra steps.
+    def sentiment_fresh?(observation)
+      max_age = ENV.fetch("SENTIMENT_MAX_AGE_SECONDS", "3600").to_f
+      return true unless max_age.positive?
+
+      reference = @as_of || Time.current
+      observation.window_end_at.present? && (reference - observation.window_end_at) <= max_age
+    end
+
+    # Blocks on evidence AGAINST, never on the absence of evidence FOR
+    # (issue #494).
+    #
+    # This previously required a strong reading in the trade's own direction
+    # before allowing anything, so no data — the state for 359 of 365 backtest
+    # days, and ~90% of live 1h windows on BTC — was a veto. 313 of 313
+    # technically-complete signals were blocked over a year, producing zero
+    # trades.
+    #
+    # It now vetoes only when a FRESH reading is STRONG and points the other
+    # way. Missing, stale or weak sentiment is neutral, which is what
+    # CONTEXT.md documents ("a soft input — does not gate entries
+    # independently") and what a signal with no validated predictive power
+    # (#468) has earned.
     def sentiment_gate_allows?(symbol:, side:)
       enabled = ENV.fetch("SENTIMENT_ENABLE", "false").to_s.casecmp("true").zero?
       return true unless enabled
 
-      threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
       sentiment_symbol = Sentiment::ContractSymbolMapper.sentiment_symbol_for(symbol) || symbol
-      z = latest_sentiment_z(sentiment_symbol)
-      return false if z.abs < threshold
+      observation = latest_sentiment_observation(sentiment_symbol)
+      return true if observation.nil? || !sentiment_fresh?(observation)
 
-      (side == :long && z > 0) || (side == :short && z < 0) ||
-        (side == :buy && z > 0) || (side == :sell && z < 0)
+      z = observation.z_score.to_f
+      threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
+      return true if z.abs < threshold # not strong enough to object
+
+      long_side = %i[long buy].include?(side.to_s.downcase.to_sym)
+      long_side ? z > 0 : z < 0
     end
 
     # Resolve the actual trading symbol to use
