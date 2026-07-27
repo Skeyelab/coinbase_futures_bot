@@ -20,7 +20,7 @@ class RapidSignalEvaluationJob < ApplicationJob
     # Get current month contract for execution (also drives contract sizing)
     begin
       contract_manager = MarketData::FuturesContractManager.new(logger: @logger)
-      target_contract = contract_manager.current_month_contract(@asset)
+      target_contract = resolve_target_contract(contract_manager)
     rescue => e
       @logger.error("[RSE] Error getting futures contract: #{e.message}")
       return
@@ -71,6 +71,16 @@ class RapidSignalEvaluationJob < ApplicationJob
   end
 
   private
+
+  # A tick that already names a tradeable contract IS the instrument to trade
+  # (issue #484). Only a spot tick needs resolving to a dated contract by asset.
+  # Without this a BIP tick resolved to the current-month BIT contract, so the
+  # perp's feed drove an order on the dated future.
+  def resolve_target_contract(contract_manager)
+    return @product_id if Contract.tradeable_product?(@product_id)
+
+    contract_manager.current_month_contract(@asset)
+  end
 
   def should_execute_signal?(signal)
     return false unless signal
