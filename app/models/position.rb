@@ -20,7 +20,27 @@ class Position < ApplicationRecord
   scope :swing_trading, -> { where(day_trading: false) }
   scope :by_product, ->(product_id) { where(product_id: product_id) }
   scope :by_side, ->(side) { where(side: side) }
-  scope :by_asset, ->(asset) { where("product_id LIKE ?", "#{asset}%") }
+  # Positions for an underlying, resolved through contracts.base_currency —
+  # which MarketData::CoinbaseRest syncs from the Coinbase products API, so the
+  # mapping is the venue's own and not a second hardcoded list to drift.
+  #
+  # This was `product_id LIKE "#{asset}%"`, which only matches when the product
+  # id starts with the asset name. True for spot (BTC-USD); false for every
+  # futures contract, because Coinbase names them by contract code — OIL is
+  # NOL-*, BTC is BIT-*/BIP-*, ETH is ET-*/ETP-*, XRP is XPP-*.
+  #
+  # So by_asset("OIL") counted 0 while three OIL positions were open, and
+  # RapidSignalEvaluationJob's per-asset concurrent cap (asset_sizing.yml, OIL
+  # max_concurrent: 1) never bound for ANY futures contract. Observed live:
+  # three concurrent NOL shorts 20 minutes apart, stopped only by the global cap.
+  #
+  # The LIKE is kept as a fallback: a position can outlive its Contract row
+  # (expired, or synced away), and dropping it from the count would be the same
+  # failure — exposure invisible to the control meant to bound it.
+  scope :by_asset, lambda { |asset|
+    product_ids = Contract.where(base_currency: asset.to_s).select(:product_id)
+    where(product_id: product_ids).or(where("product_id LIKE ?", "#{asset}%"))
+  }
   scope :opened_today, -> { where("DATE(entry_time) = ?", Date.current) }
   scope :opened_yesterday, -> { where("entry_time < ? AND entry_time >= ?", 24.hours.ago, 48.hours.ago) }
   scope :expiring_soon, -> { day_trading.opened_yesterday.open }
