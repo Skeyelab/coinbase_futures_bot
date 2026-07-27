@@ -29,6 +29,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, per_contract_fee: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
+      preload_candles: true,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
       logger: Rails.logger)
@@ -95,7 +96,24 @@ module Backtest
       # MaxDrawdown (issue #401): global equity-drawdown halt, evaluated per candle
       # against the run's equity curve on the simulated clock.
       @max_drawdown = max_drawdown || Trading::Protections::MaxDrawdown.from_config
+      # Escape hatch (issue #387): lets a run fall back to the per-step database
+      # reads, which is how the preloaded path is proved equivalent rather than
+      # merely faster.
+      @preload_candles = preload_candles
       @logger = logger
+    end
+
+    # Issue #387: the strategy read ~6 queries per STEP. Serve the whole run
+    # from memory instead — one query per timeframe — which is what makes
+    # year-long windows and bigger calibration grids affordable. The strategy
+    # itself is untouched (#297 parity): only where it reads candles changes.
+    def preload_candles!(from, to)
+      return unless @preload_candles
+      return unless @strategy.respond_to?(:candle_source=) && @strategy.respond_to?(:warmup_candles)
+
+      @strategy.candle_source = Signals::CandleSource::Preloaded.for_run(
+        symbol: @symbol, from: from, to: to, warmup_candles: @strategy.warmup_candles
+      )
     end
 
     def run(from:, to:)
@@ -113,6 +131,7 @@ module Backtest
         constant_rate_per_interval: constant_rate,
         constant_interval_seconds: @funding_interval_seconds, logger: @logger)
       @strategy.funding_schedule = funding_schedule if @strategy.respond_to?(:funding_schedule=)
+      preload_candles!(from, to)
 
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
         fee_rate: @fee_rate, per_contract_fee: @per_contract_fee,

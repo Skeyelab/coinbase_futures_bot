@@ -43,6 +43,27 @@ module Strategy
     # object the simulator accrues from, so gate and accrual never desync.
     attr_accessor :funding_schedule
 
+    # Where candles come from (issue #387). Defaults to the database — the live
+    # path — so nothing changes unless a caller injects something else. A
+    # backtest swaps in a preloaded source to avoid ~6 queries per step while
+    # replaying this exact strategy, keeping #297's live/backtest parity.
+    attr_writer :candle_source
+
+    def candle_source
+      @candle_source ||= Signals::CandleSource::Database.new
+    end
+
+    # How much history this strategy needs before it can emit anything, per
+    # timeframe. A preloading source uses it to size its warm-up window.
+    def warmup_candles
+      {
+        hourly: @config[:min_1h_candles],
+        fifteen_minute: @config[:min_15m_candles],
+        five_minute: @config[:min_5m_candles],
+        one_minute: @config[:min_1m_candles]
+      }
+    end
+
     def initialize(config = {})
       @config = DEFAULTS.merge(config)
       # Break-even must be priced at the fees fills actually pay (taker) or
@@ -64,10 +85,10 @@ module Strategy
 
       return nil unless @current_symbol
 
-      candles_1h = candle_scope(:hourly).last(@config[:min_1h_candles])
-      candles_15m = candle_scope(:fifteen_minute).last(@config[:min_15m_candles])
-      candles_5m = candle_scope(:five_minute).last(@config[:min_5m_candles])
-      candles_1m = candle_scope(:one_minute).last(@config[:min_1m_candles])
+      candles_1h = recent_candles(:hourly, @config[:min_1h_candles])
+      candles_15m = recent_candles(:fifteen_minute, @config[:min_15m_candles])
+      candles_5m = recent_candles(:five_minute, @config[:min_5m_candles])
+      candles_1m = recent_candles(:one_minute, @config[:min_1m_candles])
 
       return nil if candles_1h.size < @config[:min_1h_candles]
       return nil if candles_15m.size < @config[:min_15m_candles]
@@ -168,10 +189,9 @@ module Strategy
       (@config[:funding_expected_hold_seconds].to_f / interval) * rate
     end
 
-    def candle_scope(timeframe)
-      scope = Candle.for_symbol(@current_symbol).public_send(timeframe).order(:timestamp)
-      scope = scope.where(timestamp: ..@as_of) if @as_of
-      scope
+    def recent_candles(timeframe, limit)
+      candle_source.recent(symbol: @current_symbol, timeframe: timeframe,
+        limit: limit, as_of: @as_of)
     end
 
     def confirm_trend_alignment(trend, ema15, ema5, ema1, last_15m, last_5m, last_1m)
@@ -279,10 +299,10 @@ module Strategy
 
     def volume_confidence_score
       # Get recent 5m candles for volume analysis (better for day trading)
-      recent_candles = candle_scope(:five_minute).last(10)
-      return 0 if recent_candles.size < 10
+      candles = recent_candles(:five_minute, 10)
+      return 0 if candles.size < 10
 
-      volumes = recent_candles.map { |c| c.volume.to_f }
+      volumes = candles.map { |c| c.volume.to_f }
       avg_volume = volumes.sum / volumes.size
       current_volume = volumes.last
 
@@ -300,10 +320,10 @@ module Strategy
 
     def momentum_confidence_score
       # Get recent 5m closes for momentum analysis (better for day trading)
-      recent_candles = candle_scope(:five_minute).last(8)
-      return 0 if recent_candles.size < 8
+      candles = recent_candles(:five_minute, 8)
+      return 0 if candles.size < 8
 
-      closes = recent_candles.map { |c| c.close.to_f }
+      closes = candles.map { |c| c.close.to_f }
 
       # Calculate rate of change over last 4 candles
       if closes.size >= 4
