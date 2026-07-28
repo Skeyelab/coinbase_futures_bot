@@ -126,13 +126,13 @@ module Cli
       desc: "Maximum number of positions to display"
     method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def positions
-      return emit_json(OperatorSnapshot.new.positions) if json_mode?
+      snapshot = OperatorSnapshot.new.positions
+      return emit_json(snapshot) if json_mode?
 
-      scope = Position.open
-      scope = scope.day_trading if options[:type] == "day"
-      scope = scope.swing_trading if options[:type] == "swing"
-      scope = scope.limit(options[:limit])
-      rows = scope.to_a
+      rows = snapshot[:positions]
+      rows = rows.select { |r| r[:day_trading] } if options[:type] == "day"
+      rows = rows.reject { |r| r[:day_trading] } if options[:type] == "swing"
+      rows = rows.first(options[:limit])
 
       puts "#{BOLD}#{CYAN}📈  Open Positions#{RESET} (#{rows.size})"
       puts "─" * 72
@@ -595,21 +595,41 @@ module Cli
       end
     end
 
+    # Columns are ID / Product / Side / Entry / Size / PnL / Type.
+    #
+    # This used to read `%w[ID Product Side Entry Price Type]` — six labels for a
+    # row supplying id, product, side, entry_price, SIZE, type — so the column
+    # labelled "Price" showed the contract count. A 1-contract position rendered
+    # as "Price 1.0", which reads as a catastrophic quote on an $80 instrument.
+    # "Entry Price" was one label that %w split into two columns.
     def format_positions_header
-      "  #{BOLD}%-6s  %-20s  %-6s  %-12s  %-12s  %-10s#{RESET}" %
-        %w[ID Product Side Entry Price Type]
+      "  #{BOLD}%-6s  %-20s  %-6s  %-12s  %-8s  %-12s  %-8s#{RESET}" %
+        %w[ID Product Side Entry Size PnL Type]
     end
 
-    def format_position_row(pos)
-      side_color = pos.long? ? GREEN : RED
-      product = pos.paper? ? "🧪#{pos.product_id}" : pos.product_id.to_s
-      "  %-6s  %-20s  #{side_color}%-6s#{RESET}  %-12s  %-12s  %-10s" % [
-        pos.id,
+    # Rows come from OperatorSnapshot, the canonical position view (#290) that
+    # `positions --json` already used. The human table hand-rolled its own read
+    # off Position.open and so had no mark price and no PnL — the two numbers an
+    # operator is actually looking for. One source now, so both views agree.
+    def format_position_row(row)
+      side_color = (row[:side].to_s.upcase == "LONG") ? GREEN : RED
+      product = row[:paper] ? "🧪#{row[:product_id]}" : row[:product_id].to_s
+      pnl = row[:unrealized_pnl]
+      pnl_text = pnl ? "%+.2f" % pnl : "—"
+      pnl_color = if pnl.nil?
+        RESET
+      else
+        (pnl >= 0) ? GREEN : RED
+      end
+
+      "  %-6s  %-20s  #{side_color}%-6s#{RESET}  %-12s  %-8s  #{pnl_color}%-12s#{RESET}  %-8s" % [
+        row[:id],
         product.truncate(20),
-        pos.side,
-        pos.entry_price&.round(2) || "N/A",
-        pos.size,
-        pos.day_trading? ? "Day" : "Swing"
+        row[:side],
+        row[:entry_price]&.round(2) || "N/A",
+        row[:size],
+        pnl_text,
+        row[:day_trading] ? "Day" : "Swing"
       ]
     end
 

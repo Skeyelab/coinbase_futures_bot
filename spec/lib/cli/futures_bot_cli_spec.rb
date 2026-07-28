@@ -288,6 +288,39 @@ RSpec.describe FuturesBotCli, type: :model do
       end
     end
 
+    # The header read `%w[ID Product Side Entry Price Type]` — six labels — while
+    # the row supplied id, product, side, entry_price, SIZE, type. So the column
+    # labelled "Price" showed the contract count: a 1-contract position rendered
+    # "Price 1.0", which reads as a catastrophic quote on an $80 instrument.
+    # "Entry Price" was almost certainly one label that %w split in two.
+    context "column labelling" do
+      before do
+        Position.delete_all
+        create(:position, product_id: "NOL-19AUG26-CDE", side: "SHORT",
+          entry_price: 80.82, size: 1)
+        allow(RecentMarketPrice).to receive(:for_product).and_return(81.59)
+        allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(10)
+      end
+
+      it "does not label the size column as a price" do
+        out = capture_stdout { run_cli("positions") }
+        header = out.lines.find { |l| l.include?("Product") }
+
+        expect(header).to include("Size")
+        expect(header).not_to match(/\bPrice\b/)
+      end
+
+      # An operator looking at a money surface needs to see they are losing.
+      # SHORT from 80.82 with the mark at 81.59 on contract_size 10 is ~-$7.70,
+      # and the table showed no PnL at all.
+      it "shows unrealized PnL" do
+        out = capture_stdout { run_cli("positions") }
+
+        expect(out).to match(/PnL/)
+        expect(out).to match(/-7\.7/)
+      end
+    end
+
     context "with no open positions" do
       before { Position.delete_all }
 
