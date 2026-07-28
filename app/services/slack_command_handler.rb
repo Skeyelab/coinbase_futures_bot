@@ -373,40 +373,51 @@ class SlackCommandHandler
       }
     end
 
+    # /bot-stop HALTS trading. It does not flatten the book.
+    #
+    # It never did: the close loop incremented a counter with `position.close!`
+    # commented out, and this handler reported that counter as "Positions
+    # Closed". Halting while claiming the book is flat is the dangerous half —
+    # the operator reads "flat" and walks away from open leveraged positions.
+    #
+    # The halt is genuine and fail-safe, so it stays. What changes is that the
+    # response now states what is still open and how to actually close it.
+    # Flattening from Slack is deliberately not offered: closes must run through
+    # Trading::PositionLifecycle so exits feed the cooldown, stoploss guard, and
+    # daily loss caps (ADR 0003), and this surface's auth fails open when
+    # SLACK_AUTHORIZED_USERS is unset. See ADR 0005.
     def handle_emergency_stop_command
-      # Execute emergency stop
-      emergency_stop_result = execute_emergency_stop
+      set_trading_status(false, emergency: true)
+      still_open = Position.open.count
 
       SlackNotificationService.alert(
         "critical",
-        "Emergency Stop Executed",
-        "All trading activities stopped via Slack command. #{emergency_stop_result[:message]}"
+        "Emergency Halt",
+        "Trading halted via Slack. #{still_open} position(s) still OPEN — Slack cannot close them."
       )
 
       {
-        text: "🚨 EMERGENCY STOP EXECUTED 🚨\n\nAll trading activities have been immediately stopped.\n\n#{emergency_stop_result[:message]}",
+        text: "🚨 TRADING HALTED 🚨\n\nNo new signals or entries will be placed.\n\n" \
+              "⚠️ This does NOT close open positions. #{still_open} position(s) remain OPEN.\n" \
+              "Close them from the TUI (`bin/futuresbot dashboard`, then `c`) " \
+              "or the MCP `close_position` tool.",
         response_type: "in_channel",
         attachments: [
           {
             color: "danger",
             fields: [
               {
-                title: "Positions Closed",
-                value: emergency_stop_result[:positions_closed].to_s,
-                short: true
-              },
-              {
-                title: "Orders Cancelled",
-                value: emergency_stop_result[:orders_cancelled].to_s,
+                title: "Positions Still Open",
+                value: still_open.to_s,
                 short: true
               },
               {
                 title: "Trading Status",
-                value: "🔴 DISABLED",
+                value: "🔴 HALTED",
                 short: true
               },
               {
-                title: "Executed At",
+                title: "Halted At",
                 value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 short: true
               }
@@ -674,42 +685,6 @@ class SlackCommandHandler
         healthy: false,
         error: e.message
       }
-    end
-
-    def execute_emergency_stop
-      positions_closed = 0
-      orders_cancelled = 0
-
-      begin
-        # Disable trading
-        set_trading_status(false, emergency: true)
-
-        # Close all open positions
-        open_positions = Position.open.day_trading
-        open_positions.each do |position|
-          # Close position logic would go here
-          # position.close!
-          positions_closed += 1
-        end
-
-        # Cancel any pending orders
-        # orders_cancelled = cancel_all_pending_orders
-
-        {
-          success: true,
-          message: "Emergency stop completed successfully.",
-          positions_closed: positions_closed,
-          orders_cancelled: orders_cancelled
-        }
-      rescue => e
-        Rails.logger.error("[SlackCommand] Error during emergency stop: #{e.message}")
-        {
-          success: false,
-          message: "Emergency stop partially completed. Error: #{e.message}",
-          positions_closed: positions_closed,
-          orders_cancelled: orders_cancelled
-        }
-      end
     end
 
     def set_trading_status(active, emergency: false)
