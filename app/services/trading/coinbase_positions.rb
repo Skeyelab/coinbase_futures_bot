@@ -653,8 +653,21 @@ module Trading
       )
 
       @logger.info("Created local position record for #{product_id}: #{position_side} #{size} at #{entry_price}")
+
+      # RETURN THE POSITION. This used to end on the @logger.info above, and
+      # Logger#info returns true — so the method returned `true`, not a Position.
+      # open_position then guarded the lineage merge with `position.is_a?(Position)`,
+      # which was false every time, so `result["position_id"]` was never set and
+      # SignalDecision#position_id stayed nil on every traded decision since the
+      # ledger shipped (#480/#488). Observed on exo-mini: 12 traded decisions,
+      # 0 with a position link.
+      #
+      # The guard is what made it invisible — a defensive `is_a?` check silently
+      # skipping the thing it was guarding, rather than failing loudly.
+      position
     rescue => e
       @logger.error("Failed to create local position record: #{e.message}")
+      nil
     end
 
     def update_local_position_record(product_id:, size:, close_price:, order_result:, position: nil)
