@@ -11,22 +11,49 @@ module Trading
       @logger = logger
     end
 
-    def close(position, reason:)
+    # `size` nil (or >= the tracked size) closes the whole position. A smaller
+    # size is a PARTIAL reduce: the closed contracts are realized and the
+    # position stays OPEN with the remainder. Both are exits as far as the
+    # protections layer is concerned — a partial realizes real P&L, so it must
+    # feed the cooldown, the stoploss guard and the daily loss caps exactly like
+    # a full close. Routing both through one method is what keeps that true:
+    # every caller that can reduce a position gets the protections for free.
+    def close(position, reason:, size: nil)
       current_price = resolve_price(position)
       return Result.new(success: false, close_price: nil, reason: reason, fallback: false) unless current_price
 
-      api_result = attempt_api_close(position)
+      partial_size = resolve_partial_size(position, size)
+      if partial_size == :invalid
+        @logger.error("Refusing to close position #{position.id}: non-positive size #{size.inspect}")
+        return Result.new(success: false, close_price: nil, reason: reason, fallback: false)
+      end
+
+      api_result = attempt_api_close(position, partial_size)
 
       if api_success?(api_result)
-        position.force_close!(current_price, reason)
-        @logger.info("Closed position #{position.id} via API at #{current_price}: #{reason}")
+        # The record whose realized P&L this exit produced: the position itself
+        # on a full close, the split-off CLOSED portion on a partial.
+        realized = if partial_size
+          position.close_partial!(partial_size, current_price, reason)
+        else
+          position.force_close!(current_price, reason)
+          position
+        end
+
+        unless realized
+          @logger.error("Position #{position.id} could not realize a #{partial_size} close after a filled API close")
+          return Result.new(success: false, close_price: nil, reason: reason, fallback: false)
+        end
+
+        portion = partial_size ? "#{partial_size} of " : nil
+        @logger.info("Closed #{portion}position #{position.id} via API at #{current_price}: #{reason}")
         # Protections layer (issue #397, ADR 0003): starting a cooldown here — the
         # single funnel every day/swing/dollar/trailing exit passes through —
         # blocks immediate re-entry on the symbol just exited.
         Trading::Protections::CooldownPeriod.record_exit(symbol: position.product_id)
         # StoplossGuard (issue #400): a losing close may trip the guard and halt
         # the offending side after a cluster of losses.
-        evaluate_stoploss_guard(position)
+        evaluate_stoploss_guard(realized)
         # Loss caps (issue #482, #392 condition 3): evaluated here because this
         # is the moment a loss becomes REALIZED, so the cap trips on the trade
         # that breached it rather than whenever a periodic job next happens to
@@ -75,10 +102,25 @@ module Trading
       end
     end
 
-    def attempt_api_close(position)
+    # nil       -> full close
+    # BigDecimal-> partial reduce of that many contracts
+    # :invalid  -> a size was asked for that cannot be closed
+    def resolve_partial_size(position, size)
+      return nil if size.nil? || size.to_s.strip.empty?
+
+      requested = BigDecimal(size.to_s)
+      return :invalid unless requested.positive?
+      return nil if requested >= position.size
+
+      requested
+    rescue ArgumentError
+      :invalid
+    end
+
+    def attempt_api_close(position, partial_size = nil)
       @positions_service.close_position(
         product_id: position.product_id,
-        size: position.size
+        size: partial_size || position.size
       )
     rescue => e
       @logger.error("API close raised for position #{position.id}: #{e.message}")

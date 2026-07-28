@@ -162,5 +162,71 @@ RSpec.describe Trading::PositionLifecycle do
         expect(position.reload.status).to eq("OPEN")
       end
     end
+
+    # A PARTIAL reduce realizes P&L on the closed contracts, so it is an exit for
+    # every purpose the protections layer cares about — it just leaves exposure
+    # behind. Before this it bypassed the lifecycle entirely.
+    context "partial reduce" do
+      let(:position) { create(:position, status: "OPEN", side: "LONG", size: 4.0, entry_price: 50_000.0) }
+
+      before do
+        allow(positions_service).to receive(:close_position).and_return({"success" => true, "order_id" => "abc123"})
+      end
+
+      it "leaves the position OPEN with its size reduced by the closed portion" do
+        lifecycle.close(position, reason: "web_operator_close", size: 1.0)
+
+        expect(position.reload.status).to eq("OPEN")
+        expect(position.size).to eq(3.0)
+      end
+
+      it "starts a protection cooldown on the symbol" do
+        lifecycle.close(position, reason: "web_operator_close", size: 1.0)
+
+        expect(Trading::Protections.blocked?(symbol: position.product_id, side: "long")).to be true
+      ensure
+        Trading::ProtectionLock.clear!
+      end
+
+      # The gap this closes: a partial reduce realized real dollars that the
+      # $10/$30/$100 caps never saw, so an operator could bleed past every cap
+      # one reduce at a time.
+      it "counts the realized P&L on the closed portion toward the loss caps" do
+        BotRuntimeStat.where(key: TradingHalt::STORE_KEY).delete_all
+        allow(DryRun).to receive(:active?).and_return(false)
+        # SHORT from 50k closing at 51k is a loss of $1,000 per contract.
+        position.update!(side: "SHORT")
+
+        lifecycle.close(position, reason: "web_operator_close", size: 1.0)
+
+        expect(TradingHalt.risk_halted?).to be true
+        expect(TradingHalt.status[:reason]).to match(/realized loss/)
+      ensure
+        Trading::ProtectionLock.clear!
+      end
+
+      # Partial P&L must be contract_size-aware or it repeats #234: NOL is 10
+      # barrels per contract, so a $1 move on one contract is $10, not $1.
+      context "on a contract with contract_size 10" do
+        let(:position) do
+          create(:position, product_id: "NOL-19AUG26-CDE", status: "OPEN", side: "LONG",
+            size: 4.0, entry_price: 60.0)
+        end
+
+        before do
+          allow(RecentMarketPrice).to receive(:for_product).with("NOL-19AUG26-CDE").and_return(61.0)
+          allow(Trading::ContractSizeResolver).to receive(:for_product)
+            .with("NOL-19AUG26-CDE").and_return(10)
+        end
+
+        it "realizes P&L scaled by contract_size" do
+          lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+          realized = Position.closed.by_product("NOL-19AUG26-CDE").last
+          expect(realized.size).to eq(2.0)
+          expect(realized.pnl).to eq(20.0)
+        end
+      end
+    end
   end
 end
