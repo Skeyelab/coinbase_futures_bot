@@ -57,11 +57,29 @@ class PositionImportController < ActionController::Base
 
   private
 
+  # ADR 0005: this controller rewrites the `positions` table the entire risk
+  # stack counts from — #replace clears it and re-imports — so authorization
+  # fails closed. Two defects are fixed here:
+  #
+  #   1. `return if Rails.env.development?` skipped auth wholesale, so anyone
+  #      who could reach a dev instance could clear the position book.
+  #   2. Plain `==` on the credentials leaked comparison timing, and matched
+  #      when both sides were nil, i.e. when nothing was configured.
+  #
+  # This mirrors positions_controller.rb#require_positions_basic_auth, the
+  # reference implementation named by the ADR.
   def require_positions_basic_auth
-    return if Rails.env.development?
+    username = ENV["POSITIONS_AUTH_USER"].to_s
+    password = ENV["POSITIONS_AUTH_PASS"].to_s
 
-    authenticate_or_request_with_http_basic("Positions") do |username, password|
-      username == ENV["POSITIONS_AUTH_USER"] && password == ENV["POSITIONS_AUTH_PASS"]
+    unless username.present? && password.present?
+      render plain: "Position import credentials not configured. Set POSITIONS_AUTH_USER and POSITIONS_AUTH_PASS.",
+        status: :forbidden and return
+    end
+
+    authenticate_or_request_with_http_basic("Positions") do |u, p|
+      ActiveSupport::SecurityUtils.secure_compare(u.to_s, username) &&
+        ActiveSupport::SecurityUtils.secure_compare(p.to_s, password)
     end
   end
 end

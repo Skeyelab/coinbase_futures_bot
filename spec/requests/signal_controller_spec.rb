@@ -57,14 +57,21 @@ RSpec.describe "Signals API", type: :request do
       end
     end
 
+    # ADR 0005: a missing secret denies. An unset SIGNALS_API_KEY used to make
+    # the whole signals API public.
     context "when no API key is configured" do
       before do
         ENV["SIGNALS_API_KEY"] = nil
       end
 
-      it "allows all requests when no API key is set" do
+      it "rejects every request (fails closed)" do
         get "/signals"
-        expect(response).to have_http_status(:success)
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it "rejects even a request that supplies a key" do
+        get "/signals", headers: {"X-API-Key" => api_key}
+        expect(response).to have_http_status(:unauthorized)
       end
     end
 
@@ -77,15 +84,42 @@ RSpec.describe "Signals API", type: :request do
     end
   end
 
+  # ADR 0005: `Access-Control-Allow-Origin: *` let any page on the internet read
+  # the signal book from a browser that had the key. The allowlist defaults to
+  # empty, so no origin is echoed unless SIGNALS_ALLOWED_ORIGINS names it.
   describe "CORS headers" do
-    before do
-      get "/signals", headers: {"X-API-Key" => api_key}
+    it "never sends a wildcard origin" do
+      get "/signals", headers: {"X-API-Key" => api_key, "Origin" => "https://evil.example"}
+
+      expect(response.headers["Access-Control-Allow-Origin"]).not_to eq("*")
     end
 
-    it "sets CORS headers on all responses" do
-      expect(response.headers["Access-Control-Allow-Origin"]).to eq("*")
+    it "sends no allow-origin when no origins are configured" do
+      get "/signals", headers: {"X-API-Key" => api_key, "Origin" => "https://evil.example"}
+
+      expect(response.headers["Access-Control-Allow-Origin"]).to be_nil
       expect(response.headers["Access-Control-Allow-Methods"]).to eq("GET, POST, PUT, DELETE, OPTIONS")
       expect(response.headers["Access-Control-Allow-Headers"]).to eq("Content-Type, X-API-Key")
+    end
+
+    it "echoes an origin that is on the configured allowlist" do
+      ENV["SIGNALS_ALLOWED_ORIGINS"] = "https://dash.example, https://ops.example"
+
+      get "/signals", headers: {"X-API-Key" => api_key, "Origin" => "https://ops.example"}
+
+      expect(response.headers["Access-Control-Allow-Origin"]).to eq("https://ops.example")
+    ensure
+      ENV.delete("SIGNALS_ALLOWED_ORIGINS")
+    end
+
+    it "does not echo an origin that is absent from the allowlist" do
+      ENV["SIGNALS_ALLOWED_ORIGINS"] = "https://dash.example"
+
+      get "/signals", headers: {"X-API-Key" => api_key, "Origin" => "https://evil.example"}
+
+      expect(response.headers["Access-Control-Allow-Origin"]).to be_nil
+    ensure
+      ENV.delete("SIGNALS_ALLOWED_ORIGINS")
     end
   end
 

@@ -43,8 +43,12 @@ class SlackCommandHandler
 
     private
 
+    # ADR 0005: authorization fails closed. An unset SLACK_AUTHORIZED_USERS used
+    # to authorize every user_id, which meant a deployment that had not yet been
+    # configured handed halt/resume to anyone who could post to the webhook.
+    # No allowlist now means no operator.
     def authorized?(user_id)
-      return true if authorized_users.empty? # If no users configured, allow all
+      return false if authorized_users.empty?
 
       authorized_users.include?(user_id)
     end
@@ -384,8 +388,7 @@ class SlackCommandHandler
     # response now states what is still open and how to actually close it.
     # Flattening from Slack is deliberately not offered: closes must run through
     # Trading::PositionLifecycle so exits feed the cooldown, stoploss guard, and
-    # daily loss caps (ADR 0003), and this surface's auth fails open when
-    # SLACK_AUTHORIZED_USERS is unset. See ADR 0005.
+    # daily loss caps (ADR 0003). See ADR 0005.
     def handle_emergency_stop_command
       set_trading_status(false, emergency: true)
       still_open = Position.open.count

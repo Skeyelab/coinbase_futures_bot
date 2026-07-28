@@ -61,10 +61,23 @@ As of 2026-07-28, partially enforced. Recorded explicitly so this ADR is not mis
 | Chat is READ-ONLY | **built** — `chat_bot_service.rb`, commit `b817863` |
 | No surface reports an action it did not perform | **built** for both emergency stops — commits `b817863`, `ad02b8e` |
 | Operator closes route through `PositionLifecycle` | **built** for MCP, TUI, web — commit `5c01d0a`; partial reduces still bypass it |
-| Slack auth fails closed | **not built** — `slack_controller.rb:149` and `slack_command_handler.rb:47` still fail open, so Slack's demotion to READ-ONLY is policy, not code |
-| `signal_controller.rb` fails closed, CORS narrowed | **not built** |
-| `position_import_controller.rb` uses the `positions_controller` auth pattern | **not built** |
+| Slack auth fails closed | **built** — an absent `SLACK_SIGNING_SECRET` denies the request, an empty `SLACK_AUTHORIZED_USERS` denies every user |
+| `signal_controller.rb` fails closed, CORS narrowed | **built** — absent `SIGNALS_API_KEY` returns 401; origins come from `SIGNALS_ALLOWED_ORIGINS`, default empty, no wildcard |
+| `position_import_controller.rb` uses the `positions_controller` auth pattern | **built** — `secure_compare`, `:forbidden` when unconfigured, no `development?` bypass |
 | A new mutating surface requires an ADR | process rule; no mechanism |
+
+Slack's two auth layers now fail closed, which clears the condition attached to
+its demotion above. Promoting it back to OPERATOR is still an amendment, not an
+automatic consequence: `/bot-pause` and `/bot-resume` mutate trading state, and
+the ADR requires a deliberate decision to grant that.
+
+A caveat for anyone writing tests against these surfaces: dotenv's autorestore
+(`config.after { Dotenv.restore }`) reverts `ENV` to a snapshot taken before
+`spec/support/test_env_setup.rb`'s `before(:suite)` runs, so keys injected there
+disappear after the first example. Ambient `ENV` is therefore not a reliable
+precondition — a spec that needs a credential must state it itself, via
+`stub_const` or `ClimateControl.modify`. Under fail-open auth this was invisible;
+under fail-closed auth it denies.
 
 ## Consequences
 

@@ -146,7 +146,15 @@ class SlackController < ApplicationController
   end
 
   def verify_slack_request(request)
-    return true unless ENV["SLACK_SIGNING_SECRET"].present?
+    # ADR 0005: authorization fails closed. A missing signing secret means we
+    # cannot establish that the request came from Slack, so we deny it. The
+    # previous `return true unless ...present?` accepted any unsigned POST to
+    # /slack/commands whenever the secret was absent, which handed /bot-pause
+    # and /bot-resume to anyone who could reach the endpoint.
+    unless ENV["SLACK_SIGNING_SECRET"].present?
+      Rails.logger.warn("[SlackController] SLACK_SIGNING_SECRET not configured; denying request")
+      return false
+    end
 
     begin
       slack_signing_secret = ENV["SLACK_SIGNING_SECRET"]
