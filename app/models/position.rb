@@ -3,6 +3,10 @@
 class Position < ApplicationRecord
   include SentryTrackable
 
+  # Fees are recorded in dollars at the same precision the venue/simulator
+  # reports them (Trading::CoinbasePositions#simulate_order rounds to 6).
+  FEE_SCALE = 6
+
   # Validations
   validates :product_id, presence: true
   validates :side, presence: true, inclusion: {in: %w[LONG SHORT]}
@@ -288,7 +292,7 @@ class Position < ApplicationRecord
   #
   # Returns the CLOSED portion, or nil when the request is not a partial of an
   # open position (caller should full-close instead).
-  def close_partial!(closed_size, close_price, reason = "Partial close", close_time = Time.current)
+  def close_partial!(closed_size, close_price, reason = "Partial close", close_time = Time.current, exit_fee: nil)
     return nil unless open? && entry_price && close_price
     closed = BigDecimal(closed_size.to_s)
     return nil unless closed.positive? && closed < size
@@ -300,6 +304,8 @@ class Position < ApplicationRecord
       contracts: closed,
       contract_size: Trading::ContractSizeResolver.for_product(product_id)
     )
+
+    portion_entry_fee = apportioned_entry_fee(closed)
 
     portion = nil
     transaction do
@@ -320,14 +326,35 @@ class Position < ApplicationRecord
         # position reduced N times as N trades. SymbolCircuitBreakerJob's
         # five-trade minimum was the first thing that made wrong, so a symbol
         # could be suspended on the evidence of a single position.
-        parent_position_id: parent_position_id || id
+        parent_position_id: parent_position_id || id,
+        entry_fee: portion_entry_fee,
+        # The exit fee belongs entirely to the closed contracts — it was paid to
+        # close exactly them. Nothing to apportion, but it must be RECORDED, or
+        # DailySummaryJob routes every partial to the venue estimate.
+        exit_fee: exit_fee.nil? ? nil : BigDecimal(exit_fee.to_s)
       )
-      update!(size: size - closed)
+      # Subtract rather than re-derive the remainder, so the two rows always sum
+      # back to the fee actually paid even when the share does not divide evenly.
+      update!(
+        size: size - closed,
+        entry_fee: portion_entry_fee ? BigDecimal(entry_fee.to_s) - portion_entry_fee : entry_fee
+      )
     end
 
     Rails.logger.info("Position #{id} partially closed: #{closed} of #{closed + size} #{product_id} " \
                       "(#{reason}) at #{close_price} pnl=#{realized}; remaining #{size}")
     portion
+  end
+
+  # The entry fee was paid ONCE, for the whole position. Splitting the position
+  # splits the fee: the closed contracts take E * (C / S), the parent keeps the
+  # rest. nil stays nil — DailySummaryJob reads nil as "cost unknown" and 0.0 as
+  # "this fill was free", and only one of those is true when we never recorded a
+  # fee.
+  def apportioned_entry_fee(closed)
+    return nil if entry_fee.nil?
+
+    (BigDecimal(entry_fee.to_s) * closed / BigDecimal(size.to_s)).round(FEE_SCALE)
   end
 
   # Class methods

@@ -34,7 +34,7 @@ module Trading
         # The record whose realized P&L this exit produced: the position itself
         # on a full close, the split-off CLOSED portion on a partial.
         realized = if partial_size
-          position.close_partial!(partial_size, current_price, reason)
+          position.close_partial!(partial_size, current_price, reason, exit_fee: close_fee(api_result))
         else
           position.force_close!(current_price, reason)
           position
@@ -125,6 +125,17 @@ module Trading
     rescue => e
       @logger.error("API close raised for position #{position.id}: #{e.message}")
       nil
+    end
+
+    # The fee the venue (or the paper simulator) charged for THIS close, taken
+    # from the order result we already have. Both paths report it under "fee";
+    # see Trading::CoinbasePositions#simulate_order and the entry_fee/exit_fee
+    # writes in its local-record methods. nil when the result carries no fee —
+    # unknown cost, not free cost.
+    def close_fee(api_result)
+      return nil unless api_result.is_a?(Hash)
+
+      api_result["fee"] || api_result[:fee]
     end
 
     def api_success?(result)
