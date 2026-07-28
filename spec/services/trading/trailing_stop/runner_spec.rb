@@ -57,7 +57,10 @@ RSpec.describe Trading::TrailingStop::Runner do
       expect(result[:closed_count]).to eq(1)
       expect(result[:processed_ids]).to contain_exactly(position.id)
       expect(position.status).to eq("CLOSED")
-      expect(positions_service).to have_received(:close_position).with(product_id: position.product_id, size: position.size)
+      # The resolved row travels with the request so the service closes THIS
+      # position rather than re-finding one by product.
+      expect(positions_service).to have_received(:close_position)
+        .with(product_id: position.product_id, size: position.size, position: position)
     end
 
     # A trailing-stop exit is a bot exit like any other, so it must feed the
