@@ -316,52 +316,20 @@ Automatic job performance tracking via ActiveSupport notifications:
 
 ## Business Metrics and Custom Events
 
-### 1. Trading Events
+There is no business-metric event layer today. A `SentryMonitoringService` once
+offered `track_signal_generated` / `track_position_opened` /
+`track_position_closed` / `track_health_check`, reachable only from
+`ActiveSupport::Notifications.subscribe` blocks in
+`config/initializers/sentry_trading_monitoring.rb`. Nothing in `app/` or `lib/`
+ever called `ActiveSupport::Notifications.instrument`, so those events were
+never published and none of it ever ran. Both the service and its subscribers
+were removed rather than left as apparent coverage.
 
-```ruby
-# Signal generation tracking
-SentryMonitoringService.track_signal_generated({
-  symbol: "BTC-USD",
-  side: "LONG",
-  confidence: 85,
-  strategy_name: "MultiTimeframeSignal"
-})
-
-# Position tracking
-SentryMonitoringService.track_position_opened(position_data)
-SentryMonitoringService.track_position_closed(position_data, "take_profit")
-```
-
-### 2. System Health Events
-
-```ruby
-# Health check results
-SentryMonitoringService.track_health_check(health_data, overall_healthy)
-
-# Critical system events
-SentryMonitoringService.track_critical_trading_event(
-  "position_force_closure",
-  "Emergency position closure due to system shutdown",
-  { position_count: 3, reason: "system_shutdown" }
-)
-```
-
-### 3. Market Data Events
-
-```ruby
-# WebSocket connection events
-SentryMonitoringService.track_market_data_event("connection_established", {
-  service: "coinbase_futures",
-  product_ids: ["BTC-USD", "ETH-USD"]
-})
-
-# Data processing events  
-SentryMonitoringService.track_market_data_event("tick_processed", {
-  symbol: "BTC-USD",
-  price: 45000.00,
-  volume: 1.5
-})
-```
+To add business-metric tracking, call `SentryHelper.add_breadcrumb` /
+`SentryHelper.capture_message` directly from the code that knows the event
+happened, or use the `SentryServiceTracking` concern's
+`track_trading_operation` block form. A notification-based indirection is only
+worth reintroducing alongside the `instrument` calls that feed it.
 
 ## Error Organization and Tagging
 
@@ -510,18 +478,20 @@ Sentry.add_breadcrumb(
 
 ### 3. Performance Tracking
 
-Track critical operation timing:
+Track critical operation timing with the `SentryServiceTracking` concern, which
+times the block and tags the result:
 
 ```ruby
-start_time = Time.current
-result = perform_operation
-duration = (Time.current - start_time) * 1000
+track_trading_operation("position_closure", symbol: "BTC-USD") do
+  perform_operation
+end
+```
 
-SentryPerformanceService.track_trading_performance(
-  "position_closure",
-  duration,
-  { symbol: "BTC-USD", success: true }
-)
+Process-level snapshots live on `SentryHelper`:
+
+```ruby
+SentryHelper.track_memory_usage
+SentryHelper.track_job_queue_performance
 ```
 
 ### 4. Sensitive Data Protection

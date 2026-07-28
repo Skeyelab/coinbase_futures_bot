@@ -165,12 +165,12 @@ namespace :sentry do
 
     # Test memory monitoring
     puts "📤 Testing memory monitoring..."
-    SentryPerformanceService.track_memory_usage
+    SentryHelper.track_memory_usage
     puts "✅ Memory usage tracked"
 
     # Test job queue monitoring
     puts "📤 Testing job queue monitoring..."
-    SentryPerformanceService.track_job_queue_performance
+    SentryHelper.track_job_queue_performance
     puts "✅ Job queue performance tracked"
 
     puts "🎉 Performance monitoring test completed!"
