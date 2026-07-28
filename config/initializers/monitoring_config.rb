@@ -3,9 +3,23 @@
 # Configuration for monitoring and alerting thresholds
 Rails.application.configure do
   config.monitoring_config = {
-    # Position exposure limits
-    max_day_trading_exposure: ENV.fetch("MAX_DAY_EXPOSURE", 0.5).to_f,
-    max_swing_trading_exposure: ENV.fetch("MAX_SWING_EXPOSURE", 0.3).to_f,
+    # Position exposure limits, in PERCENT of equity — these are compared against
+    # HealthCheckJob#exposure_percent, which already multiplies by 100.
+    #
+    # They were 0.5 and 0.3, which read as fractions (50%/30%) but were compared
+    # against a percentage, so the real ceiling was HALF OF ONE PERCENT. On a
+    # $10,072 account that allowed $50.36 of notional — less than a single
+    # contract — so no position the bot can open could satisfy it, and the health
+    # card reported "Warning" every hour forever (issue #536).
+    #
+    # The tell that it was a units error rather than caution: Trading::NotionalCap,
+    # which actually blocks orders, permits 2.0x equity = 200% exposure. An
+    # advisory warning does not get set 400x below the limit that is enforced.
+    #
+    # 50/30 warns at a quarter of that hard cap, which is deliberate — a warning
+    # is only useful with enough headroom left to act on it.
+    max_day_trading_exposure: ENV.fetch("MAX_DAY_EXPOSURE", 50.0).to_f,
+    max_swing_trading_exposure: ENV.fetch("MAX_SWING_EXPOSURE", 30.0).to_f,
 
     # Portfolio exposure monitoring
     portfolio_exposure_warning_threshold: ENV.fetch("EXPOSURE_WARNING_THRESHOLD", 0.8).to_f,
