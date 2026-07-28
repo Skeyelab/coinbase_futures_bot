@@ -104,7 +104,7 @@ class RapidSignalEvaluationJob < ApplicationJob
       min_5m_candles: 60,
       min_1m_candles: 30,
       contract_size_usd: contract_notional_usd(target_contract),
-      max_position_size: max_contracts_for_asset(@asset),
+      max_position_size: max_contracts_for_contract(target_contract),
       min_position_size: 1
     )
 
@@ -211,9 +211,15 @@ class RapidSignalEvaluationJob < ApplicationJob
       return false
     end
 
-    # Check if we already have positions in this asset
+    # Check if we already have positions in this asset.
+    #
+    # The COUNT stays per-asset (a dated BIT and a perp BIP long are the same
+    # BTC exposure twice), but the CAP is resolved from the contract about to be
+    # traded — because "BTC" alone cannot say whether the next contract is a
+    # $100 nano or a $659 perp. Where a contract has no entry of its own this is
+    # exactly the old per-asset number.
     existing_positions = Position.open.by_asset(@asset).count
-    max_positions = max_concurrent_positions_for_asset(@asset)
+    max_positions = max_concurrent_for_contract(@target_contract)
 
     if existing_positions >= max_positions
       @logger.info("[RSE] Skipping signal - already at max positions (#{existing_positions}/#{max_positions}) for #{@asset}")
@@ -281,7 +287,7 @@ class RapidSignalEvaluationJob < ApplicationJob
   def contract_notional_usd(contract_id)
     contract_size = Trading::ContractSizeResolver.for_product(contract_id).to_f
     if (contract_size - Trading::ContractSizeResolver::DEFAULT_CONTRACT_SIZE.to_f).abs < Float::EPSILON
-      return legacy_contract_size_for_asset(@asset)
+      return legacy_contract_size_for_contract(contract_id)
     end
 
     (contract_size * @current_price).round(2)
@@ -291,12 +297,17 @@ class RapidSignalEvaluationJob < ApplicationJob
   # BTC/ETH `case`. An unlisted asset (OIL, metals, any expansion pair) now
   # resolves to the conservative `default` block instead of silently inheriting
   # the crypto shape.
-  def legacy_contract_size_for_asset(asset)
-    Trading::AssetSizing.for(asset).contract_size_usd
+  #
+  # Keyed by CONTRACT rather than base currency since #486: BIT and BIP are both
+  # "BTC" but $100 and $659 a contract, so the perp was inheriting the dated
+  # nano's fallback notional — a 6.6x understatement on the exact number that
+  # only gets used when the resolver has already failed.
+  def legacy_contract_size_for_contract(contract_id)
+    Trading::AssetSizing.for_product(contract_id).contract_size_usd
   end
 
-  def max_contracts_for_asset(asset)
-    Trading::AssetSizing.for(asset).max_contracts
+  def max_contracts_for_contract(contract_id)
+    Trading::AssetSizing.for_product(contract_id).max_contracts
   end
 
   # Distinct product_ids currently holding an open position — the instruments
@@ -319,8 +330,8 @@ class RapidSignalEvaluationJob < ApplicationJob
     value.positive? ? value : 3
   end
 
-  def max_concurrent_positions_for_asset(asset)
-    Trading::AssetSizing.for(asset).max_concurrent
+  def max_concurrent_for_contract(contract_id)
+    Trading::AssetSizing.for_product(contract_id).max_concurrent
   end
 
   # open_position returns the raw exchange (or dry-run) payload, which is

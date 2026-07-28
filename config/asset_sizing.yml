@@ -30,3 +30,30 @@ assets:
     contract_size_usd: 930.0
     max_contracts: 1
     max_concurrent: 1
+
+# Per-CONTRACT overrides, keyed by Coinbase product-ID prefix (issue #486
+# precondition 4). Layered over the `assets` entry for the contract's base
+# currency, which is layered over `default` — so an entry here need only state
+# what differs.
+#
+# Exists because base currency is too coarse a key for this venue: BIT (dated
+# nano, ~$100/contract) and BIP (perp, ~$659/contract) are both "BTC", so the
+# perp silently inherited the nano's 5-contract / 2-concurrent shape.
+contracts:
+  BIP:
+    # BTC perp, ADR 0002's home instrument. Pinned to ONE contract and ONE
+    # concurrent position for the #486 calibration run and #392 condition 1
+    # (min_position_size = 1 for perps). Do not raise either without re-opening
+    # #392 — the whole $150 loss budget assumes a single contract of exposure.
+    contract_size_usd: 659.0
+    max_contracts: 1
+    max_concurrent: 1
+  PAU:
+    # PAXG (gold) perp: $4,082 notional/contract measured 2026-07-27 (ADR 0004).
+    # Base currency PAXG has no `assets` entry, so this used to fall to
+    # `default` — a $100 fallback notional, understating a PAU contract 40x, at
+    # 2 contracts. Ingest-only today (ADR 0006 fails closed), but the fallback
+    # should not be wrong if it is ever reached.
+    contract_size_usd: 4082.0
+    max_contracts: 1
+    max_concurrent: 1
