@@ -205,6 +205,19 @@ RSpec.describe Trading::PositionLifecycle do
         Trading::ProtectionLock.clear!
       end
 
+      # The exit fee for the closed contracts is a real, already-known number:
+      # the close order result carries it. Recomputing it from a rate would put
+      # an estimate where a measurement belongs (#391), and dropping it left the
+      # split row with no cost at all.
+      it "records the close order's fee as the split row's exit fee" do
+        allow(positions_service).to receive(:close_position)
+          .and_return({"success" => true, "order_id" => "abc123", "fee" => 1.53})
+
+        lifecycle.close(position, reason: "web_operator_close", size: 1.0)
+
+        expect(Position.closed.by_product(position.product_id).last.exit_fee).to eq(BigDecimal("1.53"))
+      end
+
       # Partial P&L must be contract_size-aware or it repeats #234: NOL is 10
       # barrels per contract, so a $1 move on one contract is $10, not $1.
       context "on a contract with contract_size 10" do

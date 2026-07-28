@@ -84,6 +84,28 @@ RSpec.describe DailySummaryJob, type: :job do
     end
   end
 
+  # A partial reduce is a whole class of exit. Its split row used to carry no
+  # fees at all, so it silently fell through to the venue ESTIMATE while
+  # reporting itself as a completed round trip — widening exactly the gap #391
+  # exists to close, on a bot with zero validated perp fills.
+  it "reports a partial close at its recorded cost, not the estimate" do
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
+    parent = create(:position, paper: true, status: "OPEN", side: "LONG", size: 2.0,
+      entry_price: 50_000.0, entry_time: Time.current - 600, entry_fee: 5.0)
+
+    parent.close_partial!(1.0, 51_000.0, "web_operator_close", exit_fee: 1.25)
+
+    # Half the $5 entry fee follows the one closed contract, plus its own $1.25
+    # exit fee = $3.75 recorded. The estimate for the same row is $1.70.
+    expect(notifier).to receive(:alert).with(
+      "info", anything, a_string_including("Est. cost/round-trip: $3.75")
+    )
+
+    ClimateControl.modify(BACKTEST_TAKER_FEE_RATE: nil, TAKER_FEE_RATE: nil) do
+      described_class.new.perform(notifier: notifier)
+    end
+  end
+
   it "fails the cost gate when costs exceed the realized edge" do
     now = Time.current
     allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
