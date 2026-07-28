@@ -213,11 +213,10 @@ RSpec.describe PositionsController, type: :controller do
       expect(response.redirect_url).to include("Position+closed")
     end
 
-    # A full close from the web UI is still an exit and must feed the
-    # protections layer (ADR 0003) exactly as a bot-initiated exit does. Closing
-    # through Trading::CoinbasePositions directly skipped the cooldown, the
-    # stoploss guard, and the daily loss caps. Partial reduces still take the
-    # direct path — PositionLifecycle closes whole positions only.
+    # A close from the web UI is still an exit and must feed the protections
+    # layer (ADR 0003) exactly as a bot-initiated exit does. Closing through
+    # Trading::CoinbasePositions directly skipped the cooldown, the stoploss
+    # guard, and the daily loss caps.
     it "records a cooldown when closing a tracked position in full" do
       create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN")
       allow(positions_service).to receive(:close_position).and_return({"success" => true})
@@ -227,6 +226,27 @@ RSpec.describe PositionsController, type: :controller do
       cooled = Trading::ProtectionLock.active.select { |l| l["symbol"] == "BIP-20DEC30-CDE" }
       expect(cooled).not_to be_empty
       expect(cooled.first["source"]).to eq("CooldownPeriod")
+    ensure
+      Trading::ProtectionLock.clear!
+    end
+
+    # A PARTIAL reduce realizes P&L too, so it takes the same funnel: the
+    # position stays OPEN with fewer contracts, and the protections layer still
+    # sees the exit.
+    it "reduces a tracked position and records a cooldown on a partial close" do
+      create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN", size: 3.0)
+      allow(positions_service).to receive(:close_position).and_return({"success" => true})
+
+      post :close, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
+
+      remaining = Position.open.find_by(product_id: "BIP-20DEC30-CDE")
+      expect(remaining.size).to eq(2.0)
+      expect(Position.closed.by_product("BIP-20DEC30-CDE").sum(:size)).to eq(1.0)
+
+      cooled = Trading::ProtectionLock.active.select { |l| l["symbol"] == "BIP-20DEC30-CDE" }
+      expect(cooled).not_to be_empty
+    ensure
+      Trading::ProtectionLock.clear!
     end
 
     it "handles service errors gracefully" do

@@ -273,6 +273,58 @@ class Position < ApplicationRecord
     Rails.logger.info("Position #{id} force closed: #{reason} at #{close_price} pnl=#{resolved_pnl}")
   end
 
+  # Realize P&L on PART of an open position.
+  #
+  # The closed contracts become their own CLOSED row (same product, side, entry
+  # price and entry time; `paper` copied so it lands in the same book) and this
+  # row stays OPEN with its size reduced by that many contracts. Splitting is
+  # what makes a partial reduce visible to everything that reads realized P&L —
+  # Trading::LossLimits sums `pnl` over CLOSED rows, and StoplossGuard counts
+  # losing CLOSED rows — neither of which can see P&L parked on an OPEN row.
+  #
+  # Realized P&L goes through Trading::FuturesUnrealizedPnl with the product's
+  # contract_size, so a partial on a 10x contract like NOL is not understated
+  # 10x. See #234.
+  #
+  # Returns the CLOSED portion, or nil when the request is not a partial of an
+  # open position (caller should full-close instead).
+  def close_partial!(closed_size, close_price, reason = "Partial close", close_time = Time.current)
+    return nil unless open? && entry_price && close_price
+    closed = BigDecimal(closed_size.to_s)
+    return nil unless closed.positive? && closed < size
+
+    realized = Trading::FuturesUnrealizedPnl.calculate(
+      side: side,
+      entry_price: entry_price,
+      current_price: close_price,
+      contracts: closed,
+      contract_size: Trading::ContractSizeResolver.for_product(product_id)
+    )
+
+    portion = nil
+    transaction do
+      portion = Position.create!(
+        product_id: product_id,
+        side: side,
+        size: closed,
+        entry_price: entry_price,
+        entry_time: entry_time,
+        status: "CLOSED",
+        close_time: close_time,
+        pnl: realized,
+        paper: paper,
+        day_trading: day_trading,
+        take_profit: take_profit,
+        stop_loss: stop_loss
+      )
+      update!(size: size - closed)
+    end
+
+    Rails.logger.info("Position #{id} partially closed: #{closed} of #{closed + size} #{product_id} " \
+                      "(#{reason}) at #{close_price} pnl=#{realized}; remaining #{size}")
+    portion
+  end
+
   # Class methods
   def self.open_day_trading_positions
     day_trading.open.opened_today

@@ -134,22 +134,23 @@ class PositionsController < ActionController::Base
     @positions_service ||= Trading::CoinbasePositions.new
   end
 
-  # A FULL close is an exit and must feed the protections layer — cooldown,
-  # stoploss guard, daily loss caps (ADR 0003). Trading::PositionLifecycle is
-  # the only writer of those, so a close that goes straight to the executor
-  # never counts against the caps that exist to stop the next loss.
+  # Any close — full or partial — is an exit and must feed the protections
+  # layer: cooldown, stoploss guard, daily loss caps (ADR 0003).
+  # Trading::PositionLifecycle is the only writer of those, so a close that goes
+  # straight to the executor never counts against the caps that exist to stop
+  # the next loss.
   #
-  # PositionLifecycle closes whole positions only, so a PARTIAL reduce (an
-  # explicit size smaller than the tracked position) still takes the direct
-  # path. That is a known gap: partial reduces realize P&L without reaching the
-  # loss caps.
+  # A PARTIAL reduce goes through the same call with an explicit size: the
+  # lifecycle realizes P&L on the closed contracts and leaves the position OPEN
+  # with the remainder. It used to take the direct path, which let an operator
+  # bleed past the caps one reduce at a time.
   def submit_close(product_id, size_to_close)
     position = tracked_open_position(product_id)
 
-    if position && full_close?(position, size_to_close)
+    if position
       outcome = Trading::PositionLifecycle
         .new(positions_service: positions_service, logger: Rails.logger)
-        .close(position, reason: "web_operator_close")
+        .close(position, reason: "web_operator_close", size: size_to_close)
 
       return redirect_to positions_path(notice: "Closed #{product_id} at #{outcome.close_price}") if outcome.success?
 
@@ -169,10 +170,6 @@ class PositionsController < ActionController::Base
   def tracked_open_position(product_id)
     scope = Position.open.where(product_id: product_id)
     (scope.count == 1) ? scope.first : nil
-  end
-
-  def full_close?(position, size_to_close)
-    size_to_close.blank? || size_to_close.to_f >= position.size.to_f
   end
 
   # Open paper positions mapped to the same hash shape the view/live path uses.
