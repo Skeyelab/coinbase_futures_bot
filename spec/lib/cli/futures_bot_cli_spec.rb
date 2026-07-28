@@ -172,15 +172,15 @@ RSpec.describe FuturesBotCli, type: :model do
       create_list(:position, 2)
       create_list(:position, 1, :swing_trading)
       create_list(:signal_alert, 3)
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
     end
 
     it "prints a status summary without raising" do
       expect { run_cli("status") }.to output(/FuturesBot Status/).to_stdout
     end
 
-    it "shows day-trading and swing position counts" do
-      expect { run_cli("status") }.to output(/Day-trading positions/).to_stdout
-      expect { run_cli("status") }.to output(/Swing positions/).to_stdout
+    it "shows open position count with the Open positions label" do
+      expect { run_cli("status") }.to output(/Open positions/).to_stdout
     end
 
     it "shows active signal count" do
@@ -201,6 +201,40 @@ RSpec.describe FuturesBotCli, type: :model do
 
     it "shows operational status" do
       expect { run_cli("status") }.to output(/operational/).to_stdout
+    end
+
+    it "shows per-position rows with ID, side, entry, and held time" do
+      pos = create(:position, product_id: "BIT-27JUN25-CDE", side: "LONG",
+        entry_price: 107_240.0, size: 1, day_trading: true)
+      allow(RecentMarketPrice).to receive(:for_product).with("BIT-27JUN25-CDE").and_return(nil)
+
+      expect { run_cli("status") }.to output(/#{pos.id}/).to_stdout
+      expect { run_cli("status") }.to output(/BIT-27JUN25-CDE/).to_stdout
+      expect { run_cli("status") }.to output(/LONG/).to_stdout
+    end
+
+    it "shows aggregate unrealized PnL when market prices are available" do
+      create(:position, product_id: "BIT-27JUN25-CDE", side: "LONG",
+        entry_price: 100_000.0, size: 1, day_trading: true)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
+      allow(RecentMarketPrice).to receive(:for_product).with("BIT-27JUN25-CDE").and_return(100_200.0)
+
+      expect { run_cli("status") }.to output(/unrealized/).to_stdout
+    end
+
+    it "marks paper positions with the 🧪 emoji" do
+      create(:position, product_id: "ET-27JUN25-CDE", paper: true)
+      allow(RecentMarketPrice).to receive(:for_product).with("ET-27JUN25-CDE").and_return(nil)
+
+      expect { run_cli("status") }.to output(/🧪/).to_stdout
+    end
+
+    it "shows a truncation hint when more than STATUS_POSITION_CAP positions are open" do
+      cap = OperatorSnapshot::STATUS_POSITION_CAP
+      create_list(:position, cap + 1, day_trading: true)
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
+
+      expect { run_cli("status") }.to output(/and \d+ more — run/).to_stdout
     end
 
     context "dry-run mode" do

@@ -14,6 +14,7 @@ RSpec.describe OperatorSnapshot do
       create(:signal_alert)
       DryRun.enable!
       TradingHalt.halt!(reason: "CPI print")
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
 
       result = snapshot.status
 
@@ -22,6 +23,45 @@ RSpec.describe OperatorSnapshot do
       expect(result[:dry_run]).to eq({active: true})
       expect(result[:positions]).to include(day: 1, swing: 1, open_total: 2)
       expect(result[:signals]).to eq({active: 1})
+    end
+
+    it "includes inline position rows and aggregate unrealized PnL in the positions key" do
+      create(:position, product_id: "BIT-27JUN25-CDE", side: "LONG", entry_price: 100_000.0, size: 1, day_trading: true)
+      create(:position, product_id: "ET-27JUN25-CDE", side: "SHORT", entry_price: 2500.0, size: 2, day_trading: false)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with("BIT-27JUN25-CDE").and_return(1)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with("ET-27JUN25-CDE").and_return(10)
+      allow(RecentMarketPrice).to receive(:for_product).with("BIT-27JUN25-CDE").and_return(100_100.0)
+      allow(RecentMarketPrice).to receive(:for_product).with("ET-27JUN25-CDE").and_return(2490.0)
+
+      pos = snapshot.status[:positions]
+
+      # Backward-compat keys still present
+      expect(pos).to include(day: 1, swing: 1, open_total: 2)
+      # Inline rows present
+      expect(pos[:rows].size).to eq(2)
+      expect(pos[:rows].first).to include(:id, :product_id, :side, :entry_price, :unrealized_pnl)
+      # Aggregate unrealized PnL is the sum across all positions
+      # BIT LONG: (100_100 - 100_000) * 1 * 1 = +100.0
+      # ET SHORT: (2500 - 2490) * 2 * 10 = +200.0
+      expect(pos[:unrealized_total]).to eq(300.0)
+    end
+
+    it "caps inline rows at STATUS_POSITION_CAP and still sums PnL for all positions" do
+      cap = OperatorSnapshot::STATUS_POSITION_CAP
+      (cap + 2).times { create(:position, day_trading: true) }
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
+
+      pos = snapshot.status[:positions]
+
+      expect(pos[:open_total]).to eq(cap + 2)
+      expect(pos[:rows].size).to eq(cap)
+    end
+
+    it "sets unrealized_total to nil when no market prices are available" do
+      create(:position)
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
+
+      expect(snapshot.status[:positions][:unrealized_total]).to be_nil
     end
 
     it "reports the realtime loop heartbeat with staleness relative to now" do
@@ -53,6 +93,7 @@ RSpec.describe OperatorSnapshot do
     end
 
     it "serializes cleanly to JSON with no ANSI escape codes" do
+      allow(RecentMarketPrice).to receive(:for_product).and_return(nil)
       json = JSON.generate(snapshot.status)
 
       expect { JSON.parse(json) }.not_to raise_error

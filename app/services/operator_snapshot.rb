@@ -10,6 +10,11 @@ class OperatorSnapshot
     @now = now
   end
 
+  # Maximum number of position rows included inline in the status snapshot.
+  # All open positions are still counted and their PnL is summed; only the
+  # display list is capped so `status` stays readable when many are open.
+  STATUS_POSITION_CAP = 5
+
   def status
     {
       as_of: iso(@now),
@@ -21,11 +26,7 @@ class OperatorSnapshot
       # Issue #437: exposure has to be visible, not just capped — an operator
       # needs to see how much room is left before entries start being refused.
       notional_cap: Trading::NotionalCap.status,
-      positions: {
-        day: Position.open.day_trading.count,
-        swing: Position.open.swing_trading.count,
-        open_total: Position.open.count
-      },
+      positions: positions_status_info,
       signals: {active: SignalAlert.active.count},
       loop: Heartbeat.status("realtime_signal", now: @now),
       market_data: Heartbeat.status("market_data", now: @now),
@@ -138,6 +139,22 @@ class OperatorSnapshot
         score: event.score&.to_f
       }
     end
+  end
+
+  # Builds the positions sub-hash for #status: backward-compatible count keys
+  # (day/swing/open_total) plus inline rows (capped at STATUS_POSITION_CAP) and
+  # the aggregate unrealized PnL across *all* open positions so the operator can
+  # answer "am I winning or losing?" from `status` alone.
+  def positions_status_info
+    all_rows = Position.open.order(entry_time: :desc).map { |p| position_row(p) }
+    pnl_values = all_rows.filter_map { |r| r[:unrealized_pnl] }
+    {
+      day: all_rows.count { |r| r[:day_trading] },
+      swing: all_rows.count { |r| !r[:day_trading] },
+      open_total: all_rows.size,
+      unrealized_total: pnl_values.empty? ? nil : pnl_values.sum.round(2),
+      rows: all_rows.first(STATUS_POSITION_CAP)
+    }
   end
 
   def position_row(position)

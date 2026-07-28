@@ -44,20 +44,15 @@ module Cli
     desc "status", "Show the current bot and system status"
     method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
     def status
-      return emit_json(OperatorSnapshot.new.status) if json_mode?
-
-      day_pos = Position.open.day_trading.count
-      swing_pos = Position.open.swing_trading.count
-      signals = SignalAlert.active.count
-      sessions = ChatSession.active.count
+      snap = OperatorSnapshot.new.status
+      return emit_json(snap) if json_mode?
 
       puts "#{BOLD}#{CYAN}📊  FuturesBot Status#{RESET}"
       puts "─" * 40
       puts "  #{YELLOW}#{BOLD}🧪 DRY-RUN — simulated orders, nothing sent to Coinbase#{RESET}" if DryRun.active?
-      puts "  #{WHITE}Day-trading positions:  #{RESET}#{colorize_count(day_pos)}"
-      puts "  #{WHITE}Swing positions:        #{RESET}#{colorize_count(swing_pos)}"
-      puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(signals)}"
-      puts "  #{WHITE}Chat sessions:          #{RESET}#{sessions}"
+      print_status_positions_section(snap[:positions])
+      puts "  #{WHITE}Active signals:         #{RESET}#{colorize_count(SignalAlert.active.count)}"
+      puts "  #{WHITE}Chat sessions:          #{RESET}#{ChatSession.active.count}"
       puts "  #{WHITE}Realtime loop:          #{RESET}#{format_liveness("realtime_signal")}"
       puts "  #{WHITE}Market data:            #{RESET}#{format_liveness("market_data")}"
       puts "─" * 40
@@ -736,6 +731,70 @@ module Cli
     def format_positions_header
       "  #{BOLD}%-6s  %-20s  %-6s  %-12s  %-8s  %-12s  %-8s#{RESET}" %
         %w[ID Product Side Entry Size PnL Type]
+    end
+
+    # Compact header for the inline position list shown inside `status`.
+    # Omits Size and Type (both available in `positions`) to keep the glance
+    # surface readable; adds Held so the operator can see how long exposure
+    # has been open without a second command.
+    def format_status_positions_header
+      "    #{BOLD}%-6s  %-20s  %-6s  %-10s  %-10s  %-8s#{RESET}" %
+        %w[ID Product Side Entry PnL Held]
+    end
+
+    # Compact row for the inline position list inside `status`.
+    # Mirrors format_position_row but narrower: no Size or Type columns.
+    def format_status_position_row(row)
+      side_color = (row[:side].to_s.upcase == "LONG") ? GREEN : RED
+      product = row[:paper] ? "🧪#{row[:product_id]}" : row[:product_id].to_s
+      pnl = row[:unrealized_pnl]
+      pnl_text = pnl ? "%+.2f" % pnl : "—"
+      pnl_color = if pnl.nil?
+        RESET
+      else
+        (pnl >= 0) ? GREEN : RED
+      end
+
+      "    %-6s  %-20s  #{side_color}%-6s#{RESET}  %-10s  #{pnl_color}%-10s#{RESET}  %s" % [
+        row[:id],
+        product.truncate(20),
+        row[:side],
+        row[:entry_price]&.round(2) || "N/A",
+        pnl_text,
+        format_holding_time(row[:holding_seconds])
+      ]
+    end
+
+    # Converts a holding duration in seconds to a human-readable string used in
+    # the inline status position rows (e.g. "1h 12m", "22m", "45s").
+    def format_holding_time(seconds)
+      return "—" if seconds.nil?
+      return "#{seconds}s" if seconds < 60
+
+      minutes = seconds / 60
+      return "#{minutes}m" if minutes < 60
+
+      hours = minutes / 60
+      mins = minutes % 60
+      mins.zero? ? "#{hours}h" : "#{hours}h #{mins}m"
+    end
+
+    # Prints the open-positions block inside `status`: aggregate count with
+    # unrealized PnL, then per-position rows (capped at STATUS_POSITION_CAP),
+    # and a truncation hint when more positions exist.
+    def print_status_positions_section(pos)
+      total = pos[:open_total]
+      unrealized = pos[:unrealized_total]
+      pnl_suffix = unrealized ? "  (unrealized: #{format_signed(unrealized)})" : ""
+      puts "  #{WHITE}Open positions:         #{RESET}#{colorize_count(total)}#{pnl_suffix}"
+      return if total.zero?
+
+      puts format_status_positions_header
+      pos[:rows].each { |p| puts format_status_position_row(p) }
+      remaining = total - pos[:rows].size
+      if remaining > 0
+        puts "    … and #{remaining} more — run `futuresbot positions`"
+      end
     end
 
     # Rows come from OperatorSnapshot, the canonical position view (#290) that
