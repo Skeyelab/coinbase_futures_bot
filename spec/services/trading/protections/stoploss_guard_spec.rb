@@ -34,6 +34,37 @@ RSpec.describe Trading::Protections::StoplossGuard, type: :service do
       expect(Trading::Protections.blocked?(symbol: "BTC-PERP", side: "short", now: now, store: store)).to be false
     end
 
+    # The write half of the same normalization problem. The guard counts exit
+    # sides against its own %w[long short], so exits carrying the spelling the
+    # positions table uses (%w[LONG SHORT]) counted zero and no lock was ever
+    # written — a halt that never happened at all, which is worse than one that
+    # is written and not read. Live callers survive only by remembering to
+    # downcase on the way in (PositionLifecycle does); the guard should not
+    # depend on every caller remembering.
+    it "counts exits however the caller spells the side" do
+      exits = [exit_at(side: "SHORT", mins_ago: 5), exit_at(side: "SELL", mins_ago: 10),
+        exit_at(side: :short, mins_ago: 20)]
+
+      guard.evaluate(symbol: "BTC-PERP", exits: exits, now: now, store: store)
+
+      expect(Trading::Protections.blocked?(symbol: "BTC-PERP", side: "SHORT", now: now, store: store)).to be true
+      expect(Trading::Protections.blocked?(symbol: "BTC-PERP", side: "LONG", now: now, store: store)).to be false
+    end
+
+    # An exit whose side cannot be read is not evidence of a losing LONG or a
+    # losing SHORT, so it must not be counted toward either. Counting it as
+    # both would fabricate a halt; counting it as "short" (the shape a
+    # `!long?` test produces) would halt a direction that never lost.
+    it "does not count an exit whose side cannot be parsed toward either side" do
+      exits = [exit_at(side: "long", mins_ago: 5), exit_at(side: "long", mins_ago: 10),
+        exit_at(side: "sideways", mins_ago: 15), exit_at(side: nil, mins_ago: 20)]
+
+      guard.evaluate(symbol: "BTC-PERP", exits: exits, now: now, store: store)
+
+      expect(Trading::Protections.blocked?(symbol: "BTC-PERP", side: "long", now: now, store: store)).to be false
+      expect(Trading::Protections.blocked?(symbol: "BTC-PERP", side: "short", now: now, store: store)).to be false
+    end
+
     it "does not lock below the threshold" do
       exits = [exit_at(side: "long", mins_ago: 5), exit_at(side: "long", mins_ago: 10)]
       guard.evaluate(symbol: "BTC-PERP", exits: exits, now: now, store: store)
