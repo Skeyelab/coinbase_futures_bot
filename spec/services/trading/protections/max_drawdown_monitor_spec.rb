@@ -37,6 +37,28 @@ RSpec.describe Trading::Protections::MaxDrawdownMonitor, type: :service do
     expect(Trading::Protections.blocked?(symbol: "OTHER", side: "short")).to be true
   end
 
+  # The live monitor runs every ~30s. Before this, a single stuck breach sent a
+  # Slack warning on every cycle — ten identical alerts in five minutes,
+  # observed 2026-07-28 after an equity reset invalidated the peak watermark.
+  # A halt is a state; the alert belongs to the transition into it.
+  it "alerts once for an ongoing breach, not once per evaluation cycle" do
+    described_class.evaluate(current_equity: 10_000.0) # establish the peak
+    described_class.evaluate(current_equity: 8_000.0)  # breach -> halt + alert
+    described_class.evaluate(current_equity: 7_900.0)  # still breaching
+    described_class.evaluate(current_equity: 7_800.0)  # still breaching
+
+    expect(SlackNotificationService).to have_received(:alert)
+      .with("warning", "MaxDrawdown halt", anything).once
+  end
+
+  it "keeps trading halted across those quiet cycles" do
+    described_class.evaluate(current_equity: 10_000.0)
+    described_class.evaluate(current_equity: 8_000.0)
+    described_class.evaluate(current_equity: 7_900.0)
+
+    expect(Trading::Protections.blocked?(symbol: "ANY", side: "long")).to be true
+  end
+
   it "is inert when disabled" do
     Rails.application.config.real_time_signals =
       Rails.application.config.real_time_signals.merge(
