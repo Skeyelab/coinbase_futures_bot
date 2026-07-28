@@ -270,19 +270,23 @@ RSpec.describe Trading::ExecutionCalibration::Runner do
   # ── Safety: aborts stop the run ─────────────────────────────────────────────
 
   describe "aborting" do
+    # Was driven by a ~60 bps commission asserting a :taker_rate breach. That
+    # condition is a claim about the VENUE, and this runs in dry-run, where the
+    # fills are the simulator's own output — asserting it here encoded the #535
+    # defect as the contract. Slippage exercises the same short-circuit without
+    # claiming to have measured Coinbase.
     it "stops placing orders the moment an abort condition trips" do
       calls = 0
       allow(positions_service).to receive(:open_position) do
         calls += 1
-        # A ~60 bps commission on the first fill falsifies ADR 0002.
-        order_ok(fee: 4.0)
+        order_ok(price: 66_900.0) # ~152 bps from the 65,900 reference
       end
-      allow(lifecycle).to receive(:close) { |position, **kw| close_ok(exit_fee: 4.0).call(position, **kw) }
+      allow(lifecycle).to receive(:close) { |position, **kw| close_ok.call(position, **kw) }
 
       report = runner(round_trips: 20).call
 
       expect(report.status).to eq(:aborted)
-      expect(report.breach.condition).to eq(:taker_rate)
+      expect(report.breach.condition).to eq(:slippage)
       expect(calls).to eq(1)
       expect(TradingHalt.risk_halted?).to be(true)
     end
