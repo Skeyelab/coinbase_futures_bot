@@ -153,10 +153,15 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     before do
       allow(handler).to receive(:trigger_position_close)
       allow(SlackNotificationService).to receive(:alert)
+      # Leverage now comes from the contract's real intraday margin rate rather
+      # than an assumed 10x. 0.1 == 10x, which keeps the arithmetic below the
+      # same as when the constant supplied it.
+      create(:contract, product_id: "BIT-29AUG25-CDE",
+        intraday_margin_rate_long: 0.1, intraday_margin_rate_short: 0.1)
     end
 
-    # Default config: buffer 0.05, assumed leverage 10 -> long entry 100 buffered
-    # exit at 90.975.
+    # buffer 0.05, contract margin 0.1 (10x) -> long entry 100 buffered exit at
+    # 90.975.
     it "closes a long that has fallen to the buffered pre-liquidation price and alerts" do
       position = create(:position, side: "LONG", entry_price: 100.0)
 
@@ -170,6 +175,18 @@ RSpec.describe RealtimeMonitoring::TickHandler do
 
       expect(handler).not_to receive(:trigger_position_close)
       expect(handler.send(:check_liquidation_buffer_exit, position, 98.0)).to be false
+    end
+
+    # The whole point of the fail-closed change: without stored margin the buffer
+    # must not fire on an assumed leverage it has no basis for.
+    it "does not close when the contract has no stored margin rate" do
+      Contract.find_by(product_id: "BIT-29AUG25-CDE").update!(
+        intraday_margin_rate_long: nil, intraday_margin_rate_short: nil
+      )
+      position = create(:position, side: "LONG", entry_price: 100.0)
+
+      expect(handler).not_to receive(:trigger_position_close)
+      expect(handler.send(:check_liquidation_buffer_exit, position, 90.9)).to be false
     end
 
     it "is inert when the buffer is disabled" do
