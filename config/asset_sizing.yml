@@ -57,3 +57,19 @@ contracts:
     contract_size_usd: 4082.0
     max_contracts: 1
     max_concurrent: 1
+  XPP:
+    # XRP perp, ADR 0002's designated second seat. Measured from the products
+    # API 2026-07-28: contract_size 500 x $1.0635 = $531.75/contract.
+    #
+    # Base currency XRP has no `assets` entry, so this fell to `default` — a
+    # $100 fallback, understating an XPP contract 5.3x. That is the DANGEROUS
+    # direction: an understated contract_size_usd makes the sizer believe a
+    # position is smaller than it is, so the notional cap binds later than it
+    # should. Left unmeasured it was a latent oversizing, not a safe unknown.
+    #
+    # Pinned 1/1 like the other perps: XPP has never traded and has no walk-
+    # forward verdict, so it does not get a larger allowance than BIP, which is
+    # the instrument ADR 0002 actually designated as home.
+    contract_size_usd: 531.75
+    max_contracts: 1
+    max_concurrent: 1
