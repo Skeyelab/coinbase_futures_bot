@@ -355,26 +355,44 @@ class HealthCheckJob < ApplicationJob
 
   private
 
+  # Notional for a set of positions, contract_size-aware.
+  #
+  # Every caller below used to inline `pos.size * pos.entry_price`, which drops
+  # contract_size — the same bug position.rb:170-181 documents as fixed for PnL
+  # under #234 and which was never applied here. On NOL (contract_size 10) it
+  # understated exposure, margin, and leverage ~10x.
+  def total_notional_for(positions)
+    positions.sum { |pos| Trading::NotionalCap.notional_for(pos.product_id, pos.size, pos.entry_price) }
+  end
+
+  # Real account equity, not a placeholder. Trading::CurrentEquity is what
+  # NotionalCap already caps against: paper equity in dry-run, the live CFM
+  # balance otherwise, degrading to the sizing figure rather than raising. This
+  # was hardcoded to 100_000.0 with a "should come from Coinbase balance" TODO,
+  # so every exposure percentage on the dashboard was fiction — and wrong in the
+  # same direction as the missing contract_size, compounding it.
+  # Memoized for the life of the job: outside dry-run this reads the live CFM
+  # balance over the network, and a single health check asks for exposure,
+  # margin, and leverage across both trading types. One read per run, not six.
+  def portfolio_equity_usd
+    @portfolio_equity_usd ||= Trading::CurrentEquity.usd.to_f
+  end
+
+  def exposure_percent(positions)
+    return 0.0 if positions.empty?
+
+    equity = portfolio_equity_usd
+    return 0.0 unless equity.positive?
+
+    (total_notional_for(positions) / equity * 100).to_f
+  end
+
   def calculate_day_trading_exposure
-    day_positions = Position.open.day_trading
-    return 0.0 if day_positions.empty?
-
-    total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
-    # Assume total portfolio value for now - this should be replaced with actual account balance
-    total_portfolio_value = 100_000.0 # This should come from Coinbase balance
-
-    (total_notional / total_portfolio_value * 100).to_f
+    exposure_percent(Position.open.day_trading)
   end
 
   def calculate_swing_trading_exposure
-    swing_positions = Position.open.swing_trading
-    return 0.0 if swing_positions.empty?
-
-    total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
-    # Assume total portfolio value for now - this should be replaced with actual account balance
-    total_portfolio_value = 100_000.0 # This should come from Coinbase balance
-
-    (total_notional / total_portfolio_value * 100).to_f
+    exposure_percent(Position.open.swing_trading)
   end
 
   def calculate_day_trading_margin(balance)
@@ -384,8 +402,7 @@ class HealthCheckJob < ApplicationJob
 
     # This is a simplified calculation - in reality this would need to be calculated
     # based on the specific margin requirements for each position
-    total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
-    total_notional * 0.1 # Assume 10% margin requirement for day trading
+    total_notional_for(day_positions) * 0.1 # Assume 10% margin requirement for day trading
   end
 
   def calculate_swing_trading_margin(balance)
@@ -394,13 +411,11 @@ class HealthCheckJob < ApplicationJob
     return 0.0 if swing_positions.empty?
 
     # Use overnight margin requirements for swing positions
-    total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
-    total_notional * 0.2 # Assume 20% margin requirement for swing trading (overnight)
+    total_notional_for(swing_positions) * 0.2 # Assume 20% margin requirement for swing trading (overnight)
   end
 
   def calculate_day_trading_leverage(balance)
-    day_positions = Position.open.day_trading
-    total_notional = day_positions.sum { |pos| pos.size * pos.entry_price }
+    total_notional = total_notional_for(Position.open.day_trading)
     margin_used = calculate_day_trading_margin(balance)
 
     return 0.0 if margin_used.zero?
@@ -408,8 +423,7 @@ class HealthCheckJob < ApplicationJob
   end
 
   def calculate_swing_trading_leverage(balance)
-    swing_positions = Position.open.swing_trading
-    total_notional = swing_positions.sum { |pos| pos.size * pos.entry_price }
+    total_notional = total_notional_for(Position.open.swing_trading)
     margin_used = calculate_swing_trading_margin(balance)
 
     return 0.0 if margin_used.zero?

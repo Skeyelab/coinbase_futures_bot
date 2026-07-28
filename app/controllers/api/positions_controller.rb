@@ -168,14 +168,20 @@ class Api::PositionsController < ApplicationController
     }
   end
 
+  # contract_size-aware notional over REAL equity. This inlined
+  # `pos.size * pos.entry_price` (dropping contract_size, the #234 bug) and
+  # divided by a hardcoded 100_000.0, so on NOL it reported ~200x too small.
   def calculate_exposure(positions)
     return 0.0 if positions.empty?
 
-    total_notional = positions.sum { |pos| pos.size * pos.entry_price }
-    # This should be replaced with actual account balance from Coinbase
-    total_portfolio_value = 100_000.0
+    equity = Trading::CurrentEquity.usd.to_f
+    return 0.0 unless equity.positive?
 
-    (total_notional / total_portfolio_value * 100).to_f
+    total_notional = positions.sum do |pos|
+      Trading::NotionalCap.notional_for(pos.product_id, pos.size, pos.entry_price)
+    end
+
+    (total_notional / equity * 100).to_f
   end
 
   def calculate_average_duration(positions)

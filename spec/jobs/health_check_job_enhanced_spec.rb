@@ -218,6 +218,12 @@ RSpec.describe HealthCheckJob, type: :job do
         max_day_trading_exposure: 0.3,
         max_swing_trading_exposure: 0.2
       })
+      # Exposure now divides by REAL equity (Trading::CurrentEquity) rather than
+      # a hardcoded 100_000.0, and counts contract_size via NotionalCap. These
+      # examples are about the exposure/warning logic, so pin both instead of
+      # reaching for a live balance and a live product lookup.
+      allow(Trading::CurrentEquity).to receive(:usd).and_return(100_000.0)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
     end
 
     it "calculates exposure correctly" do
