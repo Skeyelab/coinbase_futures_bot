@@ -361,8 +361,18 @@ module Trading
       # instead of 9 bps/$0.85 and understated the cost of the only instrument
       # this bot has actually traded. fee_for also prefers a real measured
       # commission over the seeded constant where one exists.
+      #
+      # The proportional leg is charged on NOTIONAL, not on the quote price.
+      # `fill_price * size` drops contract_size — the #234 bug — and on BIP
+      # (0.01 BTC/contract) that priced a 1-contract fill as if it were a whole
+      # bitcoin: $19.12 instead of $0.19, 100x. The #486 calibration rehearsal
+      # surfaced it as a "measured" 300 bps taker rate against a modeled 3 bps,
+      # which would have read as ADR 0002's venue thesis being falsified when in
+      # fact the simulator was overcharging. Trading::NotionalCap.notional_for is
+      # the contract_size-aware helper every other notional site now uses.
       fees = CostModel.fee_for(product_id)
-      fee = [fill_price.to_f * size.to_f * fees[:taker_rate].to_f,
+      notional = Trading::NotionalCap.notional_for(product_id, size, fill_price)
+      fee = [notional * fees[:taker_rate].to_f,
         size.to_f * fees[:per_contract_fee].to_f].max.round(6)
       order_id = PaperTrading::ExchangeSimulator.new.place_limit(
         symbol: product_id,
