@@ -115,12 +115,24 @@ set +e
 status=("${PIPESTATUS[@]}")
 set -e
 
-if [[ "${status[0]}" -ne 0 ]]; then
-  log "FATAL: pg_dump exited ${status[0]} -- backup is incomplete, not retrying"
+# restic is checked FIRST. pg_dump writes into restic, so when restic dies --
+# an unreachable destination is the common case -- pg_dump gets SIGPIPE and
+# exits 141 as a CONSEQUENCE. Checking pg_dump first reported
+# "pg_dump exited 141 -- backup is incomplete" for what was actually
+# `ssh: connect to host hermes port 22: Connection timed out`, sending triage
+# at the database instead of the network (issue #519). A pg_dump failure with a
+# healthy restic is still reported as pg_dump, which is the case that means the
+# dump itself is broken.
+if [[ "${status[1]}" -ne 0 ]]; then
+  if [[ "${status[0]}" -eq 141 ]]; then
+    log "FATAL: restic exited ${status[1]} (destination ${RESTIC_REPOSITORY}) -- pg_dump's 141 is SIGPIPE from restic closing the stream, not a dump fault"
+  else
+    log "FATAL: restic exited ${status[1]} (destination ${RESTIC_REPOSITORY})"
+  fi
   exit 1
 fi
-if [[ "${status[1]}" -ne 0 ]]; then
-  log "FATAL: restic exited ${status[1]}"
+if [[ "${status[0]}" -ne 0 ]]; then
+  log "FATAL: pg_dump exited ${status[0]} -- backup is incomplete, not retrying"
   exit 1
 fi
 
@@ -152,7 +164,39 @@ if [[ "$MODE" == "full" ]]; then
   #
   # NOTE: nothing watches THIS run in turn. Closing that loop needs an external
   # dead-man's switch -- see README, "Known gap".
-  newest_tier1="$(restic snapshots --tag tier1 --latest 1 --json 2>/dev/null | grep -o '"time":"[^"]*"' | head -1 | cut -d'"' -f4)"
+  # Read restic's output into a variable BEFORE parsing it. The previous shape
+  # piped through `head -1`, which exits after the first line and closes the
+  # pipe under `grep`; grep then dies of SIGPIPE (141), `pipefail` promotes that
+  # to the pipeline's status, and `set -e` aborts the script -- skipping the
+  # very freshness check this block exists for (issue #466). It aborted AFTER a
+  # complete, verified backup, so the unit reported failure on healthy runs and
+  # the watchdog never once executed. `jq` consumes its input fully and cannot
+  # short-circuit; it is already a dependency of cfb-backup-alert.sh.
+  #
+  # The restic call is checked separately from the parse because an unreachable
+  # repository and an empty repository are different faults with different
+  # fixes, and the old shape reported both as "no tier1 snapshot exists".
+  if ! snapshots_json="$(restic snapshots --tag tier1 --json 2>&1)"; then
+    log "FATAL: could not list tier1 snapshots -- ${snapshots_json}"
+    exit 1
+  fi
+  # `--latest 1` is NOT used, and taking element [0] would be wrong. restic's
+  # --latest is applied PER GROUP, and the default grouping is host+paths --
+  # but every snapshot here has a unique path (the timestamped dump filename),
+  # so each snapshot forms its own group and --latest 1 returns ALL of them,
+  # oldest first. Verified on the hermes repo: 139 snapshots in, 139 out, [0]
+  # six days stale while the hourly timer was healthy. `--group-by ''` does not
+  # change this on restic 0.18.1. So the SIGPIPE in #466 was hiding a second
+  # bug: fixing only the pipeline would have turned "the check never runs" into
+  # "the check cries wolf every night".
+  #
+  # Sorting the timestamps as strings is correct while they share a UTC offset.
+  # Across a DST change the retained window can mix -04:00 and -05:00, where a
+  # string sort can mis-order two snapshots inside the one ambiguous hour. That
+  # is harmless here: both candidates are from that same hour, so the age it
+  # yields moves by under an hour against a 3h threshold and cannot invent a
+  # stale reading.
+  newest_tier1="$(jq -r '[.[].time] | sort | last // empty' <<<"$snapshots_json")"
   if [[ -z "$newest_tier1" ]]; then
     log "FATAL: no tier1 snapshot exists in this repo at all"
     exit 1

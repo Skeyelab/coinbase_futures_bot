@@ -45,12 +45,38 @@ payload=$(cat <<JSON
 JSON
 )
 
-curl -sf --max-time 15 \
-  -X POST "https://${host}/api/${project}/store/" \
-  -H "Content-Type: application/json" \
-  -H "X-Sentry-Auth: Sentry sentry_version=7, sentry_key=${key}, sentry_client=cfb-backup/1.0" \
-  -d "$payload" >/dev/null \
-  && echo "[cfb-backup-alert] reported to Sentry" \
-  || echo "[cfb-backup-alert] Sentry report FAILED -- check the journal directly" >&2
+# Retried, because the conditions that trigger this alert overlap heavily with
+# the conditions that break it. On 2026-07-28 a ~5 minute network outage failed
+# the hourly backup AND this notification -- one 15s attempt, then silence, with
+# systemd still reporting the alert unit successful (issue #519). The outage was
+# transient; the next backup succeeded 57 minutes later.
+#
+# Still exits 0 in every case: an alerter that fails its own unit turns one
+# incident into two. The abandonment message is the operator's only signal that
+# a failure went unreported, so it must be unambiguous.
+send_to_sentry() {
+  curl -sf --max-time 15 \
+    -X POST "https://${host}/api/${project}/store/" \
+    -H "Content-Type: application/json" \
+    -H "X-Sentry-Auth: Sentry sentry_version=7, sentry_key=${key}, sentry_client=cfb-backup/1.0" \
+    -d "$payload" >/dev/null
+}
+
+ATTEMPTS="${CFB_ALERT_ATTEMPTS:-4}"
+BACKOFF="${CFB_ALERT_BACKOFF_SECONDS:-10}"
+
+for attempt in $(seq 1 "$ATTEMPTS"); do
+  if send_to_sentry; then
+    echo "[cfb-backup-alert] reported to Sentry (attempt ${attempt}/${ATTEMPTS})"
+    exit 0
+  fi
+  if (( attempt < ATTEMPTS )); then
+    echo "[cfb-backup-alert] Sentry send failed (attempt ${attempt}/${ATTEMPTS}), retrying in ${BACKOFF}s" >&2
+    sleep "$BACKOFF"
+    BACKOFF=$(( BACKOFF * 2 ))
+  fi
+done
+
+echo "[cfb-backup-alert] GAVE UP after ${ATTEMPTS} attempts -- ${UNIT} failed and was NOT reported to Sentry; check the journal directly" >&2
 
 exit 0

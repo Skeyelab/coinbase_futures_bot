@@ -76,6 +76,13 @@ RSpec.describe FetchCandlesJob, type: :job do
     end
 
     it "caps 1m depth (API request budget) but honors more than the old 6-hour limit" do
+      # The cap is a STEADY-STATE figure: it governs keeping an already-deep
+      # contract current. A contract that has never had its one-time deep
+      # backfill gets the deep window instead, which is the #506 fix and is
+      # covered in fetch_candles_job_deep_1m_spec.rb. Stamping the fixture is
+      # what puts this example in the steady state it means to test.
+      btc_pair.update!(deep_1m_backfilled_at: 1.day.ago)
+
       described_class.perform_now(backfill_days: 60)
 
       expect(mock_rest).to have_received(:upsert_1m_candles_chunked).with(
