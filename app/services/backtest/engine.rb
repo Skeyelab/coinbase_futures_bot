@@ -27,6 +27,12 @@ module Backtest
     # so BacktestRun can record what was actually used (issue #406).
     attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd, :per_contract_fee
 
+    # Last-resort funding rate when a product has no observed rows at all. Inert
+    # in practice: CostModel.perp? treats "no funding history" as "not a perp",
+    # so the rate is nulled before use. Kept as the historical value so the
+    # behaviour of an unobserved product is unchanged.
+    DEFAULT_FUNDING_BPS_PER_INTERVAL = 2.0
+
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, per_contract_fee: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
       preload_candles: true,
@@ -66,8 +72,22 @@ module Backtest
       @slippage = slippage.to_f
       # Perp funding (issue #391): a constant *adverse* sensitivity knob, ON by
       # default so backtests stop silently pricing funding as free (ADR 0002).
-      # Default 2 bps/interval, hourly; set funding_bps_per_interval: 0 to disable.
-      funding_bps = (funding_bps_per_interval || ENV["BACKTEST_FUNDING_BPS_PER_INTERVAL"] || 2.0).to_f
+      # Hourly; set funding_bps_per_interval: 0 to disable.
+      #
+      # The default is now DERIVED from this product's observed funding rows
+      # rather than hardcoded at 2.0 bps. 2.0 was 21x BIP's measured 0.0938
+      # bps/hr, and because funding history cannot be reconstructed, that
+      # constant priced ~364 of any 370-day window. Getting it wrong by 21x
+      # penalises long-hold shapes hardest, so it could decide a target-shape
+      # comparison on its own (#485). Making the safe value the DEFAULT means a
+      # caller has to opt into being wrong rather than remember to be right.
+      #
+      # Falls back to the old 2.0 only when a product has no observations at
+      # all — in which case CostModel.perp? also reports "not a perp" and the
+      # rate is discarded below, so the value is inert.
+      observed_bps = Funding::Schedule.observed_fallback_rate(product_id: @symbol)&.*(10_000.0)
+      funding_bps = (funding_bps_per_interval || ENV["BACKTEST_FUNDING_BPS_PER_INTERVAL"] ||
+                     observed_bps || DEFAULT_FUNDING_BPS_PER_INTERVAL).to_f
       @funding_rate_per_interval = (funding_bps > 0) ? funding_bps / 10_000.0 : nil
       @funding_interval_seconds =
         (funding_interval_seconds || ENV["BACKTEST_FUNDING_INTERVAL_SECONDS"] || 3600).to_i
