@@ -277,21 +277,42 @@ class SignalController < ApplicationController
     signals
   end
 
+  # ADR 0005: authorization fails closed. An unset SIGNALS_API_KEY used to make
+  # the entire signals API public, so a deployment that had not configured a key
+  # served the whole signal book to anyone who found the host. A missing secret
+  # now denies. Comparison is constant-time so a wrong key leaks no timing.
   def authenticate_request
-    # Simple API key authentication
     api_key = request.headers["X-API-Key"] || params[:api_key]
-    expected_key = ENV["SIGNALS_API_KEY"]
+    expected_key = ENV["SIGNALS_API_KEY"].to_s
 
-    # Allow request if no API key is configured OR if API key matches
-    return if expected_key.nil? || api_key == expected_key
+    if expected_key.blank?
+      Rails.logger.warn("[SignalController] SIGNALS_API_KEY not configured; denying request")
+      render json: {error: "Signals API key not configured"}, status: :unauthorized and return
+    end
+
+    return if ActiveSupport::SecurityUtils.secure_compare(api_key.to_s, expected_key)
 
     render json: {error: "Unauthorized"}, status: :unauthorized
   end
 
+  # ADR 0005: `Access-Control-Allow-Origin: *` let any page on the internet read
+  # this API from a browser that carried the key. The allowlist defaults to
+  # empty, so no origin is granted unless SIGNALS_ALLOWED_ORIGINS names it
+  # (comma-separated, exact scheme+host+port match).
   def set_cors_headers
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    origin = request.headers["Origin"].to_s
+
+    if origin.present? && allowed_cors_origins.include?(origin)
+      response.headers["Access-Control-Allow-Origin"] = origin
+      response.headers["Vary"] = [response.headers["Vary"], "Origin"].compact_blank.join(", ")
+    end
+
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
+  end
+
+  def allowed_cors_origins
+    ENV["SIGNALS_ALLOWED_ORIGINS"].to_s.split(",").map(&:strip).reject(&:empty?)
   end
 
   # Helper method to safely convert parameters to numbers

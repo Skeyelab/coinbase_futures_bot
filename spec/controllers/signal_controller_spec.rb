@@ -510,7 +510,8 @@ RSpec.describe SignalController, type: :controller do
         )
       end
 
-      it "allows request when no API key is configured" do
+      # ADR 0005: a missing secret denies.
+      it "rejects request when no API key is configured" do
         ENV["SIGNALS_API_KEY"] = nil
 
         allow(controller_instance).to receive(:request).and_return(
@@ -521,7 +522,9 @@ RSpec.describe SignalController, type: :controller do
         )
 
         controller_instance.send(:authenticate_request)
-        expect(controller_instance).not_to have_received(:render)
+        expect(controller_instance).to have_received(:render).with(
+          json: {error: "Signals API key not configured"}, status: :unauthorized
+        )
       end
 
       it "prioritizes header over params" do
@@ -545,12 +548,16 @@ RSpec.describe SignalController, type: :controller do
         allow(controller_instance).to receive(:response).and_return(
           double("response", headers: response_headers)
         )
+        allow(controller_instance).to receive(:request).and_return(
+          double("request", headers: {"Origin" => "https://evil.example"})
+        )
       end
 
-      it "sets CORS headers correctly" do
+      # ADR 0005: no wildcard origin; an unconfigured allowlist grants nobody.
+      it "sets method and header CORS policy but grants no origin by default" do
         controller_instance.send(:set_cors_headers)
 
-        expect(response_headers["Access-Control-Allow-Origin"]).to eq("*")
+        expect(response_headers["Access-Control-Allow-Origin"]).to be_nil
         expect(response_headers["Access-Control-Allow-Methods"]).to eq("GET, POST, PUT, DELETE, OPTIONS")
         expect(response_headers["Access-Control-Allow-Headers"]).to eq("Content-Type, X-API-Key")
       end

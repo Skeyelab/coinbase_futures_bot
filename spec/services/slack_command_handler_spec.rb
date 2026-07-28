@@ -17,7 +17,7 @@ RSpec.describe SlackCommandHandler, type: :service do
   describe ".authorized_users" do
     context "when SLACK_AUTHORIZED_USERS is set" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return("U123,U456,U789")
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => "U123,U456,U789"))
       end
 
       it "returns array of authorized users" do
@@ -27,7 +27,7 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     context "when SLACK_AUTHORIZED_USERS is not set" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(nil)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => nil))
       end
 
       it "returns empty array" do
@@ -39,7 +39,7 @@ RSpec.describe SlackCommandHandler, type: :service do
   describe ".handle_command" do
     context "when user is authorized" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => authorized_user_id))
       end
 
       context "with /bot-status command" do
@@ -146,7 +146,7 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     context "when user is not authorized" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => authorized_user_id))
       end
 
       it "returns unauthorized response" do
@@ -160,21 +160,28 @@ RSpec.describe SlackCommandHandler, type: :service do
       end
     end
 
+    # ADR 0005: an unset allowlist denies. Previously an empty list authorized
+    # every user_id, so anyone who could reach the webhook could halt or resume
+    # trading.
     context "when no authorized users are configured" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(nil)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => nil))
       end
 
-      it "allows all users" do
-        expect(described_class).to receive(:handle_status_command)
+      it "denies every user (fails closed)" do
+        expect(described_class).not_to receive(:handle_status_command)
         described_class.handle_command(params.merge(user_id: unauthorized_user_id))
+      end
+
+      it "denies the user_id that would otherwise be allowed" do
+        expect(described_class).not_to receive(:handle_status_command)
+        described_class.handle_command(params.merge(user_id: authorized_user_id))
       end
     end
 
     context "when an error occurs during command processing" do
       before do
-        allow(ENV).to receive(:[]).and_call_original
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => authorized_user_id))
         allow(described_class).to receive(:handle_status_command).and_raise(StandardError.new("Command failed"))
       end
 
@@ -194,7 +201,7 @@ RSpec.describe SlackCommandHandler, type: :service do
   describe ".authorized?" do
     context "when authorized users are configured" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return("#{authorized_user_id},U111,U222")
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => "#{authorized_user_id},U111,U222"))
       end
 
       it "returns true for authorized user" do
@@ -208,12 +215,12 @@ RSpec.describe SlackCommandHandler, type: :service do
 
     context "when no authorized users are configured" do
       before do
-        allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(nil)
+        stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => nil))
       end
 
-      it "returns true for any user" do
-        expect(described_class.send(:authorized?, authorized_user_id)).to be true
-        expect(described_class.send(:authorized?, unauthorized_user_id)).to be true
+      it "returns false for any user (ADR 0005: no allowlist means no operator)" do
+        expect(described_class.send(:authorized?, authorized_user_id)).to be false
+        expect(described_class.send(:authorized?, unauthorized_user_id)).to be false
       end
     end
   end
@@ -820,6 +827,10 @@ RSpec.describe SlackCommandHandler, type: :service do
   # from open leveraged positions. Halting is correct and stays; the claim goes.
   describe "/bot-stop truthfulness" do
     before do
+      # Stated, not ambient: dotenv's autorestore drops the keys
+      # spec/support/test_env_setup.rb sets in before(:suite) after the first
+      # example, and authorization now fails closed on an empty allowlist.
+      stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => authorized_user_id))
       allow(SlackNotificationService).to receive(:alert)
       TradingHalt.resume!
       create_list(:position, 2, product_id: "BTC-USD")

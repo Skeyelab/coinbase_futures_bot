@@ -7,8 +7,7 @@ RSpec.describe SlackCommandHandler do
   let(:unauthorized_user_id) { "U99999" }
 
   before do
-    allow(ENV).to receive(:[]).and_call_original
-    allow(ENV).to receive(:[]).with("SLACK_AUTHORIZED_USERS").and_return(authorized_user_id)
+    stub_const("ENV", ENV.to_hash.merge("SLACK_AUTHORIZED_USERS" => authorized_user_id))
   end
 
   describe ".handle_command" do

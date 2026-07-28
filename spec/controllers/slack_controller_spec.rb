@@ -319,9 +319,11 @@ RSpec.describe SlackController, type: :controller do
         stub_const("ENV", ENV.to_hash.merge("SLACK_SIGNING_SECRET" => nil))
       end
 
-      it "returns true (skips verification)" do
+      # ADR 0005: a missing secret denies. An unsigned request must never be
+      # accepted just because the deployment forgot to configure Slack.
+      it "returns false (fails closed)" do
         result = controller.send(:verify_slack_request, request)
-        expect(result).to be true
+        expect(result).to be false
       end
     end
   end
