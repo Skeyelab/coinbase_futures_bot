@@ -5,6 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# See cfb-realtime.service: journald must receive the Rails log, not just `puts`.
+Environment=RAILS_LOG_TO_STDOUT=1
 WorkingDirectory=%h/coinbase_futures_bot
 ExecStart=/bin/bash -lc "cd %h/coinbase_futures_bot && exec bundle exec good_job start"
 Restart=always

@@ -183,7 +183,15 @@ module Trading
         # Surfaced so callers can link the order to what it created (issue #480
         # lineage). Merged rather than returned separately so every existing
         # caller keeps reading the same result hash.
-        result = result.merge("position_id" => position.id) if result.is_a?(Hash) && position.is_a?(Position)
+        if result.is_a?(Hash) && position.is_a?(Position)
+          result = result.merge("position_id" => position.id)
+          # A position with no Order row cannot be audited for slippage or
+          # reconciled after an outage (ADR 0001). It is NOT a reason to fail the
+          # open — the venue order is already placed — but the caller must be
+          # able to see the gap rather than read a bare success. Silence here is
+          # what cost six days of order history.
+          result = result.merge("order_record_missing" => true) unless position.orders.exists?
+        end
       end
 
       result
@@ -666,7 +674,28 @@ module Trading
       # skipping the thing it was guarding, rather than failing loudly.
       position
     rescue => e
-      @logger.error("Failed to create local position record: #{e.message}")
+      # Deliberately NOT atomic with the Order write, and deliberately no
+      # rollback of the Position.
+      #
+      # By the time we get here the EXCHANGE ORDER HAS ALREADY BEEN PLACED, and
+      # no database transaction can undo that. Wrapping both writes so they fail
+      # together would, on an Order failure, discard the only local record of
+      # live exposure — a position the bot is in and does not know about. That is
+      # the same trade PositionLifecycle refuses when it will not mark a row
+      # CLOSED after a failed venue close ("faking success created a
+      # 'phantom-flat' position"). A missing Order row is an audit gap; a missing
+      # Position row is untracked money. So: keep the Position, and be loud.
+      @logger.error("Failed to create local position record for #{product_id}: #{e.class}: #{e.message}")
+      begin
+        SlackNotificationService.alert(
+          "critical",
+          "Local position record not written",
+          "An exchange order was placed for #{product_id} (#{side} #{size}) but no local Position " \
+          "row could be created: #{e.class}: #{e.message}. The bot is holding exposure it is not tracking."
+        )
+      rescue => notify_error
+        @logger.error("Failed to alert on missing Position record: #{notify_error.class}: #{notify_error.message}")
+      end
       nil
     end
 
@@ -801,12 +830,18 @@ module Trading
       order_result&.dig("order_id") || order_result&.dig("success_response", "order_id")
     end
 
+    # The single writer of Order rows. Returns the Order, or nil when it could
+    # not be written — and a nil here is never quiet.
+    #
+    # Normalizing `side` HERE rather than at each of the three call sites is the
+    # point: this is the only place Order#side is set, so one boundary keeps
+    # every caller's vocabulary (buy/sell, BUY/SELL, LONG/SHORT) legal.
     def persist_order(position:, contract_id:, side:, order_type:, quantity:, status:,
       target_price: nil, fill_price: nil, placed_at: nil, filled_at: nil, coinbase_order_id: nil)
       Order.create!(
         position: position,
         contract_id: contract_id,
-        side: side.to_s.downcase,
+        side: SideNormalizer.order_action(side) || side.to_s.downcase,
         order_type: order_type,
         quantity: quantity,
         target_price: target_price,
@@ -817,7 +852,39 @@ module Trading
         coinbase_order_id: coinbase_order_id
       )
     rescue => e
-      @logger.error("Failed to persist Order record: #{e.message}")
+      # This rescue used to be the whole story: log, return, carry on. That is
+      # how a duplicate-id bug became a silent outage of the entire orders table
+      # — 17 positions, 1 Order, six days of missing slippage audit and outage
+      # reconciliation (ADR 0001), and NOTHING surfaced it. The rescue stays,
+      # because raising from here would abort a close AFTER the venue already
+      # filled it and strand a phantom-OPEN row; what changes is that the hole
+      # now reaches a human.
+      escalate_order_write_failure(error: e, contract_id: contract_id, position: position,
+        coinbase_order_id: coinbase_order_id)
+      nil
+    end
+
+    # An Order that cannot be written is a hole in the audit trail. Log it, then
+    # page: `Rails.logger.error` alone is not an operator-visible channel — on
+    # the live box the loop runs without RAILS_ENV, so Rails.logger goes to
+    # log/development.log and never reaches journald at all.
+    #
+    # Notification failure must never propagate. The caller is mid-way through
+    # recording a real venue fill; Slack being down cannot be allowed to cost us
+    # the rest of that write.
+    def escalate_order_write_failure(error:, contract_id:, position:, coinbase_order_id:)
+      detail = "#{contract_id} (position #{position&.id || "none"}, " \
+               "exchange order #{coinbase_order_id || "unknown"}): #{error.class}: #{error.message}"
+      @logger.error("Failed to persist Order record for #{detail}")
+
+      SlackNotificationService.alert(
+        "critical",
+        "Order record not written",
+        "The exchange order was placed but no Order row exists for #{detail}. " \
+        "Slippage audit and outage reconciliation are blind for this fill."
+      )
+    rescue => notify_error
+      @logger.error("Failed to alert on missing Order record: #{notify_error.class}: #{notify_error.message}")
     end
 
     # --- Auth helpers (Advanced Trade style signing) ---
