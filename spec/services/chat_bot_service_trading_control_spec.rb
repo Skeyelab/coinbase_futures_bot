@@ -26,6 +26,52 @@ RSpec.describe ChatBotService, type: :service do
     Rails.cache.clear
   end
 
+  # Chat is READ-ONLY with respect to trading state. POST /api/chat_messages is
+  # unauthenticated, and intent is matched by regex over the *model's own
+  # response* (parse_ai_response cases on `content`), so any prompt that induces
+  # the model to echo "emergency stop" fired the real thing.
+  describe "trading state is not mutable from chat" do
+    def ai_says(content)
+      allow(ai_service).to receive(:process_command).and_return({content: content})
+    end
+
+    it "does not halt trading when asked to stop" do
+      ai_says("stop trading operations pause")
+      TradingHalt.resume!
+
+      service.process("stop trading")
+
+      expect(TradingHalt.active?).to be(true)
+    end
+
+    it "does not resume trading when asked to start" do
+      ai_says("start trading operations now")
+      TradingHalt.halt!(reason: "operator paused")
+
+      service.process("start trading")
+
+      expect(TradingHalt.active?).to be(false)
+      expect(TradingHalt.status[:reason]).to eq("operator paused")
+    end
+
+    # The old emergency stop halted trading, then reported a count of positions
+    # it had not closed (`position.close!` was commented out). Halting while
+    # claiming the book is flat is the dangerous half: the operator reads
+    # "flat" and walks away from open leveraged positions.
+    it "does not claim to have closed positions it left open" do
+      ai_says("emergency stop kill switch")
+      TradingHalt.resume!
+      create_list(:position, 2, product_id: "BTC-USD")
+
+      result = service.process("emergency stop")
+
+      expect(result).not_to include("Positions closed")
+      expect(result).not_to include("EMERGENCY STOP EXECUTED")
+      expect(Position.open.count).to eq(2)
+      expect(TradingHalt.active?).to be(true)
+    end
+  end
+
   describe "trading control commands" do
     describe "start trading command" do
       let(:ai_response) { {content: "start trading operations now"} }
@@ -34,94 +80,11 @@ RSpec.describe ChatBotService, type: :service do
         allow(ai_service).to receive(:process_command).and_return(ai_response)
       end
 
-      context "when trading is currently inactive" do
-        before do
-          TradingHalt.halt!(reason: "test setup")
-        end
+      it "declines and names the surfaces that can act" do
+        result = service.process("start trading")
 
-        it "activates trading and returns success message" do
-          result = service.process("start trading")
-
-          expect(result).to include("✅ Trading has been activated")
-          expect(TradingHalt.active?).to be(true)
-        end
-      end
-
-      context "when trading is already active" do
-        before do
-          TradingHalt.resume!
-        end
-
-        it "returns already active message" do
-          result = service.process("start trading")
-
-          expect(result).to include("Trading is already active")
-          expect(TradingHalt.active?).to be(true)
-        end
-      end
-    end
-
-    describe "stop trading command" do
-      let(:ai_response) { {content: "stop trading operations pause"} }
-
-      before do
-        allow(ai_service).to receive(:process_command).and_return(ai_response)
-      end
-
-      context "when trading is currently active" do
-        before do
-          TradingHalt.resume!
-        end
-
-        it "pauses trading and returns success message" do
-          result = service.process("stop trading")
-
-          expect(result).to include("⏸️ Trading has been paused")
-          expect(TradingHalt.active?).to be(false)
-        end
-      end
-
-      context "when trading is already inactive" do
-        before do
-          TradingHalt.halt!(reason: "test setup")
-        end
-
-        it "returns already inactive message" do
-          result = service.process("stop trading")
-
-          expect(result).to include("Trading is already inactive")
-          expect(TradingHalt.active?).to be(false)
-        end
-      end
-    end
-
-    describe "emergency stop command" do
-      let(:ai_response) { {content: "emergency stop kill switch"} }
-
-      before do
-        allow(ai_service).to receive(:process_command).and_return(ai_response)
-      end
-
-      it "executes emergency stop and returns detailed message" do
-        result = service.process("emergency stop")
-
-        expect(result).to include("🚨 EMERGENCY STOP EXECUTED 🚨")
-        expect(result).to include("Positions closed: 0")
-        expect(result).to include("Orders cancelled: 0")
-        expect(TradingHalt.active?).to be(false)
-        expect(TradingHalt.status[:reason]).to include("emergency_stop")
-      end
-
-      context "with open positions" do
-        before do
-          create_list(:position, 2, product_id: "BTC-USD")
-        end
-
-        it "counts positions to be closed" do
-          result = service.process("emergency stop")
-
-          expect(result).to include("Positions closed: 2")
-        end
+        expect(result).to include("Chat cannot change trading state")
+        expect(result).to include("bin/futuresbot")
       end
     end
 
@@ -222,21 +185,10 @@ RSpec.describe ChatBotService, type: :service do
         expect(service.send(:trading_active?)).to be(true)
       end
 
-      it "returns the durable status when set" do
-        service.send(:set_trading_status, false)
+      it "reflects a halt written by another surface" do
+        TradingHalt.halt!(reason: "halted from the CLI")
+
         expect(service.send(:trading_active?)).to be(false)
-      end
-    end
-
-    describe "#set_trading_status" do
-      it "persists trading status in the durable store" do
-        service.send(:set_trading_status, false)
-        expect(TradingHalt.active?).to be(false)
-      end
-
-      it "records an emergency reason when specified" do
-        service.send(:set_trading_status, false, emergency: true)
-        expect(TradingHalt.status[:reason]).to include("emergency_stop")
       end
     end
   end
