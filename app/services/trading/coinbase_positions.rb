@@ -748,6 +748,7 @@ module Trading
         end
         @logger.info("Reduced local position record #{position.id} by #{size}; " \
                      "realized #{portion.id} with PnL: #{portion.pnl}; remaining #{position.size}")
+        evaluate_loss_limits
         return portion
       end
 
@@ -756,10 +757,22 @@ module Trading
       # Close the position
       position.close_position!(close_price)
       @logger.info("Updated local position record #{position.id} as closed with PnL: #{position.pnl}")
+      evaluate_loss_limits
       position
     rescue => e
       @logger.error("Failed to update local position record: #{e.message}")
       nil
+    end
+
+    # Loss caps (issue #482): when this service realizes a close itself (no
+    # caller owns the row), the exit never passes through PositionLifecycle,
+    # which is where the caps are normally evaluated. Same contract as there:
+    # a loss must trip the halt on the trade that breached it, and evaluation
+    # must never fail the close that has already happened.
+    def evaluate_loss_limits
+      Trading::LossLimits.evaluate!(logger: @logger)
+    rescue => e
+      @logger.error("[CoinbasePositions] loss-limit evaluation failed: #{e.class}: #{e.message}")
     end
 
     # The one open row for this product, or nil when none is tracked (an
