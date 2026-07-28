@@ -82,4 +82,18 @@ Rails.application.configure do
 
   # GoodJob runs inside Puma in dev — no separate process needed.
   config.good_job.execution_mode = :async
+
+  # The always-on box runs the trading loops under systemd with no RAILS_ENV, so
+  # they boot HERE, in development — where Rails logs to log/development.log and
+  # journald therefore captures nothing but `puts` and crash backtraces. Seven
+  # days of `journalctl --user -u cfb-realtime` contained zero logger lines while
+  # a swallowed Order-write failure repeated in the file, unread.
+  #
+  # Opt-in rather than unconditional: `bin/rails server` already broadcasts to
+  # stdout in development, and turning this on for everyone would double every
+  # line for anyone working locally. The systemd units set it; laptops do not.
+  if ENV["RAILS_LOG_TO_STDOUT"].present?
+    config.logger = ActiveSupport::TaggedLogging.logger($stdout)
+    config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
+  end
 end

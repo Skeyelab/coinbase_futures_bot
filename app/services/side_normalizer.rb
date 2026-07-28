@@ -22,6 +22,21 @@ class SideNormalizer
     "sell" => "SELL"
   }.freeze
 
+  # What an order DOES, in the only vocabulary Order#side admits: buy or sell.
+  #
+  # Deliberately separate from ORDER_SIDES, which maps into the venue's mixed
+  # position/action vocabulary (LONG/SHORT/BUY/SELL). Feeding an Order the result
+  # of .order was the bug: `SideNormalizer.order("short")` is "SHORT", Order
+  # validates `inclusion: {in: %w[buy sell]}`, and every short entry died on
+  # "Side is not included in the list" — invisibly, because #persist_order
+  # swallowed it. Observed live on exo-mini 2026-07-28.
+  ORDER_ACTIONS = {
+    "long" => "buy",
+    "buy" => "buy",
+    "short" => "sell",
+    "sell" => "sell"
+  }.freeze
+
   ORDER_SIDE_SYMBOLS = {
     "LONG" => :long,
     "SHORT" => :short,
@@ -63,6 +78,10 @@ class SideNormalizer
 
   def self.order(value)
     ORDER_SIDES[value.to_s.downcase]
+  end
+
+  def self.order_action(value)
+    ORDER_ACTIONS[value.to_s.downcase]
   end
 
   def self.order_symbol(value)
