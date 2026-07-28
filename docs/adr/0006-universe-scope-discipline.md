@@ -45,18 +45,24 @@ The pattern this ADR exists to break: **a permission is granted, machinery grows
 
 Recorded honestly, because the failure this ADR describes is exactly the one an unimplemented ADR causes. ADR 0002 declared BIP the home instrument on 2026-07-22 and `ASSET_MAPPING` still routes BTC to the dated BIT contract; the decision read as done for five days because nothing tracked the gap.
 
-**As of 2026-07-28, every numbered decision above is UNBUILT.** Nothing in this ADR is enforced by code yet:
+**As of 2026-07-28, decisions 1, 2, 4 and 5 are enforced by code. Decisions 3 and 6 are not.**
 
 | Decision | State |
 |---|---|
-| 1. Ingestion writes `enabled: false` by default | not built — `coinbase_rest.rb:92` still writes `enabled: true` |
-| 2. `MAX_LIVE_INSTRUMENTS` enforced at the entry gate | not built |
-| 3. Entry gate reads the recorded walk-forward verdict | not built — `backtest_runs.metrics->>'cost_gate_passed'` still unread |
-| 4. Suspension fails closed | not built — `SymbolSuspension` still defaults to permitting |
-| 5. `bin/futuresbot suspend` / `resume` | not built |
-| 6. One in, one out | policy only; no code |
+| 1. Ingestion writes `enabled: false` by default | **built, with a deviation — see the note below.** `upsert_products` no longer writes `enabled` on rows that already exist, and `FuturesContractManager#discover_*_month_contract` no longer does either. `contracts.enabled` keeps its schema default of `true` and keeps meaning *in the data pipeline*; what a newly-ingested product can no longer do is trade. |
+| 2. `MAX_LIVE_INSTRUMENTS` enforced at the entry gate | **built.** Default 1, in `RapidSignalEvaluationJob#should_execute_signal?`, rejection reason `live_instrument_cap`, alongside `global_position_cap` / `asset_position_cap` / `account_notional_cap`. Two arms: distinct instruments holding open positions, and more symbols enabled than may ever be live at once. |
+| 3. Entry gate reads the recorded walk-forward verdict | **not built** — `backtest_runs.metrics->>'cost_gate_passed'` is still unread. Admission is therefore still an operator judgement, recorded through `resume --reason` but not machine-checked. This is the largest remaining gap in this ADR. |
+| 4. Suspension fails closed | **built.** `Trading::SymbolSuspension` now holds two facts — enablement and suspension — and `suspended?` is the absence of the first or the presence of the second. An explicit suspension stays authoritative over a stale enablement, so a breaker trip cannot be undone by a leftover record. `LIVE_INSTRUMENTS` seeds the list declaratively so a fresh database is not an outage only a Rails console can end. |
+| 5. `bin/futuresbot suspend` / `resume` | **built.** `suspend SYMBOL --reason` (no confirmation — friction on the brake is friction during an incident), `resume SYMBOL` (money-touching, so `--yes` per ADR 0005), and `universe` to show what is live and why the rest is not. All three support `--json`. Every block message names the exact command that ends it. |
+| 6. One in, one out | policy only; no code. Partly subsumed by decision 2, whose default of 1 makes admitting a second instrument require suspending the first. |
 
-Until these land, the universe is bounded by operator discipline alone. Do not read this ADR as protection.
+**The deviation in decision 1.** The decision text says ingestion writes `enabled: false` for anything not on the live list. Implementing that literally would have stopped *data collection*, because `contracts.enabled` is what drives `RealtimeSubscriptionCatalog`, `FetchCandlesJob`, sentiment and calibration — the very thing this ADR wanted to keep cheap and reversible. Ingestion and enablement are separated instead by moving tradeability entirely into the fail-closed suspension store, and by making ingestion non-authoritative over `enabled` for rows that already exist. The property the decision was reaching for holds: adding a prefix to `PREFIX_TO_BASE_CURRENCY` now grants data collection and nothing else. The mechanism differs from the one written above, and that is recorded here rather than by editing the decision.
+
+**Two paths granted enablement with no decision behind them; both are now closed.** `upsert_products` wrote `enabled: true` on every run, so an operator's explicit disable was reverted on the next ingestion cycle with no log line saying so — the pipeline out-voted the human, every time. `FuturesContractManager#discover_*_month_contract` did the same, and is reached from a lookup scoped to `Contract.enabled`: disabling a contract made the lookup miss, which called discovery, which re-enabled the row that had just been turned off.
+
+**A related data defect, fixed.** `ingestible_product_id?` gated *refresh* as well as *creation*, so any `Contract` row whose prefix is absent from `PREFIX_TO_BASE_CURRENCY` could never receive the margin-rate columns that shipped on 2026-07-27 — leaving `Trading::LiquidationBuffer` unarmed on four enabled futures (`GOL-*`, `SLR-*`, `SLP-*`, `ETP-*`). The prefix map now gates what we start collecting, not whether a row we already hold gets the number the liquidation rail depends on. `BTC-USD` and `ETH-USD` are spot reference feeds created by `rake real_time:setup_pairs`; they carry no `future_product_details` and never will, and under the separation above their `enabled` flag is a data-pipeline statement rather than a licence to trade.
+
+**And one in the circuit breaker.** `SymbolCircuitBreakerJob` filtered `paper: true`, so with `LIVE_TRADING_CONFIRMED=1` the only automated writer of `SymbolSuspension` queried an empty set; it is now scoped to the mode in force, as `Trading::LossLimits` already was. Its `MIN_TRADES` sample also counted rows, and since #509 a partial reduce creates its own `CLOSED` row — five reduces of one position satisfied a five-trade minimum, so the breaker could suspend a symbol on the evidence of a single position. Positions now carry `parent_position_id` and the sample counts positions.
 
 ## Consequences
 

@@ -12,12 +12,24 @@ class SymbolCircuitBreakerJob < ApplicationJob
   TRAILING_WINDOW = 7.days
   MIN_TRADES = 5
 
+  # Scoped to the MODE IN FORCE, not to paper (ADR 0006). This filtered
+  # `paper: true`, and with LIVE_TRADING_CONFIRMED=1 positions are written
+  # `paper: false` — so the only automated writer of Trading::SymbolSuspension
+  # queried an empty set and suspended nothing, on exactly the runs where a
+  # cost-bleeding symbol costs real money. Trading::LossLimits already scopes
+  # this way; the breaker now matches it, so the caps can be drilled in paper
+  # and still mean real dollars live.
   def perform(window: TRAILING_WINDOW, min_trades: MIN_TRADES)
-    closed = Position.closed.where(paper: true).where("close_time >= ?", window.ago)
+    closed = Position.closed.where(paper: DryRun.active?).where("close_time >= ?", window.ago)
 
     closed.group_by(&:product_id).each do |symbol, trades|
-      next if trades.size < min_trades
-      next if Trading::SymbolSuspension.suspended?(symbol)
+      # Distinct POSITIONS, not distinct rows. Since #509 a partial reduce
+      # creates its own CLOSED row, so five reduces of one position satisfied a
+      # five-TRADE minimum — the breaker would suspend a symbol on a sample of
+      # one. parent_position_id is NULL for a whole trade, which is why it
+      # coalesces to the row's own id.
+      next if distinct_positions(trades) < min_trades
+      next if Trading::SymbolSuspension.explicitly_suspended?(symbol)
 
       gross = trades.sum { |p| p.pnl.to_f }
       costs = trades.sum { |t| estimated_round_trip_cost(t) }
@@ -25,12 +37,19 @@ class SymbolCircuitBreakerJob < ApplicationJob
 
       Trading::SymbolSuspension.suspend!(
         symbol,
-        reason: "trailing #{trades.size}-trade gross $#{gross.round(2)} < est. costs $#{costs.round(2)} over #{(window / 1.day).to_i}d"
+        reason: "trailing #{distinct_positions(trades)}-trade gross $#{gross.round(2)} < est. costs $#{costs.round(2)} over #{(window / 1.day).to_i}d"
       )
     end
   end
 
   private
+
+  # How many POSITIONS these rows represent. Costs are still summed per row —
+  # each slice paid its own exit fee — but the SAMPLE is positions, because that
+  # is the unit MIN_TRADES is a statement about.
+  def distinct_positions(trades)
+    trades.map { |t| t.parent_position_id || t.id }.uniq.size
+  end
 
   # Same cost model as DailySummaryJob: taker fees on both sides of the
   # contract-size notional; exit approximated by entry (not recorded).

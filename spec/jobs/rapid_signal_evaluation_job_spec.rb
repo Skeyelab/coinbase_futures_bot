@@ -22,6 +22,10 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
   before do
     allow(Rails).to receive(:logger).and_return(mock_logger)
+    # ADR 0006's MAX_LIVE_INSTRUMENTS is not the gate under test here. These
+    # examples stand several instruments up so that a DIFFERENT cap is the one
+    # that binds; the universe cap has its own spec.
+    allow(described_class).to receive(:max_live_instruments).and_return(10)
     allow(mock_logger).to receive(:debug)
     allow(mock_logger).to receive(:info)
     allow(mock_logger).to receive(:warn)

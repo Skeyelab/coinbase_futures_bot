@@ -71,15 +71,31 @@ module MarketData
       all_products
     end
 
+    # ADR 0006 decision 1: ingestion and enablement are separate decisions.
+    #
+    # This wrote `enabled: true` on every run for every matching product, which
+    # meant the pipeline silently out-voted the operator: an explicit disable
+    # was reverted on the next cycle, with no log line saying so. Ingestion now
+    # grants data collection to products it has never seen and is not
+    # authoritative over rows that already exist.
+    #
+    # `contracts.enabled` means "in the data pipeline" — it drives
+    # RealtimeSubscriptionCatalog, FetchCandlesJob, sentiment and calibration.
+    # The schema default stays `true` for exactly that reason: flipping it would
+    # stop candle collection for every future monthly roll, which is an outage,
+    # not a safety property. TRADEABILITY is a different fact and lives in
+    # Trading::SymbolSuspension, which fails closed — so a newly-ingested
+    # product collects history and cannot open a position.
     def upsert_products
       products = list_products
       futures_products = products.select { |p| ingestible_product_id?(p["product_id"]) && !p["trading_disabled"] }
+      known = Contract.where(product_id: futures_products.map { |p| p["product_id"] }).pluck(:product_id).to_set
 
       futures_products.each do |p|
         contract_info = build_contract_info(p)
         next unless contract_info
 
-        Contract.upsert({
+        attrs = {
           product_id: p["product_id"],
           base_currency: contract_info[:base_currency],
           quote_currency: contract_info[:quote_currency],
@@ -89,14 +105,41 @@ module MarketData
           min_size: p["base_min_size"],
           price_increment: p["quote_increment"],
           size_increment: p["base_increment"],
-          enabled: true,
           **margin_rates(p),
           created_at: Time.now.utc,
           updated_at: Time.now.utc
-        }, unique_by: :index_contracts_on_product_id)
+        }
+        # Only on insert. Omitting the key from the UPDATE set is what leaves an
+        # existing row's enablement alone.
+        attrs[:enabled] = true unless known.include?(p["product_id"])
+
+        Contract.upsert(attrs, unique_by: :index_contracts_on_product_id)
       end
 
+      backfill_margin_rates(products - futures_products)
+
       Rails.logger.info("Upserted #{futures_products.count} futures products")
+    end
+
+    # The prefix map decides what we START collecting. It must not decide
+    # whether a Contract row we ALREADY have gets refreshed with the number
+    # Trading::LiquidationBuffer depends on.
+    #
+    # Rows exist for prefixes the map does not contain — GOL, SLR, SLP and ETP
+    # on the live box, from before the map was the ingestion filter. Because
+    # `ingestible_product_id?` rejected them, upsert_products skipped them
+    # entirely and they never received the margin columns that shipped later, so
+    # the buffer stayed unarmed on four enabled futures.
+    #
+    # Update, never insert: an unmapped product with no row is a product we have
+    # deliberately not ingested, and this must not smuggle it in.
+    def backfill_margin_rates(products)
+      products.each do |p|
+        rates = margin_rates(p)
+        next if rates.values.all?(&:nil?)
+
+        Contract.where(product_id: p["product_id"]).update_all(rates.merge(updated_at: Time.now.utc))
+      end
     end
 
     # Real per-side margin rates, which Trading::LiquidationBuffer needs to know

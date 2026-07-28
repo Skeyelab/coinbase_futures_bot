@@ -17,7 +17,7 @@ class GenerateSignalsJob < ApplicationJob
       # which depends on a symbol collecting candles while barred from trading —
       # exactly the state BIP/XPP are being added in.
       if Trading::SymbolSuspension.suspended?(pair.product_id)
-        puts "[Signal] #{pair.product_id} suspended — skipping"
+        puts "[Signal] #{pair.product_id} blocked — #{Trading::SymbolSuspension.block_reason(pair.product_id)}"
         next
       end
 

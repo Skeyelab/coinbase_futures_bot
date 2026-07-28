@@ -8,6 +8,10 @@ require "rails_helper"
 RSpec.describe SymbolCircuitBreakerJob, type: :job do
   before do
     allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
+    # The breaker is scoped to the mode in force (ADR 0006), so paper fixtures
+    # need dry-run asserted. It used to hardcode `paper: true` and was blind to
+    # live trades entirely.
+    allow(DryRun).to receive(:active?).and_return(true)
   end
 
   def close_paper_trade(symbol, pnl:, entry_price: 4_000.0, size: 2.0, ago: 1.day)

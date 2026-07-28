@@ -197,14 +197,75 @@ module Cli
     end
 
     # ─── resume ─────────────────────────────────────────────────────────────────
-    desc "resume", "Resume trading after a halt"
+    # Two verbs behind one word, deliberately: `resume` with no argument has
+    # meant "lift the global halt" since the kill switch shipped and appears in
+    # runbooks as such, so ADR 0006's per-symbol resume is an OPTIONAL argument
+    # rather than a rename that would break the muscle memory of whoever is
+    # holding the pager.
+    desc "resume [SYMBOL]", "Resume trading after a halt, or re-enable one SYMBOL (MONEY-TOUCHING — requires confirmation)"
+    method_option :reason, aliases: "-r", type: :string, desc: "Why this symbol is being re-enabled"
+    method_option :yes, aliases: "-y", type: :boolean, default: false,
+      desc: "Confirm without an interactive prompt (required with --json)"
     method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
-    def resume
+    def resume(symbol = nil)
+      return resume_symbol(symbol) if symbol.present?
+
       status = TradingHalt.resume!
       return emit_json(status) if json_mode?
 
       puts "#{GREEN}#{BOLD}🟢 Trading RESUMED#{RESET}"
       puts "   As of : #{status[:as_of]}"
+    end
+
+    # ─── suspend ────────────────────────────────────────────────────────────────
+    # The brake. No confirmation, for the same reason `halt` needs none: the
+    # safe direction should never be the one with friction on it.
+    desc "suspend SYMBOL", "Block SYMBOL from opening new positions (exits continue)"
+    method_option :reason, aliases: "-r", type: :string, desc: "Why this symbol is being suspended"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def suspend(symbol)
+      Trading::SymbolSuspension.suspend!(symbol, reason: options[:reason])
+
+      if json_mode?
+        return emit_json({suspended: true, symbol: symbol, reason: options[:reason],
+                          live_symbols: Trading::SymbolSuspension.live_symbols,
+                          as_of: Time.current.utc.iso8601})
+      end
+
+      puts "#{RED}#{BOLD}⛔ #{symbol} SUSPENDED#{RESET} — no new entries; open positions still exit."
+      puts "   Reason : #{options[:reason] || "(none)"}"
+      puts "   Undo   : #{BOLD}bin/futuresbot resume #{symbol} --reason \"...\"#{RESET}"
+      print_live_universe
+    end
+
+    # ─── universe ───────────────────────────────────────────────────────────────
+    desc "universe", "Show which symbols may trade, which are blocked, and why (ADR 0006)"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def universe
+      live = Trading::SymbolSuspension.live_symbols
+      suspended = Trading::SymbolSuspension.all
+
+      if json_mode?
+        return emit_json({
+          live_symbols: live,
+          max_live_instruments: RapidSignalEvaluationJob.max_live_instruments,
+          suspended: suspended,
+          ingested_symbols: Contract.enabled.pluck(:product_id).sort,
+          as_of: Time.current.utc.iso8601
+        })
+      end
+
+      puts "#{BOLD}#{CYAN}🌐  Live universe#{RESET} (ADR 0006 — fails closed)"
+      puts "─" * 72
+      print_live_universe
+      puts "  #{WHITE}Blocked:#{RESET}"
+      blocked = Contract.enabled.pluck(:product_id).sort - live
+      if blocked.empty?
+        puts "    #{YELLOW}none#{RESET}"
+      else
+        blocked.each { |s| puts "    #{s}: #{Trading::SymbolSuspension.block_reason(s)}" }
+      end
+      puts "─" * 72
     end
 
     # ─── halt_status ────────────────────────────────────────────────────────────
@@ -384,6 +445,62 @@ module Cli
 
       $stdout.puts "#{GREEN}#{BOLD}✅ Closed#{RESET} position #{position.id} " \
                    "(#{position.product_id}) at #{outcome.close_price}"
+    end
+
+    # ── universe helpers ─────────────────────────────────────────────────────────
+
+    # Re-enabling a symbol is what puts an instrument back on the order path, so
+    # it carries the same confirmation contract as `close`: `--yes`, an
+    # interactive prompt for a human, and an outright refusal for `--json`
+    # callers who cannot answer a prompt.
+    def resume_symbol(symbol)
+      unless resume_confirmed?(symbol)
+        if json_mode?
+          return emit_json({resumed: false, error: "confirmation_required", symbol: symbol,
+                            as_of: Time.current.utc.iso8601})
+        end
+        return $stdout.puts "#{RED}#{BOLD}✖ Resume aborted#{RESET} — Not confirmed; " \
+                            "#{symbol} stays blocked. Re-run with #{BOLD}--yes#{RESET}."
+      end
+
+      Trading::SymbolSuspension.enable!(symbol, reason: options[:reason])
+      live = Trading::SymbolSuspension.live_symbols
+
+      if json_mode?
+        return emit_json({resumed: true, symbol: symbol, reason: options[:reason],
+                          live_symbols: live, as_of: Time.current.utc.iso8601})
+      end
+
+      puts "#{GREEN}#{BOLD}🟢 #{symbol} ENABLED for trading#{RESET}"
+      puts "   Reason : #{options[:reason] || "(none)"}"
+      print_live_universe
+      warn_over_instrument_cap(live)
+    end
+
+    def resume_confirmed?(symbol)
+      return true if options[:yes]
+      return false if json_mode?
+
+      $stdout.print "#{YELLOW}#{BOLD}⚠ MONEY-TOUCHING#{RESET} re-enabling #{symbol} lets it open NEW positions.\n" \
+                    "Type #{BOLD}yes#{RESET} to enable it: "
+      $stdin.gets.to_s.strip.casecmp("yes").zero?
+    end
+
+    def print_live_universe
+      live = Trading::SymbolSuspension.live_symbols
+      puts "   #{WHITE}Live symbols:#{RESET} #{live.empty? ? "#{YELLOW}none#{RESET}" : live.join(", ")} " \
+           "(#{live.size}/#{RapidSignalEvaluationJob.max_live_instruments})"
+    end
+
+    # The cap is enforced at the entry gate, not here — refusing the resume
+    # would leave an operator unable to swap which instrument is live. Say it
+    # plainly instead, so nobody wonders why the newly-enabled symbol is quiet.
+    def warn_over_instrument_cap(live)
+      cap = RapidSignalEvaluationJob.max_live_instruments
+      return if live.size <= cap
+
+      puts "#{YELLOW}#{BOLD}⚠ #{live.size} symbols enabled but MAX_LIVE_INSTRUMENTS=#{cap}#{RESET} — " \
+           "entries are rejected until you suspend #{live.size - cap} of them."
     end
 
     # Prints simulated (paper) account state for `status` when dry-run is active
