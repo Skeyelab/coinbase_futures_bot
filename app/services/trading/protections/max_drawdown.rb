@@ -52,10 +52,24 @@ module Trading
         dd.negative? ? 0.0 : dd
       end
 
-      # Writes a global halt when drawdown exceeds the ceiling. Returns the locks.
+      # Writes a global halt when drawdown exceeds the ceiling. Returns the locks
+      # it WROTE — empty when the breach is a continuation of one already halted.
+      #
+      # Idempotent on purpose. A halt is a state, not an event per evaluation
+      # cycle. MaxDrawdownMonitor calls this every ~30s and raises a Slack
+      # warning per lock returned, so re-adding unconditionally produced an alert
+      # every 30 seconds and stacked 12 identical locks for a single condition
+      # (observed 2026-07-28). An operator who learns to mute that channel also
+      # misses the liquidation-buffer warning that shares it.
+      #
+      # Returning [] does NOT un-halt anything: the existing lock is still in the
+      # store and Protections.blocked? still reports true. This suppresses the
+      # duplicate record and the duplicate alarm, not the protection. Once the
+      # lock expires, a still-breaching equity curve halts and alerts afresh.
       def evaluate(peak:, current:, now: Time.current, store: Trading::ProtectionLock.default_store)
         return [] unless enabled?
         return [] if drawdown(peak: peak, current: current) < @ceiling
+        return [] if already_halted?(now: now, store: store)
 
         [Trading::ProtectionLock.add(
           scope: "global",
@@ -65,6 +79,14 @@ module Trading
           expires_at: now + @lock_ttl_seconds,
           store: store
         )]
+      end
+
+      # True when a global halt from THIS guard is already in force. Scoped to
+      # SOURCE so an unrelated protection's lock never suppresses a drawdown
+      # halt that has not yet been raised.
+      def already_halted?(now:, store:)
+        Trading::ProtectionLock.active(now: now, store: store)
+          .any? { |lock| lock["source"] == SOURCE }
       end
     end
   end
