@@ -11,11 +11,32 @@
 #   sources.<name>.weight     : relative trust when aggregating (default 1.0)
 
 symbols:
+  # Market-wide crypto terms (CRYPTO/DEFI/STABLECOIN/TOKENIZED) are on BOTH
+  # symbols deliberately. Two thirds of ingested articles were tagging to no
+  # symbol at all, and the crypto misses were overwhelmingly stories that never
+  # write "BTC" or "ETHEREUM" in the headline: "Crypto climbs off worst levels",
+  # "PayPal expands stablecoin push", "1inch moves to unite DeFi liquidity".
+  # ETH was worst hit — 5 events in 24h — because almost nothing says "Ethereum"
+  # in a title.
+  #
+  # The tradeoff, stated so it is a choice rather than an accident: a market-wide
+  # term tags both symbols, so their z-scores become more correlated. That is
+  # honest (BTC and ETH do move together on regulatory and flow news) but it
+  # means the two are less independent as signals.
+  #
+  # Leakage into OIL is impossible regardless: crypto sources are scoped to
+  # [BTC-USD, ETH-USD] and oil sources to [OIL-USD], so scope bounds recall.
+  #
+  # Follows the OIL precedent from #431 — add terms that are high-precision for
+  # the asset, omit low-precision ones. BLOCKCHAIN is excluded on purpose:
+  # enterprise-blockchain stories are not market-moving for spot BTC/ETH.
   BTC-USD:
-    keywords: [BTC, BITCOIN]
+    keywords: [BTC, BITCOIN, SATOSHI, HALVING, MARA, RIOT, MICROSTRATEGY,
+      CRYPTO, DEFI, STABLECOIN, TOKENIZED]
     lexicon: crypto
   ETH-USD:
-    keywords: [ETH, ETHEREUM]
+    keywords: [ETH, ETHEREUM, ETHER, VITALIK, "ERC-20",
+      CRYPTO, DEFI, STABLECOIN, TOKENIZED]
     lexicon: crypto
   OIL-USD:
     # Commodity terms + high-signal geopolitical/supply-disruption terms (issue
@@ -24,7 +45,7 @@ symbols:
     # terms (bare "war"/"strike"/"Israel") that false-positive off oil. Sources
     # are oil-scoped, so recall gains here don't leak into other symbols.
     keywords: [OIL, CRUDE, WTI, BRENT, OPEC, PETROLEUM, BARREL,
-      HORMUZ, HOUTHI, "RED SEA", TANKER, REFINERY, PIPELINE,
+      HORMUZ, HOUTHI, "RED SEA", TANKER, REFINERY, PIPELINE, RIG,
       SANCTIONS, SANCTION, EMBARGO, IRAN, SAUDI, "SUPPLY DISRUPTION"]
     lexicon: oil
 

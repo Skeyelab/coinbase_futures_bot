@@ -3,6 +3,11 @@
 module Sentiment
   # Base class for all news clients to ensure consistent interface
   class BaseNewsClient
+    # Shared with the backfill task so both sides compute the identical digest.
+    def self.normalized_hash_input(url, title, symbol = nil)
+      [url, title, symbol].compact.map { |v| v.to_s.downcase.gsub(/\s+/, " ").strip }.join("|")
+    end
+
     include SentryServiceTracking
 
     def initialize(logger: Rails.logger)
@@ -43,8 +48,22 @@ module Sentiment
     # Common method to generate content hash. Include the symbol so an article
     # tagged with multiple symbols yields a distinct hash per symbol and both
     # rows survive the (source, raw_text_hash) upsert dedup.
+    # Normalized before hashing. A feed that republishes the same story with
+    # different capitalisation or re-wrapped whitespace produced a different
+    # hash and therefore a second row — observed live:
+    #
+    #   "Galaxy, MARA Holdings deepen Texas expansion with land acquisitions"
+    #   "Galaxy, MARA Holdings deepen Texas expansion with land Acquisitions"
+    #
+    # Both ingested. That inflates the inflow rate, which is precisely the
+    # number used to decide whether sentiment is undersampled (#431) — so the
+    # duplicate makes the feed look healthier than it is.
+    #
+    # Changing this changes every hash, so existing rows no longer match and
+    # would all re-insert once. `rake sentiment:rehash` backfills them; run it
+    # with the deploy.
     def generate_content_hash(url, title, symbol = nil)
-      Digest::SHA256.hexdigest([url, title, symbol].compact.join("|"))
+      Digest::SHA256.hexdigest(self.class.normalized_hash_input(url, title, symbol))
     end
 
     # Common method to map currencies to trading symbols
