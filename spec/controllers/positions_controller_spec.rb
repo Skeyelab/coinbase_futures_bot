@@ -213,6 +213,22 @@ RSpec.describe PositionsController, type: :controller do
       expect(response.redirect_url).to include("Position+closed")
     end
 
+    # A full close from the web UI is still an exit and must feed the
+    # protections layer (ADR 0003) exactly as a bot-initiated exit does. Closing
+    # through Trading::CoinbasePositions directly skipped the cooldown, the
+    # stoploss guard, and the daily loss caps. Partial reduces still take the
+    # direct path — PositionLifecycle closes whole positions only.
+    it "records a cooldown when closing a tracked position in full" do
+      create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN")
+      allow(positions_service).to receive(:close_position).and_return({"success" => true})
+
+      post :close, params: {product_id: "BIP-20DEC30-CDE"}
+
+      cooled = Trading::ProtectionLock.active.select { |l| l["symbol"] == "BIP-20DEC30-CDE" }
+      expect(cooled).not_to be_empty
+      expect(cooled.first["source"]).to eq("CooldownPeriod")
+    end
+
     it "handles service errors gracefully" do
       allow(positions_service).to receive(:close_position).and_raise(
         StandardError.new("Order failed")

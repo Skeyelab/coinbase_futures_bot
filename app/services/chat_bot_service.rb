@@ -319,11 +319,11 @@ class ChatBotService
   def execute_trading_control_command(params, original_input)
     case params[:action]
     when "start"
-      execute_start_trading_command
+      trading_control_unavailable("start")
     when "stop"
-      execute_stop_trading_command
+      trading_control_unavailable("stop")
     when "emergency_stop"
-      execute_emergency_stop_command
+      trading_control_unavailable("emergency_stop")
     when "position_sizing"
       execute_position_sizing_command(params[:content], original_input)
     else
@@ -331,64 +331,35 @@ class ChatBotService
     end
   end
 
-  def execute_start_trading_command
-    if trading_active?
-      return {
-        type: "trading_control_response",
-        data: {
-          action: "start",
-          status: "already_active",
-          message: "Trading is already active. No action needed."
-        }
-      }
-    end
-
-    set_trading_status(true)
-
+  # Chat is read-only with respect to trading state. Two independent reasons,
+  # either sufficient alone:
+  #
+  #   1. POST /api/chat_messages is unauthenticated — Api::ChatMessagesController
+  #      inherits ActionController::API and its only before_actions are
+  #      ensure_json_request / set_session_id / set_chat_bot_service. No auth,
+  #      no CSRF. This was a remote halt for anyone who could reach the port.
+  #   2. Intent is matched by regex over the *model's own response*
+  #      (parse_ai_response cases on `content`, not on operator input), so any
+  #      prompt that induced the model to echo "emergency stop" fired it. An LLM
+  #      classifier is the wrong mechanism for a control action regardless of who
+  #      is authenticated: auth establishes *who*, not *did they mean it*.
+  #
+  # Recognise the intent and decline plainly rather than dropping it silently.
+  # Halt/resume live on surfaces built for it — see ADR 0005.
+  def trading_control_unavailable(action)
     {
       type: "trading_control_response",
       data: {
-        action: "start",
-        status: "success",
-        message: "\u2705 Trading has been activated. The bot will now generate signals and manage positions."
-      }
-    }
-  end
-
-  def execute_stop_trading_command
-    unless trading_active?
-      return {
-        type: "trading_control_response",
-        data: {
-          action: "stop",
-          status: "already_inactive",
-          message: "Trading is already inactive. No action needed."
-        }
-      }
-    end
-
-    set_trading_status(false)
-
-    {
-      type: "trading_control_response",
-      data: {
-        action: "stop",
-        status: "success",
-        message: "\u23F8\uFE0F Trading has been paused. The bot will stop generating new signals and opening positions."
-      }
-    }
-  end
-
-  def execute_emergency_stop_command
-    # Execute emergency stop similar to SlackCommandHandler
-    result = execute_emergency_stop_internal
-
-    {
-      type: "trading_control_response",
-      data: {
-        action: "emergency_stop",
-        status: result[:success] ? "success" : "partial",
-        message: "🚨 EMERGENCY STOP EXECUTED 🚨\n\n#{result[:message]}\n\nPositions closed: #{result[:positions_closed]}\nOrders cancelled: #{result[:orders_cancelled]}"
+        action: action,
+        status: "unavailable",
+        message: "⛔ Chat cannot change trading state — read-only for halt, " \
+                 "resume, and emergency stop.\n\n" \
+                 "Use an authenticated surface:\n" \
+                 "  • `bin/futuresbot halt --reason \"...\"` / `bin/futuresbot resume`\n" \
+                 "  • the TUI halt toggle\n" \
+                 "  • the MCP `halt_trading` / `resume_trading` tools\n\n" \
+                 "Current state: #{trading_active? ? "active" : "halted"} " \
+                 "(`bin/futuresbot halt_status`)."
       }
     }
   end
@@ -660,57 +631,10 @@ class ChatBotService
     {recent_signals: recent_signals}
   end
 
-  def set_trading_status(active, emergency: false)
-    # Delegate to TradingHalt so the state is durable and shared across every
-    # process (a chat "stop" must reach the running bot in another terminal).
-    if active
-      TradingHalt.resume!
-    else
-      TradingHalt.halt!(reason: emergency ? "emergency_stop (chat)" : "chat stop")
-    end
-    Rails.logger.info("[ChatBot] Trading status set to: #{active ? "active" : "inactive"}#{if emergency
-                                                                                             " (EMERGENCY)"
-                                                                                           end}")
-  end
-
+  # Read-only. Chat reports halt state; it cannot write it — see
+  # trading_control_unavailable and ADR 0005.
   def trading_active?
     TradingHalt.active?
-  end
-
-  def execute_emergency_stop_internal
-    positions_closed = 0
-    orders_cancelled = 0
-
-    begin
-      # Disable trading
-      set_trading_status(false, emergency: true)
-
-      # Close all open positions (simplified for now)
-      open_positions = Position.open.day_trading
-      open_positions.each do |position|
-        # In a real implementation, this would call the trading API
-        # position.close!
-        positions_closed += 1
-      end
-
-      # Cancel any pending orders (placeholder)
-      # orders_cancelled = cancel_all_pending_orders
-
-      {
-        success: true,
-        message: "Emergency stop completed successfully.",
-        positions_closed: positions_closed,
-        orders_cancelled: orders_cancelled
-      }
-    rescue => e
-      Rails.logger.error("[ChatBot] Error during emergency stop: #{e.message}")
-      {
-        success: false,
-        message: "Emergency stop partially completed. Error: #{e.message}",
-        positions_closed: positions_closed,
-        orders_cancelled: orders_cancelled
-      }
-    end
   end
 
   def get_ai_response_with_fallback(input)

@@ -62,4 +62,59 @@ RSpec.describe Trading::LiquidationBuffer, type: :service do
       expect(described_class.new(buffer: nil).enabled?).to be false
     end
   end
+
+  # The buffer used to compute liquidation from DEFAULT_LEVERAGE = 10.0 because
+  # nothing stored real margin. On PAU (gold perp, 5% intraday margin = 20x)
+  # that put the buffered exit at ~9.0% adverse while real liquidation is at
+  # ~4.5% — the rail sat BEHIND the cliff and could never fire in time.
+  # Real per-contract, per-side rates now come from the products API.
+  describe ".from_config with real contract margin" do
+    it "arms at the contract's real leverage, not an assumed 10x" do
+      create(:contract, product_id: "PAU-20DEC30-CDE",
+        intraday_margin_rate_long: 0.05, intraday_margin_rate_short: 0.05)
+
+      calc = described_class.from_config(symbol: "PAU-20DEC30-CDE")
+
+      # im 0.05, mm 0.005 -> loss-to-liq 0.045 -> liq 95.5, buffered 95.725.
+      # The old assumed-10x answer was 90.975, which is past liquidation.
+      expect(calc.liquidation_price(entry_price: 100.0, side: "long")).to be_within(1e-9).of(95.5)
+      expect(calc.buffered_exit_price(entry_price: 100.0, side: "long")).to be_within(1e-9).of(95.725)
+      expect(calc.breached?(entry_price: 100.0, side: "long", current_price: 95.8)).to be false
+      expect(calc.breached?(entry_price: 100.0, side: "long", current_price: 95.7)).to be true
+    end
+
+    it "uses the side's own rate when long and short margin differ" do
+      create(:contract, product_id: "BIP-20DEC30-CDE",
+        intraday_margin_rate_long: 0.10, intraday_margin_rate_short: 0.05)
+
+      calc = described_class.from_config(symbol: "BIP-20DEC30-CDE")
+
+      expect(calc.liquidation_price(entry_price: 100.0, side: "long")).to be_within(1e-9).of(90.5)
+      expect(calc.liquidation_price(entry_price: 100.0, side: "short")).to be_within(1e-9).of(104.5)
+    end
+
+    # A buffer calibrated on a wrong constant protects nothing AND reads as
+    # protection. Refusing to arm is the honest failure.
+    it "refuses to arm for a contract with no stored margin, and says so" do
+      create(:contract, product_id: "NOL-19JUN26-CDE",
+        intraday_margin_rate_long: nil, intraday_margin_rate_short: nil)
+      allow(Rails.logger).to receive(:warn)
+
+      calc = described_class.from_config(symbol: "NOL-19JUN26-CDE")
+
+      expect(calc.armed?("long")).to be false
+      expect(calc.breached?(entry_price: 100.0, side: "long", current_price: 1.0)).to be false
+      expect(Rails.logger).to have_received(:warn).with(/NOT ARMED for NOL-19JUN26-CDE/)
+    end
+
+    it "treats a 'buy' side as long, not short" do
+      create(:contract, product_id: "PAU-20DEC30-CDE",
+        intraday_margin_rate_long: 0.05, intraday_margin_rate_short: 0.05)
+
+      calc = described_class.from_config(symbol: "PAU-20DEC30-CDE")
+
+      # A long liquidates BELOW entry. Read as a short, this returned 104.5.
+      expect(calc.liquidation_price(entry_price: 100.0, side: "buy")).to be_within(1e-9).of(95.5)
+    end
+  end
 end

@@ -90,12 +90,48 @@ module MarketData
           price_increment: p["quote_increment"],
           size_increment: p["base_increment"],
           enabled: true,
+          **margin_rates(p),
           created_at: Time.now.utc,
           updated_at: Time.now.utc
         }, unique_by: :index_contracts_on_product_id)
       end
 
       Rails.logger.info("Upserted #{futures_products.count} futures products")
+    end
+
+    # Real per-side margin rates, which Trading::LiquidationBuffer needs to know
+    # where liquidation actually is. Coinbase returns them on every products call:
+    #
+    #   future_product_details.intraday_margin_rate.{long,short}_margin_rate
+    #   future_product_details.overnight_margin_rate.{long,short}_margin_rate
+    #
+    # These were being dropped, so the buffer fell back to an assumed 10x and on
+    # PAU (5% intraday = 20x) placed its exit ~9.0% from entry while real
+    # liquidation is ~4.5% — behind the cliff.
+    #
+    # Missing values stay nil rather than becoming 0: the buffer reads nil as
+    # "unknown" and refuses to arm, which is the fail-closed direction. A 0 would
+    # read as a positive rate and produce nonsense leverage.
+    def margin_rates(product)
+      details = product["future_product_details"] || {}
+      intraday = details["intraday_margin_rate"] || {}
+      overnight = details["overnight_margin_rate"] || {}
+
+      {
+        intraday_margin_rate_long: decimal_or_nil(intraday["long_margin_rate"]),
+        intraday_margin_rate_short: decimal_or_nil(intraday["short_margin_rate"]),
+        overnight_margin_rate_long: decimal_or_nil(overnight["long_margin_rate"]),
+        overnight_margin_rate_short: decimal_or_nil(overnight["short_margin_rate"])
+      }
+    end
+
+    def decimal_or_nil(value)
+      return nil if value.blank?
+
+      parsed = BigDecimal(value.to_s)
+      parsed.positive? ? parsed : nil
+    rescue ArgumentError, TypeError
+      nil
     end
 
     # Returns array of arrays: [ time, low, high, open, close, volume ]

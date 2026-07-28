@@ -544,47 +544,34 @@ RSpec.describe SlackCommandHandler, type: :service do
   end
 
   describe ".handle_emergency_stop_command" do
-    let(:emergency_result) do
-      {
-        success: true,
-        message: "Emergency stop completed",
-        positions_closed: 2,
-        orders_cancelled: 3
-      }
-    end
-
     before do
-      allow(described_class).to receive(:execute_emergency_stop).and_return(emergency_result)
       allow(SlackNotificationService).to receive(:alert)
     end
 
-    it "executes emergency stop" do
-      expect(described_class).to receive(:execute_emergency_stop)
-      described_class.send(:handle_emergency_stop_command)
-    end
+    it "alerts that the halt landed but the book is untouched" do
+      create_list(:position, 2, product_id: "BTC-USD")
 
-    it "sends critical alert notification" do
       expect(SlackNotificationService).to receive(:alert).with(
         "critical",
-        "Emergency Stop Executed",
-        "All trading activities stopped via Slack command. Emergency stop completed"
+        "Emergency Halt",
+        "Trading halted via Slack. 2 position(s) still OPEN — Slack cannot close them."
       )
+
       described_class.send(:handle_emergency_stop_command)
     end
 
-    it "returns emergency stop confirmation" do
+    it "returns a halt confirmation that does not claim closure" do
       result = described_class.send(:handle_emergency_stop_command)
 
-      expect(result[:text]).to start_with("\u{1F6A8} EMERGENCY STOP EXECUTED \u{1F6A8}")
+      expect(result[:text]).to start_with("\u{1F6A8} TRADING HALTED \u{1F6A8}")
       expect(result[:response_type]).to eq("in_channel")
-      expect(result[:attachments]).to be_an(Array)
 
       fields = result[:attachments].first[:fields]
       expect(fields).to include(
-        {title: "Positions Closed", value: "2", short: true},
-        {title: "Orders Cancelled", value: "3", short: true},
-        {title: "Trading Status", value: "\u{1F534} DISABLED", short: true}
+        {title: "Positions Still Open", value: "0", short: true},
+        {title: "Trading Status", value: "\u{1F534} HALTED", short: true}
       )
+      expect(fields.map { |f| f[:title] }).not_to include("Positions Closed", "Orders Cancelled")
     end
   end
 
@@ -827,48 +814,39 @@ RSpec.describe SlackCommandHandler, type: :service do
     end
   end
 
-  describe ".execute_emergency_stop" do
-    let(:mock_positions) { [double("Position"), double("Position")] }
-
+  # /bot-stop halted trading and then reported a count of positions it had not
+  # closed (`position.close!` was commented out). Halting while claiming the
+  # book is flat is the dangerous half: the operator reads "flat" and walks away
+  # from open leveraged positions. Halting is correct and stays; the claim goes.
+  describe "/bot-stop truthfulness" do
     before do
-      allow(described_class).to receive(:set_trading_status)
-      allow(Position).to receive(:open).and_return(double("OpenPositions", day_trading: mock_positions))
-      allow(Rails.logger).to receive(:error)
+      allow(SlackNotificationService).to receive(:alert)
+      TradingHalt.resume!
+      create_list(:position, 2, product_id: "BTC-USD")
     end
 
-    it "sets trading status to false with emergency flag" do
-      expect(described_class).to receive(:set_trading_status).with(false, emergency: true)
-      described_class.send(:execute_emergency_stop)
+    def field_titles(result)
+      result[:attachments].flat_map { |a| a[:fields] }.map { |f| f[:title] }
     end
 
-    it "returns success result" do
-      result = described_class.send(:execute_emergency_stop)
-
-      expect(result).to include(
-        success: true,
-        message: "Emergency stop completed successfully.",
-        positions_closed: 2,
-        orders_cancelled: 0
+    it "does not claim to have closed positions it left open" do
+      result = described_class.handle_command(
+        command: "/bot-stop", user_id: described_class.authorized_users.first, text: ""
       )
+
+      expect(Position.open.count).to eq(2)
+      expect(field_titles(result)).not_to include("Positions Closed")
+      expect(result[:text]).not_to include("completed successfully")
     end
 
-    context "when an error occurs during execution" do
-      before do
-        allow(Position).to receive(:open).and_raise(StandardError.new("DB Error"))
-      end
+    it "still halts trading and reports what is left open" do
+      result = described_class.handle_command(
+        command: "/bot-stop", user_id: described_class.authorized_users.first, text: ""
+      )
 
-      it "logs the error and returns partial success" do
-        expect(Rails.logger).to receive(:error).with("[SlackCommand] Error during emergency stop: DB Error")
-
-        result = described_class.send(:execute_emergency_stop)
-
-        expect(result).to include(
-          success: false,
-          message: "Emergency stop partially completed. Error: DB Error",
-          positions_closed: 0,
-          orders_cancelled: 0
-        )
-      end
+      expect(TradingHalt.active?).to be(false)
+      expect(result[:text]).to include("does NOT close open positions")
+      expect(result[:text]).to include("2 position(s) remain OPEN")
     end
   end
 

@@ -105,6 +105,23 @@ RSpec.describe Mcp::Server do
       expect(fake).to have_received(:close_position).with(hash_including(product_id: "NOL-19JUN26-CDE"))
       expect(result[:data]).to include("closed" => true)
     end
+
+    # An operator-initiated close is still an exit: it must feed the protections
+    # layer (ADR 0003) exactly as a bot-initiated exit does. Closing through
+    # Trading::CoinbasePositions directly skipped the cooldown, the stoploss
+    # guard, and the daily loss caps — so a loser closed by hand never counted
+    # against the caps that exist to stop the next one.
+    it "records a cooldown so the protections layer sees the exit" do
+      position = create(:position, product_id: "NOL-19JUN26-CDE")
+      fake = instance_double(Trading::CoinbasePositions, close_position: {"success" => true})
+      allow(Trading::CoinbasePositions).to receive(:new).and_return(fake)
+
+      tool_call("close_position", {"position_id" => position.id, "confirm" => true})
+
+      cooled = Trading::ProtectionLock.active.select { |l| l["symbol"] == "NOL-19JUN26-CDE" }
+      expect(cooled).not_to be_empty
+      expect(cooled.first["source"]).to eq("CooldownPeriod")
+    end
   end
 
   describe "unknown method" do

@@ -314,8 +314,16 @@ module Trading
       fill_price = price || get_current_market_price(product_id)
       # Simulated taker fee with the flat per-contract floor (issue #372) so
       # paper Positions carry realistic per-fill costs for reconciliation.
-      fee = [fill_price.to_f * size.to_f * CostModel.taker_fee_rate,
-        size.to_f * CostModel.min_fee_per_contract].max.round(6)
+      #
+      # Priced PER VENUE via CostModel.fee_for (issue #458, ADR 0004). This used
+      # to inline CostModel.taker_fee_rate and .min_fee_per_contract — the PERP
+      # schedule — for every product, so a dated NOL fill recorded 3 bps/$0.15
+      # instead of 9 bps/$0.85 and understated the cost of the only instrument
+      # this bot has actually traded. fee_for also prefers a real measured
+      # commission over the seeded constant where one exists.
+      fees = CostModel.fee_for(product_id)
+      fee = [fill_price.to_f * size.to_f * fees[:taker_rate].to_f,
+        size.to_f * fees[:per_contract_fee].to_f].max.round(6)
       order_id = PaperTrading::ExchangeSimulator.new.place_limit(
         symbol: product_id,
         side: simulator_side(side),

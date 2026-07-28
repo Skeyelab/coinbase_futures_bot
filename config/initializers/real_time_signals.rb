@@ -52,12 +52,20 @@ Rails.application.config.real_time_signals = {
 
   # Liquidation buffer (issue #399, ADR 0003). Close a leveraged position before
   # it reaches the exchange's liquidation price. `buffer` is the fraction of the
-  # entry→liq distance kept as a safety margin (default 0.05). Positions carry no
-  # real leverage yet, so an assumed `leverage` is used (documented gap). Set
-  # buffer: 0 to disable. Per-symbol overrides via `per_symbol`.
+  # entry→liq distance kept as a safety margin (default 0.05). Set buffer: 0 to
+  # disable. Per-symbol overrides via `per_symbol`.
+  #
+  # `leverage` has NO default on purpose. Leverage comes from the contract's real
+  # per-side intraday margin rate (contracts.intraday_margin_rate_*, populated
+  # from the products API). It used to default to 10.0, which silently
+  # under-protected anything more levered: on PAU (5% intraday = 20x) the
+  # assumed-10x exit sat at ~9.0% adverse while real liquidation is ~4.5%, so the
+  # buffer could never fire in time. A contract with no stored margin and no
+  # explicit override now leaves the buffer UNARMED and logs it, rather than
+  # arming on a number nobody checked.
   liquidation_buffer: {
     buffer: ENV.fetch("LIQUIDATION_BUFFER", "0.05").to_f,
-    leverage: ENV.fetch("LIQUIDATION_ASSUMED_LEVERAGE", "10.0").to_f,
+    leverage: ENV["LIQUIDATION_ASSUMED_LEVERAGE"]&.to_f,
     maintenance_margin_rate: ENV.fetch("LIQUIDATION_MAINTENANCE_MARGIN_RATE", "0.005").to_f,
     per_symbol: {}
   },

@@ -60,6 +60,23 @@ RSpec.describe Trading::TrailingStop::Runner do
       expect(positions_service).to have_received(:close_position).with(product_id: position.product_id, size: position.size)
     end
 
+    # A trailing-stop exit is a bot exit like any other, so it must feed the
+    # protections layer (ADR 0003). This path built its own close (force_close!
+    # plus a price fallback) instead of going through PositionLifecycle, so a
+    # trailing-stop loss never reached the cooldown, the stoploss guard, or the
+    # daily loss caps.
+    it "records a cooldown so the protections layer sees the exit" do
+      create(:tick, product_id: position.product_id, price: position.entry_price * 1.02, observed_at: 2.minutes.ago)
+      runner.evaluate_position(position)
+      create(:tick, product_id: position.product_id, price: position.entry_price * 1.015, observed_at: 1.minute.ago)
+
+      runner.close_triggered_positions(positions: Position.where(id: position.id))
+
+      cooled = Trading::ProtectionLock.active.select { |l| l["symbol"] == position.product_id }
+      expect(cooled).not_to be_empty
+      expect(cooled.first["source"]).to eq("CooldownPeriod")
+    end
+
     it "skips work when disabled" do
       allow(ENV).to receive(:fetch).with("TRAILING_STOP_ENABLED", "false").and_return("false")
       result = runner.close_triggered_positions(positions: Position.where(id: position.id))
