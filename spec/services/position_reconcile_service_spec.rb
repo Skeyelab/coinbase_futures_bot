@@ -98,5 +98,38 @@ RSpec.describe PositionReconcileService do
 
       expect(pos.reload.pnl).to eq(3.6)
     end
+
+    # Issue #482: a reconciled close realizes P&L exactly like a lifecycle
+    # close, but this path never passes through PositionLifecycle — the loss
+    # caps must be evaluated here or a loss realized on-exchange would not trip
+    # the halt until some later lifecycle close happened to run.
+    describe "loss-cap evaluation" do
+      it "evaluates the caps after realizing closes" do
+        create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG", status: "OPEN")
+        allow(Trading::LossLimits).to receive(:evaluate!)
+
+        service.reconcile!(exchange_rows: [])
+
+        expect(Trading::LossLimits).to have_received(:evaluate!)
+      end
+
+      it "does not evaluate when nothing was closed" do
+        allow(Trading::LossLimits).to receive(:evaluate!)
+
+        service.reconcile!(exchange_rows: [])
+
+        expect(Trading::LossLimits).not_to have_received(:evaluate!)
+      end
+
+      it "does not fail the reconcile when evaluation raises" do
+        pos = create(:position, product_id: "BIT-29AUG25-CDE", side: "LONG", status: "OPEN")
+        allow(Trading::LossLimits).to receive(:evaluate!).and_raise(StandardError, "db hiccup")
+
+        result = service.reconcile!(exchange_rows: [])
+
+        expect(result[:closed_count]).to eq(1)
+        expect(pos.reload.status).to eq("CLOSED")
+      end
+    end
   end
 end

@@ -35,6 +35,19 @@ class PositionReconcileService
 
     @logger.info("[PRS] Reconciled #{closed_ids.size} local row(s) absent from exchange")
 
+    # Loss caps (issue #482): a reconciled close realizes P&L exactly like a
+    # lifecycle close, but this path skips PositionLifecycle — without this, a
+    # loss realized here would not trip the caps until the NEXT lifecycle close
+    # happened to run. Never allowed to fail the reconcile: the rows are already
+    # closed, and raising would misreport work that has been done.
+    if closed_ids.any?
+      begin
+        Trading::LossLimits.evaluate!(logger: @logger)
+      rescue => e
+        @logger.error("[PRS] loss-limit evaluation failed: #{e.class}: #{e.message}")
+      end
+    end
+
     {closed_count: closed_ids.size, closed_ids: closed_ids, errors: errors}
   end
 
