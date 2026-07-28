@@ -127,23 +127,13 @@ if defined?(Sentry) && ENV["SENTRY_DSN"].present?
     )
   end
 
-  # Custom trading event tracking
-  ActiveSupport::Notifications.subscribe("signal.generated") do |name, started, finished, unique_id, data|
-    SentryMonitoringService.track_signal_generated(data[:signal])
-  end
-
-  ActiveSupport::Notifications.subscribe("position.opened") do |name, started, finished, unique_id, data|
-    SentryMonitoringService.track_position_opened(data[:position])
-  end
-
-  ActiveSupport::Notifications.subscribe("position.closed") do |name, started, finished, unique_id, data|
-    SentryMonitoringService.track_position_closed(data[:position], data[:reason])
-  end
-
-  # Monitor critical system events
-  ActiveSupport::Notifications.subscribe("health_check.completed") do |name, started, finished, unique_id, data|
-    SentryMonitoringService.track_health_check(data[:health_data], data[:overall_healthy])
-  end
+  # NOTE: the subscribers above are for Rails-emitted events (active_job,
+  # action_controller, action_cable), which the framework instruments itself.
+  # Four further subscribers once listened for "signal.generated",
+  # "position.opened", "position.closed" and "health_check.completed" and
+  # dispatched to SentryMonitoringService. Nothing in app/ or lib/ ever called
+  # ActiveSupport::Notifications.instrument, so those events were never
+  # published and the service they fed never ran. Both are removed.
 
   Rails.logger.info("[Sentry] Trading-specific monitoring initialized")
 end

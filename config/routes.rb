@@ -67,13 +67,6 @@ Rails.application.routes.draw do
 
   # API routes
   namespace :api do
-    resources :positions, only: [:index] do
-      collection do
-        get :summary
-        get :exposure
-      end
-    end
-
     resources :chat_messages, only: %i[create index] do
       collection do
         post :send_message
