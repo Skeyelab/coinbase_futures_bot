@@ -127,10 +127,47 @@ RSpec.describe Trading::PositionManagement::DayTradingWorkflow do
       positions_approaching_closure: 0
     })
 
+    # `total_pnl: 123.45` used to be asserted here, passed straight through from
+    # the manager's summary — which is unrealized PnL on OPEN positions only,
+    # mislabeled. That pass-through IS the bug, so the payload now comes from
+    # Trading::PaperPnlSummary and this asserts the gate, not the old plumbing.
     expect(SlackNotificationService).to receive(:pnl_update).with(
-      hash_including(total_pnl: 123.45, open_positions: 6, closed_today: 0)
+      hash_including(open_positions: 0, closed_today: 0)
     )
 
     workflow.call
+  end
+
+  it "reports real realized PnL and win rate rather than nil placeholders" do
+    allow(manager).to receive(:positions_need_closure?).and_return(false)
+    allow(manager).to receive(:positions_approaching_closure?).and_return(false)
+    allow(manager).to receive(:check_tp_sl_triggers).and_return([])
+    allow(manager).to receive(:get_position_summary).and_return({
+      open_count: 0,
+      closed_today_count: 2,
+      total_pnl: 0,
+      positions_needing_closure: 0,
+      positions_approaching_closure: 0
+    })
+
+    # Two closed paper trades today, one win — the shape that produced
+    # "Total PnL $0 | Daily PnL $ | Win Rate N/A" before the fix.
+    [32.0, -6.4].each do |pnl|
+      Position.create!(
+        product_id: "NOL-19AUG26-CDE", side: "SHORT", size: 1, entry_price: 80.0,
+        entry_time: 2.hours.ago, close_time: 1.hour.ago, status: "CLOSED",
+        pnl: pnl, paper: true, day_trading: true
+      )
+    end
+
+    payload = nil
+    allow(SlackNotificationService).to receive(:pnl_update) { |p| payload = p }
+
+    workflow.call
+
+    expect(payload[:daily_pnl]).to eq(25.6)
+    expect(payload[:win_rate]).to eq(50.0)
+    expect(payload[:closed_today]).to eq(2)
+    expect(payload[:total_pnl]).to eq(25.6)
   end
 end

@@ -124,18 +124,35 @@ module Trading
         closed_count
       end
 
+      # The numbers come from Trading::PaperPnlSummary, the same source the daily
+      # summary uses. They used to be computed here, badly:
+      #
+      #   daily_pnl: nil, win_rate: nil   <- literals, never populated
+      #   total_pnl: summary[:total_pnl]  <- unrealized on OPEN positions only
+      #
+      # On 2026-07-28 that produced "Total PnL $0 | Daily PnL $ | Win Rate N/A"
+      # at 15:30 UTC, on a day the paper account had closed five trades for
+      # +$62.65. With nothing open, unrealized is legitimately zero — so the one
+      # field an operator reads to answer "did we make money today" showed a
+      # hardcoded floor, beside a correct "Closed Positions Today 5".
       def send_pnl_update(summary)
         closed_today_count = summary[:closed_today_count] || 0
         open_count = summary[:open_count] || 0
-        return unless summary[:total_pnl]
         return unless closed_today_count.positive? || open_count > 5
 
+        today = Trading::PaperPnlSummary.call(since: Time.current.utc.beginning_of_day)
+
         SlackNotificationService.pnl_update({
-          total_pnl: summary[:total_pnl],
-          daily_pnl: nil,
-          open_positions: open_count,
-          closed_today: closed_today_count,
-          win_rate: nil
+          total_pnl: (today[:realized_pnl] + today[:unrealized_pnl]).round(2),
+          daily_pnl: today[:realized_pnl],
+          unrealized_pnl: today[:unrealized_pnl],
+          # Both counts from one source. The card used to print the DAY-TRADING
+          # open count beside an all-paper closed count, so the two numbers an
+          # operator naturally compares were scoped differently. The manager's
+          # day-trading count still decides whether to SEND.
+          open_positions: today[:open],
+          closed_today: today[:trades],
+          win_rate: today[:win_rate]
         })
       end
 
