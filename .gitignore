@@ -67,3 +67,4 @@ spec/examples.txt
 debug_*.rb
 check_*.rb
 .env
+.gstack/
