@@ -76,16 +76,21 @@ module MarketData
       contract_info = Contract.parse_contract_info(contract_id)
       return nil unless contract_info
 
-      # Create or update the trading pair
+      # Create or update the trading pair. `enabled` is written on CREATE only:
+      # discovery may bring a new month into the data pipeline, but it must not
+      # overturn a decision already recorded on an existing row. It used to
+      # assign it unconditionally, and because the lookup that calls discovery
+      # is scoped to Contract.enabled, disabling a contract made the lookup miss
+      # and discovery re-enabled the row the operator had just turned off.
       contract = Contract.find_or_initialize_by(product_id: contract_id)
       contract.assign_attributes(
         base_currency: contract_info[:base_currency],
         quote_currency: contract_info[:quote_currency],
         expiration_date: contract_info[:expiration_date],
         contract_type: contract_info[:contract_type],
-        enabled: true,
         status: "online"
       )
+      contract.enabled = true if contract.new_record?
 
       if contract.save
         @logger.info("Created current month contract: #{contract_id}")
@@ -105,16 +110,21 @@ module MarketData
       contract_info = Contract.parse_contract_info(contract_id)
       return nil unless contract_info
 
-      # Create or update the trading pair
+      # Create or update the trading pair. `enabled` is written on CREATE only:
+      # discovery may bring a new month into the data pipeline, but it must not
+      # overturn a decision already recorded on an existing row. It used to
+      # assign it unconditionally, and because the lookup that calls discovery
+      # is scoped to Contract.enabled, disabling a contract made the lookup miss
+      # and discovery re-enabled the row the operator had just turned off.
       contract = Contract.find_or_initialize_by(product_id: contract_id)
       contract.assign_attributes(
         base_currency: contract_info[:base_currency],
         quote_currency: contract_info[:quote_currency],
         expiration_date: contract_info[:expiration_date],
         contract_type: contract_info[:contract_type],
-        enabled: true,
         status: "online"
       )
+      contract.enabled = true if contract.new_record?
 
       if contract.save
         @logger.info("Created upcoming month contract: #{contract_id}")

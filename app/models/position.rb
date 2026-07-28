@@ -315,7 +315,12 @@ class Position < ApplicationRecord
         paper: paper,
         day_trading: day_trading,
         take_profit: take_profit,
-        stop_loss: stop_loss
+        stop_loss: stop_loss,
+        # Without this link every consumer that counts CLOSED rows counts one
+        # position reduced N times as N trades. SymbolCircuitBreakerJob's
+        # five-trade minimum was the first thing that made wrong, so a symbol
+        # could be suspended on the evidence of a single position.
+        parent_position_id: parent_position_id || id
       )
       update!(size: size - closed)
     end

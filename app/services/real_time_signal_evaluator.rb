@@ -71,8 +71,10 @@ class RealTimeSignalEvaluator
   def evaluate_pair(contract)
     symbol = resolve_symbol(contract.product_id)
 
+    # info, not debug: with the ADR 0006 fail-closed default this is the line
+    # that explains a silent bot, and debug is off in production.
     if Trading::SymbolSuspension.suspended?(symbol)
-      @logger.debug("[RTSE] Skip #{symbol}: suspended")
+      @logger.info("[RTSE] Skip #{symbol} — #{Trading::SymbolSuspension.block_reason(symbol)}")
       return {signals_created: 0, insufficient_data: 0, suspended: 1}
     end
 

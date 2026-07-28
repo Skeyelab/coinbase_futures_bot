@@ -20,6 +20,10 @@ RSpec.describe RapidSignalEvaluationJob, "account notional cap", type: :job do
     allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1.0)
     allow(Trading::CurrentEquity).to receive(:usd).and_return(1_000.0)
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
+    # ADR 0006's MAX_LIVE_INSTRUMENTS is not the gate under test here. These
+    # examples stand several instruments up so that a DIFFERENT cap is the one
+    # that binds; the universe cap has its own spec.
+    allow(described_class).to receive(:max_live_instruments).and_return(10)
     Position.destroy_all
     SignalDecision.delete_all
   end

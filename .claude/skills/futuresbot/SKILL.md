@@ -22,8 +22,8 @@ state and issue control actions through the `bin/futuresbot` CLI only.
    parse the human-formatted ANSI tables. Commands not listed there (e.g.
    `dry_run_status`, `version`) are human-formatted only.
 2. **Only documented CLI commands.** Never place or modify orders by any
-   free-form means. The only control commands are `halt`, `resume`, and (with
-   `--yes`) `close`. There is no "buy"/"sell" command and you must not invent
+   free-form means. The only control commands are `halt`, `resume`, `suspend`,
+   and (with `--yes`) `close`. There is no "buy"/"sell" command and you must not invent
    one. Every verb this skill names is verified to exist — if a command is
    rejected as unknown, stop and tell the operator rather than guessing at a
    variant.
@@ -45,6 +45,7 @@ bin/futuresbot status --json        # halt, dry_run, position counts, signals, e
 bin/futuresbot positions --json     # open positions: product_id, side, entry_price, size, tp/sl, unrealized_pnl, paper
 bin/futuresbot signals --json       # active signals: symbol, side, confidence, strategy, timestamp
 bin/futuresbot halt_status --json   # active / halted / reason / as_of
+bin/futuresbot universe --json      # live_symbols, max_live_instruments, suspended{}, ingested_symbols
 ```
 
 All JSON documents use snake_case keys, ISO-8601 UTC timestamps, and an `as_of`
@@ -68,6 +69,30 @@ bin/futuresbot halt_status --json      # verify halted == true
 bin/futuresbot resume --json
 bin/futuresbot halt_status --json      # verify active == true
 ```
+
+**Suspend one symbol (ADR 0006) — the brake, no confirmation needed:**
+```bash
+bin/futuresbot suspend BIP-20DEC30-CDE --json --reason "cost bleed"
+bin/futuresbot universe --json         # verify it left live_symbols
+```
+Suspension blocks NEW entries only; open positions still exit normally.
+
+**Re-enable one symbol — MONEY-TOUCHING, confirm first:**
+
+The universe gate fails closed (ADR 0006): a symbol with no recorded enablement
+cannot trade, so `resume SYMBOL` is what puts an instrument back on the order
+path. Same confirmation contract as `close`.
+```bash
+bin/futuresbot resume BIP-20DEC30-CDE --json --yes --reason "walk-forward passed"
+bin/futuresbot universe --json         # verify it appears in live_symbols
+```
+Branch on the `resumed` field. `{"resumed": false, "error": "confirmation_required"}`
+means `--yes` was missing. If `live_symbols` is longer than `max_live_instruments`,
+**entries are rejected for every symbol** until one is suspended — say so.
+
+**"The bot is not trading and nothing is halted":** read `universe --json`. An
+empty `live_symbols` is the expected fail-closed state on a fresh deploy, not a
+fault. The fix is `resume SYMBOL --yes` or the `LIVE_INSTRUMENTS` env var.
 
 **Close a position — MONEY-TOUCHING, confirm first:**
 1. Read `positions --json`, identify the position id.

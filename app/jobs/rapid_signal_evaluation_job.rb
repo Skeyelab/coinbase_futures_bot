@@ -23,6 +23,23 @@ class RapidSignalEvaluationJob < ApplicationJob
     ENV.fetch("RSE_MIN_CONFIDENCE", DEFAULT_MIN_CONFIDENCE).to_f
   end
 
+  # ADR 0006 decision 2: how many symbols may be simultaneously tradeable.
+  #
+  # Distinct from MAX_CONCURRENT_POSITIONS, which bounds open positions, and
+  # from Trading::NotionalCap, which bounds exposure. Both of those govern what
+  # happens AFTER an instrument is live; nothing governed how many got there,
+  # and the growth path was one line in Contract::PREFIX_TO_BASE_CURRENCY.
+  #
+  # Default 1 because the count of instruments that have produced a perp fill is
+  # zero. This is scaffolding tied to that condition and should be revisited by
+  # amendment once #486 produces measured fills.
+  DEFAULT_MAX_LIVE_INSTRUMENTS = 1
+
+  def self.max_live_instruments
+    value = ENV.fetch("MAX_LIVE_INSTRUMENTS", DEFAULT_MAX_LIVE_INSTRUMENTS).to_i
+    value.positive? ? value : DEFAULT_MAX_LIVE_INSTRUMENTS
+  end
+
   def perform(product_id:, current_price:, asset:, day_trading: nil)
     @logger = Rails.logger
     @product_id = product_id
@@ -34,9 +51,14 @@ class RapidSignalEvaluationJob < ApplicationJob
     # best-effort and never blocks an order.
     @decisions = Trading::DecisionRecorder.new(product_id: @product_id, asset: @asset, logger: @logger)
 
+    # ADR 0006: this gate now fails closed, so the reason must carry the way
+    # out. It previously interpolated `all.dig(product_id, "reason")`, which is
+    # nil for anything the operator did not suspend by hand — the message read
+    # "is suspended ()" and told nobody what to do about it.
     if Trading::SymbolSuspension.suspended?(@product_id)
-      @logger.info("[RSE] #{@product_id} is suspended (#{Trading::SymbolSuspension.all.dig(@product_id, "reason")}) — skipping evaluation")
-      @decisions.rejected(:symbol_suspended)
+      reason = Trading::SymbolSuspension.block_reason(@product_id)
+      @logger.info("[RSE] #{@product_id} blocked from new entries — #{reason}")
+      @decisions.rejected(:symbol_suspended, reason: reason)
       return
     end
 
@@ -165,6 +187,30 @@ class RapidSignalEvaluationJob < ApplicationJob
       return false
     end
 
+    # MAX_LIVE_INSTRUMENTS (ADR 0006 decision 2). The caps above and below bound
+    # position COUNT and NOTIONAL — both of which govern what happens after an
+    # instrument is live. Neither bounds how many instruments get there, and the
+    # growth path is one line in Contract::PREFIX_TO_BASE_CURRENCY.
+    #
+    # Two arms, because there are two ways to exceed the bound. The runtime arm
+    # is the one shaped like its neighbours: would this entry make one more
+    # instrument concurrently live than allowed? The configuration arm catches
+    # the state that produces the runtime arm's breach a tick later — more
+    # symbols enabled than may ever be live at once — and names it as a
+    # configuration problem rather than letting whichever symbol ticks first win
+    # the slot by race.
+    unless within_live_instrument_cap?
+      cap = self.class.max_live_instruments
+      enabled = Trading::SymbolSuspension.live_symbols
+      @logger.info("[RSE] Skipping signal - live-instrument cap " \
+                   "(#{live_instruments.size} holding positions, #{enabled.size} enabled, cap #{cap}). " \
+                   "Suspend one with `bin/futuresbot suspend SYMBOL --reason \"...\"` " \
+                   "or raise MAX_LIVE_INSTRUMENTS.")
+      @decisions&.rejected(:live_instrument_cap, signal: signal,
+        live: live_instruments.to_a.sort, enabled: enabled, cap: cap)
+      return false
+    end
+
     # Check if we already have positions in this asset
     existing_positions = Position.open.by_asset(@asset).count
     max_positions = max_concurrent_positions_for_asset(@asset)
@@ -251,6 +297,19 @@ class RapidSignalEvaluationJob < ApplicationJob
 
   def max_contracts_for_asset(asset)
     Trading::AssetSizing.for(asset).max_contracts
+  end
+
+  # Distinct product_ids currently holding an open position — the instruments
+  # that are live in the only sense that costs money.
+  def live_instruments
+    Position.open.distinct.pluck(:product_id).compact.to_set
+  end
+
+  def within_live_instrument_cap?
+    cap = self.class.max_live_instruments
+    return false if Trading::SymbolSuspension.live_symbols.size > cap
+
+    (live_instruments << @target_contract).size <= cap
   end
 
   # Total open positions allowed across all products. Defaults to 3 (the top of

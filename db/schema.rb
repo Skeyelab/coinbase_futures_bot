@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_27_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_28_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -248,6 +248,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_27_200000) do
     t.decimal "exit_fee"
     t.decimal "max_adverse_excursion"
     t.boolean "paper", default: false, null: false
+    t.bigint "parent_position_id"
     t.decimal "pnl"
     t.string "product_id"
     t.string "side"
@@ -258,6 +259,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_27_200000) do
     t.boolean "trailing_stop_enabled", default: false, null: false
     t.jsonb "trailing_stop_state", default: {}, null: false
     t.datetime "updated_at", null: false
+    t.index ["parent_position_id"], name: "index_positions_on_parent_position_id"
     t.index ["status", "trailing_stop_enabled"], name: "index_positions_on_status_and_trailing_stop_enabled"
   end
 

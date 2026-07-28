@@ -18,6 +18,12 @@ class Contract < ApplicationRecord
   # TRADING is a separate decision — see Trading::SymbolSuspension and ADR 0002's
   # no-evidence-inheritance rule: a new perp collects data while suspended until
   # it earns enablement on its own walk-forward.
+  #
+  # That separation is now enforced rather than described (ADR 0006). Adding a
+  # key here grants DATA COLLECTION and nothing else: Trading::SymbolSuspension
+  # fails closed, so a symbol with no recorded enablement cannot open a
+  # position. Before ADR 0006 this comment was aspirational — the suspension
+  # store started empty, so one line here put an instrument on the order path.
   PREFIX_TO_BASE_CURRENCY = {
     "BIT" => "BTC",   # dated nano BTC
     "ET" => "ETH",    # dated nano ETH
@@ -30,8 +36,9 @@ class Contract < ApplicationRecord
     # Dated gold is the worst cost-to-volatility on the venue (~18% of a daily
     # move vs the perp's ~8%), because gold's 1h sigma is ~25 bps — half of BTC
     # — so a 9 bps dated fee eats a large share of the move it is trying to
-    # capture. Ingesting only: PAU stays SymbolSuspension-suspended and earns
-    # enablement on its own walk-forward, per ADR 0002 / 0004.
+    # capture. Ingesting only: PAU is blocked from trading until an operator
+    # records an enablement for it, and earns that on its own walk-forward, per
+    # ADR 0002 / 0004. Enforced by the fail-closed gate since ADR 0006.
     "PAU" => "PAXG"
   }.freeze
 
