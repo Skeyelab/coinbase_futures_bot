@@ -298,6 +298,49 @@ module Cli
       close_success(position, outcome)
     end
 
+    # ─── calibrate ──────────────────────────────────────────────────────────────
+    # A CLI verb rather than a rake task, deliberately. This is money-touching,
+    # and the confirmation contract for money-touching operator actions lives
+    # here (ADR 0005): `close` and `resume` established --yes/--json/interactive
+    # prompt, and rake has no equivalent — `rake calibrate[live,PHRASE]` cannot
+    # refuse a non-interactive caller and cannot emit the --json shape the
+    # /futuresbot skill and MCP server consume. The operator surface is
+    # bin/futuresbot; putting the one command that spends $150 somewhere else
+    # would be the surprise.
+    desc "calibrate", "Measure real BIP execution cost — 20 forced round trips (issue #486). " \
+                      "DRY-RUN unless --live; MONEY-TOUCHING"
+    method_option :live, type: :boolean, default: false,
+      desc: "Place REAL orders. Also requires LIVE_TRADING_CONFIRMED=1 and the typed confirmation phrase"
+    method_option :confirm, type: :string,
+      desc: "The exact confirmation phrase (non-interactive equivalent of the prompt)"
+    method_option :round_trips, type: :numeric, default: Trading::ExecutionCalibration::Runner::DEFAULT_ROUND_TRIPS,
+      desc: "How many forced round trips; half taker-entry, half maker-entry"
+    method_option :hold_seconds, type: :numeric, default: Trading::ExecutionCalibration::Runner::DEFAULT_HOLD_SECONDS,
+      desc: "How long each position is held before it is closed"
+    method_option :resume, type: :boolean, default: false,
+      desc: "Continue an interrupted run instead of refusing to start over it"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def calibrate
+      confirmation, refusal = calibration_confirmation
+      return calibration_refused(refusal) if refusal
+
+      print_calibration_banner unless json_mode?
+
+      report = Trading::ExecutionCalibration::Runner.new(
+        live: options[:live],
+        confirmation: confirmation,
+        round_trips: options[:round_trips].to_i,
+        hold_seconds: options[:hold_seconds].to_i,
+        resume: options[:resume],
+        logger: Rails.logger
+      ).call
+
+      return emit_json(report.to_h) if json_mode?
+
+      puts report.summary
+      puts calibration_footer(report)
+    end
+
     # ─── dry_run_on ─────────────────────────────────────────────────────────────
     desc "dry_run_on", "Enable dry-run mode (simulate orders; nothing is sent to Coinbase)"
     def dry_run_on
@@ -455,6 +498,64 @@ module Cli
 
       $stdout.puts "#{GREEN}#{BOLD}✅ Closed#{RESET} position #{position.id} " \
                    "(#{position.product_id}) at #{outcome.close_price}"
+    end
+
+    # ── calibrate helpers ────────────────────────────────────────────────────────
+
+    # Returns [confirmation, refusal]. A dry run needs no phrase. A live run
+    # needs the exact phrase, typed — and a --json caller that cannot be
+    # prompted must be refused rather than promoted to live or hung on stdin.
+    #
+    # The phrase is forwarded VERBATIM, right or wrong: the runner owns the
+    # comparison, so there is exactly one place where "is this authorized?" is
+    # decided, and the CLI cannot accidentally answer it more leniently.
+    def calibration_confirmation
+      return [options[:confirm], nil] if options[:confirm].present?
+      return [nil, nil] unless options[:live]
+
+      if json_mode?
+        return [nil, "live run requested with --json but no confirmation phrase. Pass " \
+                     "--confirm \"#{Trading::ExecutionCalibration::Runner::CONFIRMATION_PHRASE}\" — " \
+                     "a JSON caller cannot answer a prompt, and this run places real orders."]
+      end
+
+      [prompt_for_calibration_phrase, nil]
+    end
+
+    def prompt_for_calibration_phrase
+      $stdout.print "#{RED}#{BOLD}⚠ MONEY-TOUCHING — LIVE CALIBRATION#{RESET}\n" \
+                    "This places up to #{options[:round_trips]} REAL orders on BIP, 1 contract each, and can " \
+                    "lose up to the authorized $150.\n" \
+                    "Type #{BOLD}#{Trading::ExecutionCalibration::Runner::CONFIRMATION_PHRASE}#{RESET} to proceed: "
+      $stdin.gets.to_s.strip
+    end
+
+    def calibration_refused(message)
+      if json_mode?
+        return emit_json({status: "refused", product_id: nil, refusals: [message],
+                          as_of: Time.current.utc.iso8601})
+      end
+
+      $stdout.puts "#{RED}#{BOLD}✖ Calibration refused#{RESET} — #{message}"
+    end
+
+    def print_calibration_banner
+      mode = options[:live] ? "#{RED}#{BOLD}LIVE#{RESET}" : "#{YELLOW}#{BOLD}DRY-RUN#{RESET}"
+      puts "#{BOLD}#{CYAN}🔬 BIP execution calibration#{RESET} (issue #486) — mode: #{mode}"
+      puts "   Measuring fees, not edge. No conclusion about strategy edge may be drawn from this run."
+    end
+
+    def calibration_footer(report)
+      case report.status
+      when :refused
+        "\n#{RED}#{BOLD}✖ Refused#{RESET} — nothing was placed. Fix the items above and re-run."
+      when :aborted
+        "\n#{RED}#{BOLD}🔴 ABORTED and RISK-HALTED#{RESET} — trading stays stopped until you clear it " \
+          "deliberately:\n   #{BOLD}bin/futuresbot halt_status#{RESET} then a Rails console " \
+          "TradingHalt.resume!(acknowledge_risk: true, operator: \"you\")"
+      else
+        "\n#{GREEN}#{BOLD}✅ Run complete#{RESET} — paste the summary above into issue #486 as the recorded finding."
+      end
     end
 
     # ── universe helpers ─────────────────────────────────────────────────────────

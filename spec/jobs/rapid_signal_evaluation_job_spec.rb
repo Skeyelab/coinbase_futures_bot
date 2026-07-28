@@ -821,21 +821,24 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       end
     end
 
+    # Sizing is keyed by CONTRACT since #486 — base currency could not tell a
+    # $659 BIP perp from a $100 BIT nano, since both are "BTC". Every existing
+    # per-asset entry must keep resolving exactly as it did.
     context "asset-specific configuration" do
-      it "applies BTC-specific limits" do
+      it "applies BTC-specific limits to the dated BTC nano" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:legacy_contract_size_for_asset, "BTC")).to eq(100.0)
-        expect(job_instance.send(:max_contracts_for_asset, "BTC")).to eq(5)
-        expect(job_instance.send(:max_concurrent_positions_for_asset, "BTC")).to eq(2)
+        expect(job_instance.send(:legacy_contract_size_for_contract, "BIT-31JUL26-CDE")).to eq(100.0)
+        expect(job_instance.send(:max_contracts_for_contract, "BIT-31JUL26-CDE")).to eq(5)
+        expect(job_instance.send(:max_concurrent_for_contract, "BIT-31JUL26-CDE")).to eq(2)
       end
 
       it "applies ETH-specific limits" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:legacy_contract_size_for_asset, "ETH")).to eq(10.0)
-        expect(job_instance.send(:max_contracts_for_asset, "ETH")).to eq(10)
-        expect(job_instance.send(:max_concurrent_positions_for_asset, "ETH")).to eq(3)
+        expect(job_instance.send(:legacy_contract_size_for_contract, "ET-31JUL26-CDE")).to eq(10.0)
+        expect(job_instance.send(:max_contracts_for_contract, "ET-31JUL26-CDE")).to eq(10)
+        expect(job_instance.send(:max_concurrent_for_contract, "ET-31JUL26-CDE")).to eq(3)
       end
 
       # Issue #340: an unlisted asset must fall to the CONSERVATIVE default, not
@@ -844,9 +847,9 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "applies conservative default limits for unknown assets" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:legacy_contract_size_for_asset, "UNKNOWN")).to eq(100.0)
-        expect(job_instance.send(:max_contracts_for_asset, "UNKNOWN")).to eq(2)
-        expect(job_instance.send(:max_concurrent_positions_for_asset, "UNKNOWN")).to eq(1)
+        expect(job_instance.send(:legacy_contract_size_for_contract, "ZZZ-01JAN30-CDE")).to eq(100.0)
+        expect(job_instance.send(:max_contracts_for_contract, "ZZZ-01JAN30-CDE")).to eq(2)
+        expect(job_instance.send(:max_concurrent_for_contract, "ZZZ-01JAN30-CDE")).to eq(1)
       end
 
       # OIL (NOL) has ~9x a BTC nano's per-contract notional, so it is capped
@@ -854,9 +857,18 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "applies conservative OIL-specific limits" do
         job_instance = described_class.new
 
-        expect(job_instance.send(:legacy_contract_size_for_asset, "OIL")).to eq(930.0)
-        expect(job_instance.send(:max_contracts_for_asset, "OIL")).to eq(1)
-        expect(job_instance.send(:max_concurrent_positions_for_asset, "OIL")).to eq(1)
+        expect(job_instance.send(:legacy_contract_size_for_contract, "NOL-19AUG26-CDE")).to eq(930.0)
+        expect(job_instance.send(:max_contracts_for_contract, "NOL-19AUG26-CDE")).to eq(1)
+        expect(job_instance.send(:max_concurrent_for_contract, "NOL-19AUG26-CDE")).to eq(1)
+      end
+
+      # The #486 bug: BIP is "BTC" too, and used to inherit the line above it.
+      it "pins the BTC PERP to one contract instead of the dated nano's five" do
+        job_instance = described_class.new
+
+        expect(job_instance.send(:legacy_contract_size_for_contract, "BIP-20DEC30-CDE")).to eq(659.0)
+        expect(job_instance.send(:max_contracts_for_contract, "BIP-20DEC30-CDE")).to eq(1)
+        expect(job_instance.send(:max_concurrent_for_contract, "BIP-20DEC30-CDE")).to eq(1)
       end
 
       it "validates sufficient buying power" do
