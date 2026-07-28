@@ -19,6 +19,11 @@ RSpec.describe Trading::SwingPositionManager, type: :service do
     allow(Coinbase::AdvancedTradeClient).to receive(:new).and_return(coinbase_client)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
     allow(coinbase_client).to receive(:authenticated?).and_return(true)
+    # Exposure and Position#pnl_percentage are contract_size-aware, so they
+    # resolve a contract size rather than assuming 1. Stubbed here to keep
+    # these specs off the products API; the multiplier itself is asserted in
+    # swing_position_manager_notional_spec.rb.
+    allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
   end
 
   describe "#cleanup_old_positions" do

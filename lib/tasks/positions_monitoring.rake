@@ -277,13 +277,24 @@ namespace :positions do
 
   private
 
+  # Same shape as HealthCheckJob#exposure_percent (PR #507), and wrong in the
+  # same two ways it was:
+  #
+  #   * notional is contract_size * price * quantity — `size * entry_price`
+  #     dropped contract_size and understated NOL (contract_size 10) 10x;
+  #   * the denominator was a hardcoded 100_000.0 placeholder while
+  #     Trading::CurrentEquity.usd — what NotionalCap already caps against —
+  #     was available.
+  #
+  # This percentage gates the portfolio exposure Slack alert. See #234.
   def calculate_exposure(positions)
     return 0.0 if positions.empty?
 
-    total_notional = positions.sum { |pos| pos.size * pos.entry_price }
-    # This should be replaced with actual account balance from Coinbase
-    total_portfolio_value = 100_000.0
+    equity = Trading::CurrentEquity.usd.to_f
+    return 0.0 unless equity.positive?
 
-    (total_notional / total_portfolio_value * 100).to_f
+    total_notional = positions.sum { |pos| Trading::NotionalCap.notional_for(pos.product_id, pos.size, pos.entry_price) }
+
+    (total_notional / equity * 100).to_f
   end
 end

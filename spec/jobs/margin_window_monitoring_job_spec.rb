@@ -219,6 +219,10 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
           entry_price: 50_000,
           entry_time: Time.current)
         allow(ENV).to receive(:fetch).with("SWING_MARGIN_BUFFER", "0.2").and_return("0.2")
+        # Margin requirement is now contract_size-aware, so it resolves a
+        # contract size rather than assuming 1. Stubbed to keep the job off the
+        # products API in a spec about alerting.
+        allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(1)
         allow(Trading::SwingPositionManager).to receive(:new).and_return(swing_manager)
         allow(swing_manager).to receive(:check_swing_risk_limits).and_return({
           risk_status: "violations_detected",
@@ -262,17 +266,22 @@ RSpec.describe MarginWindowMonitoringJob, type: :job do
     end
 
     describe "#calculate_position_margin_requirement" do
-      let(:position) { double("Position", size: 10, entry_price: 50_000) }
+      # contract_size 10 deliberately: a double with an implied contract_size of
+      # 1 is what let the #234 defect survive review here.
+      let(:position) { double("Position", product_id: "NOL-19AUG26-CDE", size: 10, entry_price: 50_000) }
       let(:intraday_window) { {"margin_window" => {"margin_window_type" => "INTRADAY_MARGIN"}} }
       let(:overnight_window) { {"margin_window" => {"margin_window_type" => "OVERNIGHT_MARGIN"}} }
+
+      before { allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(10) }
 
       it "calculates higher margin for overnight window" do
         overnight_margin = job_instance.send(:calculate_position_margin_requirement, position, overnight_window)
         intraday_margin = job_instance.send(:calculate_position_margin_requirement, position, intraday_window)
 
+        # 10 contracts * $50,000 * contract_size 10 = $5,000,000 notional.
         expect(overnight_margin).to be > intraday_margin
-        expect(overnight_margin).to eq(500_000 * 0.20) # 20% of position value
-        expect(intraday_margin).to eq(500_000 * 0.10)  # 10% of position value
+        expect(overnight_margin).to eq(5_000_000 * 0.20) # 20% of position value
+        expect(intraday_margin).to eq(5_000_000 * 0.10)  # 10% of position value
       end
     end
 

@@ -79,23 +79,29 @@ RSpec.describe MarketAnalysisService do
   end
 
   describe "#assess_position_risk" do
+    # Exposure is contract_size * price * quantity. These doubles carry a
+    # contract_size of 10 (NOL) deliberately — sizing a tier on a contract_size
+    # 1 product is what let the #234 defect survive review here.
+    def nol_position(size)
+      instance_double(Position, product_id: "NOL-19AUG26-CDE", size: size, entry_price: 10_000)
+    end
+
+    before { allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(10) }
+
     it "returns low for empty positions" do
       expect(service.send(:assess_position_risk, [])).to eq("low")
     end
 
     it "returns low for small exposure" do
-      p = instance_double(Position, size: 0.1, entry_price: 5000) # $500
-      expect(service.send(:assess_position_risk, [p])).to eq("low")
+      expect(service.send(:assess_position_risk, [nol_position(0.005)])).to eq("low") # $500
     end
 
     it "returns medium for mid-range exposure" do
-      p = instance_double(Position, size: 1, entry_price: 10_000) # $10k
-      expect(service.send(:assess_position_risk, [p])).to eq("medium")
+      expect(service.send(:assess_position_risk, [nol_position(0.1)])).to eq("medium") # $10k
     end
 
     it "returns high for large exposure" do
-      p = instance_double(Position, size: 5, entry_price: 10_000) # $50k
-      expect(service.send(:assess_position_risk, [p])).to eq("high")
+      expect(service.send(:assess_position_risk, [nol_position(0.5)])).to eq("high") # $50k
     end
   end
 
