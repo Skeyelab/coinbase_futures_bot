@@ -87,15 +87,7 @@ class PositionsController < ActionController::Base
   end
 
   def update
-    product_id = params[:product_id]
-    size_to_close = params[:size].presence
-
-    begin
-      result = positions_service.close_position(product_id: product_id, size: size_to_close)
-      redirect_to positions_path(notice: "Close order submitted: #{result["order_id"] || result["message"] || result["success"]}")
-    rescue => e
-      redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
-    end
+    submit_close(params[:product_id], params[:size].presence)
   end
 
   def close
@@ -104,12 +96,7 @@ class PositionsController < ActionController::Base
 
     Rails.logger.info("CLOSE ACTION CALLED: product_id=#{product_id}, size=#{size_to_close}")
 
-    begin
-      result = positions_service.close_position(product_id: product_id, size: size_to_close)
-      redirect_to positions_path(notice: "Close order submitted: #{result["order_id"] || result["message"] || result["success"]}")
-    rescue => e
-      redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
-    end
+    submit_close(product_id, size_to_close)
   end
 
   def increase
@@ -145,6 +132,47 @@ class PositionsController < ActionController::Base
 
   def positions_service
     @positions_service ||= Trading::CoinbasePositions.new
+  end
+
+  # A FULL close is an exit and must feed the protections layer — cooldown,
+  # stoploss guard, daily loss caps (ADR 0003). Trading::PositionLifecycle is
+  # the only writer of those, so a close that goes straight to the executor
+  # never counts against the caps that exist to stop the next loss.
+  #
+  # PositionLifecycle closes whole positions only, so a PARTIAL reduce (an
+  # explicit size smaller than the tracked position) still takes the direct
+  # path. That is a known gap: partial reduces realize P&L without reaching the
+  # loss caps.
+  def submit_close(product_id, size_to_close)
+    position = tracked_open_position(product_id)
+
+    if position && full_close?(position, size_to_close)
+      outcome = Trading::PositionLifecycle
+        .new(positions_service: positions_service, logger: Rails.logger)
+        .close(position, reason: "web_operator_close")
+
+      return redirect_to positions_path(notice: "Closed #{product_id} at #{outcome.close_price}") if outcome.success?
+
+      return redirect_to edit_position_path(product_id,
+        notice: "Close failed for #{product_id}; position left OPEN.")
+    end
+
+    result = positions_service.close_position(product_id: product_id, size: size_to_close)
+    redirect_to positions_path(notice: "Close order submitted: #{result["order_id"] || result["message"] || result["success"]}")
+  rescue => e
+    redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
+  end
+
+  # Only route through the lifecycle when exactly one open position is tracked
+  # locally for this product — with several, we cannot tell which one the
+  # operator meant, and force_close!-ing the wrong record is worse than the gap.
+  def tracked_open_position(product_id)
+    scope = Position.open.where(product_id: product_id)
+    (scope.count == 1) ? scope.first : nil
+  end
+
+  def full_close?(position, size_to_close)
+    size_to_close.blank? || size_to_close.to_f >= position.size.to_f
   end
 
   # Open paper positions mapped to the same hash shape the view/live path uses.

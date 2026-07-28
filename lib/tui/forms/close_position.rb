@@ -20,12 +20,20 @@ module Tui
         confirmed = Gum.confirm("Close #{position.product_id} ##{position.id}?", affirmative: "Close", negative: "Cancel")
         return unless confirmed
 
+        # Route through PositionLifecycle, not CoinbasePositions directly: an
+        # operator close is still an exit and must feed the protections layer
+        # (cooldown, stoploss guard, daily loss caps — ADR 0003). Closing through
+        # the executor bypassed all three, so a loser closed by hand never
+        # counted against the caps that exist to stop the next one.
         svc = Trading::CoinbasePositions.new(logger: Rails.logger)
-        result = svc.close_position(product_id: position.product_id, size: position.size)
-        if result["success"] || result["order_id"]
-          Gum.log("Close submitted for ##{position.id}", level: "info")
+        outcome = Trading::PositionLifecycle
+          .new(positions_service: svc, logger: Rails.logger)
+          .close(position, reason: "tui_operator_close")
+
+        if outcome.success?
+          Gum.log("Closed ##{position.id} at #{outcome.close_price}", level: "info")
         else
-          Gum.log("Close failed: #{result.inspect}", level: "error")
+          Gum.log("Close failed for ##{position.id}; left OPEN", level: "error")
         end
       rescue => e
         Gum.log("Close error: #{e.message}", level: "error")

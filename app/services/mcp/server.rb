@@ -111,8 +111,23 @@ module Mcp
       return tool_result(id, {error: "not_found", position_id: args["position_id"]}, is_error: true) unless position
 
       @logger.warn("[MCP] close_position confirmed: id=#{position.id} product=#{position.product_id}")
-      result = Trading::CoinbasePositions.new.close_position(product_id: position.product_id, size: position.size)
-      tool_result(id, {closed: true, position_id: position.id, product_id: position.product_id, result: result})
+      # Route through PositionLifecycle, not CoinbasePositions directly: an
+      # operator close is still an exit and must feed the protections layer
+      # (cooldown, stoploss guard, daily loss caps — ADR 0003). Closing through
+      # the executor bypassed all three, so a loser closed by hand never counted
+      # against the caps that exist to stop the next one.
+      outcome = Trading::PositionLifecycle
+        .new(positions_service: Trading::CoinbasePositions.new, logger: @logger)
+        .close(position, reason: "mcp_operator_close")
+
+      unless outcome.success?
+        return tool_result(id, {error: "close_failed", position_id: position.id,
+                                product_id: position.product_id,
+                                message: "Exchange close did not succeed; position left OPEN."}, is_error: true)
+      end
+
+      tool_result(id, {closed: true, position_id: position.id, product_id: position.product_id,
+                       close_price: outcome.close_price})
     rescue => e
       tool_result(id, {error: "close_failed", message: "#{e.class}: #{e.message}"}, is_error: true)
     end

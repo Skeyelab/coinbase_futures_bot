@@ -121,16 +121,21 @@ module Trading
         )
       end
 
+      # Delegate to PositionLifecycle rather than reimplementing the close. A
+      # trailing-stop exit is a bot exit like any other and must feed the
+      # protections layer — cooldown, stoploss guard, daily loss caps (ADR
+      # 0003). The previous inline version did its own force_close! and price
+      # fallback, so a trailing-stop loss reached none of them.
       def close_position(position, trigger)
-        current_price = position.get_current_market_price || position.entry_price
-        result = positions_service.close_position(product_id: position.product_id, size: position.size)
+        outcome = Trading::PositionLifecycle
+          .new(positions_service: positions_service, logger: logger)
+          .close(position, reason: "Trailing stop #{trigger}")
 
-        if result["success"] || result["order_id"]
-          position.force_close!(current_price, "Trailing stop #{trigger}")
+        if outcome.success?
           logger.info("Closed position #{position.id} via trailing stop (#{trigger})")
           true
         else
-          logger.error("Trailing stop close failed for position #{position.id}: #{result.inspect}")
+          logger.error("Trailing stop close failed for position #{position.id}")
           false
         end
       rescue => e

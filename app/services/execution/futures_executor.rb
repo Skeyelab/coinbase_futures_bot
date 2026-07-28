@@ -93,6 +93,12 @@ module Execution
         @logger.info("[EXEC] Closing #{pos.side} #{size} #{from_contract} for rollover")
 
         begin
+          # Deliberately NOT routed through Trading::PositionLifecycle, unlike
+          # every other close (ADR 0003). A rollover is not an exit: exposure
+          # continues on to_contract in the same breath. Recording a cooldown
+          # or evaluating the daily loss caps here would treat a mechanical
+          # contract roll as a discretionary exit and could halt the bot on a
+          # calendar event rather than a risk event.
           positions_service.close_position(product_id: from_contract, size: size)
         rescue => e
           @logger.error("[EXEC] Failed to close #{from_contract} position #{pos.id}: #{e.class}: #{e.message}")
