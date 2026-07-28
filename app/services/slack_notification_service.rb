@@ -601,10 +601,36 @@ class SlackNotificationService
                 value: Time.current.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 short: true
               }
-            ]
+            ] + health_issue_fields(health_data)
           }
         ]
       }
+    end
+
+    # The verdict's CAUSE, which the card never carried.
+    #
+    # HealthCheckJob#calculate_overall_health downgrades to "warning" based on
+    # :portfolio_exposure, :day_trading_positions and :swing_positions — none of
+    # which were rendered. So the card showed "Warning" beside four green checks
+    # and no way to act on it, and diagnosing a real one meant reading the job
+    # and running gather_health_data by hand (issue #536).
+    #
+    # Only emitted when something is actually wrong, so a healthy card stays
+    # short and a Warning always explains itself.
+    def health_issue_fields(health_data)
+      return [] if health_data[:overall_health].to_s == "healthy"
+
+      %i[portfolio_exposure day_trading_positions swing_positions].filter_map do |check|
+        data = health_data[check]
+        next unless data.is_a?(Hash)
+        next if data[:healthy] != false
+
+        {
+          title: check.to_s.tr("_", " ").capitalize,
+          value: Array(data[:warnings]).presence&.join("\n") || "unhealthy",
+          short: false
+        }
+      end
     end
 
     def format_market_message(market_data)
