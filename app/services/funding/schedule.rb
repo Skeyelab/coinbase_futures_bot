@@ -34,6 +34,38 @@ module Funding
     # fallback used for boundaries with no observation (preserves today's default
     # 2 bps/interval hourly behavior). Pass constant_rate_per_interval: nil to make
     # missing history contribute zero rather than a synthetic charge.
+    # The fallback rate to use for boundaries with no observation, derived from
+    # what this product actually does rather than guessed.
+    #
+    # Backtest::Engine defaulted to a hardcoded 2.0 bps/interval. Measured
+    # against BIP's own snapshots that is 21x reality (observed 0.0938 bps/hr
+    # over 134 hourly rows). Funding history is NOT reconstructible — the API
+    # advertises only the upcoming timestamp — so on a 370-day window ~364 days
+    # fall back to this number. Funding is charged per unit of TIME HELD, so a
+    # 21x error does not bias shapes equally: at 200/120's ~16.6h hold it is
+    # ~16 boundaries per round trip, penalising exactly the long-hold shapes a
+    # target sweep is comparing (#485, #497).
+    #
+    # MAGNITUDE, not signed. The constant is documented as an adverse
+    # sensitivity knob, and this codebase deliberately refuses to bank expected
+    # funding INCOME into a decision (see expected_forward_rate). Taking the
+    # median of |rate| keeps the conservative direction while fixing the size.
+    #
+    # Median rather than mean: funding spikes are fat-tailed and a single
+    # outlier hour should not set the rate for a year of unobserved boundaries.
+    #
+    # nil when the product has no observations at all — which is also how
+    # CostModel.perp? decides something is not a perp, so a dated contract is
+    # never charged phantom funding.
+    def self.observed_fallback_rate(product_id:)
+      rates = FundingRate.for_product(product_id).pluck(:funding_rate).map { |r| r.to_f.abs }
+      return nil if rates.empty?
+
+      sorted = rates.sort
+      mid = sorted.size / 2
+      sorted.size.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
+    end
+
     def self.for(product_id:, constant_rate_per_interval: nil, constant_interval_seconds: 3600, logger: Rails.logger)
       observations = FundingRate.for_product(product_id).chronological.to_a
       new(product_id: product_id, observations: observations,
