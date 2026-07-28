@@ -123,7 +123,6 @@ end
 - `SignalController` - Trading signal API errors
 - `PositionsController` - Position management errors
 - `HealthController` - Health check endpoint errors
-- `SlackController` - Slack webhook errors
 - `SentimentController` - Sentiment data API errors
 
 ### 3. Service Layer

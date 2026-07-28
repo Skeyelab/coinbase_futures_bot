@@ -45,13 +45,10 @@ Rails.application.configure do
     Rails.logger.info("[Slack] Configuration status:")
     Rails.logger.info("[Slack]   Enabled: #{ENV["SLACK_ENABLED"]&.downcase == "true"}")
     Rails.logger.info("[Slack]   Bot token configured: #{ENV["SLACK_BOT_TOKEN"].present?}")
-    Rails.logger.info("[Slack]   Signing secret configured: #{ENV["SLACK_SIGNING_SECRET"].present?}")
     Rails.logger.info("[Slack]   Signals channel: #{ENV["SLACK_SIGNALS_CHANNEL"] || "#trading-signals"}")
     Rails.logger.info("[Slack]   Positions channel: #{ENV["SLACK_POSITIONS_CHANNEL"] || "#trading-positions"}")
     Rails.logger.info("[Slack]   Status channel: #{ENV["SLACK_STATUS_CHANNEL"] || "#bot-status"}")
     Rails.logger.info("[Slack]   Alerts channel: #{ENV["SLACK_ALERTS_CHANNEL"] || "#trading-alerts"}")
-
-    authorized_users = ENV["SLACK_AUTHORIZED_USERS"]&.split(",") || []
-    Rails.logger.info("[Slack]   Authorized users: #{authorized_users.any? ? authorized_users.join(", ") : "All users (no restriction)"}")
+    Rails.logger.info("[Slack]   Direction: outbound only (inbound commands removed, ADR 0007)")
   end
 end

@@ -49,7 +49,7 @@
 
 - Thor CLI/TUI dashboard: `bin/futuresbot dashboard` (tab-based: `1` Overview, `2` Positions, `3` Signals, `4` Market, `5` Health/Ops; a persistent system strip shows halt state, `Eval: Ns ago` from the durable store, and a sentiment one-liner)
 - Full session (dashboard + market data + signal + sentiment collection): `bin/futuresbot start`
-- Chat CLI: `bin/futuresbot chat`
+- Conversational control plane: MCP (`app/services/mcp/server.rb`), stdio, local only
 - Realtime signal loop: `bin/rake realtime:signals`
 - One-shot realtime evaluation: `bin/rake realtime:evaluate`
 - Day trading summary: `bin/rake day_trading:check_positions`
@@ -68,7 +68,7 @@
 - `bin/setup` is not a harmless bootstrap script. It also runs `git config core.hooksPath .githooks`. Do not run it casually in automation if you want to avoid mutating local git config.
 - `bin/parallel_rspec_local` sets `PARALLEL_RSPEC_CONFIG` to `.parallel_rspec_config.local` and reuses `bin/parallel_rspec` (no file copying).
 - The UI credentials used by the positions web UI are `POSITIONS_UI_USERNAME` and `POSITIONS_UI_PASSWORD` (`app/controllers/positions_controller.rb`), while `.env.example` documents different names under “API Authentication”. Trust controller code, not the example text.
-- `bin/futuresbot dashboard` and `bin/futuresbot chat` both sync positions from Coinbase on startup unless `FUTURESBOT_SKIP_POSITION_SYNC` is set.
+- `bin/futuresbot dashboard` syncs positions from Coinbase on startup unless `FUTURESBOT_SKIP_POSITION_SYNC` is set.
 - Sentiment collection runs inside `bin/futuresbot start` (not `dashboard`) via `Sentiment::PipelineRunner` (fetch→score→aggregate in-process); disable with `FUTURESBOT_SKIP_SENTIMENT_PIPELINE=1`, tune cadence with `SENTIMENT_PIPELINE_INTERVAL_SECONDS` (default 120). A deployed Rails app runs the same jobs via GoodJob cron instead. Verify it is flowing with `bin/futuresbot status` → the Sentiment section shows a per-symbol z-score and a recent `Last event` age (not `No sentiment data yet` / `⚠ STALE`). NOL/OIL contracts map to the `OIL-USD` sentiment symbol (`Sentiment::ContractSymbolMapper`); run `bin/rake market_data:upsert_futures_products` first so enabled contracts resolve. Relevant env: `SENTIMENT_ENABLE`, `SENTIMENT_STALE_THRESHOLD_MINUTES` (default 30).
 - The repository’s `.env.example` contains credential-like Coinbase values. Treat that file as shape/examples only; never reuse or commit secrets from it.
 - CI runs lint and Brakeman first, then tests. CI forces single-process RSpec execution even though local parallel test helpers exist.
@@ -91,9 +91,10 @@
 - **Position sync/reconciliation**:
   - `PositionImportService` imports exchange positions into local `positions`
   - `PositionReconcileService` closes local `OPEN` rows that are absent from Coinbase snapshots; it does not place orders. `PositionImportService` auto-reconciles after each import (disable with `FUTURESBOT_SKIP_AUTO_RECONCILE=1`). Reconcile PnL prefers contract-sized mark-to-market, then last synced exchange `pnl`.
-- **Chat/CLI**: `lib/cli/*`, `app/services/chat_bot_service.rb`, `app/controllers/api/chat_messages_controller.rb`
-  - Thor CLI (`bin/futuresbot`) offers TUI, chat, status, positions, signals
-  - Chat API and CLI both route through `ChatBotService`
+- **Operator surfaces**: `lib/cli/*`, `lib/tui/*`, `app/services/mcp/server.rb`
+  - Thor CLI (`bin/futuresbot`) offers TUI, status, positions, signals, halt/resume, close
+  - MCP (`Mcp::Server`) is the only conversational control plane — ADR 0007
+  - Reads go through `OperatorSnapshot`; surfaces format it, they do not recompute it
 - **Background jobs / scheduling**: `app/jobs/*`, `config/initializers/good_job.rb`
   - GoodJob is the Active Job adapter
   - Cron jobs cover candles, signals, paper trading, sentiment, day/swing management, expiry, health
@@ -126,7 +127,7 @@
 - Position side conventions are uppercase `LONG` / `SHORT` in `Position`.
 - `SignalAlert` validates persisted `side` as `long` / `short` / `unknown`. `SideNormalizer.signal` and `SignalAlert.normalize_side_value` map inbound `buy` / `sell` (and related forms) before save; dedupe and readers may still account for legacy `buy` / `sell` rows in the database.
 - Realtime signal configuration lives in `config/initializers/real_time_signals.rb`, not per-service constants.
-- `config/api_only = true`, but this app intentionally adds cookies/session/flash middleware back for GoodJob dashboard and the HTML/UI/chat flows.
+- `config/api_only = true`, but this app intentionally adds cookies/session/flash middleware back for the GoodJob dashboard and the HTML/UI flows.
 - Positions UI is not a JSON API controller; `PositionsController` inherits from `ActionController::Base` and uses HTTP Basic auth plus server-rendered views.
 - `MarketData::CoinbaseRest` handles multiple Coinbase response shapes defensively; preserve that tolerance when modifying API parsing.
 

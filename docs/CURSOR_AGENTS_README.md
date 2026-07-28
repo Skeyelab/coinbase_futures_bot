@@ -64,7 +64,7 @@ README.md       — project overview
 - ❌ `/good_job` URL → ✅ `/jobs` (`config/routes.rb`)
 - ❌ Ruby 3.2.2 / Rails 7.2 / 8.0.2 in new docs
 - ❌ Stale contract IDs like `BIT-29AUG25-CDE`
-- ❌ Calling the app "API-only" without noting Positions/Chat HTML UI
+- ❌ Calling the app "API-only" without noting the Positions HTML UI
 - ❌ `bundle exec rspec` for full CI parity → use `bin/parallel_rspec`
 
 ## Last Updated
