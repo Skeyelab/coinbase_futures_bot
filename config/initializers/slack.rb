@@ -4,10 +4,25 @@
 if defined?(Slack)
   Slack.configure do |config|
     config.token = ENV["SLACK_BOT_TOKEN"]
-    config.logger = Rails.logger
 
-    # Enable request/response logging in development
-    config.logger.level = Logger::DEBUG if Rails.env.development?
+    # Slack gets its OWN logger. It used to receive Rails.logger and then set
+    # `config.logger.level = Logger::DEBUG` — the same object, so that line
+    # forced the GLOBAL Rails logger to DEBUG for the whole process. The intent
+    # was verbose Slack request logging; the effect was every ActiveRecord query
+    # in the app.
+    #
+    # Measured on the always-on box: cfb-realtime emitted 17,619 lines in 60
+    # seconds (~294/sec), almost all of it `Contract Load` / `TRANSACTION` /
+    # `Tick Create` SQL. At ~150 bytes a line that is ~3.3 GB/day against
+    # journald's 4 GB default cap — the trading loop's own logs would evict
+    # themselves inside about a day, and take everything else on the box with
+    # them. It also defeated RAILS_LOG_LEVEL entirely, since an initializer runs
+    # after config/environments and simply overwrote it.
+    #
+    # A separate logger means Slack verbosity is a Slack decision again.
+    slack_logger = ActiveSupport::Logger.new($stdout)
+    slack_logger.level = ENV.fetch("SLACK_LOG_LEVEL", "warn").upcase.then { |l| ActiveSupport::Logger.const_get(l) }
+    config.logger = slack_logger
   end
 end
 

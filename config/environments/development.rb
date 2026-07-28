@@ -92,8 +92,26 @@ Rails.application.configure do
   # Opt-in rather than unconditional: `bin/rails server` already broadcasts to
   # stdout in development, and turning this on for everyone would double every
   # line for anyone working locally. The systemd units set it; laptops do not.
+  # The level is set on the LOGGER, not only via config.log_level. A logger the
+  # app constructs itself is born at DEBUG, and config.log_level does not
+  # reliably reach it — measured on the box: with config.log_level = "info" set
+  # exactly as below, cfb-realtime still emitted 17,619 lines in 60 seconds
+  # (~294/sec), all ActiveRecord query logging, which is :debug. At ~150 bytes a
+  # line that is ~3.3 GB/day against journald's 4 GB default cap: the trading
+  # loop's own logs would evict themselves, and everything else on the box with
+  # them, inside about a day. Setting Logger#level closes that.
+  # The level must be a Logger SEVERITY CONSTANT set on the logger object.
+  # Two things defeat the obvious spellings:
+  #   * When config.logger is supplied, Rails uses it as-is and never applies
+  #     config.log_level — that assignment only runs on the logger Rails builds
+  #     itself. So config.log_level alone is inert here.
+  #   * Logger#level = "info" (a String) does not coerce; the logger stays at
+  #     DEBUG. Verified both, rather than assumed.
   if ENV["RAILS_LOG_TO_STDOUT"].present?
-    config.logger = ActiveSupport::TaggedLogging.logger($stdout)
-    config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
+    level_name = ENV.fetch("RAILS_LOG_LEVEL", "info").upcase
+    stdout_logger = ActiveSupport::TaggedLogging.logger($stdout)
+    stdout_logger.level = ActiveSupport::Logger.const_get(level_name)
+    config.logger = stdout_logger
+    config.log_level = level_name.downcase.to_sym
   end
 end
