@@ -200,11 +200,19 @@ RSpec.describe Trading::ExecutionCalibration::Runner do
       expect(voided.count).to eq(2)
     end
 
-    it "reports the zero maker fill rate as the finding that kills the +22 bps case" do
+    # This asserted `maker_warning` includes "KILLS" — but the runner defaults to
+    # a dry-run REHEARSAL, where a maker leg not filling is a property of the
+    # simulator's fill logic, not of Coinbase's queue. Killing ADR 0002's
+    # +22 bps case from that is the #535 defect one layer up from the abort path.
+    # The rate is still recorded; it is the CLAIM that a rehearsal cannot make.
+    # Live behaviour is covered in rehearsal_claims_nothing_spec.rb.
+    it "records the zero maker fill rate without killing the +22 bps case from a rehearsal" do
       report = runner(round_trips: 4, observer: never_fills_maker).call
 
       expect(report.tape.maker_fill_rate).to eq(0.0)
-      expect(report.maker_warning).to include("KILLS")
+      expect(report.maker_warning).to be_nil
+      expect(report.summary).to include("not assessed")
+      expect(report.summary).not_to include("KILLS")
       expect(TradingHalt.risk_halted?).to be(false)
     end
   end
