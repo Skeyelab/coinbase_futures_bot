@@ -54,6 +54,18 @@ RSpec.describe Trading::AssetSizing do
       expect(params.contract_size_usd).to eq(100.0)
     end
 
+    # XRP has no `assets` entry, so XPP fell to `default` — a $100 fallback
+    # against a measured $531.75 contract. An understated contract_size_usd is
+    # the dangerous direction: the sizer believes the position is smaller than
+    # it is, so the notional cap binds later than it should.
+    it "gives XPP its measured notional rather than the conservative default" do
+      params = described_class.for_product("XPP-20DEC30-CDE")
+
+      expect(params.contract_size_usd).to be_within(1.0).of(531.75)
+      expect(params.max_contracts).to eq(1)
+      expect(params.max_concurrent).to eq(1)
+    end
+
     it "resolves a prefix with no contract entry through its base currency (NOL -> OIL)" do
       params = described_class.for_product("NOL-19AUG26-CDE")
 
