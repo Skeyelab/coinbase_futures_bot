@@ -437,8 +437,7 @@ module Strategy
       threshold = ENV.fetch("SENTIMENT_Z_THRESHOLD", "1.2").to_f
       return true if z.abs < threshold # not strong enough to object
 
-      long_side = %i[long buy].include?(side.to_s.downcase.to_sym)
-      long_side ? z > 0 : z < 0
+      SideNormalizer.long?(side) ? z > 0 : z < 0
     end
 
     # Resolve the actual trading symbol to use

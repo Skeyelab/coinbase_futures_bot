@@ -150,10 +150,7 @@ module Trading
     end
 
     def resolve_price(position)
-      RecentMarketPrice.for_product(position.product_id) || begin
-        @logger.warn("No recent price for #{position.product_id}, using entry price")
-        position.entry_price
-      end
+      RecentMarketPrice.mark(position, logger: @logger).price
     end
   end
 end

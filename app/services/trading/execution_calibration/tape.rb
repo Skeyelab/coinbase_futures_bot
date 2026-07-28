@@ -37,7 +37,7 @@ module Trading
       # the measurement exactly as much as an adverse one.
       def deviation_bps = slippage_bps.abs
 
-      def buying? = %w[BUY LONG].include?(side.to_s.upcase)
+      def buying? = SideNormalizer.long?(side)
     end
 
     # One forced round trip: an entry, a hold, an exit. `entry` is nil when a

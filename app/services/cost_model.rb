@@ -138,7 +138,7 @@ class CostModel
   end
 
   def self.long_side?(side)
-    %i[long buy].include?(side.to_s.downcase.to_sym)
+    SideNormalizer.long?(side)
   end
 
   # Flat per-contract fee minimum (issue #372): Coinbase US futures charge

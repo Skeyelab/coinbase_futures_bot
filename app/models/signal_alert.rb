@@ -121,11 +121,11 @@ class SignalAlert < ApplicationRecord
   end
 
   def long?
-    %w[long buy].include?(side)
+    SideNormalizer.long?(side)
   end
 
   def short?
-    %w[short sell].include?(side)
+    SideNormalizer.short?(side)
   end
 
   def entry_signal?

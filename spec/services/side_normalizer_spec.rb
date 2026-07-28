@@ -19,6 +19,29 @@ RSpec.describe SideNormalizer do
     end
   end
 
+  describe ".long? / .short?" do
+    it "accepts every alias and every casing, string or symbol" do
+      ["long", "buy", :long, :buy, "LONG", "Buy"].each do |value|
+        expect(described_class.long?(value)).to be(true), "expected #{value.inspect} to be long"
+        expect(described_class.short?(value)).to be false
+      end
+
+      ["short", "sell", :short, :sell, "SHORT", "Sell"].each do |value|
+        expect(described_class.short?(value)).to be(true), "expected #{value.inspect} to be short"
+        expect(described_class.long?(value)).to be false
+      end
+    end
+
+    # Not complements: an unrecognised side must not read as "short" the way
+    # `!long?` would make it.
+    it "reports an unrecognised side as neither long nor short" do
+      [nil, "", "sideways", :wait].each do |value|
+        expect(described_class.long?(value)).to be false
+        expect(described_class.short?(value)).to be false
+      end
+    end
+  end
+
   describe ".signal" do
     it "normalizes long/buy to long" do
       expect(described_class.signal("long")).to eq("long")
