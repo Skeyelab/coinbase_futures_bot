@@ -272,6 +272,58 @@ RSpec.describe PositionsController, type: :controller do
     end
   end
 
+  # An increase mutates a tracked row's size and averaged entry price, so the
+  # operator UI has to name the row the same way a close does. Handing the
+  # service a bare product_id made it re-find one, and with several open on the
+  # product it grew whichever sorted last.
+  describe "POST #increase" do
+    before do
+      request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("admin:password123")
+    end
+
+    it "passes the tracked open row to the service" do
+      position = create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN")
+
+      expect(positions_service).to receive(:increase_position).with(
+        product_id: "BIP-20DEC30-CDE",
+        size: "1",
+        position: position
+      ).and_return({"success" => true, "order_id" => "inc-123"})
+
+      post :increase, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
+
+      expect(response).to have_http_status(:redirect)
+      expect(response.redirect_url).to include("inc-123")
+    end
+
+    # Two open rows means the operator's intent is genuinely unknown. We pass
+    # nothing rather than pick one; the service then refuses instead of growing
+    # a position at random.
+    it "resolves nothing when several rows are open on the product" do
+      create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN", entry_time: 2.hours.ago)
+      create(:position, product_id: "BIP-20DEC30-CDE", status: "OPEN", entry_time: 1.hour.ago)
+
+      expect(positions_service).to receive(:increase_position).with(
+        product_id: "BIP-20DEC30-CDE",
+        size: "1",
+        position: nil
+      ).and_return({"success" => true})
+
+      post :increase, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
+    end
+
+    it "reports a refusal back to the operator instead of redirecting as success" do
+      allow(positions_service).to receive(:increase_position).and_raise(
+        Trading::CoinbasePositions::AmbiguousPositionError.new("2 open positions tracked")
+      )
+
+      post :increase, params: {product_id: "BIP-20DEC30-CDE", size: "1"}
+
+      expect(response.redirect_url).to include("/positions/BIP-20DEC30-CDE/edit")
+      expect(response.redirect_url).to include("2+open+positions+tracked")
+    end
+  end
+
   describe "PATCH #update" do
     before do
       request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("admin:password123")

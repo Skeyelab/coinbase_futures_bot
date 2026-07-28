@@ -150,6 +150,55 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     end
   end
 
+  # Two OPEN rows on one product is the only shape that can see this bug. The
+  # re-find by product picks the newest row and averages a fill into a position
+  # that never took it; with a single row it lands on the right record by luck,
+  # which is why every existing example passed.
+  describe "increase targets the row the caller resolved" do
+    let!(:older) do
+      Position.create!(
+        product_id: product_id, side: "LONG", size: 1.0, entry_price: 40_000.0,
+        entry_time: 2.hours.ago, status: "OPEN", day_trading: true
+      )
+    end
+
+    let!(:newer) do
+      Position.create!(
+        product_id: product_id, side: "LONG", size: 1.0, entry_price: 60_000.0,
+        entry_time: 1.hour.ago, status: "OPEN", day_trading: true
+      )
+    end
+
+    it "increases the passed row and leaves the other untouched" do
+      service.increase_position(product_id: product_id, size: 1.0, position: older)
+
+      older.reload
+      expect(older.size).to eq(2.0)
+      # (1 @ 40,000 + 1 @ 51,000) / 2
+      expect(older.entry_price).to be_within(0.01).of(45_500.0)
+
+      newer.reload
+      expect(newer.size).to eq(1.0)
+      expect(newer.entry_price).to eq(60_000.0)
+    end
+
+    # This is the live order path. Guessing which of two positions to grow is a
+    # real-money error, so an unresolvable target refuses BEFORE the order goes
+    # out — nothing sent, nothing mutated.
+    it "refuses to guess, and places no order, when no row was resolved" do
+      expect(service).not_to receive(:submit_order)
+
+      expect do
+        service.increase_position(product_id: product_id, size: 1.0)
+      end.to raise_error(Trading::CoinbasePositions::AmbiguousPositionError, /2 open positions/)
+
+      expect(older.reload.size).to eq(1.0)
+      expect(older.entry_price).to eq(40_000.0)
+      expect(newer.reload.size).to eq(1.0)
+      expect(newer.entry_price).to eq(60_000.0)
+    end
+  end
+
   describe "position updates integration" do
     let!(:position) do
       Position.create!(
