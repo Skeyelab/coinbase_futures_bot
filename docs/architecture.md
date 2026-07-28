@@ -2,7 +2,7 @@
 
 ## System Architecture
 
-The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes for positions/chat added on top) designed for automated cryptocurrency futures trading. The system follows a modular architecture with clear separation of concerns.
+The coinbase_futures_bot is a Rails 8.1 API-first application (HTML UI routes for positions added on top) designed for automated cryptocurrency futures trading. The system follows a modular architecture with clear separation of concerns.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

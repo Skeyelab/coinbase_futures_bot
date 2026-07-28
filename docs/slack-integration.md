@@ -1,121 +1,33 @@
-# Slack Integration Documentation
+# Slack Integration
 
 ## Overview
 
-The Coinbase Futures Bot includes comprehensive Slack integration for real-time notifications, bot control, and monitoring. This integration enables traders to interact with the bot, receive alerts, and monitor performance directly through Slack.
+Slack is a **push-only** surface. The bot sends alerts *to* Slack; it accepts
+nothing *from* Slack.
 
-## Features
+The inbound half — slash commands, event subscriptions, DMs, mentions — was
+deleted in **[ADR 0007](adr/0007-one-conversational-control-plane.md)**. It was a
+regex router over the same reads that `Mcp::Server` already serves by
+delegation, and keeping two routers is what produced six position serializers and
+six PnL formulas. MCP is the conversational control plane; `bin/futuresbot` is
+the operator CLI. Neither reaches this file.
 
-### 🔔 Real-Time Notifications
+Everything below describes `app/services/slack_notification_service.rb`, which is
+unchanged and has 18 caller files.
 
-- **Trading Signals**: Automatically posted when new signals are generated
-- **Position Updates**: Notifications for position openings, closures, and updates
-- **PnL Reports**: Regular profit/loss updates and summaries
-- **Health Alerts**: System health monitoring and issue alerts
-- **Error Notifications**: Critical error alerts with detailed information
+## Notifications
 
-### 🎮 Bot Control Commands
+| Notification | Trigger |
+|---|---|
+| Trading signals | a new `SignalAlert` is generated |
+| Position updates | position opened, increased, reduced, or closed |
+| PnL reports | scheduled summaries |
+| Health alerts | `HealthCheckJob` detects a degraded system |
+| Error alerts | critical failures in trading paths |
+| Margin window transitions | intraday/overnight margin step changes |
 
-The bot responds to the following slash commands:
+Examples:
 
-- `/bot-status` - Show current bot status and statistics
-- `/bot-pause` - Pause trading operations (stop new signals)
-- `/bot-resume` - Resume trading operations
-- `/bot-positions [filter]` - Show current positions (filter: open, closed, symbol)
-- `/bot-pnl [period]` - Show PnL report (period: today, week, month)
-- `/bot-health` - Show system health status
-- `/bot-stop` - 🚨 Emergency stop all trading activities
-- `/bot-help` - Show help message with all commands
-
-### 📊 Monitoring Dashboard
-
-- **Health Checks**: Automated system health monitoring
-- **Performance Metrics**: Real-time trading performance data
-- **Market Conditions**: Alert on unusual market conditions
-- **Position Management**: Track position lifecycles and risk metrics
-
-## Setup
-
-### 1. Slack App Configuration
-
-Create a new Slack app at [api.slack.com](https://api.slack.com/apps) with the following configuration:
-
-#### Bot Token Scopes (OAuth & Permissions)
-```
-channels:read     - Read public channel information
-chat:write        - Send messages
-commands          - Receive slash commands
-im:read          - Read direct messages
-im:write         - Send direct messages
-users:read       - Read user profile information
-```
-
-#### Event Subscriptions
-- **Request URL**: `https://your-domain.com/slack/events`
-- **Subscribe to bot events**:
-  - `message.im` - Direct messages to bot
-  - `app_mention` - When bot is mentioned in channels
-
-#### Slash Commands
-Create the following slash commands pointing to `https://your-domain.com/slack/commands`:
-
-| Command | Description | Usage Hint |
-|---------|-------------|------------|
-| `/bot-status` | Show bot status | Get current trading status and statistics |
-| `/bot-pause` | Pause trading | Stop new signal generation |
-| `/bot-resume` | Resume trading | Resume normal operations |
-| `/bot-positions` | Show positions | [open\|closed\|symbol] |
-| `/bot-pnl` | Show PnL report | [today\|week\|month] |
-| `/bot-health` | System health | Show health check results |
-| `/bot-stop` | Emergency stop | ⚠️ Immediately stop all trading |
-| `/bot-help` | Show help | List all available commands |
-
-### 2. Environment Configuration
-
-Add the following environment variables to your `.env` file:
-
-```bash
-# Enable Slack integration
-SLACK_ENABLED=true
-
-# Slack credentials (from your app's settings)
-SLACK_BOT_TOKEN=xoxb-your-bot-token-here
-SLACK_SIGNING_SECRET=your-signing-secret-here
-
-# Channel configuration
-SLACK_SIGNALS_CHANNEL=#trading-signals
-SLACK_POSITIONS_CHANNEL=#trading-positions
-SLACK_STATUS_CHANNEL=#bot-status
-SLACK_ALERTS_CHANNEL=#trading-alerts
-
-# Security: authorized users (comma-separated Slack user IDs)
-SLACK_AUTHORIZED_USERS=U1234567890,U0987654321
-```
-
-### 3. Channel Setup
-
-Create the following channels in your Slack workspace:
-
-- `#trading-signals` - Trading signal notifications
-- `#trading-positions` - Position update notifications
-- `#bot-status` - Bot status and health updates
-- `#trading-alerts` - Error alerts and critical notifications
-
-Invite your bot to all channels where it needs to post messages.
-
-### 4. Install Dependencies
-
-The Slack integration uses the `slack-ruby-client` gem, which is already included in the Gemfile:
-
-```bash
-bundle install
-```
-
-## Usage
-
-### Notification Types
-
-#### Trading Signal Notifications
 ```
 🎯 New Trading Signal: BTC-USD
 Symbol: BTC-USD        Side: LONG
@@ -124,88 +36,12 @@ Take Profit: $52,000   Stop Loss: $48,000
 Confidence: 75%        Timestamp: 2025-01-15 14:30:00 UTC
 ```
 
-#### Position Update Notifications
 ```
 🟢 Position Opened: ETH-USD
 Symbol: ETH-USD        Side: LONG
 Size: 1.0              Entry Price: $3,000.00
 ```
 
-#### PnL Update Notifications
-```
-📈 PnL Update
-Total PnL: $500.00     Daily PnL: $100.00
-Open Positions: 3      Closed Today: 2
-Win Rate: 66.7%        Timestamp: 2025-01-15 14:30:00 UTC
-```
-
-### Command Examples
-
-#### Check Bot Status
-```
-/bot-status
-```
-Returns current trading status, open positions, daily PnL, and system health.
-
-#### Show Current Positions
-```
-/bot-positions open
-/bot-positions BTC
-/bot-positions
-```
-
-#### Get PnL Report
-```
-/bot-pnl today
-/bot-pnl week
-/bot-pnl month
-```
-
-#### Emergency Stop
-```
-/bot-stop
-```
-Immediately stops all trading activities and closes open positions.
-
-### Interactive Features
-
-#### Direct Messages
-Send a direct message to the bot for basic help:
-```
-@FuturesBot help
-```
-
-#### Channel Mentions
-Mention the bot in any channel for quick help:
-```
-@FuturesBot what's the status?
-```
-
-## Security
-
-### Request Verification
-
-All incoming Slack requests are verified using the signing secret to ensure they come from Slack. This prevents unauthorized access to bot commands.
-
-### User Authorization
-
-Commands can be restricted to specific users by setting `SLACK_AUTHORIZED_USERS`. If this environment variable is empty, all users in the workspace can use commands.
-
-### Emergency Controls
-
-The `/bot-stop` command provides immediate emergency stop functionality, allowing authorized users to quickly halt all trading activities.
-
-## Error Handling
-
-### Graceful Degradation
-
-- If Slack is unavailable, the bot continues normal operations
-- Failed notifications are logged but don't impact trading
-- Retry logic with exponential backoff for temporary failures
-
-### Error Notifications
-
-Critical errors are automatically sent to the alerts channel:
 ```
 🚨 Alert: Day Trading Position Management Error
 Level: ERROR
@@ -213,145 +49,150 @@ Details: Database connection timeout
 Timestamp: 2025-01-15 14:30:00 UTC
 ```
 
+## Setup
+
+### 1. Slack app
+
+Create an app at [api.slack.com](https://api.slack.com/apps).
+
+**Bot token scopes** (OAuth & Permissions) — only what posting requires:
+
+```
+channels:read     - Read public channel information
+chat:write        - Send messages
+```
+
+**No Event Subscriptions and no Slash Commands are needed.** There is no
+request URL to configure; the app exposes no Slack-facing endpoint. If you are
+upgrading an existing installation, remove the slash commands and the event
+subscription — `POST /slack/commands`, `POST /slack/events`, and
+`GET /slack/health` no longer resolve and will return 404.
+
+### 2. Environment
+
+```bash
+# Enable Slack notifications
+SLACK_ENABLED=true
+
+# Bot credentials
+SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+
+# Channel configuration
+SLACK_SIGNALS_CHANNEL=#trading-signals
+SLACK_POSITIONS_CHANNEL=#trading-positions
+SLACK_STATUS_CHANNEL=#bot-status
+SLACK_ALERTS_CHANNEL=#trading-alerts
+SLACK_DAY_TRADING_CHANNEL=#day-trading
+SLACK_MARGIN_ALERTS_CHANNEL=#margin-alerts
+SLACK_RISK_ALERTS_CHANNEL=#risk-alerts
+```
+
+`SLACK_SIGNING_SECRET` and `SLACK_AUTHORIZED_USERS` are **inert**. They existed
+to authorize inbound requests and nothing reads them. Leaving them set is
+harmless; they grant nothing.
+
+### 3. Channels
+
+Create the channels named above and invite the bot to each one it must post to.
+
+### 4. Dependencies
+
+`slack-ruby-client` is already in the Gemfile. `bundle install`.
+
+## Where the reads went
+
+Anything the old slash commands returned is available from a surface that
+delegates to `OperatorSnapshot` instead of re-deriving it:
+
+| Old command | Replacement |
+|---|---|
+| `/bot-status` | `bin/futuresbot status` · MCP `get_status` |
+| `/bot-positions` | `bin/futuresbot positions` · MCP `get_positions` |
+| `/bot-pnl` | `bin/futuresbot positions` · MCP `get_positions` |
+| `/bot-health` | `bin/futuresbot status` · `GET /health` |
+| `/bot-pause` / `/bot-resume` | `bin/futuresbot halt` / `resume` · MCP `halt_trading` / `resume_trading` |
+| `/bot-stop` | `bin/futuresbot halt --reason` · MCP `halt_trading` |
+
+Per ADR 0005, halt and resume are OPERATOR actions and require a deliberate,
+stated action from an authenticated human. Slack never met that bar — both of
+its auth layers failed open until PR #512, and its intent came from a text
+string.
+
+## Error handling
+
+- If Slack is unavailable, the bot continues trading normally.
+- Failed notifications are logged and never block a trading path.
+- Retry with exponential backoff on transient Slack API failures.
+
 ## Monitoring
 
-### Health Checks
+Startup logs the effective configuration:
 
-Access the Slack integration health status:
-```bash
-GET https://your-domain.com/slack/health
+```
+[Slack] Configuration status:
+[Slack]   Enabled: true
+[Slack]   Bot token configured: true
+[Slack]   Signals channel: #trading-signals
+[Slack]   ...
+[Slack]   Direction: outbound only (inbound commands removed, ADR 0007)
 ```
 
-Returns:
-```json
-{
-  "slack_enabled": true,
-  "bot_token_configured": true,
-  "signing_secret_configured": true,
-  "api_connection": true,
-  "bot_user_id": "U0BOTUSER",
-  "team_name": "Your Team",
-  "timestamp": "2025-01-15T14:30:00Z"
-}
-```
+Runtime:
 
-### Automated Health Checks
-
-The `HealthCheckJob` runs hourly during trading hours and sends status updates to Slack when issues are detected.
-
-### Logs
-
-All Slack interactions are logged with appropriate detail levels:
 ```
 [Slack] Message sent to #trading-signals
-[Slack] Command received: /bot-status from U1234567890
 [Slack] API Error: rate_limited - retrying in 2 seconds
 ```
 
+`HealthCheckJob` runs hourly during trading hours and posts to Slack when it
+detects a problem.
+
 ## Troubleshooting
 
-### Common Issues
+**Notifications not appearing**
 
-#### Bot Not Responding to Commands
-1. Check bot token validity
-2. Verify request URL configuration
-3. Ensure bot is invited to relevant channels
-4. Check signing secret configuration
+1. Verify `SLACK_ENABLED=true`.
+2. Check channel names match the configured values.
+3. Ensure the bot has `chat:write` and is a member of the channel.
+4. Review application logs for `[Slack] API Error`.
 
-#### Notifications Not Appearing
-1. Verify `SLACK_ENABLED=true`
-2. Check channel names match configuration
-3. Ensure bot has `chat:write` permission
-4. Review application logs for errors
+**A slash command returns "dispatch_failed" or 404**
 
-#### Unauthorized Command Responses
-1. Check `SLACK_AUTHORIZED_USERS` configuration
-2. Verify user IDs are correct (use "Copy member ID" in Slack)
-3. Ensure users are in the workspace
+Expected. Delete the slash command from the Slack app configuration — the
+endpoint is gone (ADR 0007).
 
-### Debug Commands
+**Testing a notification** (Rails console):
 
-Test the Slack integration:
-```bash
-# Check health endpoint
-curl https://your-domain.com/slack/health
-
-# Test notification (Rails console)
-SlackNotificationService.bot_status({
-  status: 'test',
+```ruby
+SlackNotificationService.bot_status(
+  status: "test",
   trading_active: true,
   healthy: true
-})
-
-# Test command handler (Rails console)
-SlackCommandHandler.handle_command({
-  command: '/bot-status',
-  user_id: 'U1234567890',
-  text: ''
-})
+)
 ```
 
-## Performance Considerations
+## Performance
 
-### Rate Limiting
-
-- Slack API has rate limits (1 message per second per channel)
-- The service includes retry logic with exponential backoff
-- Critical notifications are prioritized
-
-### Message Batching
-
-- Position updates are batched to avoid spam
-- Health checks only notify on status changes
-- PnL updates are sent at reasonable intervals
-
-### Fallback Mechanisms
-
-- All notifications include fallback logging
-- Trading continues if Slack is unavailable
-- Essential bot functions work without Slack
+- Slack rate-limits to roughly one message per second per channel; the service
+  retries with backoff.
+- Position updates are batched to avoid spam.
+- Health checks notify on status *changes*, not on every run.
 
 ## Development
 
-### Testing
-
-Run the Slack integration tests:
 ```bash
-rspec spec/services/slack_notification_service_spec.rb
-rspec spec/services/slack_command_handler_spec.rb
-rspec spec/controllers/slack_controller_spec.rb
-rspec spec/jobs/health_check_job_spec.rb
+bundle exec rspec spec/services/slack_notification_service_spec.rb
+bundle exec rspec spec/services/slack_notification_service_enhanced_spec.rb
+bundle exec rspec spec/jobs/health_check_job_spec.rb
 ```
 
-### Adding New Notifications
+**Adding a notification**
 
-1. Add method to `SlackNotificationService`
-2. Call from appropriate job or service
-3. Add tests for the new notification
-4. Update documentation
+1. Add a method to `SlackNotificationService`.
+2. Call it from the relevant job or service.
+3. Add a spec.
+4. Update this document.
 
-### Adding New Commands
-
-1. Add command handler to `SlackCommandHandler`
-2. Add route if needed
-3. Update help text
-4. Add tests for the new command
-5. Document the command
-
-## Migration
-
-### From Other Notification Systems
-
-If migrating from other notification systems:
-
-1. Update existing notification calls to use `SlackNotificationService`
-2. Configure Slack channels to match existing workflow
-3. Test notification delivery
-4. Gradually migrate users to Slack commands
-
-### Deployment Considerations
-
-- Test in staging environment first
-- Configure channels before enabling notifications
-- Train users on new commands
-- Monitor logs during initial deployment
+**Adding a command** — don't. Slack is push-only. A new inbound surface is a new
+mutating surface and requires an ADR (ADR 0005, rule 2), and the argument would
+have to explain what it gives the operator that MCP does not.

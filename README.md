@@ -4,7 +4,7 @@
 
 **Status**: Actively developed | **Framework**: Rails 8.1 | **Language**: Ruby 3.2.4
 
-Automated cryptocurrency futures trading bot with a full-screen TUI dashboard, AI chat interface, real-time market data, multi-timeframe signal generation, sentiment analysis, swing/day-trading workflows, and risk controls.
+Automated cryptocurrency futures trading bot with a full-screen TUI dashboard, an MCP control plane, real-time market data, multi-timeframe signal generation, sentiment analysis, swing/day-trading workflows, and risk controls.
 
 **Repository**: [https://github.com/Skeyelab/coinbase_futures_bot](https://github.com/Skeyelab/coinbase_futures_bot)
 
@@ -13,7 +13,7 @@ Automated cryptocurrency futures trading bot with a full-screen TUI dashboard, A
 ## Features
 
 - **Full-Screen TUI Dashboard**: Primary operator interface (`bin/futuresbot`) with positions, signals, live prices, and keyboard shortcuts
-- **AI Chat Interface**: Natural language commands via OpenRouter (Claude) with OpenAI fallback
+- **MCP Control Plane**: `Mcp::Server` over local stdio — the only conversational surface ([ADR 0007](docs/adr/0007-one-conversational-control-plane.md))
 - **Positions Web UI**: Server-rendered HTML at `/positions` (HTTP Basic auth)
 - **Multi-Timeframe Strategies**: 1h trend, 15m confirmation, 5m entry, 1m micro-timing
 - **Real-Time Market Data**: WebSocket subscribers for Coinbase spot and futures feeds
@@ -22,8 +22,8 @@ Automated cryptocurrency futures trading bot with a full-screen TUI dashboard, A
 - **Sentiment Analysis**: CryptoPanic plus RSS sources with lexicon scoring
 - **Nightly Calibration**: Walk-forward grid search of the live strategy; activates versioned per-symbol TradingProfiles
 - **Background Processing**: GoodJob on PostgreSQL with cron scheduling
-- **REST & WebSocket APIs**: Signals, sentiment, chat, positions, health checks
-- **Observability**: Sentry error/performance monitoring, Slack notifications and commands
+- **REST & WebSocket APIs**: Signals, sentiment, positions, health checks
+- **Observability**: Sentry error/performance monitoring, outbound Slack notifications
 - **Testing**: RSpec with VCR (strict HTTP), SimpleCov coverage, parallel CI runs
 
 ## Technology Stack
@@ -45,7 +45,7 @@ The suite has **109 spec files** and **~2,400 examples** (run `bundle exec rspec
 
 ```bash
 # Single file or focused debug
-bundle exec rspec spec/services/chat_bot_service_spec.rb
+bundle exec rspec spec/services/operator_snapshot_spec.rb
 
 # Full suite (parallel — matches CI)
 bin/parallel_rspec
@@ -85,7 +85,6 @@ CI runs StandardRB, Brakeman, bundler-audit, then `bin/parallel_rspec` with `COV
   - `cdp_api_key.json` at the repo root (preferred for ES256 private keys with real newlines), or
   - `COINBASE_API_KEY` + `COINBASE_API_SECRET` in `.env`
 - CryptoPanic token (sentiment; optional if sentiment disabled)
-- OpenRouter and/or OpenAI keys (chat interface)
 
 Copy `.env.example` to `.env` for shape only — never commit secrets. See [docs/configuration.md](docs/configuration.md) and [docs/development.md](docs/development.md).
 
@@ -105,10 +104,6 @@ bin/futuresbot start
 
 # Custom refresh interval (seconds)
 bin/futuresbot dashboard --refresh 10
-
-# AI chat
-bin/futuresbot chat
-bin/futuresbot chat --resume
 
 # One-shot CLI summaries
 bin/futuresbot status
@@ -179,7 +174,6 @@ FORCE=true bin/rake realtime:cancel_all
 - **[Development Guide](docs/development.md)** — Setup and workflow
 - **[Configuration](docs/configuration.md)** — Environment variables
 - **[API Documentation](docs/api-endpoints.md)** — REST endpoints
-- **[Chat Bot Interface](docs/chat-bot-interface.md)** — AI chat commands
 - **[Trading Strategies](docs/strategies.md)** — Strategy logic
 - **[Database Schema](docs/database-schema.md)** — Models and relationships
 - **[Background Jobs](docs/jobs.md)** — Scheduling
@@ -187,7 +181,7 @@ FORCE=true bin/rake realtime:cancel_all
 - **[Deployment Guide](docs/deployment.md)** — Production operations
 - **[Day Trading](docs/day-trading.md)** — Day-trading lifecycle
 - **[Sentry Monitoring](docs/sentry-monitoring.md)** — Error and performance tracking
-- **[Slack Integration](docs/slack-integration.md)** — Notifications and slash commands
+- **[Slack Integration](docs/slack-integration.md)** — Outbound notifications
 - **[Services](docs/services/)** — Core business logic
 
 Agent-oriented reference: [AGENTS.md](AGENTS.md)
@@ -290,18 +284,22 @@ CANDLE_AGGREGATION_ENABLED=true
 
 Panels: status bar, open positions (live uPnL), active signals, futures ticks, spot ticks.
 
-### AI Chat Examples
+### Conversational Control (MCP)
 
-```bash
-bin/futuresbot chat
+`Mcp::Server` is the conversational control plane — a typed tool surface over
+local stdio, not a text router. An MCP client (e.g. Claude Code) calls named
+tools; the bot never infers intent from prose.
 
-# FuturesBot> show my positions
-# FuturesBot> what signals are active?
-# FuturesBot> start trading
-# FuturesBot> emergency stop
-# FuturesBot> BTC price
-# FuturesBot> help
-```
+| Tool | Effect |
+|---|---|
+| `get_status`, `get_positions`, `get_signals`, `get_sentiment`, `get_fee_truth`, `get_halt_status` | read-only, all via `OperatorSnapshot` |
+| `halt_trading`, `resume_trading` | mutate trading state |
+| `close_position` | requires `confirm: true` |
+
+See [ADR 0005](docs/adr/0005-control-planes-and-trading-state-authorization.md)
+for the authorization rules and
+[ADR 0007](docs/adr/0007-one-conversational-control-plane.md) for why this is the
+only conversational surface.
 
 ## Futures Contract Notes
 

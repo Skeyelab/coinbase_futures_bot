@@ -17,12 +17,8 @@ Rails.application.routes.draw do
     get "/boom", to: ->(_env) { raise "Sentry smoke test" }
   end
 
-  # Slack webhook endpoints
-  namespace :slack do
-    post :commands
-    post :events
-    get :health
-  end
+  # Slack is push-only (outbound alerts via SlackNotificationService).
+  # The inbound command endpoint was deleted — see ADR 0007.
 
   # Defines the root path route ("/")
   # root "posts#index"
@@ -62,18 +58,8 @@ Rails.application.routes.draw do
 
   get "/sentiment/aggregates", to: "sentiment#aggregates"
 
-  # Chat interface routes
-  get "/chat", to: "chat#index"
-
-  # API routes
-  namespace :api do
-    resources :chat_messages, only: %i[create index] do
-      collection do
-        post :send_message
-        get :conversation_history
-      end
-    end
-  end
+  # The chat interface and its API were deleted — MCP is the conversational
+  # control plane. See ADR 0007.
 
   root to: "positions#index"
 end

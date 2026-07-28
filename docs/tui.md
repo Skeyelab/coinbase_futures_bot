@@ -56,7 +56,7 @@ Status  ·  Day: 2  ·  Swing: 1  ·  Signals: 4  ·  Sessions: 1  ·  Coinbase:
 
 - **Day / Swing** — count of open day-trading and swing positions
 - **Signals** — count of currently active signal alerts
-- **Sessions** — count of active chat sessions
+- **Sessions** — count of active `ChatSession` rows (historical; the chat surface was removed in ADR 0007)
 - **Coinbase** — `LIVE` (tick ≤ 15 s old), `STALE` (older), or `NO DATA`
 
 ### Open Positions
@@ -118,11 +118,6 @@ bin/futuresbot signals
 bin/futuresbot signals --limit 20
 bin/futuresbot signals --min_confidence 75
 
-# AI-powered interactive chat
-bin/futuresbot chat
-bin/futuresbot chat --resume
-bin/futuresbot chat --session_id <uuid>
-
 # Show version info
 bin/futuresbot version
 
@@ -148,7 +143,6 @@ back to a single one-shot render with no interactive loop.
 bin/futuresbot
   └── Cli::FuturesBotCli  (lib/cli/futures_bot_cli.rb)
         ├── dashboard  →  Cli::TuiDashboard#start  (lib/cli/tui_dashboard.rb)
-        ├── chat       →  inline loop + ChatBotService
         ├── status     →  inline ActiveRecord queries
         ├── positions  →  inline ActiveRecord queries
         └── signals    →  inline ActiveRecord queries
