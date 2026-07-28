@@ -99,4 +99,52 @@ RSpec.describe FetchCandlesJob, "deep 1m backfill (issue #506)", type: :job do
     expect(deep_calls).to be_empty
     expect(target.reload.deep_1m_backfilled_at).to be_nil
   end
+
+  describe "drain order (found by running the fix on exo-mini)" do
+    def candles!(product_id, count, oldest_ago)
+      base = oldest_ago
+      count.times do |i|
+        Candle.find_or_create_by!(symbol: product_id, timeframe: "1m", timestamp: base + i.minutes) do |c|
+          c.open = 1
+          c.high = 1
+          c.low = 1
+          c.close = 1
+          c.volume = 1
+        end
+      end
+    end
+
+    it "serves the neediest contract first, not the oldest row" do
+      # `healthy` is created FIRST, so ordering by id would serve it first --
+      # but `starved` is the one that cannot emit a signal.
+      healthy = contract("BIT-31JUL26-CDE")
+      starved = contract("BIT-30OCT26-CDE")
+      candles!(healthy.product_id, 40, 10.days.ago)
+      candles!(starved.product_id, 2, 1.hour.ago)
+
+      described_class.new.perform
+
+      expect(deep_calls.map { |kw| kw[:product_id] }).to eq([starved.product_id])
+    end
+
+    it "records depth a contract already has instead of re-walking it" do
+      already_deep = contract("BIP-20DEC30-CDE")
+      candles!(already_deep.product_id, 3, (described_class::DEEP_1M_BACKFILL_DAYS + 5).days.ago)
+
+      described_class.new.perform
+
+      expect(already_deep.reload.deep_1m_backfilled_at).not_to be_nil
+      expect(deep_calls.map { |kw| kw[:product_id] }).not_to include(already_deep.product_id)
+    end
+
+    it "still deep-fetches a contract whose history is only recent" do
+      shallow = contract("BIT-30OCT26-CDE")
+      candles!(shallow.product_id, 5, 2.days.ago)
+
+      described_class.new.perform
+
+      expect(deep_calls.map { |kw| kw[:product_id] }).to eq([shallow.product_id])
+      expect(shallow.reload.deep_1m_backfilled_at).not_to be_nil
+    end
+  end
 end

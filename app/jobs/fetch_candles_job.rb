@@ -88,11 +88,43 @@ class FetchCandlesJob < ApplicationJob
     # it by silently fetching a different window than the one they asked for.
     return Set.new if @explicit_1m_days
 
-    scope.where(deep_1m_backfilled_at: nil)
-      .order(:id)
-      .limit(DEEP_1M_BACKFILL_PER_RUN)
-      .pluck(:product_id)
+    pending = scope.where(deep_1m_backfilled_at: nil).to_a
+    return Set.new if pending.empty?
+
+    needs_fetch = pending.reject { |c| record_existing_depth(c) }
+    return Set.new if needs_fetch.empty?
+
+    # NEEDIEST FIRST, not oldest row first. Ordering by id served the starved
+    # contracts LAST, because a contract that rolled in yesterday is the newest
+    # row — the exact contracts this exists for would have waited ~20 hours
+    # behind healthy ones at one per run. Observed on exo-mini: 20 pending,
+    # with the three that could not emit a signal at the back of the queue.
+    counts = Candle.where(symbol: needs_fetch.map(&:product_id), timeframe: "1m")
+      .group(:symbol).count
+    needs_fetch
+      .sort_by { |c| [counts.fetch(c.product_id, 0), c.product_id] }
+      .first(DEEP_1M_BACKFILL_PER_RUN)
+      .map(&:product_id)
       .to_set
+  end
+
+  # A contract whose 1m history already reaches past the deep window has had its
+  # backfill, just before the stamp existed — record that rather than re-walking
+  # it. Without this the first ~14 runs on exo-mini would have spent themselves
+  # refetching minutes BIP (466k 1m candles) and BTC-USD (533k) already hold,
+  # while three unusable contracts waited behind them.
+  def record_existing_depth(contract)
+    earliest = Candle.where(symbol: contract.product_id, timeframe: "1m").minimum(:timestamp)
+    return false if earliest.nil?
+    # A day of slack: the venue's own history may not reach the full window.
+    return false if earliest > (DEEP_1M_BACKFILL_DAYS - 1).days.ago
+
+    contract.update!(deep_1m_backfilled_at: Time.now.utc)
+    Rails.logger.info(
+      "[Candles] #{contract.product_id} already has 1m back to #{earliest.to_date} " \
+      "— recording deep backfill without refetching"
+    )
+    true
   end
 
   # True when this run's 1m fetch for `pair` is deep enough to count as the
