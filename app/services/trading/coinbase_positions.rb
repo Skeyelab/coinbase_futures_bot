@@ -393,21 +393,29 @@ module Trading
       notional = Trading::NotionalCap.notional_for(product_id, size, fill_price)
       fee = [notional * fees[:taker_rate].to_f,
         size.to_f * fees[:per_contract_fee].to_f].max.round(6)
-      order_id = PaperTrading::ExchangeSimulator.new.place_limit(
-        symbol: product_id,
-        side: simulator_side(side),
-        price: fill_price,
-        quantity: size.to_f
-      )
+      # A unique id per simulated order, generated here rather than borrowed
+      # from PaperTrading::ExchangeSimulator.
+      #
+      # This used to call ExchangeSimulator.new.place_limit and use its return.
+      # The simulator's id sequence is per-INSTANCE state starting at 0, and a
+      # fresh instance was built on every call, so it always returned 1 — every
+      # simulated order in the database carried the id "DRY-RUN-1". ADR 0001
+      # made Orders first-class precisely so the exchange order id could support
+      # outage reconciliation against the venue; one id for all of them defeats
+      # that, and defeats duplicate detection with it. The #486 calibration run
+      # aborted on exactly that, refusing to trust a fill count it could not
+      # de-duplicate.
+      #
+      # Nothing else of that call survived: the instance was discarded
+      # immediately, along with its orders hash, its equity and its slippage and
+      # funding math. Paper economics come from the fee computed above, not from
+      # the simulator. Its fill logic is reached only from Backtest::Engine,
+      # which owns a simulator for the length of a run and so gets a real
+      # sequence. Generating the id directly removes a dependency that was
+      # contributing nothing but a constant.
+      order_id = "DRY-RUN-#{SecureRandom.hex(8)}"
       @logger.warn("[DryRun] Simulated order #{order_id}: #{side} #{size} #{product_id} @ #{fill_price} (no Coinbase order placed)")
-      {"success" => true, "order_id" => "DRY-RUN-#{order_id}", "dry_run" => true, "price" => fill_price, "fee" => fee}
-    end
-
-    def simulator_side(side)
-      normalized = side.to_s.downcase
-      return :sell if %w[sell short].include?(normalized)
-
-      :buy
+      {"success" => true, "order_id" => order_id, "dry_run" => true, "price" => fill_price, "fee" => fee}
     end
 
     # Get current market price for a product
