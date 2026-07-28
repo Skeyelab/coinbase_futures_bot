@@ -145,8 +145,15 @@ export RESTIC_REPOSITORY=$(doppler secrets get RESTIC_REPOSITORY_HERMES \
 export RESTIC_PASSWORD=$(doppler secrets get RESTIC_PASSWORD_HERMES \
   --project coinbase-futures-bot --config dev --plain)
 
-SNAP=$(restic snapshots --tag tier1 --latest 1 --json \
-  | grep -o '"short_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+# Newest tier1 snapshot. Do NOT use `--latest 1` here: restic applies it per
+# GROUP, and the default grouping is host+paths — every snapshot has a unique
+# timestamped dump filename, so each forms its own group and --latest returns
+# ALL of them, oldest first. Combined with `head -1` the old recipe selected the
+# OLDEST snapshot, which during an incident restores stale data that looks
+# correct. Verified on the hermes repo: 139 in, 139 out, [0] six days stale
+# while the hourly timer was healthy (issue #466).
+SNAP=$(restic snapshots --tag tier1 --json \
+  | jq -r 'sort_by(.time) | last | .short_id')
 
 # Dump the SPECIFIC file path, not "/" — restic emits a tar archive when asked
 # for a directory, and pg_restore fails with "could not find header for file

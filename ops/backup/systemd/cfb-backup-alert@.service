@@ -3,5 +3,11 @@ Description=Report failed CFB backup unit %i to Sentry (issue #414)
 
 [Service]
 Type=oneshot
+# Type=oneshot defaults TimeoutStartSec to infinity. The script now retries the
+# Sentry send across a ~70s backoff (issue #519), so it needs more than the 90s
+# default a non-oneshot unit would get -- but "infinity" would let a wedged curl
+# hold the unit open forever. 300s covers the worst case (4 x 15s curl + 70s of
+# sleep) with room, and bounds it.
+TimeoutStartSec=300
 # Needs SENTRY_DSN, which also lives in Doppler.
 ExecStart=/usr/bin/doppler run --project coinbase-futures-bot --config dev -- %h/coinbase_futures_bot/ops/backup/cfb-backup-alert.sh %i

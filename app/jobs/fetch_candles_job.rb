@@ -8,11 +8,39 @@ class FetchCandlesJob < ApplicationJob
   # Pass max_1m_days (or set MAX_1M_BACKFILL_DAYS) for deliberate deep
   # backfills — long-range walk-forward validation needs 1m depth because
   # the strategy requires 60x1m before every evaluation (issue #378).
+  #
+  # This 3-day window is a DELIBERATE steady-state choice, not a depth target.
+  # It is the right cost for keeping an already-deep symbol current; it is the
+  # wrong thing to be a symbol's entire history. The path that gives a symbol
+  # real depth is the one-time deep backfill below — the two work together and
+  # neither is sufficient alone (issue #506).
   DEFAULT_MAX_1M_BACKFILL_DAYS = 3
+
+  # One-time deep 1m backfill for contracts that have never had one.
+  #
+  # Issue #506: adding a contract starts collection, but the rolling window
+  # meant "ingesting" never produced usable 1m history. On 2026-07-27 a routine
+  # monthly roll left five contracts with 1–72 1m candles each, all of them
+  # looking fine on 5m/15m/1h. Three could not emit a signal at all, and nothing
+  # surfaced it — which is worse than a loud failure, because a rolled contract
+  # is not something anyone "adds" and then checks.
+  #
+  # Driven off a per-contract stamp rather than hooked into product ingestion,
+  # so it is self-healing instead of forward-only: contracts already starved
+  # when this ships get their history on the next cron tick with no manual step.
+  DEEP_1M_BACKFILL_DAYS = 120
+
+  # Deep backfill is ~288 requests per symbol per 60 days, so draining several
+  # starved contracts at once would turn an hourly maintenance job into a
+  # sustained burst against the venue. One per run drains a monthly roll's worth
+  # in a few hours, which is far inside the window that matters (the symbol is
+  # suspended and cannot trade until it earns enablement anyway).
+  DEEP_1M_BACKFILL_PER_RUN = 1
 
   # symbols: optional product_id filter (deep backfill for specific pairs);
   # nil = all enabled contracts (hourly cron path).
   def perform(backfill_days: 7, symbols: nil, max_1m_days: nil)
+    @explicit_1m_days = !max_1m_days.nil? || ENV["MAX_1M_BACKFILL_DAYS"].present?
     @max_1m_days = (max_1m_days || ENV.fetch("MAX_1M_BACKFILL_DAYS", DEFAULT_MAX_1M_BACKFILL_DAYS)).to_i
     rest = MarketData::CoinbaseRest.new
     rest.upsert_products
@@ -27,6 +55,15 @@ class FetchCandlesJob < ApplicationJob
     scope = Contract.enabled
     scope = scope.where(product_id: symbols) if symbols.present?
 
+    @deep_1m_pending = deep_1m_candidates(scope)
+    if @deep_1m_pending.any?
+      awaiting = scope.where(deep_1m_backfilled_at: nil).count
+      Rails.logger.info(
+        "[Candles] Deep 1m backfill (#{DEEP_1M_BACKFILL_DAYS}d) this run: " \
+        "#{@deep_1m_pending.to_a.join(", ")} (#{awaiting} contract(s) awaiting one)"
+      )
+    end
+
     scope.find_each do |pair|
       Rails.logger.info("[Candles] Fetching candles for #{pair.product_id}")
       fetch_1m_candles(rest, pair, backfill_days)
@@ -40,10 +77,48 @@ class FetchCandlesJob < ApplicationJob
 
   private
 
+  # Which contracts get a WIDENED 1m window on this run (issue #506).
+  #
+  # Deliberately widens the existing 1m fetch rather than adding a second pass.
+  # A separate pass double-fetched: an operator asking for `max_1m_days: 60`
+  # got their 60-day walk AND a 120-day one behind it, for the same minutes.
+  # One fetch per contract per run, sometimes deeper, is the honest shape.
+  def deep_1m_candidates(scope)
+    # An explicit depth means the caller owns the decision; do not second-guess
+    # it by silently fetching a different window than the one they asked for.
+    return Set.new if @explicit_1m_days
+
+    scope.where(deep_1m_backfilled_at: nil)
+      .order(:id)
+      .limit(DEEP_1M_BACKFILL_PER_RUN)
+      .pluck(:product_id)
+      .to_set
+  end
+
+  # True when this run's 1m fetch for `pair` is deep enough to count as the
+  # contract's one-time backfill — either because we chose it, or because the
+  # caller asked for at least as much depth as we would have.
+  def deep_1m_run_for?(pair)
+    return true if @deep_1m_pending.include?(pair.product_id)
+
+    @explicit_1m_days && @max_1m_days >= DEEP_1M_BACKFILL_DAYS &&
+      pair.deep_1m_backfilled_at.nil?
+  end
+
   def fetch_1m_candles(rest, pair, backfill_days)
     # 1m: honor backfill_days up to MAX_1M_BACKFILL_DAYS; single request only
     # covers ~5h (300 candles), so chunk anything longer.
-    backfill_days_1m = [backfill_days.to_i, @max_1m_days].min
+    #
+    # A contract that has never had a deep backfill gets the deep window INSTEAD
+    # of the rolling one on this run — the rolling window is a maintenance
+    # figure, and applying it to a contract with no history is what left five
+    # contracts unusable through a monthly roll (issue #506).
+    deep = deep_1m_run_for?(pair)
+    backfill_days_1m = if deep
+      DEEP_1M_BACKFILL_DAYS
+    else
+      [backfill_days.to_i, @max_1m_days].min
+    end
     start_time = fetch_start_time(pair.product_id, "1m", 1.minute, backfill_days_1m.days.ago)
 
     if Time.now.utc - start_time > 5.hours
@@ -58,6 +133,17 @@ class FetchCandlesJob < ApplicationJob
         product_id: pair.product_id,
         start_time: start_time,
         end_time: Time.now.utc
+      )
+    end
+
+    # Stamped only after the fetch returns. A failed deep backfill must stay
+    # pending — the whole point is that a starved contract does not quietly
+    # remain starved, and stamping up front would recreate exactly that.
+    if deep
+      pair.update!(deep_1m_backfilled_at: Time.now.utc)
+      Rails.logger.info(
+        "[Candles] Deep 1m backfill complete for #{pair.product_id} " \
+        "(#{Candle.where(symbol: pair.product_id, timeframe: "1m").count} 1m candles)"
       )
     end
   rescue => e

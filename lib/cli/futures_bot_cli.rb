@@ -268,6 +268,46 @@ module Cli
       puts "─" * 72
     end
 
+    # ─── coverage ───────────────────────────────────────────────────────────────
+    # Issue #506: 1m depth was invisible from every surface. A contract with
+    # three days of 1m looks identical to a deep one on 5m/15m/1h, and the only
+    # way to tell them apart was hand-written SQL — so five contracts sat
+    # unusable through a monthly roll without anything reporting it.
+    #
+    # 1m leads the table because it is the column that decides whether a symbol
+    # can produce a signal at all (MultiTimeframeSignal needs 60 of them).
+    desc "coverage", "Show candle depth per contract — surfaces 1m starvation (issue #506)"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def coverage
+      rows = Contract.enabled.order(:product_id).map { |c| coverage_row(c) }
+
+      if json_mode?
+        return emit_json({
+          min_1m_for_signal: MIN_1M_FOR_SIGNAL,
+          contracts: rows,
+          as_of: Time.current.utc.iso8601
+        })
+      end
+
+      puts "#{BOLD}#{CYAN}📈  Candle coverage#{RESET}  (1m gates signal generation — needs #{MIN_1M_FOR_SIGNAL})"
+      puts "─" * 86
+      printf("  %-18s %10s %9s %9s %8s  %s\n", "CONTRACT", "1m", "5m", "15m", "1h", "DEEP 1m")
+      rows.each do |r|
+        flag = r[:signal_capable] ? "" : "#{RED} ⚠#{RESET}"
+        deep = r[:deep_1m_backfilled_at] ? "#{GREEN}yes#{RESET}" : "#{YELLOW}pending#{RESET}"
+        printf("  %-18s %10s %9s %9s %8s  %s%s\n",
+          r[:product_id], r[:candles]["1m"], r[:candles]["5m"],
+          r[:candles]["15m"], r[:candles]["1h"], deep, flag)
+      end
+      puts "─" * 86
+      starved = rows.reject { |r| r[:signal_capable] }
+      if starved.any?
+        puts "  #{RED}#{starved.size} contract(s) below #{MIN_1M_FOR_SIGNAL}x1m — cannot emit a signal#{RESET}"
+      end
+      pending = rows.count { |r| r[:deep_1m_backfilled_at].nil? }
+      puts "  #{YELLOW}#{pending} awaiting deep 1m backfill#{RESET} (FetchCandlesJob drains #{FetchCandlesJob::DEEP_1M_BACKFILL_PER_RUN}/run)" if pending.positive?
+    end
+
     # ─── halt_status ────────────────────────────────────────────────────────────
     desc "halt_status", "Show current trading halt / kill-switch status"
     method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
@@ -394,6 +434,26 @@ module Cli
     end
 
     private
+
+    # Read from the strategy rather than duplicated as a literal — a coverage
+    # report that disagrees with the thing it reports on is worse than none.
+    # The rapid path (RapidSignalEvaluationJob) runs a lower bar of 30, so this
+    # is the stricter of the two: clearing it means every path can evaluate.
+    MIN_1M_FOR_SIGNAL = Strategy::MultiTimeframeSignal::DEFAULTS[:min_1m_candles]
+
+    COVERAGE_TIMEFRAMES = %w[1m 5m 15m 1h].freeze
+
+    def coverage_row(contract)
+      counts = Candle.where(symbol: contract.product_id, timeframe: COVERAGE_TIMEFRAMES)
+        .group(:timeframe).count
+      candles = COVERAGE_TIMEFRAMES.to_h { |tf| [tf, counts.fetch(tf, 0)] }
+      {
+        product_id: contract.product_id,
+        candles: candles,
+        signal_capable: candles["1m"] >= MIN_1M_FOR_SIGNAL,
+        deep_1m_backfilled_at: contract.deep_1m_backfilled_at&.utc&.iso8601
+      }
+    end
 
     # True when JSON output is requested via the --json flag or FUTURESBOT_JSON.
     def json_mode?
