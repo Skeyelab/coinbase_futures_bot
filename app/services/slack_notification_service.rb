@@ -479,6 +479,12 @@ class SlackNotificationService
       }
     end
 
+    # An absent number must not render as "$". Money that was never computed and
+    # money that is genuinely zero are different facts and must read differently.
+    def money(value)
+      value.nil? ? "N/A" : "$#{value.round(2)}"
+    end
+
     def format_pnl_message(pnl_data)
       return {} unless pnl_data.present? && pnl_data.is_a?(Hash)
 
@@ -492,14 +498,23 @@ class SlackNotificationService
           {
             color: color,
             fields: [
+              # `"$#{nil&.round(2)}"` rendered as a bare "$" — a field that looks
+              # like a value of nothing rather than an absent one. An operator
+              # cannot tell "we made $0" from "this was never computed", and for
+              # months it was always the latter.
               {
-                title: "Total PnL",
-                value: "$#{total_pnl&.round(2)}",
+                title: "Total PnL (realized + open)",
+                value: money(total_pnl),
                 short: true
               },
               {
-                title: "Daily PnL",
-                value: "$#{pnl_data[:daily_pnl]&.round(2)}",
+                title: "Daily PnL (realized)",
+                value: money(pnl_data[:daily_pnl]),
+                short: true
+              },
+              {
+                title: "Unrealized (open)",
+                value: money(pnl_data[:unrealized_pnl]),
                 short: true
               },
               {
