@@ -388,9 +388,13 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
         .to raise_error(TradingHalt::HaltedError)
     end
 
-    it "raises HaltedError on close_position when halted" do
+    # Inverted deliberately (issue #537). This previously asserted that a halt
+    # blocks closes — which is the defect, not the contract. A halt that stops
+    # exits does not stop the bot holding risk, it pins positions through their
+    # own stop-loss. Exits must survive the kill switch.
+    it "still CLOSES when halted — a halt must not trap a position past its stop" do
       expect { service.close_position(product_id: product_id) }
-        .to raise_error(TradingHalt::HaltedError)
+        .not_to raise_error
     end
 
     it "raises HaltedError on increase_position when halted" do
