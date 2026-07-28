@@ -117,10 +117,17 @@ module Trading
       :invalid
     end
 
+    # `position:` tells the service two things: close THIS row (not whatever
+    # `by_product(...).order(:entry_time).last` happens to return, which is a
+    # different row whenever several are open on the product), and leave
+    # realizing it to us. We are the single writer of realized P&L here — we
+    # hold the exit reason and we must run the protections layer on the row that
+    # results. A service that also closed it would double-realize a reduce.
     def attempt_api_close(position, partial_size = nil)
       @positions_service.close_position(
         product_id: position.product_id,
-        size: partial_size || position.size
+        size: partial_size || position.size,
+        position: position
       )
     rescue => e
       @logger.error("API close raised for position #{position.id}: #{e.message}")

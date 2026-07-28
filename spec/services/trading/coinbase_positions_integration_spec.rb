@@ -111,6 +111,45 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     end
   end
 
+  # The live/paper close path, exercised WITHOUT stubbing #close_position — the
+  # only shape that can see this bug. Every partial-close spec elsewhere stubs
+  # the service, so #update_local_position_record never ran and its full-close
+  # of a partial request went unnoticed.
+  describe "partial position closure integration" do
+    let!(:position) do
+      Position.create!(
+        product_id: product_id,
+        side: "LONG",
+        size: 5.0,
+        entry_price: 50_000.0,
+        entry_time: Time.current,
+        status: "OPEN",
+        day_trading: true,
+        entry_fee: 5.0
+      )
+    end
+
+    before do
+      # Five contracts open at the venue, so the reduce-only cap leaves the
+      # requested partial size alone.
+      allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_get).and_return(
+        double("Response", body: {
+          "positions" => [
+            {"product_id" => product_id, "side" => "LONG", "number_of_contracts" => "5.0"}
+          ]
+        }.to_json)
+      )
+    end
+
+    it "reduces the tracked position instead of closing it" do
+      service.close_position(product_id: product_id, size: 2.0)
+
+      position.reload
+      expect(position.status).to eq("OPEN")
+      expect(position.size).to eq(3.0)
+    end
+  end
+
   describe "position updates integration" do
     let!(:position) do
       Position.create!(

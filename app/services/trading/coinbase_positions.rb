@@ -186,8 +186,26 @@ module Trading
 
     # Close a position by submitting an opposite-side market order for the specified size.
     # If size is nil, attempts to infer the open size from list_open_positions for the product.
+    #
+    # `size` smaller than the tracked position is a PARTIAL reduce, not a close.
+    #
+    # `position:` is the local row the caller already resolved. Passing it does
+    # two things, and both matter on the live order path:
+    #
+    #   1. It stops us re-finding the row by product. Re-finding meant
+    #      `Position.open.by_product(...).order(:entry_time).last`, which can
+    #      pick a DIFFERENT row than the one the caller decided to close when
+    #      several are open on the same product.
+    #   2. It transfers ownership of realizing P&L to the caller. Whoever
+    #      resolved the position closes it, and there is exactly one writer per
+    #      close. Trading::PositionLifecycle passes it because it knows the exit
+    #      reason and must run the protections layer on the realized row; we then
+    #      only record the order and the fee. Callers that pass nothing (rollover,
+    #      the legacy current-month helpers, operator paths with no tracked row)
+    #      keep today's behavior: we find the row and realize it here.
+    #
     # Returns order result hash
-    def close_position(product_id:, size: nil)
+    def close_position(product_id:, size: nil, position: nil)
       TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
       raise "Authentication required" unless @authenticated || DryRun.active?
 
@@ -237,7 +255,8 @@ module Trading
           product_id: product_id,
           size: pos_size,
           close_price: get_current_market_price(product_id),
-          order_result: result
+          order_result: result,
+          position: position
         )
       end
 
@@ -580,12 +599,17 @@ module Trading
       @logger.error("Failed to create local position record: #{e.message}")
     end
 
-    def update_local_position_record(product_id:, size:, close_price:, order_result:)
-      # Find the most recent open position for this product
-      position = Position.open.by_product(product_id).order(:entry_time).last
+    def update_local_position_record(product_id:, size:, close_price:, order_result:, position: nil)
+      # A caller that handed us the row owns realizing it (see #close_position).
+      # We record the order and the fee; we do NOT touch status or size, because
+      # two writers of realized P&L is how a reduce ends up counted twice.
+      caller_realizes = !position.nil?
+      # Otherwise: find the most recent open position for this product.
+      position ||= Position.open.by_product(product_id).order(:entry_time).last
       return unless position
 
       close_price ||= position.entry_price
+      partial = partial_close?(position, size)
 
       persist_order(
         position: position,
@@ -601,13 +625,52 @@ module Trading
         coinbase_order_id: extract_order_id(order_result)
       )
 
-      position.update!(exit_fee: order_result["fee"]) if order_result.is_a?(Hash) && order_result["fee"]
+      fee = (order_result["fee"] if order_result.is_a?(Hash))
+
+      if caller_realizes
+        # On a partial the fee belongs to the split row, and only the caller's
+        # close_partial! can put it there; writing it on the parent would bill
+        # the contracts that are still open for an exit they have not taken.
+        position.update!(exit_fee: fee) if fee && !partial
+        return position
+      end
+
+      # A reduce is NOT a close. Asking to close 2 of 5 contracts used to run
+      # close_position! anyway, flattening the whole row and leaving the caller
+      # nothing left to realize. Route it to Position#close_partial! — the single
+      # implementation of the split (#509, #517) — so the closed contracts become
+      # their own CLOSED row and this one stays OPEN with the remainder.
+      if partial
+        portion = position.close_partial!(size, close_price, "API partial close", exit_fee: fee)
+        if portion.nil?
+          @logger.error("Failed to realize partial close of #{size} on position #{position.id}")
+          return nil
+        end
+        @logger.info("Reduced local position record #{position.id} by #{size}; " \
+                     "realized #{portion.id} with PnL: #{portion.pnl}; remaining #{position.size}")
+        return portion
+      end
+
+      position.update!(exit_fee: fee) if fee
 
       # Close the position
       position.close_position!(close_price)
       @logger.info("Updated local position record #{position.id} as closed with PnL: #{position.pnl}")
+      position
     rescue => e
       @logger.error("Failed to update local position record: #{e.message}")
+      nil
+    end
+
+    # A close request is a partial only when it is smaller than what we track.
+    # nil, blank, or >= the tracked size all mean "close the whole thing", which
+    # is the untouched full-close path.
+    def partial_close?(position, size)
+      return false if size.nil? || size.to_s.strip.empty?
+
+      BigDecimal(size.to_s) < BigDecimal(position.size.to_s)
+    rescue ArgumentError
+      false
     end
 
     def increase_local_position_record(product_id:, additional_size:, additional_price:, order_result:)

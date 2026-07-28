@@ -241,5 +241,116 @@ RSpec.describe Trading::PositionLifecycle do
         end
       end
     end
+
+    # Every other partial-close example above stubs #close_position, so the real
+    # Trading::CoinbasePositions#update_local_position_record never runs. It used
+    # to FULL-close the row for any partial request, after which close_partial!
+    # returned nil ("return nil unless open?") and this lifecycle reported
+    # failure — skipping CooldownPeriod, the StoplossGuard and LossLimits. The
+    # position was flat AND unprotected. Only the HTTP boundary is stubbed here.
+    context "partial reduce through the real CoinbasePositions service" do
+      subject(:lifecycle) { described_class.new(positions_service: real_service, logger: logger) }
+
+      let(:real_service) { Trading::CoinbasePositions.new }
+      let(:position) { create(:position, status: "OPEN", side: "LONG", size: 5.0, entry_price: 50_000.0) }
+
+      before do
+        allow_any_instance_of(Trading::CoinbasePositions).to receive(:load_credentials_from_file)
+          .and_return({api_key: "organizations/test/apiKeys/test", private_key: "test-key"})
+        allow_any_instance_of(Trading::CoinbasePositions).to receive(:build_jwt_token).and_return("test-jwt")
+        allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_get).and_return(
+          double("Response", body: {
+            "positions" => [
+              {"product_id" => position.product_id, "side" => "LONG", "number_of_contracts" => "5.0"}
+            ]
+          }.to_json)
+        )
+        allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_post).and_return(
+          double("Response", body: {"success" => true, "order_id" => "live-order-1"}.to_json)
+        )
+      end
+
+      it "reports success" do
+        expect(lifecycle.close(position, reason: "web_operator_close", size: 2.0)).to be_success
+      end
+
+      it "leaves the position OPEN with the remainder" do
+        lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+        expect(position.reload.status).to eq("OPEN")
+        expect(position.size).to eq(3.0)
+      end
+
+      # The double-realization guard. Both the service and this lifecycle used to
+      # realize the same reduce: the service full-closed the row it re-found
+      # (booking P&L on all 5 contracts) while this object, holding a stale
+      # in-memory copy that still looked OPEN, split off another 2. $7,000 of
+      # realized P&L on a 5-contract position, and the loss caps believed it.
+      it "realizes the closed contracts once, and only the closed contracts" do
+        lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+        realized = Position.closed.where(parent_position_id: position.id)
+        expect(realized.count).to eq(1)
+        expect(realized.first.size).to eq(2.0)
+        expect(realized.first.pnl).to eq(2_000.0)
+        expect(Position.closed.sum(:pnl)).to eq(2_000.0)
+      end
+
+      it "still runs the protections layer on the reduce" do
+        lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+        expect(Trading::Protections.blocked?(symbol: position.product_id, side: "long")).to be true
+      ensure
+        Trading::ProtectionLock.clear!
+      end
+
+      it "records the close order's fee on the split row, not on the remainder" do
+        allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_post).and_return(
+          double("Response", body: {"success" => true, "order_id" => "live-order-1", "fee" => 1.53}.to_json)
+        )
+
+        lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+        expect(Position.closed.find_by(parent_position_id: position.id).exit_fee).to eq(BigDecimal("1.53"))
+        expect(position.reload.exit_fee).to be_nil
+      end
+
+      # The service used to re-find the row with
+      # `Position.open.by_product(...).order(:entry_time).last`, which is a
+      # different position than the one the caller resolved whenever more than
+      # one is open on the product — so the close landed on the wrong record.
+      context "with another open position on the same product" do
+        let!(:newer) do
+          create(:position, product_id: position.product_id, status: "OPEN", side: "LONG",
+            size: 7.0, entry_price: 50_000.0, entry_time: position.entry_time + 1.hour)
+        end
+
+        it "reduces the position it was given and leaves the other untouched" do
+          lifecycle.close(position, reason: "web_operator_close", size: 2.0)
+
+          expect(position.reload.size).to eq(3.0)
+          expect(newer.reload.size).to eq(7.0)
+          expect(newer.status).to eq("OPEN")
+        end
+      end
+
+      # The full-close path must be untouched: still CLOSED, still carrying the
+      # exit fee the order result reported.
+      context "when the requested size is the whole position" do
+        it "closes the row and records the exit fee" do
+          allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_post).and_return(
+            double("Response", body: {"success" => true, "order_id" => "live-order-1", "fee" => 2.25}.to_json)
+          )
+
+          expect(lifecycle.close(position, reason: "web_operator_close")).to be_success
+
+          position.reload
+          expect(position.status).to eq("CLOSED")
+          expect(position.size).to eq(5.0)
+          expect(position.exit_fee).to eq(BigDecimal("2.25"))
+          expect(Position.where(parent_position_id: position.id)).to be_empty
+        end
+      end
+    end
   end
 end
