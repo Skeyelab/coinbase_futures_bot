@@ -48,7 +48,18 @@ module Trading
 
       def total_commission = fills.sum { |f| f.commission.to_f }
 
-      def funding_debited = legs.sum { |l| l.funding_debited.to_f }
+      # nil, not 0.0, when no leg carries a debited figure. Nothing in the
+      # codebase ever ASSIGNS Leg#funding_debited — funding is charged out of
+      # band by the venue and never appears on the order path this run reads.
+      # Summing nils to 0.0 turned that absence into "$0.0000 debited", which
+      # reads as a measurement of zero rather than an absence of measurement,
+      # and made the report's "not observable" branch dead code.
+      def funding_debited
+        observed = legs.filter_map(&:funding_debited)
+        return nil if observed.empty?
+
+        observed.sum(&:to_f)
+      end
 
       def funding_modeled = legs.sum { |l| l.funding_modeled.to_f }
 

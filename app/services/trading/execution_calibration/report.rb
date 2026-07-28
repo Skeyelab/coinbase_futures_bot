@@ -160,20 +160,39 @@ module Trading
           "(mean #{s[:mean]}, worst absolute #{s[:worst_abs]}; abort threshold #{AbortConditions::SLIPPAGE_BPS})"
       end
 
+      # `boundary_crossed` says the MODEL produced a figure, which only means a
+      # hold spanned a funding timestamp. It is not evidence that funding was
+      # charged, and it used to be called `observed`, which invited exactly that
+      # reading. `debited_usd` is nil until something actually reads a charge.
       def funding_summary
         {modeled_usd: tape&.funding_modeled, debited_usd: tape&.funding_debited,
-         observed: tape ? tape.legs.any? { |l| l.funding_modeled.to_f.abs.positive? } : false}
+         boundary_crossed: tape ? tape.legs.any? { |l| l.funding_modeled.to_f.abs.positive? } : false,
+         measured: !tape&.funding_debited.nil?}
       end
 
       def funding_line
         f = funding_summary
-        unless f[:observed]
+        unless f[:boundary_crossed]
           return "no funding boundary was crossed by any hold — funding is UNMEASURED by this run. " \
             "ADR 0002's 0.1-0.5 bps/trade funding estimate is untested; a longer-hold run is needed."
         end
 
-        "modeled #{format("$%+.4f", f[:modeled_usd].to_f)} vs debited " \
-          "#{f[:debited_usd].nil? ? "not observable from the order path" : format("$%+.4f", f[:debited_usd].to_f)}"
+        modeled = format("$%+.4f", f[:modeled_usd].to_f)
+
+        # A rehearsal cannot be charged funding, so the modeled figure is the
+        # only number here and comparing it to itself proves nothing.
+        if mode == :dry_run
+          return "modeled #{modeled}, debited NOTHING — a rehearsal is never charged funding, so this is " \
+            "CostModel's estimate quoted back, not a measurement. Funding remains UNVALIDATED."
+        end
+
+        if f[:debited_usd].nil?
+          return "modeled #{modeled} vs debited: NOT OBSERVABLE — funding is settled out of band and never " \
+            "appears on the order path this run reads. Measuring it needs a separate source (the funding " \
+            "ledger or account statement), so ADR 0002's estimate stays untested by this run."
+        end
+
+        "modeled #{modeled} vs debited #{format("$%+.4f", f[:debited_usd].to_f)}"
       end
     end
   end
