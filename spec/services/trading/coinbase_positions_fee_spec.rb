@@ -29,12 +29,34 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
       FundingRate.create!(product_id: "BIP-20DEC30-CDE", funding_rate: 0.0001,
         funding_interval_seconds: 3600, funding_time: Time.current,
         observed_at: Time.current)
+      # BIP is 0.01 BTC per contract — the quote price is NOT the notional.
+      allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
 
       fee = service.send(:simulate_order,
         product_id: "BIP-20DEC30-CDE", side: :buy, size: 2, price: 100_000.0)["fee"]
 
-      # Perp: max(100_000 * 2 * 0.0003, 2 * 0.15) = max(60.0, 0.30) = 60.0
-      expect(fee).to be_within(1e-6).of(60.0)
+      # notional = 100_000 * 0.01 * 2 = $2,000
+      # max(2_000 * 0.0003, 2 * 0.15) = max(0.60, 0.30) = 0.60
+      expect(fee).to be_within(1e-6).of(0.60)
+    end
+
+    # The #486 calibration rehearsal measured a 300 bps taker rate against a
+    # modeled 3 bps — exactly 100x, which is BIP's contract_size of 0.01. The
+    # fee was being charged on the quote price rather than on notional, so a
+    # 1-contract BIP fill priced as if it were a whole bitcoin.
+    it "charges the fee on notional, not on the quote price" do
+      FundingRate.create!(product_id: "BIP-20DEC30-CDE", funding_rate: 0.0001,
+        funding_interval_seconds: 3600, funding_time: Time.current,
+        observed_at: Time.current)
+      allow(Trading::ContractSizeResolver).to receive(:for_product).and_return(0.01)
+
+      fee = service.send(:simulate_order,
+        product_id: "BIP-20DEC30-CDE", side: :buy, size: 1, price: 63_745.0)["fee"]
+
+      # notional = 63_745 * 0.01 = $637.45; 3 bps of that is $0.191235, and the
+      # $0.15/contract floor does not bind. Charging on the raw price gave
+      # $19.1235 — the 100x the calibration run surfaced.
+      expect(fee).to be_within(1e-6).of(0.191235)
     end
   end
 end
