@@ -163,11 +163,30 @@ class RapidSignalEvaluationJob < ApplicationJob
     # MaxDrawdown bound the backtest and not production, which is a parity break
     # in the dangerous direction: the simulation was SAFER than live.
     #
+    # A side we cannot name is not tradeable. This used to fall through as ""
+    # — a normalization failure wearing the costume of a side — and "" reaches
+    # no direction-scoped lock, so an unparseable side was the one input that
+    # walked past the guards and on to sizing and order placement. The next
+    # thing this method does on a `true` is send an order; there is no reading
+    # of an unrecognisable side that makes that the right move. Fail closed.
+    #
+    # Deliberately NOT folded into the blocked? call below. Trading::Protections
+    # answers "does a lock cover this side", and it correctly says no for a side
+    # that names no direction. Whether an unnameable direction may be traded at
+    # all is a different question, and hanging it off the lock check would make
+    # the refusal depend on whether some unrelated StoplossGuard lock happens to
+    # be active. One decision, one home.
+    protection_side = SideNormalizer.position(signal[:side])
+    unless protection_side
+      @logger.warn("[RSE] Skipping signal - unparseable side #{signal[:side].inspect} for #{@target_contract}")
+      @decisions&.rejected(:unparseable_side, signal: signal, side: signal[:side].to_s)
+      return false
+    end
+
     # Keyed on the contract id because that is what PositionLifecycle records
-    # exits under, and on a normalized long/short because side matching is an
-    # exact string compare — passing the raw "BUY" would silently miss a
-    # side-scoped StoplossGuard lock.
-    protection_side = SideNormalizer.position(signal[:side]).to_s.downcase
+    # exits under. Side spelling no longer matters here — Trading::Protections
+    # normalizes both sides of the compare (a lock written "long" now catches a
+    # candidate "LONG"/"BUY") — but the normalized value is what we hold anyway.
     if Trading::Protections.blocked?(symbol: @target_contract, side: protection_side)
       reason = Trading::Protections.block_reason(symbol: @target_contract, side: protection_side)
       @logger.info("[RSE] Skipping signal - protection active for #{@target_contract} (#{reason})")

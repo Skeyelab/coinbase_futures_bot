@@ -82,6 +82,26 @@ RSpec.describe Trading::PositionLifecycle do
           expect(Trading::Protections.blocked?(symbol: pid, side: "long")).to be false
         end
 
+        # The halt above is only worth writing if the entry gate can READ it.
+        # The guard writes its lock side from PositionLifecycle's downcased
+        # exits ("short"); the side a caller naturally has in hand is
+        # Position#side, which the model constrains to %w[LONG SHORT]. The
+        # assertions above pass either way because they spell the side the same
+        # way the writer did — which is exactly how a fail-open survived. Name
+        # the side the way the database does.
+        it "halts a side named the way Position#side names it" do
+          allow(SlackNotificationService).to receive(:alert)
+          pid = position.product_id
+          position.update!(side: "SHORT")
+          create(:position, product_id: pid, side: "SHORT", status: "CLOSED",
+            close_time: 10.minutes.ago, pnl: -25.0)
+
+          lifecycle.close(position, reason: "stop_loss")
+
+          expect(Trading::Protections.blocked?(symbol: pid, side: "SHORT")).to be true
+          expect(Trading::Protections.blocked?(symbol: pid, side: "LONG")).to be false
+        end
+
         it "does not halt on a winning close" do
           allow(SlackNotificationService).to receive(:alert)
           # position stays LONG: entry 50k closing at 51k is a WIN (DB pnl > 0).

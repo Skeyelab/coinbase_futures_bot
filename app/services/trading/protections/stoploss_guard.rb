@@ -56,8 +56,20 @@ module Trading
         locks = []
 
         if @only_per_side
+          # Normalized, not compared raw. Callers supply exits in their own
+          # vocabulary — PositionLifecycle downcases Position#side on the way in
+          # to satisfy this loop, and a caller that forgets counts zero losing
+          # exits and writes no halt at all. A guard whose correctness rests on
+          # every caller remembering to downcase is a guard that will eventually
+          # not fire. An exit whose side normalizes to nothing is evidence for
+          # neither direction and counts toward neither.
           %w[long short].each do |side|
-            next if recent.count { |e| e[:side].to_s == side } < @threshold
+            # `side` is a literal, so it always normalizes; only the
+            # caller-supplied exit side can come back nil, and nil equals
+            # neither "LONG" nor "SHORT".
+            direction = SideNormalizer.position(side)
+            matching = recent.count { |e| SideNormalizer.position(e[:side]) == direction }
+            next if matching < @threshold
 
             locks << write_lock(symbol: symbol, side: side, now: now, store: store)
           end
