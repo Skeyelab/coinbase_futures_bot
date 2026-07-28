@@ -18,6 +18,9 @@ RSpec.describe GenerateSignalsJob, type: :job do
   end
 
   before do
+    # The notification throttle is cache-backed; a stale key from a previous
+    # example would silently swallow expected notifications.
+    Rails.cache.clear
     allow(Strategy::MultiTimeframeSignal).to receive(:new).and_return(mock_strategy)
     allow(SlackNotificationService).to receive(:signal_generated)
     # Allow puts to be called without mocking it
@@ -210,6 +213,65 @@ RSpec.describe GenerateSignalsJob, type: :job do
           }
         )
 
+        job.perform
+      end
+
+      # 2026-07-28 storm regression: the job runs every 15 minutes and used to
+      # re-announce the same still-valid signal on every run (and on every
+      # GoodJob retry — see the halted context below). One announcement per
+      # symbol+side per throttle window is the contract.
+      it "does not re-announce the same symbol+side within the throttle window" do
+        Rails.cache.clear
+        expect(SlackNotificationService).to receive(:signal_generated).once
+
+        job.perform
+        described_class.new.perform
+      end
+    end
+
+    # 2026-07-28 storm regression: a signal + an active halt turned one cron
+    # tick into ~3 retries/second (GoodJob retries unhandled errors with no
+    # backoff), each posting to Slack before crashing on HaltedError. A halt is
+    # a state — the job must skip execution and complete, not crash and retry.
+    context "when trading is halted and live trading is enabled" do
+      let(:mock_executor) { instance_double(Execution::FuturesExecutor) }
+
+      before do
+        Rails.cache.clear
+        allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        allow(Execution::FuturesExecutor).to receive(:new).and_return(mock_executor)
+        allow(mock_executor).to receive(:consider_entry)
+          .and_raise(TradingHalt::HaltedError, "Trading is halted (daily realized loss $12.60 breached cap $10.00)")
+        allow(ENV).to receive(:[]).with("PAPER_TRADING_MODE").and_return("false")
+      end
+
+      it "completes without raising" do
+        expect { job.perform }.not_to raise_error
+      end
+
+      it "still announces the signal once" do
+        expect(SlackNotificationService).to receive(:signal_generated).once
+        job.perform
+      end
+
+      it "discards rather than retries if a HaltedError escapes anyway" do
+        expect(described_class.rescue_handlers.map(&:first)).to include("TradingHalt::HaltedError")
+      end
+    end
+
+    context "when the durable dry-run state is active but PAPER_TRADING_MODE is unset" do
+      let(:mock_executor) { instance_double(Execution::FuturesExecutor) }
+
+      before do
+        Rails.cache.clear
+        allow(mock_strategy).to receive(:signal).and_return(mock_signal)
+        allow(Execution::FuturesExecutor).to receive(:new).and_return(mock_executor)
+        allow(ENV).to receive(:[]).with("PAPER_TRADING_MODE").and_return(nil)
+        allow(DryRun).to receive(:active?).and_return(true)
+      end
+
+      it "does not walk the live execution path" do
+        expect(mock_executor).not_to receive(:consider_entry)
         job.perform
       end
     end
@@ -689,6 +751,9 @@ RSpec.describe GenerateSignalsJob, type: :job do
         allow(mock_strategy).to receive(:signal).and_return(mock_signal)
 
         expect { job.perform }.not_to raise_error
+        # The first perform consumed the notification throttle window; clear it
+        # so the second run can prove the notification path.
+        Rails.cache.clear
         expect(SlackNotificationService).to receive(:signal_generated)
 
         job.perform
