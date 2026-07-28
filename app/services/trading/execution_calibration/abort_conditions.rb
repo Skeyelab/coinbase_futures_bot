@@ -88,6 +88,10 @@ module Trading
 
       # Reported, never aborts. nil when no maker entry was attempted yet.
       def maker_fill_rate_warning
+        # A claim about the venue's queue, so a rehearsal cannot make it. The
+        # simulator's fill behaviour is a property of the simulator.
+        return nil if dry_run?
+
         rate = @tape.maker_fill_rate
         return nil if rate.nil? || rate >= MAKER_FILL_RATE_FLOOR
 

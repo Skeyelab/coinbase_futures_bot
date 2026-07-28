@@ -60,7 +60,7 @@ module Trading
           "",
           "MAKER FILLS",
           "  maker fill rate     : #{maker_rate_line}",
-          "  #{maker_warning || "at or above the 30% floor — the +22 bps maker case survives"}",
+          "  #{maker_case_line}",
           "",
           "SLIPPAGE",
           "  slippage distribution : #{slippage_line}",
@@ -112,8 +112,27 @@ module Trading
       def reconciliation_line
         return "not computed" unless reconciliation
 
+        # In a rehearsal the simulator charges CostModel's own rate, so measured
+        # and modeled agree by construction. Reporting 0.0% drift as "#376 gate
+        # 1" would offer the model agreeing with itself as evidence — the same
+        # mistake the abort path made when it read a simulated rate as a venue
+        # finding (issue #535, errata on #486).
+        if mode == :dry_run
+          return "CIRCULAR in dry-run — the simulator charges CostModel's own rate, so any agreement here " \
+            "is the model matching itself. #376 gate 1 is NOT addressed by this run."
+        end
+
         verdict = reconciliation[:within_tolerance] ? "WITHIN 10%" : "OUTSIDE 10%"
         "#{verdict} (#{(reconciliation[:relative_drift].to_f * 100).round(1)}% off) — #376 gate 1"
+      end
+
+      # The maker verdict is a claim about the VENUE's queue behaviour. A
+      # rehearsal has no queue in it, so it may neither kill the +22 bps case
+      # nor pronounce it survived — the previous fallback did the latter.
+      def maker_case_line
+        return "not assessed — a rehearsal cannot kill or confirm the +22 bps maker case" if mode == :dry_run
+
+        maker_warning || "at or above the 30% floor — the +22 bps maker case survives"
       end
 
       def maker_rate_line
