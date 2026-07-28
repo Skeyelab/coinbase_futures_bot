@@ -210,8 +210,27 @@ module Trading
     #      keep today's behavior: we find the row and realize it here.
     #
     # Returns order result hash
+    # NOT gated on TradingHalt. Stopping new risk and preventing risk REDUCTION
+    # are different actions, and only the first belongs to a kill switch.
+    #
+    # This used to call `TradingHalt.assert_active!`, so a halt did not stop the
+    # bot holding risk — it removed the ability to shed it, pinning every open
+    # position through its own stop-loss. Observed 2026-07-28: during a 14-minute
+    # RISK halt, position 14's take-profit fired twice and all four close
+    # attempts (2 + 2 retries) raised; the position was still open afterwards
+    # with its TP unfilled (issue #537).
+    #
+    # Three things made that worse than a missed exit: a RISK halt needs a
+    # console to clear (#481), RISK halts can be raised spuriously (#535 — a
+    # calibration measuring DRY-RUN fills raised two), and ADR 0006 suspension
+    # already documents the correct semantics for its sibling mechanism — new
+    # entries only, "open positions still exit normally".
+    #
+    # Exits are safe to allow unconditionally here because this method is
+    # reduce-only by construction: the size is capped at the open contracts
+    # below, so it can never flip or grow a position. `open_position` and
+    # `increase_position` keep their assertions — those are what a halt is for.
     def close_position(product_id:, size: nil, position: nil)
-      TradingHalt.assert_active!(context: "CoinbasePositions#close_position")
       raise "Authentication required" unless @authenticated || DryRun.active?
 
       # If explicit size provided, infer the actual open size + side from the
