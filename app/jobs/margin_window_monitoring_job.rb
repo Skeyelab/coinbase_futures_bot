@@ -152,15 +152,20 @@ class MarginWindowMonitoringJob < ApplicationJob
     margin_violations = []
 
     swing_positions.each do |position|
-      # Check if position exceeds overnight margin requirements
-      next unless position_exceeds_margin_requirements?(position, balance_summary, margin_window)
+      # Computed ONCE and then used, both for the decision and for the payload.
+      # It used to be computed inside the predicate, discarded there, and
+      # recomputed here for the alert — which is how a correct number came to
+      # be reported by a gate that never consulted it.
+      margin_requirement = calculate_position_margin_requirement(position, margin_window)
+
+      next unless position_exceeds_margin_requirements?(margin_requirement, balance_summary)
 
       violation = {
         position_id: position.id,
         product_id: position.product_id,
         size: position.size,
         entry_price: position.entry_price,
-        margin_requirement: calculate_position_margin_requirement(position, margin_window)
+        margin_requirement: margin_requirement
       }
       margin_violations << violation
 
@@ -189,16 +194,34 @@ class MarginWindowMonitoringJob < ApplicationJob
     nil
   end
 
-  def position_exceeds_margin_requirements?(position, balance_summary, margin_window)
-    # Calculate position margin requirement based on current margin window
-    calculate_position_margin_requirement(position, margin_window)
-    available_margin = balance_summary[:available_margin]
+  # Two conditions, and they answer DIFFERENT questions. Both are kept.
+  #
+  # The account-level buffer answers "is there a problem at all?". A cushion
+  # above SWING_MARGIN_BUFFER of equity means no swing position needs
+  # flattening, whatever its individual requirement — it is the same condition
+  # SwingPositionManager reports as :insufficient_margin_buffer, and it is
+  # legitimate. But it is identical for every position, so on its own it flags
+  # all of them or none of them, and it cannot answer "which one?".
+  #
+  # The per-position requirement answers "which one?" — the number this method
+  # used to compute and throw away. A position breaches when the margin it
+  # needs under the current window is more than the account has free to cover
+  # it. Contract size is load-bearing here: NOL (contract_size 10) and BIP
+  # (0.01) at the same contract count are two different requirements.
+  #
+  # Requiring BOTH strictly narrows the flagged set to a subset of what was
+  # flagged before, so nothing gets closed that was not already eligible.
+  def position_exceeds_margin_requirements?(margin_requirement, balance_summary)
+    return false unless account_margin_buffer_breached?(balance_summary)
 
-    # Check if position margin exceeds a safety threshold
+    margin_requirement > balance_summary[:available_margin]
+  end
+
+  def account_margin_buffer_breached?(balance_summary)
     margin_safety_buffer = ENV.fetch("SWING_MARGIN_BUFFER", "0.2").to_f
     required_buffer = balance_summary[:total_usd_balance] * margin_safety_buffer
 
-    available_margin < required_buffer
+    balance_summary[:available_margin] < required_buffer
   end
 
   def calculate_position_margin_requirement(position, margin_window)
