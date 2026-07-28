@@ -40,6 +40,23 @@ class SideNormalizer
     POSITION_SIDES[value.to_s.downcase]
   end
 
+  # "Is this side long?" was the question four callers actually had, and each
+  # answered it by re-typing a slice of POSITION_SIDES as its own inclusion
+  # list: %i[long buy] (CostModel, Strategy::MultiTimeframeSignal),
+  # %w[BUY LONG] (ExecutionCalibration::Tape), %w[long buy] (SignalAlert).
+  # Four copies of one table is four places for an alias to go missing.
+  #
+  # Deliberately NOT complements: an unrecognised side is neither long nor
+  # short, so garbage cannot silently read as "short" the way `!long?` would
+  # make it.
+  def self.long?(value)
+    position(value) == "LONG"
+  end
+
+  def self.short?(value)
+    position(value) == "SHORT"
+  end
+
   def self.signal(value)
     SIGNAL_SIDES[value.to_s.downcase]
   end

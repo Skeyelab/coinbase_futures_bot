@@ -217,10 +217,7 @@ module Trading
     end
 
     def get_current_price_for_position(position)
-      RecentMarketPrice.for_product(position.product_id) || begin
-        @logger.warn("No recent price data for #{position.product_id}, using entry price")
-        position.entry_price
-      end
+      RecentMarketPrice.mark(position, logger: @logger).price
     end
   end
 end

@@ -65,10 +65,8 @@ class PositionReconcileService
   end
 
   def resolve_close_price(position)
-    market_price = position.get_current_market_price
-    return [market_price, true] if market_price
-
-    [position.entry_price, false]
+    mark = RecentMarketPrice.mark(position, logger: Rails.logger)
+    [mark.price, mark.live?]
   end
 
   def resolve_close_pnl(position, close_price, market_price_used:)
