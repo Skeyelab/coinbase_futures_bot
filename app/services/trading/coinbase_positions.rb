@@ -13,6 +13,11 @@ module Trading
 
     DEFAULT_BASE = "https://api.coinbase.com"
 
+    # Raised when a mutation would have to GUESS which tracked row it applies to.
+    # On the live order path a guess is a real-money error, so we refuse and
+    # leave state alone rather than mutate whichever row sorted last.
+    class AmbiguousPositionError < StandardError; end
+
     # How entries should be placed (issue #374/#377). Defaults to :market so
     # nothing changes until deliberately switched — the maker fill rate has never
     # been observed (zero perp fills), and #486 exists to measure it.
@@ -264,19 +269,34 @@ module Trading
     end
 
     # Increase an existing position by adding more contracts in the same direction.
+    #
+    # `position:` is the local row the caller already resolved — the row this
+    # increase lands on. It mirrors #close_position's `position:` for the same
+    # reason: without it the size and averaged entry price were written to
+    # `Position.open.by_product(...).order(:entry_time).last`, which is a
+    # DIFFERENT row than the caller meant whenever several are open on one
+    # product. On the close path Trading::PositionLifecycle sits in front and
+    # would notice; nothing sits in front of an increase, so a misrouted fill
+    # just silently skews some other position's average entry.
+    #
     # Returns order result hash
-    def increase_position(product_id:, size:)
+    def increase_position(product_id:, size:, position: nil)
       TradingHalt.assert_active!(context: "CoinbasePositions#increase_position")
       raise "Authentication required" unless @authenticated || DryRun.active?
+
+      # Resolve the target row BEFORE anything is sent. Refusing after the fill
+      # would leave contracts at the venue that no local row accounts for, so
+      # the ambiguity has to be settled while there is still nothing to undo.
+      position ||= sole_open_position(product_id)
 
       # Get the current position to determine the side
       positions = list_open_positions(product_id: product_id)
       return {"success" => false, "message" => "No open position found to increase"} if positions.empty?
 
-      position = positions.find { |p| p["product_id"] == product_id } || positions.first
-      current_side = position["side"] || position["position_side"] || position.dig("position", "side")
+      venue_position = positions.find { |p| p["product_id"] == product_id } || positions.first
+      current_side = venue_position["side"] || venue_position["position_side"] || venue_position.dig("position", "side")
 
-      @logger.info("Increasing position debug: product_id=#{product_id}, current_side=#{current_side.inspect}, position=#{position.inspect}")
+      @logger.info("Increasing position debug: product_id=#{product_id}, current_side=#{current_side.inspect}, position=#{venue_position.inspect}")
 
       # Convert position side to order side for increase:
       # LONG position: BUY more contracts to increase
@@ -304,8 +324,9 @@ module Trading
         increase_local_position_record(
           product_id: product_id,
           additional_size: size,
-          additional_price: get_current_market_price(product_id) || position["avg_entry_price"]&.to_f,
-          order_result: result
+          additional_price: get_current_market_price(product_id) || venue_position["avg_entry_price"]&.to_f,
+          order_result: result,
+          position: position
         )
       end
 
@@ -662,6 +683,24 @@ module Trading
       nil
     end
 
+    # The one open row for this product, or nil when none is tracked (an
+    # operator acting on an untracked venue position — allowed, it just has no
+    # local record to update).
+    #
+    # Several open rows is NOT a nil case: it is a refusal. The caller asked us
+    # to mutate "the" position for a product that has more than one, and the old
+    # answer — `order(:entry_time).last` — was a guess dressed up as a lookup.
+    # PositionsController#tracked_open_position takes the same care on close.
+    def sole_open_position(product_id)
+      scope = Position.open.by_product(product_id)
+      count = scope.count
+      return scope.first if count <= 1
+
+      raise AmbiguousPositionError,
+        "#{count} open positions tracked for #{product_id}; refusing to guess which one to increase. " \
+        "Resolve the row and pass it as `position:`."
+    end
+
     # A close request is a partial only when it is smaller than what we track.
     # nil, blank, or >= the tracked size all mean "close the whole thing", which
     # is the untouched full-close path.
@@ -673,9 +712,10 @@ module Trading
       false
     end
 
-    def increase_local_position_record(product_id:, additional_size:, additional_price:, order_result:)
-      # Find the most recent open position for this product
-      position = Position.open.by_product(product_id).order(:entry_time).last
+    def increase_local_position_record(product_id:, additional_size:, additional_price:, order_result:, position: nil)
+      # The caller's resolved row wins. Only fall back to finding one ourselves
+      # when nobody told us which row this fill belongs to.
+      position ||= Position.open.by_product(product_id).order(:entry_time).last
       return unless position
 
       # Calculate new average entry price

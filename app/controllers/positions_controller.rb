@@ -106,7 +106,16 @@ class PositionsController < ActionController::Base
     Rails.logger.info("INCREASE ACTION CALLED: product_id=#{product_id}, size=#{size_to_increase}")
 
     begin
-      result = positions_service.increase_position(product_id: product_id, size: size_to_increase)
+      # Name the row, the same way #submit_close does. An increase rewrites a
+      # position's size and averaged entry price, and a bare product_id left the
+      # service to re-find one — the newest open row on the product, which is
+      # not necessarily the one on screen. tracked_open_position returns nil
+      # when several match; the service refuses rather than guessing.
+      result = positions_service.increase_position(
+        product_id: product_id,
+        size: size_to_increase,
+        position: tracked_open_position(product_id)
+      )
       redirect_to positions_path(notice: "Position increased: #{result["order_id"] || result["message"] || result["success"]}")
     rescue => e
       redirect_to edit_position_path(product_id, notice: "Error: #{e.message}")
