@@ -559,6 +559,133 @@ RSpec.describe FuturesBotCli, type: :model do
     end
   end
 
+  # ── close ────────────────────────────────────────────────────────────────────
+  #
+  # The operator CLI is the surface reached for during an incident, and it was
+  # the only one with no way to close a position. Every close here routes through
+  # Trading::PositionLifecycle — never Trading::CoinbasePositions directly —
+  # because the lifecycle is the sole writer of the cooldown, the stoploss guard,
+  # and the daily loss caps (ADR 0003, ADR 0005).
+  describe "#close" do
+    let(:position) { create(:position, product_id: "NOL-19AUG26-CDE", size: 1) }
+    let(:lifecycle) { instance_double(Trading::PositionLifecycle) }
+    let(:ok) { Trading::PositionLifecycle::Result.new(success: true, close_price: 81.5, reason: "cli_operator_close", fallback: false) }
+
+    before { allow(Trading::PositionLifecycle).to receive(:new).and_return(lifecycle) }
+
+    it "routes a confirmed close through PositionLifecycle" do
+      expect(lifecycle).to receive(:close).with(position, hash_including(reason: "cli_operator_close")).and_return(ok)
+
+      capture_stdout { run_cli("close", position.id.to_s, "--yes") }
+    end
+
+    it "refuses to close when the interactive prompt is not answered 'yes'" do
+      allow($stdin).to receive(:gets).and_return("n\n")
+      expect(lifecycle).not_to receive(:close)
+
+      out = capture_stdout { run_cli("close", position.id.to_s) }
+
+      expect(out).to match(/aborted/i)
+      expect(position.reload.status).to eq("OPEN")
+    end
+
+    # An operator mistypes an id during an incident. That must read as a clear
+    # "no such open position", not a NoMethodError on nil.
+    it "reports an unknown position id cleanly" do
+      expect(lifecycle).not_to receive(:close)
+
+      out = capture_stdout { run_cli("close", "99999999", "--yes") }
+
+      expect(out).to match(/No OPEN position with id 99999999/)
+    end
+
+    it "refuses a position that is already CLOSED" do
+      closed = create(:position, status: "CLOSED", close_time: Time.current)
+      expect(lifecycle).not_to receive(:close)
+
+      out = capture_stdout { run_cli("close", closed.id.to_s, "--yes") }
+
+      expect(out).to match(/No OPEN position/)
+    end
+
+    describe "--json" do
+      # A machine caller cannot answer a prompt. Reading stdin here would hang
+      # the /futuresbot skill mid-incident, so JSON without --yes refuses.
+      it "refuses without --yes and never reads stdin" do
+        expect($stdin).not_to receive(:gets)
+        expect(lifecycle).not_to receive(:close)
+
+        out = capture_stdout { run_cli("close", position.id.to_s, "--json") }
+
+        expect(JSON.parse(out)).to include("closed" => false, "error" => "confirmation_required")
+        expect(out).not_to match(/\e\[/)
+      end
+
+      it "emits a machine-readable document on a confirmed close" do
+        allow(lifecycle).to receive(:close).and_return(ok)
+
+        out = capture_stdout { run_cli("close", position.id.to_s, "--json", "--yes") }
+
+        expect(JSON.parse(out)).to include(
+          "closed" => true, "position_id" => position.id,
+          "product_id" => "NOL-19AUG26-CDE", "close_price" => 81.5
+        )
+        expect(out).not_to match(/\e\[/)
+      end
+    end
+
+    # The reason `close` must not call Trading::CoinbasePositions directly:
+    # PositionLifecycle is the sole writer of the cooldown, the stoploss guard,
+    # and Trading::LossLimits. A hand-closed loser that skipped it never counted
+    # against the daily caps that exist to stop the next one.
+    context "protections layer" do
+      before do
+        allow(Trading::PositionLifecycle).to receive(:new).and_call_original
+        allow(Trading::CoinbasePositions).to receive(:new)
+          .and_return(instance_double(Trading::CoinbasePositions, close_position: {"success" => true}))
+        allow(RecentMarketPrice).to receive(:for_product).and_return(81.5)
+      end
+
+      it "starts a cooldown and evaluates the daily loss caps on a confirmed close" do
+        expect(Trading::Protections::CooldownPeriod)
+          .to receive(:record_exit).with(symbol: "NOL-19AUG26-CDE")
+        expect(Trading::LossLimits).to receive(:evaluate!)
+
+        capture_stdout { run_cli("close", position.id.to_s, "--yes") }
+
+        expect(position.reload.status).to eq("CLOSED")
+      end
+    end
+
+    # PositionLifecycle deliberately leaves the DB row OPEN when the exchange
+    # close fails, so the bot never believes it is flat while real exposure
+    # remains ("phantom-flat"). The CLI must report that failure, not success.
+    context "when the exchange close fails" do
+      let(:positions_service) { instance_double(Trading::CoinbasePositions) }
+
+      before do
+        allow(Trading::PositionLifecycle).to receive(:new).and_call_original
+        allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)
+        allow(positions_service).to receive(:close_position).and_return({"success" => false})
+        allow(RecentMarketPrice).to receive(:for_product).and_return(81.5)
+      end
+
+      it "leaves the position OPEN and says so" do
+        out = capture_stdout { run_cli("close", position.id.to_s, "--yes") }
+
+        expect(position.reload.status).to eq("OPEN")
+        expect(out).to match(/still OPEN/)
+      end
+
+      it "reports closed=false in JSON" do
+        out = capture_stdout { run_cli("close", position.id.to_s, "--yes", "--json") }
+
+        expect(JSON.parse(out)).to include("closed" => false, "error" => "close_failed")
+        expect(position.reload.status).to eq("OPEN")
+      end
+    end
+  end
+
   describe "#backtests" do
     def run!(**overrides)
       BacktestRun.create!({

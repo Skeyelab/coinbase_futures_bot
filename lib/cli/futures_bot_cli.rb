@@ -223,6 +223,30 @@ module Cli
       puts "   As of  : #{s[:as_of]}"
     end
 
+    # ─── close ──────────────────────────────────────────────────────────────────
+    desc "close POSITION_ID", "Close an OPEN position (MONEY-TOUCHING — requires confirmation)"
+    method_option :yes, aliases: "-y", type: :boolean, default: false,
+      desc: "Confirm the close without an interactive prompt (required with --json)"
+    method_option :json, type: :boolean, default: false, desc: "Emit machine-readable JSON (no ANSI)"
+    def close(position_id)
+      position = Position.open.find_by(id: position_id)
+
+      return close_failure("not_found", "No OPEN position with id #{position_id}.", position_id: position_id) unless position
+      return close_failure("confirmation_required", confirmation_hint(position), position_id: position.id) unless close_confirmed?(position)
+
+      outcome = Trading::PositionLifecycle
+        .new(positions_service: Trading::CoinbasePositions.new, logger: Rails.logger)
+        .close(position, reason: "cli_operator_close")
+
+      unless outcome.success?
+        return close_failure("close_failed",
+          "Exchange close did not succeed — position #{position.id} (#{position.product_id}) is still OPEN.",
+          position_id: position.id, product_id: position.product_id)
+      end
+
+      close_success(position, outcome)
+    end
+
     # ─── dry_run_on ─────────────────────────────────────────────────────────────
     desc "dry_run_on", "Enable dry-run mode (simulate orders; nothing is sent to Coinbase)"
     def dry_run_on
@@ -319,6 +343,47 @@ module Cli
     # consumers (the /futuresbot skill and MCP server).
     def emit_json(data)
       puts JSON.generate(data)
+    end
+
+    # ── close helpers ────────────────────────────────────────────────────────────
+
+    # ADR 0005: money-touching operator actions require explicit confirmation.
+    # `--yes` is that confirmation; without it a human gets an interactive
+    # prompt. `--json` callers (the /futuresbot skill, scripts) must never be
+    # blocked on a prompt they cannot answer, so JSON without `--yes` refuses
+    # outright — the same shape as Mcp::Server#close_position's `confirm: true`.
+    def close_confirmed?(position)
+      return true if options[:yes]
+      return false if json_mode?
+
+      $stdout.print "#{YELLOW}#{BOLD}⚠ MONEY-TOUCHING#{RESET} #{close_summary(position)}\n" \
+                    "Type #{BOLD}yes#{RESET} to close it: "
+      $stdin.gets.to_s.strip.casecmp("yes").zero?
+    end
+
+    def confirmation_hint(position)
+      "Not confirmed — #{close_summary(position)} left OPEN. " \
+        "Re-run with #{BOLD}--yes#{RESET} to confirm."
+    end
+
+    def close_summary(position)
+      "position #{position.id} (#{position.product_id} #{position.side} #{position.size})"
+    end
+
+    def close_failure(error, message, **details)
+      return emit_json({closed: false, error: error, **details, as_of: Time.current.utc.iso8601}) if json_mode?
+
+      $stdout.puts "#{RED}#{BOLD}✖ Close aborted#{RESET} — #{message}"
+    end
+
+    def close_success(position, outcome)
+      if json_mode?
+        return emit_json({closed: true, position_id: position.id, product_id: position.product_id,
+                          close_price: outcome.close_price, as_of: Time.current.utc.iso8601})
+      end
+
+      $stdout.puts "#{GREEN}#{BOLD}✅ Closed#{RESET} position #{position.id} " \
+                   "(#{position.product_id}) at #{outcome.close_price}"
     end
 
     # Prints simulated (paper) account state for `status` when dry-run is active
