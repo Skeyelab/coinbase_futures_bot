@@ -203,8 +203,12 @@ class MarginWindowMonitoringJob < ApplicationJob
 
   def calculate_position_margin_requirement(position, margin_window)
     # Simplified margin calculation - in reality this would be more complex
-    # based on the specific contract and margin window requirements
-    position_value = position.size * position.entry_price
+    # based on the specific contract and margin window requirements.
+    #
+    # Notional is contract_size * price * quantity. `size * entry_price` drops
+    # contract_size and understates NOL (contract_size 10) 10x, which is the
+    # difference between this gate firing and never firing. See #234.
+    position_value = Trading::NotionalCap.notional_for(position.product_id, position.size, position.entry_price)
 
     # Use higher margin requirements for overnight window
     margin_rate = if margin_window.dig("margin_window", "margin_window_type") == "OVERNIGHT_MARGIN"

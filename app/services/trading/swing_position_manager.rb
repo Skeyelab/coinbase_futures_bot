@@ -168,12 +168,19 @@ module Trading
         # Extract asset from product_id (e.g., "BTC-USD-PERP" -> "BTC")
         asset = position.product_id.split("-").first
 
-        summary[:total_exposure] += position.size * (current_price || position.entry_price)
+        # Notional is contract_size * price * quantity. `size * price` drops
+        # contract_size and understated NOL (contract_size 10) exposure 10x
+        # in both the total and the per-asset breakdown. See #234.
+        exposure = Trading::NotionalCap.notional_for(
+          position.product_id, position.size, current_price || position.entry_price
+        )
+
+        summary[:total_exposure] += exposure
         summary[:unrealized_pnl] += current_pnl
 
         summary[:positions_by_asset][asset] ||= {count: 0, exposure: 0, pnl: 0}
         summary[:positions_by_asset][asset][:count] += 1
-        summary[:positions_by_asset][asset][:exposure] += position.size * (current_price || position.entry_price)
+        summary[:positions_by_asset][asset][:exposure] += exposure
         summary[:positions_by_asset][asset][:pnl] += current_pnl
 
         position_data = {

@@ -424,22 +424,29 @@ class MarketAnalysisService
     "extreme"
   end
 
+  # Notional is contract_size * price * quantity. `size * entry_price` drops
+  # contract_size, which both under-states NOL (contract_size 10) 10x and makes
+  # "largest" a contract-count comparison across mixed contract sizes. See #234.
+  def position_notional(position)
+    Trading::NotionalCap.notional_for(position.product_id, position.size, position.entry_price).abs
+  end
+
   def largest_position(positions)
     return nil if positions.empty?
 
-    largest = positions.max_by { |p| (p.size * p.entry_price).abs }
+    largest = positions.max_by { |p| position_notional(p) }
     {
       symbol: largest.product_id,
       side: largest.side,
       size: largest.size,
-      value: (largest.size * largest.entry_price).abs.round(2)
+      value: position_notional(largest).round(2)
     }
   end
 
   def assess_position_risk(positions)
     return "low" if positions.empty?
 
-    total_exposure = positions.sum { |p| (p.size * p.entry_price).abs }
+    total_exposure = positions.sum { |p| position_notional(p) }
     return "low" if total_exposure < 1000
 
     POSITION_RISK_TIERS.each { |range, level| return level if range.cover?(total_exposure) }

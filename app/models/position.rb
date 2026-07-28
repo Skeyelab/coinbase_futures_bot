@@ -217,16 +217,20 @@ class Position < ApplicationRecord
     (close_time - entry_time).to_i
   end
 
+  # Realized return as a percentage of the notional put at risk.
+  #
+  # BOTH sides must be contract_size-aware or the ratio is off by exactly
+  # contract_size. `pnl` comes from Trading::FuturesUnrealizedPnl, which
+  # multiplies by contract_size; the denominator used to be a bare
+  # `entry_price * size`, which does not — so NOL (contract_size 10) read 10x
+  # too high and BIP (0.01) 100x too low. Same class of defect as #234.
   def pnl_percentage
     return nil unless closed? && entry_price && pnl
 
-    # Calculate percentage based on PnL and position size
-    # PnL = (exit_price - entry_price) * size for long positions
-    # PnL = (entry_price - exit_price) * size for short positions
-    # So percentage = (PnL / (entry_price * size)) * 100
-    percentage = (pnl / (entry_price * size)) * 100
+    entry_notional = Trading::NotionalCap.notional_for(product_id, size, entry_price)
+    return nil unless entry_notional.positive?
 
-    percentage.round(2)
+    ((pnl / entry_notional) * 100).round(2)
   end
 
   def hit_take_profit?(current_price)
