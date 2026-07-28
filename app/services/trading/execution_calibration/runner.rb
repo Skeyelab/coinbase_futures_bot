@@ -157,7 +157,7 @@ module Trading
           @tape.add(leg)
           journal.record_leg!(leg)
 
-          breach = AbortConditions.new(tape: @tape, logger: @logger).enforce!
+          breach = AbortConditions.new(tape: @tape, mode: mode, logger: @logger).enforce!
           break if breach
         end
 
@@ -332,7 +332,7 @@ module Trading
           status: breach ? :aborted : :completed, mode: mode, product_id: @product_id,
           tape: @tape, breach: breach, refusals: [],
           reconciliation: reconciliation,
-          maker_warning: AbortConditions.new(tape: @tape, logger: @logger).maker_fill_rate_warning,
+          maker_warning: AbortConditions.new(tape: @tape, mode: mode, logger: @logger).maker_fill_rate_warning,
           started_at: started, finished_at: @clock.call
         )
         @logger.info("[ExecutionCalibration] #{report.summary}")
