@@ -8,6 +8,15 @@ class ContractExpiryManager
   ESTIMATED_CONTRACT_VALUE = 50_000.0  # Estimated value per contract in USD
   ESTIMATED_MARGIN_RATE = 0.1          # Estimated margin requirement (10%)
 
+  # Margin-warning dedup (issue #561; fourth instance of the
+  # alert-a-state-forever shape from #548/#557). A position near expiry is a
+  # state that persists for days; without dedup every scheduled run re-posted
+  # the same warning. Keyed per position+reason so a tier escalation (e.g.
+  # "within 1 week" -> "within 3 days") still alerts immediately; the same
+  # tier re-alerts at most once per day. Durable in bot_runtime_stats.
+  MARGIN_WARNING_KEY_PREFIX = "alerting:margin_expiry_warning"
+  MARGIN_WARNING_REALERT_INTERVAL = 24.hours
+
   def initialize(logger: Rails.logger)
     @logger = logger
     @positions_service = Trading::CoinbasePositions.new(logger: logger)
@@ -215,13 +224,17 @@ class ContractExpiryManager
     @logger.error("Failed to send expiry closure notification: #{e.message}")
   end
 
-  # Send Slack notifications for margin warnings near expiry
+  # Send Slack notifications for margin warnings near expiry. Only warnings
+  # not yet announced (or last announced over 24h ago) for the same
+  # position+reason make the message; a run where everything is deduped posts
+  # nothing (issue #561).
   def notify_margin_warnings_near_expiry(margin_warnings)
-    return if margin_warnings.empty?
+    due_warnings = margin_warnings.select { |warning| margin_warning_due?(warning) }
+    return if due_warnings.empty?
 
     message_lines = ["Margin requirement increases near contract expiry:"]
 
-    margin_warnings.each do |warning|
+    due_warnings.each do |warning|
       position = warning[:position]
       impact = warning[:margin_impact]
       days = position.days_until_expiry
@@ -234,8 +247,34 @@ class ContractExpiryManager
       "Margin Warning Near Expiry",
       message_lines.join("\n")
     )
+
+    # Record only after a successful post so a Slack failure retries next run.
+    due_warnings.each { |warning| record_margin_warning_notified(warning) }
   rescue => e
     @logger.error("Failed to send margin warning notification: #{e.message}")
+  end
+
+  # One bot_runtime_stats row per position+reason: whole-value overwrite, which
+  # is exactly the contract BotRuntimeStat.upsert_value! is safe for (#546).
+  def margin_warning_key(warning)
+    "#{MARGIN_WARNING_KEY_PREFIX}:#{warning[:position].id}:#{warning[:margin_impact][:reason]}"
+  end
+
+  def margin_warning_due?(warning)
+    stored = BotRuntimeStat.find_by(key: margin_warning_key(warning))&.value
+    last_notified = stored&.dig("notified_at")
+    return true if last_notified.blank?
+
+    Time.zone.parse(last_notified) <= MARGIN_WARNING_REALERT_INTERVAL.ago
+  rescue ArgumentError
+    true
+  end
+
+  def record_margin_warning_notified(warning)
+    BotRuntimeStat.upsert_value!(
+      key: margin_warning_key(warning),
+      value: {"notified_at" => Time.current.utc.iso8601}
+    )
   end
 
   # Track exceptions to Sentry with context
