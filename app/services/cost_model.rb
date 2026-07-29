@@ -18,13 +18,34 @@ class CostModel
   # ~24 bps pessimistic per round trip (issue #391). Override via
   # BACKTEST_TAKER_FEE_RATE / TAKER_FEE_RATE.
   def self.taker_fee_rate
-    (ENV["BACKTEST_TAKER_FEE_RATE"] || ENV["TAKER_FEE_RATE"] || "0.0003").to_f
+    override = ENV["BACKTEST_TAKER_FEE_RATE"] || ENV["TAKER_FEE_RATE"]
+    return override.to_f if override.present?
+
+    Trading::VenueFeeSchedule.current&.fetch(:taker_rate) || 0.0003
+  end
+
+  # Where the rate above came from. Falling back has to be VISIBLE: a wrong
+  # number nobody questions is exactly how 3 bps survived long enough to price
+  # twelve backtests and ADR 0002's venue decision (issue #585).
+  #
+  #   :override — an operator is deliberately pricing a hypothetical
+  #   :venue     — the schedule Coinbase is charging this account
+  #   :seeded    — a constant, because the venue has never been asked or answered
+  def self.fee_source
+    return :override if ENV["BACKTEST_TAKER_FEE_RATE"].present? || ENV["TAKER_FEE_RATE"].present?
+
+    Trading::VenueFeeSchedule.current ? :venue : :seeded
   end
 
   # Maker fee per side. US perps charge 0% maker (ADR 0002); override via
   # BACKTEST_MAKER_FEE_RATE / MAKER_FEE_RATE.
   def self.maker_fee_rate
-    (ENV["BACKTEST_MAKER_FEE_RATE"] || ENV["MAKER_FEE_RATE"] || "0.0").to_f
+    override = ENV["BACKTEST_MAKER_FEE_RATE"] || ENV["MAKER_FEE_RATE"]
+    return override.to_f if override.present?
+
+    # The 0.0 default said maker fills are free. The venue charges 7.5 bps, and
+    # ADR 0002's maker-optimized +22 bps case was priced on the 0% (issue #585).
+    Trading::VenueFeeSchedule.current&.fetch(:maker_rate) || 0.0
   end
 
   # Dated-futures fees (issue #458): Coinbase has NO oil/metals perp — oil trades

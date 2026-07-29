@@ -15,7 +15,15 @@
 class FeeMeasurementSnapshotJob < ApplicationJob
   queue_as :default
 
-  def perform(limit: 250, now: Time.current, fee_truth: Trading::FeeTruth)
+  def perform(limit: 250, now: Time.current, fee_truth: Trading::FeeTruth,
+    schedule: Trading::VenueFeeSchedule)
+    # The published schedule first (issue #585). This is the number CostModel
+    # prices with; the fill measurements below are what the venue actually
+    # charged. Refreshing it here rather than on a cron of its own keeps the two
+    # halves of "what does a trade cost" on the same clock — and the tier is
+    # volume-based, so it does move.
+    schedule.fetch!
+
     report = fee_truth.call(limit: limit)
 
     # No credentials, or no fills yet: leave the seeded constants in place
