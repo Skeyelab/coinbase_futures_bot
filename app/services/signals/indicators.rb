@@ -29,6 +29,21 @@ module Signals
       series.drop(period).reduce(seed) { |acc, v| v * k + acc * (1 - k) }
     end
 
+    # Sample standard deviation (n-1 denominator) of the last `period` values.
+    # Returns a Float, or nil when period < 2 (sample variance is undefined)
+    # or the series is shorter than period.
+    def stddev(values, period)
+      period = period.to_i
+      return nil if period < 2
+
+      series = values.map(&:to_f)
+      return nil if series.size < period
+
+      window = series.last(period)
+      mean = window.sum / period
+      Math.sqrt(window.sum { |v| (v - mean)**2 } / (period - 1))
+    end
+
     # Simple moving average of the last `period` values.
     # Returns a Float, or nil when period is non-positive or the series
     # is shorter than period.

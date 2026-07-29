@@ -35,7 +35,7 @@ module Backtest
 
     def initialize(symbol:, strategy: nil, step: "5m", starting_equity: 10_000.0,
       fee_rate: nil, per_contract_fee: nil, slippage: 0.0002, contract_size_usd: nil, protection_cooldown_seconds: nil,
-      preload_candles: true,
+      preload_candles: true, fill_model: :touch, maker_fee_rate: nil,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
       logger: Rails.logger)
@@ -70,6 +70,13 @@ module Backtest
           venue_fee[:per_contract_fee]&.to_f
         end
       @slippage = slippage.to_f
+      # Resting-limit replay (issue #568). :through_price flips the simulator
+      # to maker semantics AND changes the engine's quoting protocol below:
+      # quotes derive from the PREVIOUS bar and live for exactly one bar. The
+      # two halves are one fill model — quoting off the same bar that fills
+      # you is look-ahead, and a quote that rests forever is a stale band.
+      @fill_model = fill_model
+      @maker_fee_rate = maker_fee_rate
       # Perp funding (issue #391): a constant *adverse* sensitivity knob, ON by
       # default so backtests stop silently pricing funding as free (ADR 0002).
       # Hourly; set funding_bps_per_interval: 0 to disable.
@@ -172,7 +179,8 @@ module Backtest
       sim = PaperTrading::ExchangeSimulator.new(starting_equity_usd: @starting_equity,
         fee_rate: @fee_rate, per_contract_fee: @per_contract_fee,
         contract_size_usd: @contract_size_usd, slippage: @slippage,
-        funding_schedule: funding_schedule)
+        funding_schedule: funding_schedule,
+        fill_model: @fill_model, maker_fee_rate: @maker_fee_rate)
       equity_curve = [@starting_equity]
       entered_at = {}
       exited_at = {}
@@ -181,17 +189,26 @@ module Backtest
       halts = []
       equity_points = [{at: from, equity: @starting_equity}]
 
+      prev_candle = nil
       step_candles(from, to).each do |candle|
-        maybe_enter(sim, candle, entered_at, protection_store)
+        # Through-price mode quotes off the last COMPLETED bar: the bar being
+        # replayed is what fills the quote, so deriving the quote from it
+        # would let the close place a limit its own low then "fills".
+        signal_as_of = through_price? ? prev_candle&.timestamp : candle.timestamp
+        maybe_enter(sim, candle, entered_at, protection_store, signal_as_of) if signal_as_of
         # Liquidation buffer takes precedence over the sim's TP/SL pass — a candle
         # that would liquidate closes at the buffered price first.
         maybe_liquidation_exit(sim, candle)
         sim.on_candle(candle)
+        # A quote gets exactly one bar to fill, then the band it priced is
+        # stale — cancel so the next flat bar re-quotes off fresh data.
+        cancel_unfilled_quotes(sim) if through_price?
         maybe_min_roi_exit(sim, candle, entered_at)
         stamp_exits(sim, candle, exited_at, protection_store, losing_exits, halts)
         equity_curve << sim.equity_usd
         equity_points << {at: candle.timestamp, equity: sim.equity_usd}
         maybe_max_drawdown_halt(candle, equity_points, protection_store, halts)
+        prev_candle = candle
       end
 
       Result.new(trades: build_trades(sim, entered_at, exited_at),
@@ -212,11 +229,19 @@ module Backtest
         .where(timestamp: from..to).order(:timestamp)
     end
 
+    def through_price?
+      @fill_model == :through_price
+    end
+
+    def cancel_unfilled_quotes(sim)
+      sim.orders.values.each { |o| sim.cancel(o.id) if o.status == :open }
+    end
+
     # One position at a time: only ask the strategy while flat.
-    def maybe_enter(sim, candle, entered_at, protection_store)
+    def maybe_enter(sim, candle, entered_at, protection_store, signal_as_of)
       return if position_active?(sim)
 
-      sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: candle.timestamp)
+      sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: signal_as_of)
       return unless sig && sig[:quantity].to_f > 0
 
       # Protections parity: a symbol/side under an active lock produces no entry,
