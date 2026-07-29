@@ -54,6 +54,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     context "rapid signal evaluation algorithms" do
       it "initializes the strategy via StrategyFactory with rapid-path overrides" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Live config + profile tp/sl (env defaults 0.006/0.004), with the
@@ -74,6 +75,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         create(:trading_profile, name: "cal-btc", symbol: "BTC-USD", active: true,
           tp_target: 0.011, sl_target: 0.005)
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         expect(Strategy::MultiTimeframeSignal).to receive(:new).with(
@@ -85,6 +87,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "derives contract_size_usd from the resolver and current price (issue #372)" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(Trading::ContractSizeResolver).to receive(:for_product).with(contract_id).and_return(0.01)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
@@ -98,6 +101,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "falls back to legacy per-asset notional when the resolver returns its default (issue #372)" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(Trading::ContractSizeResolver).to receive(:for_product).with(contract_id).and_return(1.0)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
@@ -129,6 +133,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "generates signal with correct equity parameters" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Unified default (issue #375): $10k everywhere, no more 5x executor skew
@@ -143,6 +148,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "respects custom equity from environment" do
         allow(ENV).to receive(:fetch).with("SIGNAL_EQUITY_USD", anything).and_return("75000")
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         expect(mock_strategy).to receive(:signal).with(
@@ -168,6 +174,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "processes current price correctly as float" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         job.perform(product_id: product_id, current_price: "50000.5", asset: asset)
@@ -180,6 +187,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "handles rapid price updates efficiently" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Simulate rapid price updates
@@ -198,6 +206,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "logs rapid signal evaluation start" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
@@ -222,6 +231,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "executes high-confidence signals" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -246,6 +256,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       # production. The suite was validating a path that could not execute.
       it "delegates position persistence to open_position rather than writing its own" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({"success" => true})
 
@@ -266,6 +277,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "logs successful signal execution" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -281,6 +293,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "sends position alert on successful execution" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -295,6 +308,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     context "performance optimization and latency" do
       it "completes evaluation within performance threshold" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         start_time = Time.current
@@ -307,6 +321,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "handles concurrent evaluations efficiently" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Serial warm-up (#546): the first perform INSERTs the keyed
@@ -344,6 +359,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "optimizes memory usage during rapid evaluations" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Perform multiple evaluations and ensure no memory leaks
@@ -376,6 +392,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "handles strategy signal generation errors" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_raise(StandardError, "Strategy error")
 
         expect {
@@ -398,6 +415,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({
           success: false,
@@ -424,6 +442,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_raise(StandardError, "API timeout")
 
@@ -438,6 +457,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "handles invalid price inputs" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         # Test with various invalid price formats
@@ -465,6 +485,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
     context "integration with trading strategies" do
       it "configures strategy with asset-specific parameters for BTC" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         job.perform(product_id: product_id, current_price: current_price, asset: "BTC")
@@ -511,6 +532,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       it "integrates with futures contract manager correctly" do
         expect(mock_contract_manager).to receive(:best_available_contract).with(asset)
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         job.perform(product_id: product_id, current_price: current_price, asset: asset)
@@ -527,6 +549,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -558,6 +581,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         ]
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
         signals.each_with_index do |signal, index|
@@ -586,6 +610,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         ]
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
 
         signals_with_confidence.each_with_index do |test_case, index|
           # Create a fresh job instance for each test case
@@ -624,6 +649,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
 
         # Test BTC max positions (2)
@@ -649,6 +675,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(large_signal)
 
         expect(mock_positions_service).not_to receive(:open_position)
@@ -670,6 +697,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         assets_and_contracts.each do |test_data|
           allow(mock_contract_manager).to receive(:best_available_contract)
             .with(test_data[:asset]).and_return(test_data[:contract])
+          pass_cost_gate!(test_data[:contract])
           allow(mock_strategy).to receive(:signal).and_return({
             side: "LONG",
             quantity: 1,
@@ -703,6 +731,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -729,6 +758,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -761,6 +791,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(high_confidence_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -789,6 +820,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(low_confidence_signal)
 
         expect(mock_positions_service).not_to receive(:open_position)
@@ -812,6 +844,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         }
 
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(threshold_signal)
         allow(mock_positions_service).to receive(:open_position).and_return({success: true})
 
@@ -822,6 +855,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
       it "handles nil signal gracefully" do
         allow(mock_contract_manager).to receive(:best_available_contract).and_return(contract_id)
+        pass_cost_gate!(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
         expect(mock_positions_service).not_to receive(:open_position)
@@ -913,6 +947,8 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
       before do
         job_instance.instance_variable_set(:@asset, asset)
         job_instance.instance_variable_set(:@logger, mock_logger)
+        job_instance.instance_variable_set(:@target_contract, contract_id)
+        pass_cost_gate!(contract_id)
       end
 
       it "returns false for nil signal" do
