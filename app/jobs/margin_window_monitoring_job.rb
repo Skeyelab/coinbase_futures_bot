@@ -233,11 +233,18 @@ class MarginWindowMonitoringJob < ApplicationJob
     # difference between this gate firing and never firing. See #234.
     position_value = Trading::NotionalCap.notional_for(position.product_id, position.size, position.entry_price)
 
-    # Use higher margin requirements for overnight window
-    margin_rate = if margin_window.dig("margin_window", "margin_window_type") == "OVERNIGHT_MARGIN"
-      0.20 # 20% margin for overnight
-    else
+    # 10% intraday only when the window is EXPLICITLY intraday (#554). Two
+    # bugs hid here: the live API enum is FCM_MARGIN_WINDOW_TYPE_OVERNIGHT,
+    # so comparing against the bare "OVERNIGHT_MARGIN" label made the
+    # overnight branch unreachable even when the endpoint worked; and on this
+    # account the endpoint 403s, resolving the window to UNKNOWN_MARGIN —
+    # which fell to the CHEAPER intraday rate. A defence that cannot know the
+    # window must assume the expensive one.
+    window_type = margin_window&.dig("margin_window", "margin_window_type").to_s
+    margin_rate = if window_type.include?("INTRADAY")
       0.10 # 10% margin for intraday
+    else
+      0.20 # 20% margin for overnight, or when the window is unknown
     end
 
     position_value * margin_rate
@@ -277,8 +284,12 @@ class MarginWindowMonitoringJob < ApplicationJob
   end
 
   def close_positions_for_margin_emergency(violations)
-    # Close positions to free up margin - start with smallest positions first
-    violations.sort_by { |v| v[:size] }.each do |violation|
+    # Largest margin REQUIREMENT first (#554): the point of an emergency close
+    # is restoring buffer, so free the most margin per close. The old sort was
+    # raw contract COUNT ascending — contract-size blind (one PAU is ~$4k of
+    # notional, one BIP ~$650), so "smallest first" closed the position that
+    # freed the least.
+    violations.sort_by { |v| -v[:margin_requirement].to_f }.each do |violation|
       position = Position.find(violation[:position_id])
       next unless position.open?
 

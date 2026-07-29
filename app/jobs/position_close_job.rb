@@ -3,7 +3,12 @@
 class PositionCloseJob < ApplicationJob
   queue_as :critical
 
-  CRITICAL_REASONS = %w[stop_loss take_profit time_limit dollar_target dollar_stop_loss].freeze
+  # emergency_margin_violation (#554): the close that exists to prevent a
+  # forced liquidation was the only urgent path that gave up silently on
+  # failure. Critical => one retry (the _retry suffix is deliberately not in
+  # this list, so retries stay bounded).
+  CRITICAL_REASONS = %w[stop_loss take_profit time_limit dollar_target dollar_stop_loss
+    emergency_margin_violation].freeze
 
   def perform(position_id:, reason:, priority: "normal")
     @reason = reason
