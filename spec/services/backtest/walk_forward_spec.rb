@@ -64,6 +64,7 @@ RSpec.describe Backtest::WalkForward, type: :service do
       window_count: 3,
       trade_count: 0,
       total_pnl: 0.0,
+      total_funding: 0.0,
       expectancy: nil,
       cost_gate_passed: nil
     )

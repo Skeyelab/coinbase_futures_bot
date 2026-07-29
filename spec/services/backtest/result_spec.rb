@@ -54,6 +54,18 @@ RSpec.describe Backtest::Result do
     expect(result.cost_pct_of_avg_win).to be_within(1e-6).of(11.25)
   end
 
+  it "totals per-trade funding so cost stressing can see it (issue #541)" do
+    funded = described_class.new(
+      trades: trades.map { |t| t.merge(funding: 2.0) },
+      equity_curve: equity_curve, starting_equity: 10_000.0,
+      from: Time.utc(2026, 1, 1), to: Time.utc(2026, 1, 4)
+    )
+    expect(funded.total_funding).to be_within(1e-9).of(6.0)
+    expect(funded.to_h[:total_funding]).to be_within(1e-9).of(6.0)
+    # Trades without a funding key (pre-#391 shapes) count as zero, not nil.
+    expect(result.total_funding).to eq(0.0)
+  end
+
   it "serializes to a JSON-friendly hash" do
     h = result.to_h
     expect(h[:trade_count]).to eq(3)
