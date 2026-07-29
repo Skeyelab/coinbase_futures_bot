@@ -309,13 +309,27 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
         allow(mock_contract_manager).to receive(:current_month_contract).and_return(contract_id)
         allow(mock_strategy).to receive(:signal).and_return(nil)
 
+        # Serial warm-up (#546): the first perform INSERTs the keyed
+        # BotRuntimeStat rows (heartbeat etc.). Doing that once before the
+        # threads spawn turns their writes into UPDATEs of existing rows —
+        # concurrent inserts of the same key under a unique index are the
+        # deadlock that flaked CI. The concurrency under test is the job body,
+        # not first-boot row creation.
+        described_class.new.perform(product_id: "#{asset}-USD",
+          current_price: current_price, asset: asset)
+
         threads = 5.times.map do |i|
           Thread.new do
-            job.perform(
-              product_id: "#{asset}-USD",
-              current_price: current_price + i,
-              asset: asset
-            )
+            # Own pool connection, returned at block end — a leaked connection
+            # with an open transaction is how one example's threads deadlock a
+            # later, unrelated example (#546).
+            ActiveRecord::Base.connection_pool.with_connection do
+              job.perform(
+                product_id: "#{asset}-USD",
+                current_price: current_price + i,
+                asset: asset
+              )
+            end
           end
         end
 
@@ -325,7 +339,7 @@ RSpec.describe RapidSignalEvaluationJob, type: :job do
 
         # All concurrent evaluations should complete within reasonable time
         expect(total_time).to be < 1.0
-        expect(mock_strategy).to have_received(:signal).exactly(5).times
+        expect(mock_strategy).to have_received(:signal).exactly(6).times
       end
 
       it "optimizes memory usage during rapid evaluations" do

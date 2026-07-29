@@ -29,12 +29,10 @@ class Heartbeat
   end
 
   def beat!(now: Time.current)
-    record = BotRuntimeStat.find_or_initialize_by(key: store_key)
-    record.value = {"last_beat_at" => now.utc.iso8601}
-    record.recorded_at = now.utc
-    record.save!
-  rescue ActiveRecord::RecordNotUnique
-    retry
+    # Atomic upsert (#546): the highest-frequency BotRuntimeStat writer must
+    # not race its own insert under the unique index.
+    BotRuntimeStat.upsert_value!(key: store_key,
+      value: {"last_beat_at" => now.utc.iso8601}, now: now)
   end
 
   def status(stale_after: DEFAULT_STALE_AFTER, now: Time.current)

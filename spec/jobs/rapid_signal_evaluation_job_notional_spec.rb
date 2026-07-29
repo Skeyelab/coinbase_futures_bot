@@ -4,7 +4,7 @@ require "rails_helper"
 
 # Issue #437: the count caps bound how MANY positions, not how much exposure.
 # This is the only check that sees the stack across concurrent positions.
-RSpec.describe RapidSignalEvaluationJob, "account notional cap", type: :job do
+RSpec.describe RapidSignalEvaluationJob, "account notional cap", type: :job, notional_cap: true do
   let(:contract_id) { "BIP-20DEC30-CDE" }
   let(:strategy) { instance_double(Strategy::MultiTimeframeSignal, last_rejection: nil) }
   let(:contract_manager) { instance_double(MarketData::FuturesContractManager) }
