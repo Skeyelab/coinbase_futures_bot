@@ -137,6 +137,21 @@ module Trading
       positions
     end
 
+    # The fee schedule Coinbase is charging this account (issue #585). Read-only.
+    # Returns the `fee_tier` hash — pricing_tier, taker_fee_rate, maker_fee_rate
+    # and the volume band that put the account in it — or {} when absent.
+    #
+    # product_type: "FUTURE" matters. The spot schedule is a different set of
+    # numbers and would price every futures trade wrong.
+    def transaction_summary(product_type: "FUTURE")
+      raise "Authentication required" unless @authenticated
+
+      resp = authenticated_get("/api/v3/brokerage/transaction_summary", {product_type: product_type})
+      data = JSON.parse(resp.body)
+      tier = data.is_a?(Hash) ? data["fee_tier"] : nil
+      tier.is_a?(Hash) ? tier : {}
+    end
+
     # Real executed fills with true commissions (issue #391 fee truth). Read-only.
     # Coinbase returns the most-recent fills; `commission` is the actual fee paid
     # and `liquidity_indicator` is MAKER/TAKER. Returns the raw fills array.
