@@ -70,6 +70,9 @@ module Backtest
         # Issue #541: the pessimistic-cost gate stresses fees + funding off
         # this aggregate, so funding must survive the roll-up.
         total_funding: metrics.sum { |m| m[:total_funding].to_f },
+        # Issue #580: how many signals the min-confidence filter dropped across
+        # all windows — without it the aggregate hides the filter's selectivity.
+        rejected_low_confidence: metrics.sum { |m| m[:rejected_low_confidence].to_i },
         expectancy: expectancy,
         cost_gate_passed: expectancy.nil? ? nil : expectancy > 0,
         mean_win_rate: win_rates.empty? ? nil : win_rates.sum / win_rates.size,

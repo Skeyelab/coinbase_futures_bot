@@ -25,7 +25,7 @@ module Backtest
     # several of these are RESOLVED here rather than passed in (fee_rate falls
     # back to CostModel, contract_size_usd to the strategy's own model). Exposed
     # so BacktestRun can record what was actually used (issue #406).
-    attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd, :per_contract_fee
+    attr_reader :symbol, :step, :starting_equity, :fee_rate, :slippage, :contract_size_usd, :per_contract_fee, :min_confidence
 
     # Last-resort funding rate when a product has no observed rows at all. Inert
     # in practice: CostModel.perp? treats "no funding history" as "not a perp",
@@ -38,7 +38,7 @@ module Backtest
       preload_candles: true, fill_model: :touch, maker_fee_rate: nil,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
-      logger: Rails.logger)
+      min_confidence: nil, logger: Rails.logger)
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step = step
@@ -123,6 +123,15 @@ module Backtest
       # MaxDrawdown (issue #401): global equity-drawdown halt, evaluated per candle
       # against the run's equity curve on the simulated clock.
       @max_drawdown = max_drawdown || Trading::Protections::MaxDrawdown.from_config
+      # Engine-level confidence filter (issue #580): the #497 incumbent is
+      # 200/120 @ conf>=30, but the engine traded every signal, so the gates
+      # could never judge the configuration as frozen. When set, a signal whose
+      # :confidence is below the bar is NOT traded, only counted
+      # (rejected_low_confidence in the result). The threshold is INCLUSIVE
+      # (conf >= min trades). A signal with NO confidence is REJECTED when the
+      # filter is set — a filter that passes unknowns is not a filter. Default
+      # nil = today's behavior exactly: every signal trades, counter stays 0.
+      @min_confidence = min_confidence&.to_f
       # Escape hatch (issue #387): lets a run fall back to the per-step database
       # reads, which is how the preloaded path is proved equivalent rather than
       # merely faster.
@@ -187,6 +196,7 @@ module Backtest
       protection_store = Trading::ProtectionLock::MemoryStore.new
       losing_exits = []
       halts = []
+      @rejected_low_confidence = 0
       equity_points = [{at: from, equity: @starting_equity}]
 
       prev_candle = nil
@@ -213,7 +223,7 @@ module Backtest
 
       Result.new(trades: build_trades(sim, entered_at, exited_at),
         equity_curve: equity_curve, starting_equity: @starting_equity, from: from, to: to,
-        protection_halts: halts)
+        protection_halts: halts, rejected_low_confidence: @rejected_low_confidence)
     end
 
     private
@@ -244,6 +254,13 @@ module Backtest
       sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: signal_as_of)
       return unless sig && sig[:quantity].to_f > 0
 
+      # Min-confidence filter (issue #580): drop the signal BEFORE simulated
+      # entry, and count it so the filter's selectivity is visible in reports.
+      if below_min_confidence?(sig)
+        @rejected_low_confidence += 1
+        return
+      end
+
       # Protections parity: a symbol/side under an active lock produces no entry,
       # evaluated on the simulated clock against the run-local store.
       return if Trading::Protections.blocked?(symbol: @symbol, side: sig[:side].to_s,
@@ -255,6 +272,16 @@ module Backtest
       id = sim.place_limit(symbol: @symbol, side: SideNormalizer.simulator_fill_side(sig[:side]),
         price: sig[:price], quantity: base_qty, tp: sig[:tp], sl: sig[:sl])
       entered_at[id] = candle.timestamp
+    end
+
+    # Inclusive bar: conf >= @min_confidence trades (the incumbent is
+    # "conf>=30"). nil confidence is REJECTED when the filter is set — a
+    # filter that passes unknowns is not a filter.
+    def below_min_confidence?(sig)
+      return false if @min_confidence.nil?
+
+      conf = sig[:confidence]
+      conf.nil? || conf.to_f < @min_confidence
     end
 
     # contracts x ($ notional per contract) / price = base units
