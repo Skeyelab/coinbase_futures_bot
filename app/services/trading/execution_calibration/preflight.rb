@@ -56,9 +56,11 @@ module Trading
       end
 
       # Precondition 2: the cumulative-loss counter is wired to that halt, and
-      # its cap is at or under the authorized loss.
+      # its cap is at or under the authorized loss. Explicitly the LIVE cap:
+      # #486 authorizes $150 of real capital, and the paper caps govern a
+      # simulated balance that no authorization covers.
       def cumulative_loss_cap_wired
-        cap = Trading::LossLimits.cumulative_cap.to_f
+        cap = Trading::LossLimits.live_cumulative_cap.to_f
         return nil if cap.positive? && cap <= AUTHORIZED_LOSS_USD
 
         "precondition 2: cumulative loss cap is #{format("$%.2f", cap)} — must be positive and at or below " \

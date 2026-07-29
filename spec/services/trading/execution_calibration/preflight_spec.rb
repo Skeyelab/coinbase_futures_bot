@@ -24,14 +24,14 @@ RSpec.describe Trading::ExecutionCalibration::Preflight do
 
   describe "precondition 2 — the cumulative-loss cap" do
     it "fails when the cumulative cap exceeds the $150 authorized loss" do
-      allow(Trading::LossLimits).to receive(:cumulative_cap).and_return(500.0)
+      allow(Trading::LossLimits).to receive(:live_cumulative_cap).and_return(500.0)
 
       expect(preflight.failures.join).to include("cumulative loss cap")
       expect(preflight.failures.join).to include("150")
     end
 
     it "fails when no cumulative cap is set at all" do
-      allow(Trading::LossLimits).to receive(:cumulative_cap).and_return(0.0)
+      allow(Trading::LossLimits).to receive(:live_cumulative_cap).and_return(0.0)
 
       expect(preflight.failures.join).to include("cumulative loss cap")
     end
@@ -39,7 +39,7 @@ RSpec.describe Trading::ExecutionCalibration::Preflight do
     # $100 (the LOSS_CAP_CUMULATIVE_USD default) is tighter than #486's $150, so
     # it trips first. That is fine — the assertion is <= 150, not == 150.
     it "accepts a cap tighter than the authorized loss" do
-      allow(Trading::LossLimits).to receive(:cumulative_cap).and_return(100.0)
+      allow(Trading::LossLimits).to receive(:live_cumulative_cap).and_return(100.0)
 
       expect(preflight.failures).to be_empty
     end
@@ -87,7 +87,7 @@ RSpec.describe Trading::ExecutionCalibration::Preflight do
   # Every failure must name what is missing, so an operator reading the refusal
   # knows what to fix rather than what to re-run.
   it "reports every unmet precondition at once rather than stopping at the first" do
-    allow(Trading::LossLimits).to receive(:cumulative_cap).and_return(500.0)
+    allow(Trading::LossLimits).to receive(:live_cumulative_cap).and_return(500.0)
     create(:position, product_id: product_id, status: "OPEN")
 
     expect(preflight.failures.size).to be >= 2

@@ -122,7 +122,7 @@ RSpec.describe Trading::ExecutionCalibration::Runner do
 
   describe "preconditions" do
     it "refuses to place any order when a precondition is unmet, naming it" do
-      allow(Trading::LossLimits).to receive(:cumulative_cap).and_return(500.0)
+      allow(Trading::LossLimits).to receive(:live_cumulative_cap).and_return(500.0)
       expect(positions_service).not_to receive(:open_position)
 
       report = runner.call
