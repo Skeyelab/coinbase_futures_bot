@@ -96,8 +96,24 @@ RSpec.describe Contract, type: :model do
     end
 
     describe ".best_available_for_asset" do
-      it "returns current month contract when available" do
-        expect(Contract.best_available_for_asset("BTC")).to eq(btc_current_month)
+      # ADR 0002 named BIP the home instrument for BTC and ADR 0004 condition 1
+      # made it non-discretionary: if a perp exists for the underlying, the perp
+      # IS the venue. BTC trades BIP, not BIT.
+      let!(:btc_perp) { Contract.create!(product_id: "BIP-20DEC30-CDE", base_currency: "BTC", quote_currency: "USD", expiration_date: Date.new(2030, 12, 20), enabled: true) }
+
+      it "returns the perp for an asset that has one, not the dated month contract" do
+        expect(Contract.best_available_for_asset("BTC")).to eq(btc_perp)
+      end
+
+      it "returns the perp even though its expiry is years outside every month window" do
+        # The perp's 2030 dummy expiry is in neither current_month nor
+        # upcoming_month, so month-window selection can never return it.
+        expect(Contract.current_month_for_asset("BTC")).not_to include(btc_perp)
+        expect(Contract.upcoming_month_for_asset("BTC")).not_to include(btc_perp)
+        expect(Contract.best_available_for_asset("BTC")).to eq(btc_perp)
+      end
+
+      it "returns the dated current month contract for an asset with no perp" do
         expect(Contract.best_available_for_asset("ETH")).to eq(eth_current_month)
       end
 
@@ -107,9 +123,34 @@ RSpec.describe Contract, type: :model do
           allow(Date).to receive(:current).and_return(Date.new(2025, 8, 28))
         end
 
-        it "returns upcoming month contract as fallback" do
-          expect(Contract.best_available_for_asset("BTC")).to eq(btc_upcoming_month)
+        it "returns upcoming month contract as fallback for an asset with no perp" do
           expect(Contract.best_available_for_asset("ETH")).to eq(eth_upcoming_month)
+        end
+
+        it "still returns the perp for an asset that has one" do
+          expect(Contract.best_available_for_asset("BTC")).to eq(btc_perp)
+        end
+      end
+
+      context "when the asset has a perp but no tradeable perp contract exists" do
+        before { btc_perp.update!(enabled: false) }
+
+        it "returns nil rather than rerouting BTC to a dated contract" do
+          expect(Contract.best_available_for_asset("BTC")).to be_nil
+        end
+
+        it "logs the refusal loudly, naming the venue it will not substitute" do
+          logger = instance_spy(Logger)
+          Contract.best_available_for_asset("BTC", logger: logger)
+          expect(logger).to have_received(:error).with(/BIP/)
+        end
+      end
+
+      context "when an asset has no perp at all" do
+        let!(:oil_current_month) { Contract.create!(product_id: "NOL-29AUG25-CDE", base_currency: "OIL", quote_currency: "USD", expiration_date: Date.new(2025, 8, 29), enabled: true) }
+
+        it "returns the dated front-month contract (ADR 0004)" do
+          expect(Contract.best_available_for_asset("OIL")).to eq(oil_current_month)
         end
       end
     end

@@ -487,10 +487,12 @@ module Trading
         stop_loss = params[:stop_loss]
       else # Old signature with positional params
         asset = asset_or_product_id
-        current_month_contract = @contract_manager.current_month_contract(asset)
-        raise "No current month contract found for #{asset}" unless current_month_contract
+        # Venue-aware, like every other asset-keyed entry point (issue #390):
+        # the method name is legacy, the routing is not allowed to be.
+        target_contract = @contract_manager.best_available_contract(asset)
+        raise "No tradeable contract found for #{asset}" unless target_contract
 
-        product_id = current_month_contract
+        product_id = target_contract
       end
 
       @logger.info("Opening #{side} position of #{size} contracts on current month contract: #{product_id}")
@@ -512,10 +514,10 @@ module Trading
       if asset_or_product_id.include?("-") # Looks like a product_id
         product_id = asset_or_product_id
       else # Looks like an asset (BTC, ETH)
-        current_month_contract = @contract_manager.current_month_contract(asset_or_product_id)
-        raise "No current month contract found for #{asset_or_product_id}" unless current_month_contract
+        target_contract = @contract_manager.best_available_contract(asset_or_product_id)
+        raise "No tradeable contract found for #{asset_or_product_id}" unless target_contract
 
-        product_id = current_month_contract
+        product_id = target_contract
       end
 
       @logger.info("Closing position on contract: #{product_id}")
@@ -1094,14 +1096,15 @@ module Trading
       positions_by_asset
     end
 
-    # Extract asset from product ID
+    # Extract asset from product ID. Reads the shared prefix map rather than a
+    # local BIT/ET regex: that regex could not name a BIP or NOL position, so
+    # every perp and oil position was missing from positions_by_asset — and from
+    # the rollover that iterates it (issue #390).
     def extract_asset_from_product_id(product_id)
-      case product_id
-      when /^(BTC|ETH)(-USD)?$/
-        ::Regexp.last_match(1)
-      when /^(BIT|ET)-\d{2}[A-Z]{3}\d{2}-[A-Z]+$/
-        product_id.start_with?("BIT") ? "BTC" : "ETH"
-      end
+      match = product_id.to_s.match(/^(BTC|ETH)(-USD)?$/)
+      return match[1] if match
+
+      Contract.asset_for_product(product_id)
     end
 
     # Check if any positions need to be rolled over to current month contracts
@@ -1127,8 +1130,12 @@ module Trading
     private
 
     def rollover_asset_positions(asset, positions)
-      current_month_contract = @contract_manager.current_month_contract(asset)
-      return unless current_month_contract
+      # Venue-aware roll target (issue #390): an expiring dated position rolls
+      # onto the asset's actual venue. For BTC that is the BIP perp — rolling
+      # into the next dated month would re-enter the venue ADR 0002 migrated
+      # off, and a perp never needs rolling again.
+      target_contract = @contract_manager.best_available_contract(asset)
+      return unless target_contract
 
       expiring_positions = positions.select do |pos|
         contract = Contract.find_by(product_id: pos["product_id"])
@@ -1137,10 +1144,10 @@ module Trading
 
       return if expiring_positions.empty?
 
-      @logger.info("Rolling over #{expiring_positions.size} #{asset} positions to #{current_month_contract}")
+      @logger.info("Rolling over #{expiring_positions.size} #{asset} positions to #{target_contract}")
 
       expiring_positions.each do |position|
-        rollover_single_position(position, current_month_contract, asset)
+        rollover_single_position(position, target_contract, asset)
       end
     end
 

@@ -1272,37 +1272,85 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
       )
     end
 
+    # Month-window resolution is dated-contract behaviour, so it is exercised on
+    # an asset that actually trades dated contracts. BTC does not any more — its
+    # venue is the BIP perp (issue #390, ADR 0002/0004).
+    let!(:eth_current_month) do
+      Contract.create!(
+        product_id: "ET-29AUG25-CDE",
+        base_currency: "ETH",
+        quote_currency: "USD",
+        expiration_date: Date.new(2025, 8, 29),
+        contract_type: "CDE",
+        enabled: true
+      )
+    end
+
+    let!(:eth_upcoming_month) do
+      Contract.create!(
+        product_id: "ET-26SEP25-CDE",
+        base_currency: "ETH",
+        quote_currency: "USD",
+        expiration_date: Date.new(2025, 9, 26),
+        contract_type: "CDE",
+        enabled: true
+      )
+    end
+
+    let!(:btc_perp) do
+      Contract.create!(
+        product_id: "BIP-20DEC30-CDE",
+        base_currency: "BTC",
+        quote_currency: "USD",
+        expiration_date: Date.new(2030, 12, 20),
+        contract_type: "CDE",
+        enabled: true
+      )
+    end
+
     describe "#resolve_trading_symbol" do
       let(:strategy) { described_class.new }
 
-      context "when current month contract is available and tradeable" do
-        it "resolves BTC to current month contract" do
+      context "when the asset trades a perp" do
+        it "resolves BTC to the perp, not the dated month contract" do
           result = strategy.send(:resolve_trading_symbol, "BTC")
-          expect(result).to eq("BIT-29AUG25-CDE")
+          expect(result).to eq("BIP-20DEC30-CDE")
         end
 
-        it "resolves BTC-USD to current month contract" do
+        it "resolves BTC-USD to the perp" do
           result = strategy.send(:resolve_trading_symbol, "BTC-USD")
-          expect(result).to eq("BIT-29AUG25-CDE")
+          expect(result).to eq("BIP-20DEC30-CDE")
+        end
+      end
+
+      context "when current month contract is available and tradeable" do
+        it "resolves ETH to current month contract" do
+          result = strategy.send(:resolve_trading_symbol, "ETH")
+          expect(result).to eq("ET-29AUG25-CDE")
+        end
+
+        it "resolves ETH-USD to current month contract" do
+          result = strategy.send(:resolve_trading_symbol, "ETH-USD")
+          expect(result).to eq("ET-29AUG25-CDE")
         end
 
         it "logs current month contract usage" do
-          expect(Rails.logger).to receive(:info).with(/Using current month contract BIT-29AUG25-CDE for asset BTC/)
-          strategy.send(:resolve_trading_symbol, "BTC")
+          expect(Rails.logger).to receive(:info).with(/Using current month contract ET-29AUG25-CDE for asset ETH/)
+          strategy.send(:resolve_trading_symbol, "ETH")
         end
       end
 
       context "when current month contract is not tradeable" do
         before { travel_to Date.new(2025, 8, 28) }
 
-        it "falls back to upcoming month contract for BTC" do
-          result = strategy.send(:resolve_trading_symbol, "BTC")
-          expect(result).to eq("BIT-26SEP25-CDE")
+        it "falls back to upcoming month contract for ETH" do
+          result = strategy.send(:resolve_trading_symbol, "ETH")
+          expect(result).to eq("ET-26SEP25-CDE")
         end
 
         it "logs upcoming month contract usage" do
-          expect(Rails.logger).to receive(:info).with(/Using upcoming month contract BIT-26SEP25-CDE for asset BTC/)
-          strategy.send(:resolve_trading_symbol, "BTC")
+          expect(Rails.logger).to receive(:info).with(/Using upcoming month contract ET-26SEP25-CDE for asset ETH/)
+          strategy.send(:resolve_trading_symbol, "ETH")
         end
       end
 
@@ -1381,8 +1429,13 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
 
         it "prioritizes upcoming month contracts for new signals" do
           # Current month expires tomorrow so not tradeable, use upcoming month
+          result = strategy.send(:resolve_trading_symbol, "ETH")
+          expect(result).to eq("ET-26SEP25-CDE")
+        end
+
+        it "leaves a perp asset on its perp — there is nothing to roll" do
           result = strategy.send(:resolve_trading_symbol, "BTC")
-          expect(result).to eq("BIT-26SEP25-CDE")
+          expect(result).to eq("BIP-20DEC30-CDE")
         end
       end
 
@@ -1390,8 +1443,8 @@ RSpec.describe Strategy::MultiTimeframeSignal, type: :service do
         before { travel_to Date.new(2025, 8, 29) }
 
         it "uses upcoming month contracts only" do
-          result = strategy.send(:resolve_trading_symbol, "BTC")
-          expect(result).to eq("BIT-26SEP25-CDE")
+          result = strategy.send(:resolve_trading_symbol, "ETH")
+          expect(result).to eq("ET-26SEP25-CDE")
         end
       end
     end

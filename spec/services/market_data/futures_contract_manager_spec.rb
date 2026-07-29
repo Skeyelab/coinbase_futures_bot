@@ -279,8 +279,28 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
     end
 
+    # THE trading resolver. Venue-aware since issue #390: ETH exercises the
+    # dated month windows (Coinbase has no ETH perp we route to), BTC exercises
+    # the perp rule, and the two must not be confused for one another.
     describe "#best_available_contract" do
       context "when current month contract is available and tradeable" do
+        let!(:eth_current) do
+          Contract.create!(
+            product_id: "ET-29AUG25-CDE",
+            base_currency: "ETH",
+            quote_currency: "USD",
+            expiration_date: Date.new(2025, 8, 29),
+            contract_type: "CDE",
+            enabled: true
+          )
+        end
+
+        it "returns the current month contract for an asset with no perp" do
+          expect(manager.best_available_contract("ETH")).to eq("ET-29AUG25-CDE")
+        end
+      end
+
+      context "when the asset trades a perp" do
         let!(:btc_current) do
           Contract.create!(
             product_id: "BIT-29AUG25-CDE",
@@ -292,18 +312,41 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
           )
         end
 
-        it "returns the current month contract" do
-          expect(manager.best_available_contract("BTC")).to eq("BIT-29AUG25-CDE")
+        let!(:btc_perp) do
+          Contract.create!(
+            product_id: "BIP-20DEC30-CDE",
+            base_currency: "BTC",
+            quote_currency: "USD",
+            expiration_date: Date.new(2030, 12, 20),
+            contract_type: "CDE",
+            enabled: true
+          )
+        end
+
+        it "returns the perp rather than the tradeable dated month contract" do
+          expect(manager.best_available_contract("BTC")).to eq("BIP-20DEC30-CDE")
+        end
+
+        context "when no tradeable perp contract exists" do
+          before { btc_perp.update!(enabled: false) }
+
+          it "returns nil rather than the dated contract" do
+            expect(manager.best_available_contract("BTC")).to be_nil
+          end
+
+          it "does not synthesize a dated contract for a perp asset" do
+            expect { manager.best_available_contract("BTC") }.not_to change(Contract, :count)
+          end
         end
       end
 
       context "when current month contract is not tradeable but upcoming month is" do
         before { travel_to Date.new(2025, 8, 28) }
 
-        let!(:btc_current) do
+        let!(:eth_current) do
           Contract.create!(
-            product_id: "BIT-29AUG25-CDE",
-            base_currency: "BTC",
+            product_id: "ET-29AUG25-CDE",
+            base_currency: "ETH",
             quote_currency: "USD",
             expiration_date: Date.new(2025, 8, 29),
             contract_type: "CDE",
@@ -311,10 +354,10 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
           )
         end
 
-        let!(:btc_upcoming) do
+        let!(:eth_upcoming) do
           Contract.create!(
-            product_id: "BIT-26SEP25-CDE",
-            base_currency: "BTC",
+            product_id: "ET-26SEP25-CDE",
+            base_currency: "ETH",
             quote_currency: "USD",
             expiration_date: Date.new(2025, 9, 26),
             contract_type: "CDE",
@@ -323,15 +366,15 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         end
 
         it "returns the upcoming month contract as fallback" do
-          expect(manager.best_available_contract("BTC")).to eq("BIT-26SEP25-CDE")
+          expect(manager.best_available_contract("ETH")).to eq("ET-26SEP25-CDE")
         end
       end
 
       context "when no existing contracts are found" do
         it "discovers and creates current month contract first" do
-          contract_id = manager.best_available_contract("BTC")
-          expect(contract_id).to eq("BIT-29AUG25-CDE")
-          expect(Contract.find_by(product_id: "BIT-29AUG25-CDE")).to be_present
+          contract_id = manager.best_available_contract("ETH")
+          expect(contract_id).to eq("ET-29AUG25-CDE")
+          expect(Contract.find_by(product_id: "ET-29AUG25-CDE")).to be_present
         end
 
         context "when current month discovery fails" do
@@ -341,9 +384,9 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
           end
 
           it "falls back to discovering upcoming month contract" do
-            contract_id = manager.best_available_contract("BTC")
-            expect(contract_id).to eq("BIT-26SEP25-CDE")
-            expect(Contract.find_by(product_id: "BIT-26SEP25-CDE")).to be_present
+            contract_id = manager.best_available_contract("ETH")
+            expect(contract_id).to eq("ET-26SEP25-CDE")
+            expect(Contract.find_by(product_id: "ET-26SEP25-CDE")).to be_present
           end
         end
       end
@@ -690,6 +733,23 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
         expect(described_class::ASSET_MAPPING).to be_frozen
       end
 
+      # Two maps once disagreed about the same pair: this one said BTC => BIT
+      # while Contract::PREFIX_TO_BASE_CURRENCY said BIP => BTC (issue #390).
+      # It is now DERIVED from the prefix map, so it cannot contradict it.
+      it "maps every asset to a prefix the contract prefix map agrees is dated" do
+        described_class::ASSET_MAPPING.each do |asset, prefix|
+          expect(Contract::PREFIX_TO_BASE_CURRENCY[prefix]).to eq(asset)
+          expect(Contract::DATED_PREFIXES).to include(prefix)
+        end
+      end
+
+      # Synthesis invents a product id from a last-Friday expiry convention.
+      # A perp has no monthly expiry to invent, so it must never be reachable
+      # here: "BIP-31JUL26-CDE" is a contract that does not exist.
+      it "never offers a perp prefix for monthly id synthesis" do
+        expect(described_class::ASSET_MAPPING.values & Contract::PERP_PREFIXES).to be_empty
+      end
+
       it "handles case sensitivity correctly" do
         contract_id = manager.generate_current_month_contract_id("btc")
         expect(contract_id).to eq("BIT-29AUG25-CDE")
@@ -938,8 +998,17 @@ RSpec.describe MarketData::FuturesContractManager, type: :service do
       end
 
       it "interacts correctly with Contract.best_available_for_asset" do
-        best_contract = Contract.best_available_for_asset("BTC")
-        expect(best_contract).to eq(active_current)
+        perp = Contract.create!(
+          product_id: "BIP-20DEC30-CDE",
+          base_currency: "BTC",
+          quote_currency: "USD",
+          expiration_date: Date.new(2030, 12, 20),
+          enabled: true
+        )
+
+        # BTC's venue is the perp (ADR 0002/0004), not whichever dated month
+        # happens to be current.
+        expect(Contract.best_available_for_asset("BTC")).to eq(perp)
       end
     end
 
