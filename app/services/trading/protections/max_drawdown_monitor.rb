@@ -39,12 +39,10 @@ module Trading
       end
 
       def write_peak(peak)
-        record = BotRuntimeStat.find_or_initialize_by(key: PEAK_KEY)
-        record.value = {"peak" => peak}
-        record.recorded_at = Time.current.utc
-        record.save!
-      rescue ActiveRecord::RecordNotUnique
-        retry
+        # Atomic upsert (#546): written every ~30s monitor cycle; the
+        # find_or_initialize insert race on this exact key is the deadlock
+        # that flaked CI on PR #545.
+        BotRuntimeStat.upsert_value!(key: PEAK_KEY, value: {"peak" => peak})
       end
     end
   end

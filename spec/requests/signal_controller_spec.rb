@@ -911,21 +911,29 @@ RSpec.describe "Signals API", type: :request do
     it "handles concurrent signal updates during read operations" do
       signal = create(:signal_alert, alert_status: "active")
 
-      # Simulate concurrent access
-      threads = []
-      results = []
-
-      5.times do
-        threads << Thread.new do
-          get "/signals/#{signal.id}", headers: @headers
-          results << response.status
+      # Simulate concurrent access. Each thread gets its OWN integration
+      # session and its OWN pool connection (#546): the previous version
+      # shared the single `get`/`response` session across all five threads —
+      # a race on the session itself — and let threads borrow connections
+      # they never returned, which is how one example's leftovers deadlock a
+      # later, unrelated example's insert.
+      results = Queue.new
+      threads = 5.times.map do
+        Thread.new do
+          ActiveRecord::Base.connection_pool.with_connection do
+            open_session do |sess|
+              sess.get "/signals/#{signal.id}", headers: @headers
+              results << sess.response.status
+            end
+          end
         end
       end
 
       threads.each(&:join)
 
       # All requests should succeed
-      expect(results).to all(eq(200))
+      statuses = Array.new(5) { results.pop }
+      expect(statuses).to all(eq(200))
     end
   end
 
