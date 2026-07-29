@@ -139,6 +139,23 @@ RSpec.describe Backtest::Gates::ParameterPlateau, type: :service do
       expect(verdict[:baseline_tp_target]).to eq(profile.tp_target.to_f)
       expect(verdict[:baseline_sl_target]).to eq(profile.sl_target.to_f)
     end
+
+    it "passes min_confidence through **engine_options to every walk-forward cell (issue #580)" do
+      allow(Trading::StrategyFactory).to receive(:multi_timeframe)
+        .and_return(instance_double(Strategy::MultiTimeframeSignal))
+      fake_walk_forward = instance_double(Backtest::WalkForward)
+      allow(Backtest::WalkForward).to receive(:new).and_return(fake_walk_forward)
+      allow(fake_walk_forward).to receive(:run).and_return(
+        {windows: [], aggregate: {total_pnl: 42.0, trade_count: 7}}
+      )
+
+      described_class.run(symbol: "BTC-PERP-INTX",
+        from: Time.parse("2026-01-01T00:00:00Z"), to: Time.parse("2026-03-01T00:00:00Z"),
+        train_span: 14.days, eval_span: 7.days, processes: 1, min_confidence: 30)
+
+      expect(Backtest::WalkForward).to have_received(:new)
+        .with(hash_including(min_confidence: 30)).exactly(25).times
+    end
   end
 
   # Issue #568: the 5x5 sweep is ~45 min single-core while the box idles.
