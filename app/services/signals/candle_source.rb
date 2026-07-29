@@ -67,10 +67,12 @@ module Signals
         # declared. Anything else falls back to the database rather than
         # returning an empty series that would look like "no data" and silently
         # change the run's behavior.
+        # Refuse before falling back, so a missing cutoff cannot slip out to the
+        # database and read the future from there instead.
+        require_cutoff!(as_of)
+
         return @fallback.recent(symbol: symbol, timeframe: timeframe, limit: limit, as_of: as_of) if
           series.nil? || symbol != @symbol
-
-        return series.last(limit) if as_of.nil?
 
         upper = upper_bound(series, as_of)
         return [] if upper.zero?
@@ -88,6 +90,31 @@ module Signals
           .where(timestamp: earliest..to)
           .order(:timestamp)
           .to_a
+      end
+
+      # The whole lookahead protection was one keyword argument (issue #586).
+      #
+      # This class holds the entire run's candles in memory, and `as_of` is what
+      # keeps a strategy from seeing past the bar it is being asked about. The
+      # old nil branch returned `series.last(limit)` — in a backtest, the tail
+      # of everything, which is the FUTURE. Every caller threads as_of today;
+      # nothing made them, and a new indicator or a dropped argument would read
+      # tomorrow's candles and report a wonderful edge.
+      #
+      # freqtrade ships `lookahead-analysis` for this exact failure, because
+      # their backtester also "populates the full dataframe including all candle
+      # timestamps at the outset". We can refuse it at the source instead: a
+      # backtest always has a current bar, so "give me the latest" is not a
+      # question this class can honestly answer. Live code uses Database, where
+      # a missing cutoff legitimately means now.
+      def require_cutoff!(as_of)
+        return if as_of
+
+        raise ArgumentError,
+          "Preloaded#recent needs an as_of cutoff — it holds the whole run's candles, " \
+          "so answering without one would hand the strategy candles from after the bar " \
+          "it is evaluating (issue #586). Live code wanting 'now' should use " \
+          "Signals::CandleSource::Database."
       end
 
       # Count of candles at or before as_of. The series is sorted, so this is a
