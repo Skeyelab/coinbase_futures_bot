@@ -189,24 +189,60 @@ RSpec.describe HealthCheckJob, type: :job do
   end
 
   describe "#check_database_health" do
-    context "when database is healthy" do
-      before do
-        allow(ActiveRecord::Base.connection).to receive(:active?).and_return(true)
-      end
-
-      it "returns true" do
-        expect(job.send(:check_database_health)).to be true
-      end
+    # Unstubbed: the real database is up in the test run, so this is the honest
+    # end-to-end answer. It also fails against the old implementation, which
+    # asked `connection.active?` — false on a lazily-unconnected pool even
+    # though the database answers queries. That false negative is a CRITICAL
+    # check, so it forced overall_health to "unhealthy" and emitted an hourly
+    # "Database down" Slack warning while the app queried happily.
+    it "reports healthy against a database that answers queries" do
+      expect(job.send(:check_database_health)).to be true
     end
 
-    context "when database connection fails" do
+    it "does not depend on a connection already being checked out" do
+      ActiveRecord::Base.connection_pool.release_connection
+
+      expect(job.send(:check_database_health)).to be true
+    end
+
+    context "when the database genuinely cannot be reached" do
       before do
-        allow(ActiveRecord::Base.connection).to receive(:active?).and_raise(StandardError.new("Connection failed"))
+        allow(ActiveRecord::Base.connection).to receive(:select_value)
+          .and_raise(ActiveRecord::ConnectionNotEstablished.new("down"))
       end
 
       it "returns false" do
         expect(job.send(:check_database_health)).to be false
       end
+    end
+  end
+
+  # A halted bot could not place an order, and reported "healthy" — so the
+  # hourly job, which only messages when health is NOT healthy, said nothing.
+  # Happened on 2026-07-28: LossLimits halted at 22:00:37 UTC on a $12.60
+  # realized loss against a $10 cap, and the next two hourly checks were silent.
+  describe "#calculate_overall_health with trading halted" do
+    let(:green) do
+      {database: true, background_jobs: true, coinbase_api: true,
+       day_trading_positions: {healthy: true}, swing_positions: {healthy: true},
+       portfolio_exposure: {healthy: true}}
+    end
+
+    it "is not healthy when trading is halted" do
+      expect(job.send(:calculate_overall_health, green.merge(trading_active: false))).not_to eq("healthy")
+    end
+
+    it "is a warning, not unhealthy — the halt is usually a control working" do
+      expect(job.send(:calculate_overall_health, green.merge(trading_active: false))).to eq("warning")
+    end
+
+    it "is healthy when trading is active and everything else is green" do
+      expect(job.send(:calculate_overall_health, green.merge(trading_active: true))).to eq("healthy")
+    end
+
+    it "still reports unhealthy when a critical check fails, halted or not" do
+      expect(job.send(:calculate_overall_health, green.merge(trading_active: false, database: false)))
+        .to eq("unhealthy")
     end
   end
 

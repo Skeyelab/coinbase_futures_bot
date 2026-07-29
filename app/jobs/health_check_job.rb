@@ -116,8 +116,25 @@ class HealthCheckJob < ApplicationJob
     health_checks
   end
 
+  # Actually ask the database a question, rather than asking whether a
+  # connection object happens to be checked out.
+  #
+  # This was `ActiveRecord::Base.connection.active?`, which reports whether a
+  # connection is currently open — not whether the database is reachable. Rails
+  # 8.1 defers connecting until first use, so in a freshly-started worker the
+  # answer is `false` before anything has queried, and the health check declared
+  # the database DOWN while the app was querying it happily. Measured on the box:
+  #
+  #   connection.active?      => false
+  #   select_value("SELECT 1") => 1
+  #   active? AFTER a query   => true
+  #
+  # `database` is a CRITICAL check, so a false negative here forces
+  # overall_health to "unhealthy" and emits an hourly Slack warning saying the
+  # database is down when it is not — noise that trains an operator to ignore
+  # the channel that also carries loss-cap and liquidation alerts.
   def check_database_health
-    ActiveRecord::Base.connection.active?
+    ActiveRecord::Base.connection.select_value("SELECT 1").to_i == 1
   rescue
     false
   end
@@ -462,6 +479,21 @@ class HealthCheckJob < ApplicationJob
 
     # Check for position-specific issues
     position_issues = []
+    # A halted bot is not healthy. `trading_active` was gathered and rendered on
+    # the Slack card but took no part in this verdict, so a bot that could not
+    # place a single order still reported "healthy" and — because the hourly job
+    # only messages when health is NOT healthy — said nothing at all.
+    #
+    # That happened for real on 2026-07-28: LossLimits halted trading at
+    # 22:00:37 UTC on a $12.60 realized loss against a $10 cap, and the next two
+    # hourly checks were silent because every other input was green. For an
+    # always-on trading bot, "I am halted and not trading" is the single most
+    # important thing a status message can carry.
+    #
+    # A halt is a WARNING, not "unhealthy": the halt itself is usually a control
+    # working correctly (a loss cap, a drawdown breaker, an operator pause), and
+    # conflating it with a broken database would make the severity meaningless.
+    position_issues << "trading is halted" if checks[:trading_active] == false
     position_issues << "day trading positions need closure" if checks.dig(:day_trading_positions, :healthy) == false
     position_issues << "swing position risk limits exceeded" if checks.dig(:swing_positions, :healthy) == false
     position_issues << "portfolio exposure limits exceeded" if checks.dig(:portfolio_exposure, :healthy) == false
