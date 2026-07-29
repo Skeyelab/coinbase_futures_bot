@@ -152,10 +152,16 @@ RSpec.describe Trading::PositionManagement::DayTradingWorkflow do
 
     # Two closed paper trades today, one win — the shape that produced
     # "Total PnL $0 | Daily PnL $ | Win Rate N/A" before the fix.
+    #
+    # close_time is NOW, not `1.hour.ago`: the workflow's daily window starts
+    # at Time.current.utc.beginning_of_day, so a relative close_time crossed
+    # the boundary during the first hour of each UTC day and this example
+    # flaked red for reasons that had nothing to do with the code (#546's
+    # cry-wolf class, observed live on PR #558's first CI run at 00:2x UTC).
     [32.0, -6.4].each do |pnl|
       Position.create!(
         product_id: "NOL-19AUG26-CDE", side: "SHORT", size: 1, entry_price: 80.0,
-        entry_time: 2.hours.ago, close_time: 1.hour.ago, status: "CLOSED",
+        entry_time: 10.minutes.ago, close_time: Time.current, status: "CLOSED",
         pnl: pnl, paper: true, day_trading: true
       )
     end
