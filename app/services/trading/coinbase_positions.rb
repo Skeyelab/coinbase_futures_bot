@@ -9,6 +9,8 @@ require "securerandom"
 
 module Trading
   class CoinbasePositions
+    # Keeps the private key out of inspect and interpolation (issue #596).
+    include Coinbase::RedactedInspect
     include SentryServiceTracking
 
     DEFAULT_BASE = "https://api.coinbase.com"

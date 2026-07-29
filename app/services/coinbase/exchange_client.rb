@@ -6,6 +6,8 @@ require "openssl"
 
 module Coinbase
   class ExchangeClient
+    # Keeps the private key out of inspect and interpolation (issue #596).
+    include Coinbase::RedactedInspect
     include SentryServiceTracking
 
     DEFAULT_BASE = "https://api.exchange.coinbase.com"
