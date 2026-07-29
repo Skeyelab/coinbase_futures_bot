@@ -25,7 +25,7 @@ symbols:
   # FundingSkewContrarian live on BIP in the paper loop.
   BIP-20DEC30-CDE:
     strategy: FundingSkewContrarian
-    enabled: false
+    enabled: true
     # entry_z ~2 maps to confidence ~20 on this strategy's z*10 scale; the
     # entry_z threshold IS the filter, so the MTS-calibrated confidence gates
     # (RSE 30 / profile 60) must not silently re-filter 2 <= z < 3 entries.

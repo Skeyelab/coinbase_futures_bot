@@ -119,8 +119,13 @@ RSpec.describe Trading::StrategySelection, type: :service do
       expect(entry.min_confidence).to eq(0.0)
     end
 
-    it "ships with the BIP entry DISABLED — the flip is explicit and operator-owned" do
-      expect(described_class.default.for_symbol("BIP-20DEC30-CDE").configured?).to be(false)
+    it "ships with the BIP entry ENABLED — the operator flipped it 2026-07-29 to start the #376 gate-2a sample" do
+      # The pre-flip version of this example pinned enabled: false so the flip
+      # had to arrive as a reviewed diff. It did (see the flip commit). This
+      # now pins the flipped state for the same reason in reverse: turning the
+      # gate-2a sample OFF mid-collection must also be an explicit, reviewed
+      # change, not a config accident.
+      expect(described_class.default.for_symbol("BIP-20DEC30-CDE").configured?).to be(true)
     end
   end
 end
