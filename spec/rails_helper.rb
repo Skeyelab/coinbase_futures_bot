@@ -90,6 +90,13 @@ RSpec.configure do |config|
   config.include ActiveJob::TestHelper
   config.include FactoryBot::Syntax::Methods
   config.include ActiveSupport::Testing::TimeHelpers
+  # WebMock is already hooked in by VCR, so requests are intercepted suite-wide —
+  # but its API (stub_request, a_request, ...) was not included anywhere, so
+  # reaching for it meant a local `include WebMock::API` in the one spec that
+  # needed it. Included here so stubbing an HTTP call is available by default
+  # rather than rediscovered. VCR cassettes are unaffected: this adds the
+  # matcher/stub DSL, it does not change how requests are intercepted.
+  config.include WebMock::API
 
   # Enable controller testing features for Rails 8
   Rails::Controller::Testing.install

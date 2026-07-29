@@ -101,8 +101,6 @@ RSpec.describe Sentiment::GenericRssClient, type: :service do
   # events for its entire life while reporting itself enabled — the same silent
   # failure #550 removed cryptopanic for, from a different cause.
   describe "an Atom feed" do
-    include WebMock::API
-
     subject(:blockworks) { described_class.new(url: "https://blockworks.co/feed", source_name: "blockworks_rss") }
 
     let(:atom) do
