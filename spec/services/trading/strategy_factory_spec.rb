@@ -6,7 +6,7 @@ require "rails_helper"
 # calibration, backtest engine, and signal jobs all describe the same
 # strategy. (Drift audit: calibration was tuning a DEFAULTS-configured twin
 # with a different trend filter than live.)
-RSpec.describe Trading::StrategyFactory, type: :service do
+RSpec.describe Trading::StrategyFactory, type: :service, strategy_selection: true do
   let(:live_config) { Rails.application.config.real_time_signals[:strategies]["MultiTimeframeSignal"] }
 
   it "builds from the live initializer config, not class DEFAULTS" do

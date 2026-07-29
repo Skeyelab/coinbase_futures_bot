@@ -9,7 +9,7 @@ require "rails_helper"
 # configured for FundingSkewContrarian then an MTS signal from the spot feed
 # must not open BIP positions — that would contaminate the #376 gate-2a
 # sample with another strategy's trades (the #479/#504 divergence class).
-RSpec.describe RapidSignalEvaluationJob, "declarative selection", type: :job do
+RSpec.describe RapidSignalEvaluationJob, "declarative selection", type: :job, strategy_selection: true do
   let(:job) { described_class.new }
   let(:tick_product) { "BTC-USD" }
   let(:contract_id) { "BIP-20DEC30-CDE" }

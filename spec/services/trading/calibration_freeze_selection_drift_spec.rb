@@ -7,7 +7,7 @@ require "rails_helper"
 # captures that file's fingerprint. A config change during the evidence window
 # is then detectable — and the factory alarms on it — instead of silently
 # invalidating the #376 gate-2a sample.
-RSpec.describe Trading::CalibrationFreeze, "strategy selection drift", type: :service do
+RSpec.describe Trading::CalibrationFreeze, "strategy selection drift", type: :service, strategy_selection: true do
   before do
     BotRuntimeStat.where(key: described_class::STORE_KEY).delete_all
   end

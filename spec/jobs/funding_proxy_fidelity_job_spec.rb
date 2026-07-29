@@ -8,7 +8,7 @@ require "rails_helper"
 # re-runs the correlation daily for every configured funding-skew pairing and
 # warns loudly — log + Slack — when r degrades or the overlap is too thin to
 # judge.
-RSpec.describe FundingProxyFidelityJob, type: :job do
+RSpec.describe FundingProxyFidelityJob, type: :job, strategy_selection: true do
   let(:job) { described_class.new }
   let(:proxy) { instance_double(Signals::FundingProxy) }
 
