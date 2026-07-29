@@ -46,6 +46,30 @@ RSpec.describe Signals::Indicators do
     end
   end
 
+  describe ".stddev" do
+    it "computes the sample standard deviation of the last `period` values" do
+      # last 3 of [9, 2, 4, 6]: mean 4, squared devs 4+0+4, sample var 8/2 = 4
+      expect(described_class.stddev([9.0, 2.0, 4.0, 6.0], 3)).to be_within(1e-9).of(2.0)
+    end
+
+    it "is zero for a constant series" do
+      expect(described_class.stddev([5.0] * 10, 5)).to eq(0.0)
+    end
+
+    it "accepts BigDecimal inputs" do
+      expect(described_class.stddev([BigDecimal(2), BigDecimal(4)], 2)).to be_within(1e-9).of(Math.sqrt(2))
+    end
+
+    it "returns nil when there are fewer values than the period" do
+      expect(described_class.stddev([1.0, 2.0], 3)).to be_nil
+    end
+
+    it "returns nil for a period below 2 (sample variance needs n-1 > 0)" do
+      expect(described_class.stddev([1.0, 2.0], 1)).to be_nil
+      expect(described_class.stddev([1.0, 2.0], 0)).to be_nil
+    end
+  end
+
   describe ".sma" do
     it "averages the last `period` values" do
       expect(described_class.sma([1.0, 2.0, 3.0, 4.0, 5.0], 3)).to be_within(1e-9).of(4.0)
