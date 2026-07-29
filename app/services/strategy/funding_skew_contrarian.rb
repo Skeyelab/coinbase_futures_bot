@@ -58,6 +58,13 @@ module Strategy
       {one_minute: (@config[:window].to_i + 2) * 60}
     end
 
+    # The live evaluator's data-sufficiency gate follows this (issue #303):
+    # the premium proxy consumes ONLY 1m bars, and requiring 1h/15m/5m data
+    # would silently starve the strategy whenever those syncs lag.
+    def required_timeframes
+      ["1m"]
+    end
+
     def signal(symbol:, equity_usd: 10_000.0, as_of: nil)
       @last_rejection = nil
       as_of ||= Time.current

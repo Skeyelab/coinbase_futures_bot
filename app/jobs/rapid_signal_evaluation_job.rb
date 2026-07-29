@@ -109,10 +109,17 @@ class RapidSignalEvaluationJob < ApplicationJob
 
     # LIVE-configured strategy via the shared factory so calibrated per-symbol
     # tp/sl actually reach execution (this job previously hardcoded 40/30bps,
-    # silently bypassing calibration). Rapid-path overrides: shorter min-candle
+    # silently bypassing calibration). Declarative selection (issue #303) is
+    # keyed on the CONTRACT that will trade, not the tick product: a spot
+    # BTC-USD tick resolves to the BIP perp (#390), and if BIP is configured
+    # for another strategy, an MTS signal from the spot feed must not open BIP
+    # positions — that would contaminate the #376 gate-2a sample with a
+    # different strategy's trades. Rapid-path overrides: shorter min-candle
     # requirements for tick-driven evaluation, real contract notional (issue
     # #372: resolver base-units x current price, not hardcoded $100/$10).
-    strategy = Trading::StrategyFactory.multi_timeframe(
+    @selection = Trading::StrategySelection.for_symbol(target_contract)
+    strategy = Trading::StrategyFactory.for_symbol(
+      target_contract,
       profile: TradingProfile.effective(symbol: @product_id),
       min_5m_candles: 60,
       min_1m_candles: 30,
@@ -121,10 +128,14 @@ class RapidSignalEvaluationJob < ApplicationJob
       min_position_size: 1
     )
 
-    # Generate signal using spot price as reference
+    # Generate signal using spot price as reference. A configured entry is
+    # evaluated on the CONTRACT's own candles (a funding-skew premium needs
+    # the perp leg, whichever feed ticked); the default keeps today's
+    # tick-product evaluation byte for byte.
     begin
       equity_usd = Trading::SignalEquity.usd
-      signal = strategy.signal(symbol: @product_id, equity_usd: equity_usd)
+      signal_symbol = @selection.configured? ? target_contract : @product_id
+      signal = strategy.signal(symbol: signal_symbol, equity_usd: equity_usd)
     rescue => e
       @logger.error("[RSE] Error generating signal: #{e.message}")
       return
@@ -167,9 +178,14 @@ class RapidSignalEvaluationJob < ApplicationJob
   def should_execute_signal?(signal)
     return false unless signal
 
-    # Only execute high-confidence signals (>75%) for rapid execution
-    if signal[:confidence] < self.class.min_confidence
-      @decisions&.rejected(:low_confidence, signal: signal, threshold: self.class.min_confidence)
+    # Minimum confidence to execute. The default (30) is calibrated to the MTS
+    # scorer's measured distribution; a strategy_selection.yml entry may
+    # override it (#303) — funding-skew's entry_z ~2 maps to confidence ~20 on
+    # its z*10 scale, and re-filtering at 30 would silently drop every
+    # 2 <= z < 3 entry, a different strategy than the one that passed the gates.
+    min_confidence = @selection&.min_confidence || self.class.min_confidence
+    if signal[:confidence] < min_confidence
+      @decisions&.rejected(:low_confidence, signal: signal, threshold: min_confidence)
       return false
     end
 
