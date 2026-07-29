@@ -15,6 +15,13 @@ class SideNormalizer
     "sell" => "short"
   }.freeze
 
+  # Display/legacy mapping. NOT what the venue accepts — see .venue_order_side.
+  #
+  # The comment this replaced claimed LONG/SHORT was the futures vocabulary. The
+  # first live order ever placed (#486, 2026-07-29) returned
+  # `invalid value for enum field side: "LONG"`, so the belief was false and had
+  # been false the whole time. Nothing disproved it because no live order with a
+  # position word had ever succeeded.
   ORDER_SIDES = {
     "long" => "LONG",
     "short" => "SHORT",
@@ -78,6 +85,20 @@ class SideNormalizer
 
   def self.order(value)
     ORDER_SIDES[value.to_s.downcase]
+  end
+
+  # The ONLY vocabulary Coinbase Advanced Trade accepts on POST /orders: BUY or
+  # SELL. A position word is translated to the action that establishes it — a
+  # :long entry BUYS.
+  #
+  # Callers may keep speaking in positions (strategies emit "LONG"/"SHORT"), and
+  # the translation happens once, here, at the boundary. Fixing this by changing
+  # what callers pass would leave the trap armed for the next one.
+  #
+  # Returns nil for anything unrecognised, so build_order_body still refuses
+  # rather than sending a guess to the venue.
+  def self.venue_order_side(value)
+    ORDER_ACTIONS[value.to_s.downcase]&.upcase
   end
 
   def self.order_action(value)

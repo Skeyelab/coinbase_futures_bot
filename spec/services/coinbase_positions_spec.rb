@@ -164,6 +164,21 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
   end
 
+  # The venue's contract, established by a real rejection rather than by belief.
+  # The first live order this bot ever placed (#486 calibration, 2026-07-29) came
+  # back:
+  #
+  #   POST /api/v3/brokerage/orders -> 400
+  #   proto: (line 1:101): invalid value for enum field side: "LONG"
+  #
+  # Coinbase Advanced Trade takes BUY/SELL. It rejects LONG/SHORT. These examples
+  # previously asserted "LONG" and "SHORT" as correct, which is why the belief
+  # survived: the code carried a comment saying futures want LONG/SHORT, the spec
+  # agreed with the comment, and no live order had ever contradicted either.
+  #
+  # `side` here is what the ORDER DOES, not what position it leaves you holding.
+  # A :long entry BUYS. Callers may keep speaking in positions — the strategies
+  # emit "LONG"/"SHORT" — and the translation happens once, at the boundary.
   describe "futures order building" do
     it "builds order body with correct futures side values" do
       order_body = service.send(:build_order_body,
@@ -172,20 +187,34 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
         size: "2",
         type: :market)
 
-      expect(order_body["side"]).to eq("LONG")
+      expect(order_body["side"]).to eq("BUY")
       expect(order_body["product_id"]).to eq("BIP-20DEC30-CDE")
       expect(order_body["order_configuration"]["market_market_ioc"]["base_size"]).to eq("2")
     end
 
-    it "converts side values correctly for futures orders" do
-      expect(service.send(:build_order_body, product_id: "TEST", side: :long, size: "1",
-        type: :market)["side"]).to eq("LONG")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :short, size: "1",
-        type: :market)["side"]).to eq("SHORT")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :buy, size: "1",
+    it "sends BUY or SELL whichever vocabulary the caller speaks" do
+      {long: "BUY", short: "SELL", buy: "BUY", sell: "SELL"}.each do |input, expected|
+        expect(service.send(:build_order_body, product_id: "TEST", side: input, size: "1",
+          type: :market)["side"]).to eq(expected)
+      end
+    end
+
+    # RapidSignalEvaluationJob passes signal[:side] straight through, and
+    # strategies emit the uppercase position words. This is the exact value that
+    # produced the 400, so it is pinned by itself.
+    it "accepts the uppercase position words the strategies actually emit" do
+      expect(service.send(:build_order_body, product_id: "TEST", side: "LONG", size: "1",
         type: :market)["side"]).to eq("BUY")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :sell, size: "1",
+      expect(service.send(:build_order_body, product_id: "TEST", side: "SHORT", size: "1",
         type: :market)["side"]).to eq("SELL")
+    end
+
+    it "never emits a value the venue rejects" do
+      %i[long short buy sell].each do |input|
+        side = service.send(:build_order_body, product_id: "TEST", side: input, size: "1",
+          type: :market)["side"]
+        expect(side).to be_in(%w[BUY SELL])
+      end
     end
 
     it "raises error for invalid side values" do
