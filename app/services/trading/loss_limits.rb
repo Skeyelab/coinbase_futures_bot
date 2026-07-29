@@ -17,6 +17,14 @@ module Trading
   # Scoped to the mode currently in force — paper rows in dry-run, live rows
   # otherwise — so the caps can be drilled in paper and still mean real dollars
   # live.
+  #
+  # The CAP VALUES are scoped the same way. They were shared, and a live cap
+  # sized for real capital is the wrong number for paper: on 2026-07-28 one
+  # ordinary NOL-19AUG26-CDE stop-out realized -$12.60 against the $10 daily
+  # cap — 94% of the day's budget in a single trade — and the resulting halt,
+  # which never auto-expires, needed a manual clear before paper could trade
+  # again. A live cap protects capital; a paper cap protects nothing and costs
+  # the >=100-trades-per-symbol sample that #376 gate 2 requires.
   class LossLimits
     Breach = Struct.new(:window, :realized, :cap) do
       def reason
@@ -24,12 +32,52 @@ module Trading
       end
     end
 
-    def self.daily_cap = ENV.fetch("LOSS_CAP_DAILY_USD", "10").to_f
+    Caps = Struct.new(:daily, :weekly, :cumulative)
 
-    def self.weekly_cap = ENV.fetch("LOSS_CAP_WEEKLY_USD", "30").to_f
+    # ---- LIVE caps: #392 condition 3, governing real money. Do not renumber.
+    def self.live_daily_cap = ENV.fetch("LOSS_CAP_DAILY_USD", "10").to_f
+
+    def self.live_weekly_cap = ENV.fetch("LOSS_CAP_WEEKLY_USD", "30").to_f
 
     # The tuition cap: total realized loss across the whole program.
-    def self.cumulative_cap = ENV.fetch("LOSS_CAP_CUMULATIVE_USD", "100").to_f
+    def self.live_cumulative_cap = ENV.fetch("LOSS_CAP_CUMULATIVE_USD", "100").to_f
+
+    # ---- PAPER caps: no capital to protect, so they exist to catch a broken
+    # strategy or a runaway loop, not to preserve a balance. Defaults are a
+    # fraction of PAPER_EQUITY_USD so they scale when the operator raises paper
+    # equity, and they keep #392's 1:3:10 daily:weekly:cumulative shape. The
+    # fraction is 10x live's (10%/30%/100% against live's 1%/3%/10% of the
+    # $1,000 account #392 sized itself against) because a live cap has to sit
+    # below one ordinary stop-out and a paper cap has to sit above it: at $10 a
+    # single -$12.60 stop-out ended the day. Cumulative at 100% is the only
+    # terminal condition paper actually has — the paper account is gone.
+    PAPER_DAILY_EQUITY_FRACTION = 0.10
+    PAPER_WEEKLY_EQUITY_FRACTION = 0.30
+    PAPER_CUMULATIVE_EQUITY_FRACTION = 1.00
+
+    def self.paper_daily_cap
+      ENV.fetch("PAPER_LOSS_CAP_DAILY_USD") { paper_equity * PAPER_DAILY_EQUITY_FRACTION }.to_f
+    end
+
+    def self.paper_weekly_cap
+      ENV.fetch("PAPER_LOSS_CAP_WEEKLY_USD") { paper_equity * PAPER_WEEKLY_EQUITY_FRACTION }.to_f
+    end
+
+    def self.paper_cumulative_cap
+      ENV.fetch("PAPER_LOSS_CAP_CUMULATIVE_USD") { paper_equity * PAPER_CUMULATIVE_EQUITY_FRACTION }.to_f
+    end
+
+    def self.paper_equity = PaperAccount.starting_equity
+
+    # The ONE place a mode chooses a cap set. Callers pass the same `paper` flag
+    # they scope rows with, so the cap and the sample cannot disagree.
+    def self.caps_for(paper:)
+      if paper
+        Caps.new(daily: paper_daily_cap, weekly: paper_weekly_cap, cumulative: paper_cumulative_cap)
+      else
+        Caps.new(daily: live_daily_cap, weekly: live_weekly_cap, cumulative: live_cumulative_cap)
+      end
+    end
 
     def self.evaluate!(now: Time.current, logger: Rails.logger)
       new(now: now, logger: logger).evaluate!
@@ -39,9 +87,15 @@ module Trading
       new(now: now).status
     end
 
+    # DryRun is a DB-backed toggle that another process can flip between two
+    # calls. Read it ONCE and derive both the cap set and the row scope from
+    # that single answer: a cap reading live values against paper rows (or the
+    # reverse) is worse than the shared cap this replaced.
     def initialize(now: Time.current, logger: Rails.logger)
       @now = now
       @logger = logger
+      @paper = DryRun.active?
+      @caps = self.class.caps_for(paper: @paper)
     end
 
     # Halts on the FIRST breach found, widest window first: a cumulative breach
@@ -61,9 +115,10 @@ module Trading
 
     def status
       {
-        cumulative: {realized: realized_since(nil), cap: self.class.cumulative_cap},
-        weekly: {realized: realized_since(@now - 7.days), cap: self.class.weekly_cap},
-        daily: {realized: realized_since(@now.beginning_of_day), cap: self.class.daily_cap},
+        mode: @paper ? "paper" : "live",
+        cumulative: {realized: realized_since(nil), cap: @caps.cumulative},
+        weekly: {realized: realized_since(@now - 7.days), cap: @caps.weekly},
+        daily: {realized: realized_since(@now.beginning_of_day), cap: @caps.daily},
         breached: breaches.map(&:window)
       }
     end
@@ -72,14 +127,14 @@ module Trading
 
     def breaches
       [
-        Breach.new(window: "cumulative", realized: realized_since(nil), cap: self.class.cumulative_cap),
-        Breach.new(window: "weekly", realized: realized_since(@now - 7.days), cap: self.class.weekly_cap),
-        Breach.new(window: "daily", realized: realized_since(@now.beginning_of_day), cap: self.class.daily_cap)
+        Breach.new(window: "cumulative", realized: realized_since(nil), cap: @caps.cumulative),
+        Breach.new(window: "weekly", realized: realized_since(@now - 7.days), cap: @caps.weekly),
+        Breach.new(window: "daily", realized: realized_since(@now.beginning_of_day), cap: @caps.daily)
       ].select { |b| b.cap.positive? && b.realized.negative? && b.realized.abs >= b.cap }
     end
 
     def realized_since(from)
-      scope = Position.where(status: "CLOSED", paper: DryRun.active?)
+      scope = Position.where(status: "CLOSED", paper: @paper)
       scope = scope.where(close_time: from..@now) if from
       scope.sum(:pnl).to_f
     end
