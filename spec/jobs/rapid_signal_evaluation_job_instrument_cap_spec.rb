@@ -20,6 +20,7 @@ RSpec.describe RapidSignalEvaluationJob, "MAX_LIVE_INSTRUMENTS", type: :job do
     job.instance_variable_set(:@asset, "BTC")
     job.instance_variable_set(:@current_price, 100.0)
     job.instance_variable_set(:@target_contract, "BIP-20DEC30-CDE")
+    pass_cost_gate!("BIP-20DEC30-CDE")
     allow(Trading::Protections).to receive(:blocked?).and_return(false)
     allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end

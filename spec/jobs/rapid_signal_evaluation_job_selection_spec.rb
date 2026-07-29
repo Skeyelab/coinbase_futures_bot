@@ -36,6 +36,12 @@ RSpec.describe RapidSignalEvaluationJob, "declarative selection", type: :job do
   end
 
   before do
+    # These specs are about STRATEGY SELECTION, not about whether the symbol has
+    # earned the right to trade. The cost gate (#575, ADR 0006 decision 3) sits
+    # upstream of selection and refuses any symbol without a passing
+    # walk-forward verdict, so without this every selection example would fail
+    # for a reason it is not testing.
+    pass_cost_gate!(contract_id)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
     allow(contract_manager).to receive(:best_available_contract).with("BTC").and_return(contract_id)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions_service)

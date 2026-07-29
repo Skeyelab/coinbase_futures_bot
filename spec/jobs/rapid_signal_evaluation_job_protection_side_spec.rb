@@ -26,6 +26,7 @@ RSpec.describe RapidSignalEvaluationJob, "protection gate side handling", type: 
     job.instance_variable_set(:@asset, "BTC")
     job.instance_variable_set(:@current_price, 100.0)
     job.instance_variable_set(:@target_contract, "BIP-20DEC30-CDE")
+    pass_cost_gate!("BIP-20DEC30-CDE")
     allow(described_class).to receive(:max_live_instruments).and_return(10)
     allow(Trading::NotionalCap).to receive(:allows?).and_return(true)
   end
