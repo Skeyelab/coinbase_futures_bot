@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_29_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -291,6 +291,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_120000) do
     t.integer "sample_size", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["product_id", "liquidity"], name: "index_product_fees_on_product_id_and_liquidity", unique: true
+  end
+
+  create_table "scorer_artifacts", force: :cascade do |t|
+    t.jsonb "coefficients", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.string "direction", null: false
+    t.jsonb "feature_spec", default: {}, null: false
+    t.datetime "frozen_at"
+    t.integer "horizon", null: false
+    t.string "kind", default: "logistic_v1", null: false
+    t.decimal "sl_frac", precision: 10, scale: 6, null: false
+    t.string "timeframe", default: "5m", null: false
+    t.decimal "tp_frac", precision: 10, scale: 6, null: false
+    t.jsonb "training_metadata", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.string "version", null: false
+    t.index ["version"], name: "index_scorer_artifacts_on_version", unique: true
   end
 
   create_table "sentiment_aggregates", force: :cascade do |t|
