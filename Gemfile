@@ -30,6 +30,9 @@ gem "faraday", "~> 2.14"
 # WebSocket client for market data subscriptions
 gem "websocket-client-simple", "~> 0.8"
 
+# Process-fork fan-out for backtest sweeps (plateau gate grid, issue #568)
+gem "parallel", "~> 1.28"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"

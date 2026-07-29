@@ -6,8 +6,10 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   let(:service) { described_class.new(base_url: "https://example.com") }
 
   before do
-    # Mock the credentials loading to avoid file system dependencies
-    allow(service).to receive(:load_credentials_from_file).and_return({
+    # Stub the shared resolver (issue #591) rather than a private method on the
+    # client — a stub on a private method breaks the moment the loader moves,
+    # which is exactly what happened when three copies became one.
+    allow(Coinbase::CredentialResolver).to receive(:call).and_return({
       api_key: "organizations/test-org/apiKeys/test-key",
       private_key: "-----BEGIN EC PRIVATE KEY-----\nMOCK_KEY\n-----END EC PRIVATE KEY-----"
     })
@@ -50,37 +52,22 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   end
 
   describe "authentication" do
-    it "loads credentials from cdp_api_key.json" do
-      service = described_class.new
-      allow(service).to receive(:load_credentials_from_file).and_return({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+    # These used to stub load_credentials_from_file and then assert the stub
+    # returned what it had been told to return — a test of RSpec, not of the
+    # client. Issue #591 replaced the loader with a shared resolver, so they now
+    # go through the real construction path and assert observable behaviour.
+    it "authenticates when the resolver supplies credentials" do
+      allow(Coinbase::CredentialResolver).to receive(:call).and_return(
+        {api_key: "organizations/test-org/apiKeys/test-key", private_key: "test-secret"}
+      )
 
-      # Set the instance variables to avoid nil errors
-      service.instance_variable_set(:@api_key, "test-key")
-      service.instance_variable_set(:@api_secret, "test-secret")
-
-      result = service.send(:load_credentials_from_file)
-      expect(result).to eq({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+      expect(described_class.new(base_url: "https://example.com")).to be_authenticated
     end
 
-    it "initializes with authentication when credentials are available" do
-      service = described_class.new
-      allow(service).to receive(:load_credentials_from_file).and_return({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+    it "does not authenticate when the resolver finds nothing" do
+      allow(Coinbase::CredentialResolver).to receive(:call).and_return(nil)
 
-      # Set the instance variables to avoid nil errors
-      service.instance_variable_set(:@api_key, "test-key")
-      service.instance_variable_set(:@api_secret, "test-secret")
-
-      service.send(:initialize)
-      expect(service.instance_variable_get(:@authenticated)).to be true
+      expect(described_class.new(base_url: "https://example.com")).not_to be_authenticated
     end
 
     it "raises error when not authenticated" do
@@ -164,6 +151,21 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
     end
   end
 
+  # The venue's contract, established by a real rejection rather than by belief.
+  # The first live order this bot ever placed (#486 calibration, 2026-07-29) came
+  # back:
+  #
+  #   POST /api/v3/brokerage/orders -> 400
+  #   proto: (line 1:101): invalid value for enum field side: "LONG"
+  #
+  # Coinbase Advanced Trade takes BUY/SELL. It rejects LONG/SHORT. These examples
+  # previously asserted "LONG" and "SHORT" as correct, which is why the belief
+  # survived: the code carried a comment saying futures want LONG/SHORT, the spec
+  # agreed with the comment, and no live order had ever contradicted either.
+  #
+  # `side` here is what the ORDER DOES, not what position it leaves you holding.
+  # A :long entry BUYS. Callers may keep speaking in positions — the strategies
+  # emit "LONG"/"SHORT" — and the translation happens once, at the boundary.
   describe "futures order building" do
     it "builds order body with correct futures side values" do
       order_body = service.send(:build_order_body,
@@ -172,20 +174,34 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
         size: "2",
         type: :market)
 
-      expect(order_body["side"]).to eq("LONG")
+      expect(order_body["side"]).to eq("BUY")
       expect(order_body["product_id"]).to eq("BIP-20DEC30-CDE")
       expect(order_body["order_configuration"]["market_market_ioc"]["base_size"]).to eq("2")
     end
 
-    it "converts side values correctly for futures orders" do
-      expect(service.send(:build_order_body, product_id: "TEST", side: :long, size: "1",
-        type: :market)["side"]).to eq("LONG")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :short, size: "1",
-        type: :market)["side"]).to eq("SHORT")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :buy, size: "1",
+    it "sends BUY or SELL whichever vocabulary the caller speaks" do
+      {long: "BUY", short: "SELL", buy: "BUY", sell: "SELL"}.each do |input, expected|
+        expect(service.send(:build_order_body, product_id: "TEST", side: input, size: "1",
+          type: :market)["side"]).to eq(expected)
+      end
+    end
+
+    # RapidSignalEvaluationJob passes signal[:side] straight through, and
+    # strategies emit the uppercase position words. This is the exact value that
+    # produced the 400, so it is pinned by itself.
+    it "accepts the uppercase position words the strategies actually emit" do
+      expect(service.send(:build_order_body, product_id: "TEST", side: "LONG", size: "1",
         type: :market)["side"]).to eq("BUY")
-      expect(service.send(:build_order_body, product_id: "TEST", side: :sell, size: "1",
+      expect(service.send(:build_order_body, product_id: "TEST", side: "SHORT", size: "1",
         type: :market)["side"]).to eq("SELL")
+    end
+
+    it "never emits a value the venue rejects" do
+      %i[long short buy sell].each do |input|
+        side = service.send(:build_order_body, product_id: "TEST", side: input, size: "1",
+          type: :market)["side"]
+        expect(side).to be_in(%w[BUY SELL])
+      end
     end
 
     it "raises error for invalid side values" do

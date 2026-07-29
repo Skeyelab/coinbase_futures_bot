@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "etc"
+
 module Backtest
   module Gates
     # Gate 6 of the #376 go-live framework (issue #541): parameter PLATEAU,
@@ -52,13 +54,25 @@ module Backtest
         # out-of-sample walk-forward run per cell, tp/sl scaled off the
         # effective profile baseline. No new data needed: only the strategy's
         # tp_target/sl_target overrides change per run.
+        # Cells are independent — each builds its own strategy and WalkForward
+        # over committed candles — so with processes > 1 they fan out across
+        # forked workers (issue #568; the GVL rules out threads). Fork safety:
+        # Rails 8.1 discards inherited connection pools in forked children
+        # (ActiveSupport::ForkTracker hook in PoolConfig), so each worker
+        # lazily opens its own DB connection and the parent's socket is never
+        # shared; the Preloaded candle source and all engine state are
+        # per-instance, built inside the worker. Parallel.map marshals plain
+        # cell hashes back in input order, so the verdict is deterministic
+        # regardless of which worker finishes first. processes: 1 is the
+        # exact sequential path — no fork, no Parallel.
         def run(symbol:, from:, to:, train_span:, eval_span:,
           stop_scales: STOP_SCALES, target_scales: TARGET_SCALES,
-          profile: TradingProfile.effective, **engine_options)
+          profile: TradingProfile.effective, processes: default_processes, **engine_options)
           baseline_tp = profile.tp_target.to_f
           baseline_sl = profile.sl_target.to_f
 
-          cells = stop_scales.product(target_scales).map do |stop_scale, target_scale|
+          grid = stop_scales.product(target_scales)
+          evaluate_cell = lambda do |(stop_scale, target_scale)|
             # resolve_symbols: false — backtest mode, use the symbol as-is
             # (same as Engine's own default strategy construction).
             strategy = Trading::StrategyFactory.multi_timeframe(
@@ -74,7 +88,24 @@ module Backtest
             }
           end
 
+          cells = if processes > 1
+            Parallel.map(grid, in_processes: processes, &evaluate_cell)
+          else
+            grid.map(&evaluate_cell)
+          end
+
           evaluate(cells: cells).merge(baseline_tp_target: baseline_tp, baseline_sl_target: baseline_sl)
+        end
+
+        # How many worker processes the grid sweep uses. PLATEAU_PROCESSES
+        # overrides; default leaves two cores for the OS/bot and caps at 8
+        # (25 cells — more workers than that is fork overhead, not speedup).
+        # Always at least 1; 1 means the plain sequential path, no forking.
+        def default_processes
+          override = ENV["PLATEAU_PROCESSES"]
+          return [override.to_i, 1].max if override
+
+          (Etc.nprocessors - 2).clamp(1, 8)
         end
 
         private

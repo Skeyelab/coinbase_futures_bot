@@ -512,6 +512,7 @@ DEPENDENCIES
   jwt (~> 3.2)
   kaminari (~> 1.2)
   lipgloss (~> 0.1)
+  parallel (~> 1.28)
   parallel_tests
   pg (~> 1.6)
   posthog-rails

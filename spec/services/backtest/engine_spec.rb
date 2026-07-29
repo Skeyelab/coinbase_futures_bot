@@ -389,6 +389,80 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  describe "engine-level min-confidence filter (issue #580)" do
+    # The #497 incumbent is 200/120 @ conf>=30, but the engine traded every
+    # signal — the gates could never judge the configuration as frozen. With
+    # min_confidence: set, a signal below the bar is NOT traded, only counted.
+    def conf_engine(min_confidence:, &script)
+      insert_step_candles(Array.new(10, 100.0) + (1..10).map { |i| 100.0 + i })
+      described_class.new(symbol: "TEST-USD", strategy: scripted_strategy(&script),
+        starting_equity: 10_000.0, fee_rate: 0.0, slippage: 0.0,
+        min_confidence: min_confidence)
+    end
+
+    it "does not trade a signal below the bar and counts the rejection" do
+      engine = conf_engine(min_confidence: 30) do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 20.0}
+        end
+      end
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(0)
+      expect(result.rejected_low_confidence).to eq(1)
+      expect(result.to_h[:rejected_low_confidence]).to eq(1)
+    end
+
+    it "trades a signal AT the bar (inclusive threshold, conf>=30 semantics)" do
+      engine = conf_engine(min_confidence: 30) do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 30.0}
+        end
+      end
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.rejected_low_confidence).to eq(0)
+    end
+
+    it "rejects a nil-confidence signal when the filter is set (a filter that passes unknowns is not a filter)" do
+      engine = conf_engine(min_confidence: 30) do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0}
+        end
+      end
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(0)
+      expect(result.rejected_low_confidence).to eq(1)
+    end
+
+    it "default nil preserves current behavior exactly: low- and nil-confidence signals trade, counter stays 0" do
+      engine = conf_engine(min_confidence: nil) do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 5.0}
+        end
+      end
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.rejected_low_confidence).to eq(0)
+      expect(result.to_h[:rejected_low_confidence]).to eq(0)
+    end
+
+    it "counts every rejected signal evaluation across the run" do
+      # Strategy signals on EVERY flat step at conf 10: all rejected, none
+      # traded, so every step stays flat and re-asks — 20 candles, 20 rejections.
+      engine = conf_engine(min_confidence: 30) do |_as_of|
+        {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 10.0}
+      end
+      result = engine.run(from: t0, to: t0 + 19 * 5.minutes)
+
+      expect(result.trade_count).to eq(0)
+      expect(result.rejected_low_confidence).to eq(20)
+    end
+  end
+
   describe "integration with the live strategy" do
     before do
       allow(ENV).to receive(:fetch).and_call_original

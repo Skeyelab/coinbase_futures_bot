@@ -9,6 +9,8 @@ require "securerandom"
 
 module Trading
   class CoinbasePositions
+    # Keeps the private key out of inspect and interpolation (issue #596).
+    include Coinbase::RedactedInspect
     include SentryServiceTracking
 
     DEFAULT_BASE = "https://api.coinbase.com"
@@ -64,7 +66,7 @@ module Trading
       end
 
       # Try to load credentials from cdp_api_key.json file (same as AdvancedTradeClient)
-      credentials = load_credentials_from_file
+      credentials = Coinbase::CredentialResolver.call(logger: logger)
 
       if credentials
         @api_key = credentials[:api_key]
@@ -135,6 +137,21 @@ module Trading
       positions = positions.select { |p| p["product_id"] == product_id } if product_id
 
       positions
+    end
+
+    # The fee schedule Coinbase is charging this account (issue #585). Read-only.
+    # Returns the `fee_tier` hash — pricing_tier, taker_fee_rate, maker_fee_rate
+    # and the volume band that put the account in it — or {} when absent.
+    #
+    # product_type: "FUTURE" matters. The spot schedule is a different set of
+    # numbers and would price every futures trade wrong.
+    def transaction_summary(product_type: "FUTURE")
+      raise "Authentication required" unless @authenticated
+
+      resp = authenticated_get("/api/v3/brokerage/transaction_summary", {product_type: product_type})
+      data = JSON.parse(resp.body)
+      tier = data.is_a?(Hash) ? data["fee_tier"] : nil
+      tier.is_a?(Hash) ? tier : {}
     end
 
     # Real executed fills with true commissions (issue #391 fee truth). Read-only.
@@ -565,8 +582,19 @@ module Trading
     private
 
     def build_order_body(product_id:, side:, size:, type:, price: nil)
-      # For futures orders, use LONG/SHORT instead of buy/sell
-      side_str = SideNormalizer.order(side)
+      # BUY/SELL — the only enum Coinbase Advanced Trade accepts. This used to
+      # send SideNormalizer.order, which passes LONG/SHORT straight through, under
+      # a comment asserting that futures wanted them. The first live order ever
+      # placed (#486, 2026-07-29) came back 400:
+      #
+      #   proto: (line 1:101): invalid value for enum field side: "LONG"
+      #
+      # RapidSignalEvaluationJob passes signal[:side] verbatim and strategies emit
+      # "LONG"/"SHORT", so every signal-driven live order would have been
+      # rejected. Only callers happening to say :buy/:sell worked, which is why
+      # nothing surfaced it — and simulate_order validates nothing, so every
+      # dry-run passed.
+      side_str = SideNormalizer.venue_order_side(side)
       raise ArgumentError, "side must be :long, :short, :buy, or :sell, got: #{side}" unless side_str
 
       order_config = case type.to_sym
@@ -1012,38 +1040,6 @@ module Trading
       host = "api.coinbase.com"
 
       "#{method} #{host}#{request_path}"
-    end
-
-    def load_credentials_from_file
-      file_path = Rails.root.join("cdp_api_key.json")
-
-      if File.exist?(file_path)
-        begin
-          data = JSON.parse(File.read(file_path))
-
-          # Use the full organization path as the API key
-          # This is what Coinbase expects for JWT authentication
-          api_key = data["name"]
-          private_key = data["privateKey"]
-
-          @logger.info("Using API key: #{api_key}")
-          @logger.info("Private key length: #{private_key.length}")
-
-          {
-            api_key: api_key,
-            private_key: private_key
-          }
-        rescue JSON::ParserError => e
-          @logger.error("Failed to parse cdp_api_key.json: #{e.message}")
-          nil
-        rescue => e
-          @logger.error("Failed to load credentials from cdp_api_key.json: #{e.message}")
-          nil
-        end
-      else
-        @logger.warn("cdp_api_key.json file not found at #{file_path}")
-        nil
-      end
     end
 
     def normalize_pem_secret(secret)

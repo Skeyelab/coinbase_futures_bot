@@ -65,10 +65,34 @@ RSpec.describe Backtest::WalkForward, type: :service do
       trade_count: 0,
       total_pnl: 0.0,
       total_funding: 0.0,
+      rejected_low_confidence: 0,
       expectancy: nil,
       cost_gate_passed: nil
     )
     expect { JSON.generate(report) }.not_to raise_error
+  end
+
+  it "rolls the min-confidence rejection counter into the aggregate (issue #580)" do
+    # 5m candles hourly across the span; a strategy that always signals at
+    # conf 10 against min_confidence: 30 trades nothing — the aggregate must
+    # still show HOW selective the filter was, or reports lose the story.
+    (0...(9 * 24)).each do |i|
+      Candle.create!(symbol: "TEST-USD", timeframe: "5m", timestamp: from + i.hours,
+        open: 100, high: 100.5, low: 99.5, close: 100, volume: 1)
+    end
+    low_conf = Class.new do
+      def signal(symbol:, equity_usd:, as_of: nil)
+        {side: :long, price: 100.0, quantity: 1.0, tp: 105.0, sl: 95.0, confidence: 10.0}
+      end
+    end.new
+
+    report = described_class.new(symbol: "TEST-USD", strategy: low_conf, min_confidence: 30)
+      .run(from: from, to: to, train_span: 3.days, eval_span: 2.days)
+
+    expect(report[:aggregate][:trade_count]).to eq(0)
+    expect(report[:aggregate][:rejected_low_confidence]).to be > 0
+    expect(report[:windows].sum { |w| w[:metrics][:rejected_low_confidence] })
+      .to eq(report[:aggregate][:rejected_low_confidence])
   end
 
   it "raises when the span cannot fit a single window" do

@@ -66,6 +66,17 @@ RSpec.describe Backtest::Result do
     expect(result.total_funding).to eq(0.0)
   end
 
+  it "carries the min-confidence rejection counter so selectivity survives into reports (issue #580)" do
+    filtered = described_class.new(trades: trades, equity_curve: equity_curve,
+      starting_equity: 10_000.0, from: Time.utc(2026, 1, 1), to: Time.utc(2026, 1, 4),
+      rejected_low_confidence: 7)
+    expect(filtered.rejected_low_confidence).to eq(7)
+    expect(filtered.to_h[:rejected_low_confidence]).to eq(7)
+    # Default (no filter) is 0, not nil — pre-#580 shapes stay JSON-stable.
+    expect(result.rejected_low_confidence).to eq(0)
+    expect(result.to_h[:rejected_low_confidence]).to eq(0)
+  end
+
   it "serializes to a JSON-friendly hash" do
     h = result.to_h
     expect(h[:trade_count]).to eq(3)

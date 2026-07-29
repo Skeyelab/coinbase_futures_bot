@@ -5,9 +5,11 @@ module Backtest
   # Trades are hashes: {side:, entry_price:, exit_price:, quantity:, pnl:,
   # fees:, entered_at:, exited_at:}.
   class Result
-    attr_reader :trades, :equity_curve, :starting_equity, :from, :to, :protection_halts
+    attr_reader :trades, :equity_curve, :starting_equity, :from, :to, :protection_halts,
+      :rejected_low_confidence
 
-    def initialize(trades:, equity_curve:, starting_equity:, from:, to:, protection_halts: [])
+    def initialize(trades:, equity_curve:, starting_equity:, from:, to:, protection_halts: [],
+      rejected_low_confidence: 0)
       @trades = trades
       @equity_curve = equity_curve
       @starting_equity = starting_equity.to_f
@@ -16,6 +18,11 @@ module Backtest
       # Protection halts during the run (issue #400): [{source:, symbol:, side:, at:}].
       # Attributes which guard halted trading and when.
       @protection_halts = protection_halts
+      # Signals dropped by the engine's min-confidence filter (issue #580).
+      # 0 when the filter is off, so pre-#580 result shapes are unchanged in
+      # meaning. Kept in #to_h (total_funding precedent, #564) so stored
+      # BacktestRuns and walk-forward aggregates keep the filter's selectivity.
+      @rejected_low_confidence = rejected_low_confidence.to_i
     end
 
     def trade_count
@@ -144,6 +151,7 @@ module Backtest
         total_pnl: total_pnl,
         total_fees: total_fees,
         total_funding: total_funding,
+        rejected_low_confidence: rejected_low_confidence,
         win_rate: win_rate,
         avg_win: avg_win,
         avg_loss: avg_loss,

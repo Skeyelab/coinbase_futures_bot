@@ -15,7 +15,15 @@
 class FeeMeasurementSnapshotJob < ApplicationJob
   queue_as :default
 
-  def perform(limit: 250, now: Time.current, fee_truth: Trading::FeeTruth)
+  def perform(limit: 250, now: Time.current, fee_truth: Trading::FeeTruth,
+    schedule: Trading::VenueFeeSchedule)
+    # The published schedule first (issue #585). This is the number CostModel
+    # prices with; the fill measurements below are what the venue actually
+    # charged. Refreshing it here rather than on a cron of its own keeps the two
+    # halves of "what does a trade cost" on the same clock — and the tier is
+    # volume-based, so it does move.
+    schedule.fetch!
+
     report = fee_truth.call(limit: limit)
 
     # No credentials, or no fills yet: leave the seeded constants in place
@@ -28,10 +36,46 @@ class FeeMeasurementSnapshotJob < ApplicationJob
     stored = Array(report[:by_product_liquidity]).count { |m| store(m, now) }
     Rails.logger.info("[FeeMeasurement] stored #{stored} product/liquidity measurements " \
                       "from #{report[:fills_examined]} fills")
+    announce_drift(report[:perp_taker_drift])
     report
   end
 
   private
+
+  # FeeTruth computes this verdict on every run and this job used to discard it.
+  #
+  # The 3 bps perp taker default priced all 12 BIP backtest runs and ADR 0002's
+  # venue decision, whose kill criterion is stated as "≤9 bps round-trip cost".
+  # The first real fills came back at 10.175 bps — 239% off — and nothing said
+  # so (issue #584). CostModel.check_taker_fee_drift! existed for exactly this
+  # and had zero callers.
+  #
+  # Silence when the model still holds is deliberate. A nightly notification
+  # would be muted inside a week, and then this is invisible again for a
+  # different reason.
+  def announce_drift(verdict)
+    return unless verdict.is_a?(Hash) && verdict[:status].to_s == "drift"
+
+    observed = verdict[:observed_rate].to_f
+    fills = verdict[:fills].to_i
+
+    # Logs the warning and returns the drift hash. Calling it here is the point:
+    # the method was written to enforce this and nothing invoked it.
+    CostModel.check_taker_fee_drift!(observed_rate: observed, expected_rate: verdict[:model_rate].to_f)
+
+    SlackNotificationService.alert("error", "Perp taker fee drift", <<~DETAILS.strip)
+      Modeled #{bps(verdict[:model_rate])} bps, measured #{bps(observed)} bps across #{fills} fill#{"s" unless fills == 1}.
+
+      The modeled rate prices every backtest and cost gate. ADR 0002's kill
+      criterion assumes a round-trip cost of 9 bps or less.
+    DETAILS
+  end
+
+  # A verdict without its sample size invites acting on a handful of fills as
+  # though it were settled. Callers get the count; they decide what it is worth.
+  def bps(rate)
+    (rate.to_f * 10_000).round(2)
+  end
 
   def store(measurement, now)
     product = measurement[:product].to_s

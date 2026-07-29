@@ -57,6 +57,16 @@ RSpec.describe Backtest::RunRecorder, type: :service do
     expect(run.trade_count).to eq(1)
   end
 
+  # total_funding precedent (#564): counters live in Result#to_h, which lands
+  # verbatim in the metrics blob — a stored run must not lose selectivity.
+  it "keeps the min-confidence rejection counter in stored metrics (issue #580)" do
+    result = Backtest::Result.new(trades: [], equity_curve: [10_000.0],
+      starting_equity: 10_000.0, from: from, to: to, rejected_low_confidence: 7)
+    run = described_class.record_single(engine: engine, result: result).reload
+
+    expect(run.metrics["rejected_low_confidence"]).to eq(7)
+  end
+
   it "splits the trade list out of the metrics blob" do
     run = described_class.record_single(engine: engine, result: result_with(trades: [trade])).reload
 

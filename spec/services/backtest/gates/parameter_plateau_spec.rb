@@ -80,6 +80,29 @@ RSpec.describe Backtest::Gates::ParameterPlateau, type: :service do
     end
   end
 
+  describe ".default_processes" do
+    it "honors PLATEAU_PROCESSES" do
+      ClimateControl.modify(PLATEAU_PROCESSES: "3") do
+        expect(described_class.default_processes).to eq(3)
+      end
+    end
+
+    it "clamps PLATEAU_PROCESSES to at least 1" do
+      ClimateControl.modify(PLATEAU_PROCESSES: "0") do
+        expect(described_class.default_processes).to eq(1)
+      end
+    end
+
+    it "defaults to nprocessors - 2, capped at 8, floored at 1" do
+      ClimateControl.modify(PLATEAU_PROCESSES: nil) do
+        {16 => 8, 6 => 4, 2 => 1, 1 => 1}.each do |cores, expected|
+          allow(Etc).to receive(:nprocessors).and_return(cores)
+          expect(described_class.default_processes).to eq(expected)
+        end
+      end
+    end
+  end
+
   describe ".run" do
     it "sweeps the scale grid through the walk-forward harness with scaled tp/sl and judges the aggregate" do
       profile = TradingProfile.effective
@@ -97,9 +120,11 @@ RSpec.describe Backtest::Gates::ParameterPlateau, type: :service do
         {windows: [], aggregate: {total_pnl: 42.0, trade_count: 7}}
       )
 
+      # processes: 1 — this spec captures the harness wiring from the parent
+      # process (seen_configs), which forked workers could not report back.
       verdict = described_class.run(symbol: "BTC-PERP-INTX",
         from: Time.parse("2026-01-01T00:00:00Z"), to: Time.parse("2026-03-01T00:00:00Z"),
-        train_span: 14.days, eval_span: 7.days)
+        train_span: 14.days, eval_span: 7.days, processes: 1)
 
       # Full 5x5 cross of the issue-specified scales, each through its own
       # walk-forward run with tp/sl scaled off the effective profile baseline.
@@ -113,6 +138,97 @@ RSpec.describe Backtest::Gates::ParameterPlateau, type: :service do
       expect(verdict[:cell_count]).to eq(25)
       expect(verdict[:baseline_tp_target]).to eq(profile.tp_target.to_f)
       expect(verdict[:baseline_sl_target]).to eq(profile.sl_target.to_f)
+    end
+
+    it "passes min_confidence through **engine_options to every walk-forward cell (issue #580)" do
+      allow(Trading::StrategyFactory).to receive(:multi_timeframe)
+        .and_return(instance_double(Strategy::MultiTimeframeSignal))
+      fake_walk_forward = instance_double(Backtest::WalkForward)
+      allow(Backtest::WalkForward).to receive(:new).and_return(fake_walk_forward)
+      allow(fake_walk_forward).to receive(:run).and_return(
+        {windows: [], aggregate: {total_pnl: 42.0, trade_count: 7}}
+      )
+
+      described_class.run(symbol: "BTC-PERP-INTX",
+        from: Time.parse("2026-01-01T00:00:00Z"), to: Time.parse("2026-03-01T00:00:00Z"),
+        train_span: 14.days, eval_span: 7.days, processes: 1, min_confidence: 30)
+
+      expect(Backtest::WalkForward).to have_received(:new)
+        .with(hash_including(min_confidence: 30)).exactly(25).times
+    end
+  end
+
+  # Issue #568: the 5x5 sweep is ~45 min single-core while the box idles.
+  # Cells are independent (own strategy + WalkForward over stored candles),
+  # so they fan out across processes — the GVL rules out threads. These specs
+  # swap in a fake harness whose pnl is a pure function of the scaled tp/sl,
+  # defined as plain classes (not rspec doubles) so behavior survives fork
+  # into Parallel's worker processes and results marshal back as plain hashes.
+  describe ".run across processes" do
+    # The two examples that actually fork are skipped on CI: on the 2-core
+    # GitHub Actions runner Parallel.map's fork + marshal round-trip hit
+    # Timeout::ExitException (execution expired) — environment timing, not
+    # behavior. Issue #546's lesson: a flaky CI example cries wolf and gets
+    # ignored, which is worse than no example. The contract still runs
+    # everywhere via the non-forking specs (default_processes, the N=1
+    # no-Parallel guarantee, and the sequential wiring spec); the fork
+    # round-trip itself is verified locally.
+    ci_fork_skip = ENV["CI"].present? &&
+      "real forks are timing-sensitive on 2-core CI runners (#546); run locally"
+
+    let(:profile) { TradingProfile.effective }
+    let(:small_stop_scales) { [0.5, 1.0] }
+    let(:small_target_scales) { [0.9, 1.0, 1.1] }
+
+    before do
+      fake_strategy = Struct.new(:tp_target, :sl_target)
+      allow(Trading::StrategyFactory).to receive(:multi_timeframe) do |**opts|
+        fake_strategy.new(opts[:tp_target], opts[:sl_target])
+      end
+
+      stub_const("Backtest::WalkForward", Class.new do
+        def initialize(strategy:, **)
+          @strategy = strategy
+        end
+
+        def run(**)
+          {windows: [], aggregate: {
+            total_pnl: (@strategy.tp_target * 1000.0) + @strategy.sl_target,
+            trade_count: 3
+          }}
+        end
+      end)
+    end
+
+    def run_gate(**opts)
+      described_class.run(symbol: "BTC-PERP-INTX",
+        from: Time.parse("2026-01-01T00:00:00Z"), to: Time.parse("2026-03-01T00:00:00Z"),
+        train_span: 14.days, eval_span: 7.days,
+        stop_scales: small_stop_scales, target_scales: small_target_scales,
+        **opts)
+    end
+
+    it "evaluates every cell and returns them in grid order with processes > 1 (real fork)", skip: ci_fork_skip do
+      verdict = run_gate(processes: 2)
+
+      grid = small_stop_scales.product(small_target_scales)
+      expect(verdict[:cell_count]).to eq(6)
+      expect(verdict[:cells].map { |c| c.values_at(:stop_scale, :target_scale) }).to eq(grid)
+      expect(verdict[:cells].map { |c| c[:net_pnl] }).to eq(
+        grid.map { |ss, ts| (profile.tp_target.to_f * ts * 1000.0) + (profile.sl_target.to_f * ss) }
+      )
+    end
+
+    it "takes the sequential path without Parallel when PLATEAU_PROCESSES=1" do
+      expect(Parallel).not_to receive(:map)
+
+      verdict = ClimateControl.modify(PLATEAU_PROCESSES: "1") { run_gate }
+
+      expect(verdict[:cell_count]).to eq(6)
+    end
+
+    it "produces a verdict identical to the sequential path", skip: ci_fork_skip do
+      expect(run_gate(processes: 2)).to eq(run_gate(processes: 1))
     end
   end
 end
