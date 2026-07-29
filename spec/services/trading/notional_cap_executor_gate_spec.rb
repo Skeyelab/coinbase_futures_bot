@@ -13,7 +13,7 @@ require "rails_helper"
 # boundary that carries the dry-run and paper-default guarantees — so all
 # entry paths inherit it. Exits are NEVER gated: blocking a close at the cap
 # would trap exactly the oversized exposure the cap exists to prevent.
-RSpec.describe Trading::CoinbasePositions, "notional cap at the executor (#530)" do
+RSpec.describe Trading::CoinbasePositions, "notional cap at the executor (#530)", notional_cap: true do
   let(:service) { described_class.new }
   let(:product) { "BIT-29AUG25-CDE" }
 

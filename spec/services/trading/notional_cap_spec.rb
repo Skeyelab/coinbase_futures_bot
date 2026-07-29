@@ -7,7 +7,7 @@ require "rails_helper"
 # caps bound CONTRACT COUNT, which is meaningless across a mixed universe: one
 # NOL contract is ~$930 and one BTC nano is ~$100, so "max 5" means two
 # different exposures. And nothing summed across concurrent positions at all.
-RSpec.describe Trading::NotionalCap, type: :service do
+RSpec.describe Trading::NotionalCap, type: :service, notional_cap: true do
   let(:equity) { 1_000.0 }
 
   before do
