@@ -165,7 +165,7 @@ module Trading
       raise "Authentication required" unless @authenticated || DryRun.active?
 
       order_body = build_order_body(product_id: product_id, side: side, size: size, type: type, price: price)
-      result = submit_order(order_body, product_id: product_id, side: side, size: size, price: price)
+      result = submit_order(order_body, product_id: product_id, side: side, size: size, price: price, intent: :entry)
 
       # If order was successful, create local Position record
       if result["success"] || result["order_id"]
@@ -279,7 +279,7 @@ module Trading
 
       @logger.info("Order body: #{order_body.inspect}")
 
-      result = submit_order(order_body, product_id: product_id, side: close_side, size: pos_size)
+      result = submit_order(order_body, product_id: product_id, side: close_side, size: pos_size, intent: :exit)
 
       # If order was successful, update local Position record
       if result["success"] || result["order_id"]
@@ -344,7 +344,7 @@ module Trading
 
       @logger.info("Order body: #{order_body.inspect}")
 
-      result = submit_order(order_body, product_id: product_id, side: increase_side, size: size)
+      result = submit_order(order_body, product_id: product_id, side: increase_side, size: size, intent: :entry)
 
       # If order was successful, update local Position record
       if result["success"] || result["order_id"]
@@ -364,8 +364,29 @@ module Trading
     # the paper simulator and NEVER reaches Coinbase; otherwise it hits the live
     # brokerage endpoint. Every order-placing method (open/close/increase) goes
     # through here so the dry-run guarantee holds at one boundary.
-    def submit_order(order_body, product_id:, side:, size:, price: nil)
+    #
+    # `intent:` is REQUIRED (issue #530): the account-notional cap is enforced
+    # here — the same boundary as the dry-run and paper-default guarantees — so
+    # every entry path inherits it instead of only the one decision-layer call
+    # site RSE had. :entry (opens AND increases) is gated; :exit is NEVER gated,
+    # because refusing a close at the cap would trap exactly the oversized
+    # exposure the cap exists to prevent. No default: a new caller must say
+    # which side of that line it is on.
+    def submit_order(order_body, product_id:, side:, size:, intent:, price: nil)
       Trading::ExecutionSafety.enforce_paper_default!(logger: @logger)
+
+      if intent == :entry
+        gate_price = price || get_current_market_price(product_id)
+        unless Trading::NotionalCap.allows?(product_id: product_id, quantity: size.to_f, price: gate_price)
+          status = Trading::NotionalCap.status
+          msg = "notional cap: adding #{size} #{product_id} would exceed the account ceiling " \
+                "(open $#{status[:open_notional_usd]} of $#{status[:limit_usd]} allowed, " \
+                "#{status[:multiple]}x equity $#{status[:equity_usd]})"
+          @logger.warn("[NotionalCap] REFUSED #{intent} order: #{msg}")
+          return {"success" => false, "error" => msg}
+        end
+      end
+
       return simulate_order(product_id: product_id, side: side, size: size, price: price) if DryRun.active?
 
       resp = authenticated_post("/api/v3/brokerage/orders", order_body)
