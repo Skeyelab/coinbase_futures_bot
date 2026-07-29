@@ -67,6 +67,9 @@ module Backtest
         trade_count: trade_count,
         total_pnl: total_pnl,
         total_fees: metrics.sum { |m| m[:total_fees] },
+        # Issue #541: the pessimistic-cost gate stresses fees + funding off
+        # this aggregate, so funding must survive the roll-up.
+        total_funding: metrics.sum { |m| m[:total_funding].to_f },
         expectancy: expectancy,
         cost_gate_passed: expectancy.nil? ? nil : expectancy > 0,
         mean_win_rate: win_rates.empty? ? nil : win_rates.sum / win_rates.size,

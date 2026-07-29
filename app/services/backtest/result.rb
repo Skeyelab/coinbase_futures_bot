@@ -39,6 +39,13 @@ module Backtest
       trades.sum { |t| t[:fees].to_f }
     end
 
+    # Total funding accrued across trades (issue #541): the pessimistic-cost
+    # gate stresses ALL modeled costs, and funding was recorded per trade
+    # (#391) but never totaled. Missing keys count as zero (pre-#391 shapes).
+    def total_funding
+      trades.sum { |t| t[:funding].to_f }
+    end
+
     def win_rate
       return nil if trades.empty?
 
@@ -136,6 +143,7 @@ module Backtest
         trade_count: trade_count,
         total_pnl: total_pnl,
         total_fees: total_fees,
+        total_funding: total_funding,
         win_rate: win_rate,
         avg_win: avg_win,
         avg_loss: avg_loss,
