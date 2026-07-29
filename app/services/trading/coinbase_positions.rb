@@ -565,8 +565,19 @@ module Trading
     private
 
     def build_order_body(product_id:, side:, size:, type:, price: nil)
-      # For futures orders, use LONG/SHORT instead of buy/sell
-      side_str = SideNormalizer.order(side)
+      # BUY/SELL — the only enum Coinbase Advanced Trade accepts. This used to
+      # send SideNormalizer.order, which passes LONG/SHORT straight through, under
+      # a comment asserting that futures wanted them. The first live order ever
+      # placed (#486, 2026-07-29) came back 400:
+      #
+      #   proto: (line 1:101): invalid value for enum field side: "LONG"
+      #
+      # RapidSignalEvaluationJob passes signal[:side] verbatim and strategies emit
+      # "LONG"/"SHORT", so every signal-driven live order would have been
+      # rejected. Only callers happening to say :buy/:sell worked, which is why
+      # nothing surfaced it — and simulate_order validates nothing, so every
+      # dry-run passed.
+      side_str = SideNormalizer.venue_order_side(side)
       raise ArgumentError, "side must be :long, :short, :buy, or :sell, got: #{side}" unless side_str
 
       order_config = case type.to_sym
