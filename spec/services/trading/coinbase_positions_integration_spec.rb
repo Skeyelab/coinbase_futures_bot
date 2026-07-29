@@ -11,7 +11,7 @@ RSpec.describe "CoinbasePositions Integration with Position Model" do
     allow_any_instance_of(Trading::CoinbasePositions).to receive(:build_jwt_token).and_return("test-jwt-token")
 
     # Mock the credentials loading specifically
-    allow_any_instance_of(Trading::CoinbasePositions).to receive(:load_credentials_from_file).and_return({
+    allow(Coinbase::CredentialResolver).to receive(:call).and_return({
       api_key: "organizations/test-org/apiKeys/test-key",
       private_key: "test-private-key"
     })

@@ -64,7 +64,7 @@ module Trading
       end
 
       # Try to load credentials from cdp_api_key.json file (same as AdvancedTradeClient)
-      credentials = load_credentials_from_file
+      credentials = Coinbase::CredentialResolver.call(logger: logger)
 
       if credentials
         @api_key = credentials[:api_key]
@@ -1038,38 +1038,6 @@ module Trading
       host = "api.coinbase.com"
 
       "#{method} #{host}#{request_path}"
-    end
-
-    def load_credentials_from_file
-      file_path = Rails.root.join("cdp_api_key.json")
-
-      if File.exist?(file_path)
-        begin
-          data = JSON.parse(File.read(file_path))
-
-          # Use the full organization path as the API key
-          # This is what Coinbase expects for JWT authentication
-          api_key = data["name"]
-          private_key = data["privateKey"]
-
-          @logger.info("Using API key: #{api_key}")
-          @logger.info("Private key length: #{private_key.length}")
-
-          {
-            api_key: api_key,
-            private_key: private_key
-          }
-        rescue JSON::ParserError => e
-          @logger.error("Failed to parse cdp_api_key.json: #{e.message}")
-          nil
-        rescue => e
-          @logger.error("Failed to load credentials from cdp_api_key.json: #{e.message}")
-          nil
-        end
-      else
-        @logger.warn("cdp_api_key.json file not found at #{file_path}")
-        nil
-      end
     end
 
     def normalize_pem_secret(secret)
