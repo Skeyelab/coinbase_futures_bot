@@ -36,6 +36,7 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
     # Stubbed to the DATED contract on purpose: if routing still re-resolved by
     # asset, the perp tick would execute on BIT and this would catch it.
     allow(contract_manager).to receive(:best_available_contract).with("BTC").and_return("BIT-29AUG26-CDE")
+    pass_cost_gate!("BIP-20DEC30-CDE")
 
     perform!(product_id: "BIP-20DEC30-CDE")
 
@@ -47,6 +48,7 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
   it "trades the dated contract the tick names, rather than re-resolving it" do
     create(:contract, product_id: "BIT-29AUG26-CDE", base_currency: "BTC", enabled: true,
       expiration_date: 1.month.from_now.to_date)
+    pass_cost_gate!("BIT-29AUG26-CDE")
 
     perform!(product_id: "BIT-29AUG26-CDE")
 
@@ -58,6 +60,7 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
   # keeps dated rollover working.
   it "resolves by asset for a spot tick" do
     allow(contract_manager).to receive(:best_available_contract).with("BTC").and_return("BIT-29AUG26-CDE")
+    pass_cost_gate!("BIT-29AUG26-CDE")
 
     perform!(product_id: "BTC-USD")
 
@@ -79,6 +82,7 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
     it "routes a spot BTC tick to the BIP perp rather than the dated BIT contract" do
       create(:contract, product_id: "BIP-20DEC30-CDE", base_currency: "BTC", enabled: true,
         expiration_date: Date.new(2030, 12, 20))
+      pass_cost_gate!("BIP-20DEC30-CDE")
 
       perform!(product_id: "BTC-USD")
 
@@ -112,6 +116,7 @@ RSpec.describe RapidSignalEvaluationJob, "contract routing", type: :job do
     create(:contract, product_id: "BIT-28JUL26-CDE", base_currency: "BTC", enabled: true,
       expiration_date: Date.current)
     allow(contract_manager).to receive(:best_available_contract).with("BTC").and_return("BIT-29AUG26-CDE")
+    pass_cost_gate!("BIT-29AUG26-CDE")
 
     perform!(product_id: "BIT-28JUL26-CDE")
 

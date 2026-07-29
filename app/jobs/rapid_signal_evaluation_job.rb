@@ -40,6 +40,51 @@ class RapidSignalEvaluationJob < ApplicationJob
     value.positive? ? value : DEFAULT_MAX_LIVE_INSTRUMENTS
   end
 
+  # Minimum trades a walk-forward must have executed before its verdict counts
+  # as evidence. #376 gate 2 asks for >=100 trades/symbol under a frozen config;
+  # this is the same bar applied at admission.
+  #
+  # Without it the gate launders noise into permission. Recorded runs for
+  # BIP-20DEC30-CDE on 2026-07-29: every PASS had trade_count 2 (expectancy
+  # +$48.64, +$29.15, +$1.71), every FAIL had 1,225-4,644 and agreed within a
+  # dollar (-$2.65 to -$3.45). Reading `cost_gate_passed` alone would have
+  # admitted the symbol on two trades.
+  DEFAULT_COST_GATE_MIN_TRADES = 100
+
+  def self.cost_gate_min_trades
+    value = ENV.fetch("COST_GATE_MIN_TRADES", DEFAULT_COST_GATE_MIN_TRADES).to_i
+    value.negative? ? DEFAULT_COST_GATE_MIN_TRADES : value
+  end
+
+  # The MOST RECENT succeeded walk-forward for this symbol decides, not the best
+  # one on record. A later run with a worse result supersedes an earlier pass —
+  # otherwise a stale good verdict outlives fresh failures and the gate becomes
+  # a search for the friendliest number ever produced.
+  #
+  # Returns {cleared:, detail:} plus the fields worth recording on the rejection,
+  # so the SignalDecision ledger says WHY a symbol was refused rather than only
+  # that it was.
+  def self.cost_gate_verdict(symbol)
+    run = BacktestRun.succeeded.where(symbol: symbol, kind: "walk_forward").order(:created_at).last
+    return {cleared: false, detail: "no succeeded walk-forward on record", verdict: nil, trades: nil} unless run
+
+    passed = run.metrics&.dig("cost_gate_passed")
+    trades = run.metrics&.dig("trade_count").to_i
+    floor = cost_gate_min_trades
+
+    unless passed == true
+      return {cleared: false, verdict: passed.inspect, trades: trades,
+              detail: "latest walk-forward #{run.created_at.to_date} did not clear the cost gate"}
+    end
+
+    if trades < floor
+      return {cleared: false, verdict: "true", trades: trades,
+              detail: "latest walk-forward cleared the gate on only #{trades} trades (floor #{floor})"}
+    end
+
+    {cleared: true, verdict: "true", trades: trades, detail: "cleared on #{trades} trades"}
+  end
+
   def perform(product_id:, current_price:, asset:, day_trading: nil)
     @logger = Rails.logger
     @product_id = product_id
@@ -247,6 +292,20 @@ class RapidSignalEvaluationJob < ApplicationJob
       return false
     end
 
+    # ADR 0006 decision 3: a symbol trades on a PASSED GATE, not on the absence
+    # of an objection. `backtest_runs.metrics->>'cost_gate_passed'` has held the
+    # verdict since #406 and nothing read it, so admission rested on operator
+    # judgement — the "no evidence inheritance" rule ADR 0002 states without ever
+    # having a mechanism behind it.
+    unless cost_gate_cleared?(@target_contract)
+      verdict = self.class.cost_gate_verdict(@target_contract)
+      @logger.info("[RSE] Skipping signal - no passing cost-gate verdict for #{@target_contract} " \
+                   "(#{verdict[:detail]}). Run a walk-forward that clears the gate on at least " \
+                   "#{self.class.cost_gate_min_trades} trades before this symbol may trade.")
+      @decisions&.rejected(:cost_gate_unproven, signal: signal, **verdict.except(:detail))
+      return false
+    end
+
     # Check if we already have positions in this asset.
     #
     # The COUNT stays per-asset (a dated BIT and a perp BIP long are the same
@@ -357,6 +416,10 @@ class RapidSignalEvaluationJob < ApplicationJob
     return false if Trading::SymbolSuspension.live_symbols.size > cap
 
     (live_instruments << @target_contract).size <= cap
+  end
+
+  def cost_gate_cleared?(symbol)
+    self.class.cost_gate_verdict(symbol)[:cleared]
   end
 
   # Total open positions allowed across all products. Defaults to 3 (the top of
