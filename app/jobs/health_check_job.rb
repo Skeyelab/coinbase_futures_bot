@@ -3,6 +3,16 @@
 class HealthCheckJob < ApplicationJob
   queue_as :default
 
+  # Transition-based Slack alerting (issue #561; third instance of the
+  # alert-a-state-forever shape from #548 MaxDrawdown spam and #557 signal
+  # storm). "overall_health != healthy" is a STATE, not an event: a permanent
+  # warning (e.g. exposure over cap at small equity) re-announced hourly trains
+  # the operator to mute the channel that carries real degradations. Post on
+  # state change, plus at most one reminder per day while degraded. Durable in
+  # bot_runtime_stats so the memory survives restarts and spans processes.
+  HEALTH_ALERT_STATE_KEY = "alerting:health_check_state"
+  DEGRADED_REMINDER_INTERVAL = 24.hours
+
   private
 
   def logger
@@ -20,9 +30,12 @@ class HealthCheckJob < ApplicationJob
     # Log health status
     logger.info("Health check results: #{health_data}")
 
-    # Send Slack notification if requested or if there are issues
-    if send_slack_notification || health_data[:overall_health] != "healthy"
+    # The explicit flag is the operator-requested path (cron/CLI with
+    # send_slack_notification: true) and always posts. The implicit path posts
+    # only on a state transition or a daily reminder while degraded.
+    if send_slack_notification || health_notification_due?(health_data[:overall_health])
       SlackNotificationService.health_check(health_data)
+      record_health_notified(health_data[:overall_health])
     end
 
     # Store health data for status endpoint
@@ -67,6 +80,34 @@ class HealthCheckJob < ApplicationJob
   end
 
   private
+
+  # Post iff the state changed since the last notification (including recovery
+  # to "healthy"), or the same degraded state has gone unmentioned for a day.
+  # No stored record reads as "healthy": a fresh deploy stays silent while
+  # green and posts on its first degraded run.
+  def health_notification_due?(current_state)
+    stored = BotRuntimeStat.find_by(key: HEALTH_ALERT_STATE_KEY)&.value
+    last_state = stored&.dig("state") || "healthy"
+
+    return true if current_state != last_state
+    return false if current_state == "healthy"
+
+    last_notified = parse_time(stored&.dig("notified_at"))
+    last_notified.nil? || last_notified <= DEGRADED_REMINDER_INTERVAL.ago
+  end
+
+  def record_health_notified(state)
+    BotRuntimeStat.upsert_value!(
+      key: HEALTH_ALERT_STATE_KEY,
+      value: {"state" => state, "notified_at" => Time.current.utc.iso8601}
+    )
+  end
+
+  def parse_time(value)
+    value.present? ? Time.zone.parse(value) : nil
+  rescue ArgumentError
+    nil
+  end
 
   def gather_health_data
     health_checks = {}
