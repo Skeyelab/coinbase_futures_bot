@@ -43,7 +43,7 @@ The pattern this ADR exists to break: **a permission is granted, machinery grows
 
 ## Implementation status
 
-Recorded honestly, because the failure this ADR describes is exactly the one an unimplemented ADR causes. ADR 0002 declared BIP the home instrument on 2026-07-22 and `ASSET_MAPPING` still routes BTC to the dated BIT contract; the decision read as done for five days because nothing tracked the gap.
+Recorded honestly, because the failure this ADR describes is exactly the one an unimplemented ADR causes. ADR 0002 declared BIP the home instrument on 2026-07-22 and `ASSET_MAPPING` still routed BTC to the dated BIT contract; the decision read as done for six days because nothing tracked the gap. **Closed 2026-07-28 (#390):** venue selection now reads `Contract::PRODUCT_PREFIXES`, which records a venue per prefix, and `Contract.best_available_for_asset` prefers an enabled perp over the dated month windows — so BTC resolves to BIP, OIL keeps resolving to the front-month NOL (ADR 0004), and an asset with a perp is never silently rerouted to a dated contract.
 
 **As of 2026-07-28, decisions 1, 2, 4 and 5 are enforced by code. Decisions 3 and 6 are not.**
 

@@ -90,6 +90,20 @@ RSpec.describe RealtimeMonitoring::TickHandler do
 
       handler.send(:check_position_alerts, product_id, price)
     end
+
+    # A spot tick looked positions up by the DATED prefix ("BIT"), so a BTC
+    # position on the perp was invisible to the spot feed (issue #390). Now that
+    # BTC flow routes to BIP, that is the only BTC position there is.
+    it "checks perp positions on a spot tick for the same asset" do
+      create(:contract, product_id: "BIP-20DEC30-CDE", base_currency: "BTC", enabled: true,
+        expiration_date: Date.new(2030, 12, 20))
+      position = create(:position, product_id: "BIP-20DEC30-CDE", entry_price: 64_000.0, take_profit: 65_000.0)
+
+      expect(handler).to receive(:check_take_profit_stop_loss).with(position, 64_100.0)
+      allow(handler).to receive(:check_day_trading_time_limits)
+
+      handler.send(:check_position_alerts, "BTC-USD", 64_100.0)
+    end
   end
 
   describe "#check_take_profit_stop_loss" do

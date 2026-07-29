@@ -24,12 +24,20 @@ class Contract < ApplicationRecord
   # fails closed, so a symbol with no recorded enablement cannot open a
   # position. Before ADR 0006 this comment was aspirational — the suspension
   # store started empty, so one line here put an instrument on the order path.
-  PREFIX_TO_BASE_CURRENCY = {
-    "BIT" => "BTC",   # dated nano BTC
-    "ET" => "ETH",    # dated nano ETH
-    "NOL" => "OIL",   # dated nano oil
-    "BIP" => "BTC",   # BTC perp — ADR 0002 home instrument
-    "XPP" => "XRP",   # XRP perp — ADR 0002 designated second seat
+  #
+  # The venue is recorded alongside the asset because it is a property of the
+  # INSTRUMENT, and routing depends on it (issue #390, ADR 0004 condition 1).
+  # CostModel.perp? answers the same question from "a FundingRate row exists",
+  # which is a data-availability proxy: it says "not a perp" for a perp we have
+  # not snapshotted yet. That is a safe default for pricing (it over-charges)
+  # and an unsafe one for routing (it would send BTC to the dated contract on a
+  # funding-collection outage). Routing reads the prefix; pricing keeps its own.
+  PRODUCT_PREFIXES = {
+    "BIT" => {base_currency: "BTC", venue: :dated},   # dated nano BTC
+    "ET" => {base_currency: "ETH", venue: :dated},    # dated nano ETH
+    "NOL" => {base_currency: "OIL", venue: :dated},   # dated nano oil
+    "BIP" => {base_currency: "BTC", venue: :perp},    # BTC perp — ADR 0002 home instrument
+    "XPP" => {base_currency: "XRP", venue: :perp},    # XRP perp — ADR 0002 designated second seat
     # PAXG perp — gold exposure via a PERP rather than the dated GOL contract.
     # Measured 2026-07-27: same $4k notional and 20x margin either way, but
     # 3 bps taker vs dated gold's 9, no monthly roll, 24/7, and a 2030 expiry.
@@ -39,8 +47,20 @@ class Contract < ApplicationRecord
     # capture. Ingesting only: PAU is blocked from trading until an operator
     # records an enablement for it, and earns that on its own walk-forward, per
     # ADR 0002 / 0004. Enforced by the fail-closed gate since ADR 0006.
-    "PAU" => "PAXG"
+    "PAU" => {base_currency: "PAXG", venue: :perp}
   }.freeze
+
+  PREFIX_TO_BASE_CURRENCY = PRODUCT_PREFIXES.transform_values { |v| v[:base_currency] }.freeze
+
+  PERP_PREFIXES = PRODUCT_PREFIXES.select { |_, v| v[:venue] == :perp }.keys.freeze
+  DATED_PREFIXES = PRODUCT_PREFIXES.select { |_, v| v[:venue] == :dated }.keys.freeze
+
+  # asset => the perp prefix that trades it ("BTC" => "BIP"), and the same for
+  # dated. One asset, one contract family per venue.
+  PERP_PREFIX_BY_ASSET = PRODUCT_PREFIXES.select { |_, v| v[:venue] == :perp }
+    .to_h { |prefix, v| [v[:base_currency], prefix] }.freeze
+  DATED_PREFIX_BY_ASSET = PRODUCT_PREFIXES.select { |_, v| v[:venue] == :dated }
+    .to_h { |prefix, v| [v[:base_currency], prefix] }.freeze
 
   scope :enabled, -> { where(enabled: true) }
   scope :current_month, -> { where("expiration_date >= ? AND expiration_date <= ?", Date.current.beginning_of_month, Date.current.end_of_month) }
@@ -243,7 +263,79 @@ class Contract < ApplicationRecord
     enabled.upcoming_month.where(base_currency: asset).order(:expiration_date)
   end
 
-  def self.best_available_for_asset(asset)
+  # The product-ID prefix of a contract ("BIP-20DEC30-CDE" => "BIP").
+  def self.prefix_for(product_id)
+    product_id.to_s.split("-").first.presence
+  end
+
+  # Which asset does this product trade? Reverse of the prefix map, and the one
+  # answer for both venues: BIT and BIP both mean BTC. Spot product ids
+  # ("BTC-USD") answer themselves.
+  def self.asset_for_product(product_id)
+    prefix = prefix_for(product_id)
+    return nil unless prefix
+
+    PREFIX_TO_BASE_CURRENCY[prefix]
+  end
+
+  def self.perp_product?(product_id)
+    PERP_PREFIXES.include?(prefix_for(product_id))
+  end
+
+  def self.dated_product?(product_id)
+    DATED_PREFIXES.include?(prefix_for(product_id))
+  end
+
+  # Does a perpetual exist ON THE VENUE for this asset? A property of the
+  # instrument catalogue, not of our database: it stays true when the row is
+  # missing, which is exactly when the answer matters.
+  def self.perp_prefix_for_asset(asset)
+    PERP_PREFIX_BY_ASSET[asset.to_s.upcase]
+  end
+
+  def self.dated_prefix_for_asset(asset)
+    DATED_PREFIX_BY_ASSET[asset.to_s.upcase]
+  end
+
+  # Tradeable perp rows for an asset. No month window: a perp does not roll, and
+  # BIP's 2030 dummy expiry is in neither the current nor the upcoming month.
+  def self.perp_for_asset(asset)
+    prefix = perp_prefix_for_asset(asset)
+    return none unless prefix
+
+    tradeable.where(base_currency: asset.to_s.upcase)
+      .where("product_id LIKE ?", "#{prefix}-%")
+      .order(:expiration_date)
+  end
+
+  # Which contract does an ASSET trade right now?
+  #
+  # Prefer the perp; fall back to the dated current/upcoming month only where no
+  # perp exists for the underlying. That is ADR 0002 (perps primary) plus ADR
+  # 0004 (dated permitted where no perp exists) expressed as a rule rather than
+  # a hardcoded prefix, so BTC follows BIP, OIL keeps following the front-month
+  # NOL, and nothing else moves.
+  #
+  # Month-window selection cannot express this: both windows filter
+  # expiration_date to a calendar month, and BIP expires 2030-12-20, so it is in
+  # neither window on any date. Month resolution is dated-contract logic.
+  #
+  # When the asset HAS a perp but no tradeable row for it, this returns nil and
+  # says so loudly rather than falling back to the dated contract. ADR 0004
+  # condition 1 leaves no discretion — "BTC trades BIP, not BIT" — and a silent
+  # reroute would put real money on a different instrument at a different fee
+  # schedule than the one the strategy was gated on. A dropped signal is
+  # recoverable; a fill on the wrong contract is not.
+  def self.best_available_for_asset(asset, logger: Rails.logger)
+    perp = perp_for_asset(asset).first
+    return perp if perp
+
+    if (perp_prefix = perp_prefix_for_asset(asset))
+      logger.error("[Contract] #{asset} trades the #{perp_prefix} perp (ADR 0002/0004) but no tradeable " \
+                   "#{perp_prefix} contract is available — refusing to route #{asset} to a dated contract")
+      return nil
+    end
+
     current_month_contracts = current_month_for_asset(asset).tradeable
     return current_month_contracts.first if current_month_contracts.any?
 

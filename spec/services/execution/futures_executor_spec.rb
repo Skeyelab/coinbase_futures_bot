@@ -523,6 +523,18 @@ RSpec.describe Execution::FuturesExecutor, type: :service do
         result = executor.extract_asset_from_product_id("ET-29DEC24-CDE")
         expect(result).to eq("ETH")
       end
+
+      # The reverse lookup used to invert the dated-only ASSET_MAPPING, so every
+      # perp product read as an unknown asset (issue #390).
+      it "extracts BTC from the BIP perp" do
+        result = executor.extract_asset_from_product_id("BIP-20DEC30-CDE")
+        expect(result).to eq("BTC")
+      end
+
+      it "extracts OIL from the dated NOL contract" do
+        result = executor.extract_asset_from_product_id("NOL-29AUG25-CDE")
+        expect(result).to eq("OIL")
+      end
     end
 
     context "with unknown product formats" do

@@ -169,11 +169,15 @@ module Execution
       product_id
     end
 
+    # Product id => asset. Reads the full prefix map, not the inverse of the
+    # dated-only ASSET_MAPPING: that inverse knew BIT and ET and nothing else,
+    # so a BIP or NOL product resolved to no asset at all and fell through
+    # unrouted (issue #390).
     def extract_asset_from_product_id(product_id)
       match = product_id.match(/^(BTC|ETH)(-USD)?$/)
       return match[1] if match
 
-      MarketData::FuturesContractManager::ASSET_MAPPING.invert[product_id.split("-").first]
+      Contract.asset_for_product(product_id)
     end
 
     private

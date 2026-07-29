@@ -157,8 +157,12 @@ module RealtimeMonitoring
       asset = extract_asset_from_product_id(product_id)
       return Position.none unless asset
 
-      prefix = MarketData::FuturesContractManager::ASSET_MAPPING[asset] || asset
-      Position.open.by_asset(prefix)
+      # by_asset resolves through contracts.base_currency, so it wants the ASSET
+      # ("BTC") and covers every contract family for it — BIT and BIP alike. It
+      # used to be handed the dated PREFIX ("BIT"), which no contract carries as
+      # a base_currency, leaving only the LIKE "BIT%" fallback: a perp position
+      # was invisible to its own asset's spot ticks (issue #390).
+      Position.open.by_asset(asset)
     end
 
     def check_take_profit_stop_loss(position, current_price)

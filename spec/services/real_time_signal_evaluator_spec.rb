@@ -274,9 +274,20 @@ RSpec.describe RealTimeSignalEvaluator, type: :service do
       expect(evaluator.send(:resolve_symbol, "AAPL")).to eq("AAPL")
     end
 
-    it "resolves BTC to current futures contract" do
-      result = evaluator.send(:resolve_symbol, "BTC")
-      expect(result).to match(/^BIT-\d{2}[A-Z]{3}\d{2}-CDE$/)
+    # Issue #390: BTC's venue is the BIP perp (ADR 0002), so the signal alert
+    # must name the instrument that would actually be traded.
+    it "resolves BTC to the perp when one is tradeable" do
+      create(:contract, product_id: "BIP-20DEC30-CDE", base_currency: "BTC", enabled: true,
+        expiration_date: Date.new(2030, 12, 20))
+
+      expect(evaluator.send(:resolve_symbol, "BTC")).to eq("BIP-20DEC30-CDE")
+    end
+
+    it "leaves BTC unresolved rather than naming a dated contract when no perp is tradeable" do
+      create(:contract, product_id: "BIT-28AUG26-CDE", base_currency: "BTC", enabled: true,
+        expiration_date: 1.month.from_now.to_date)
+
+      expect(evaluator.send(:resolve_symbol, "BTC")).to eq("BTC")
     end
 
     it "resolves ETH to current futures contract" do

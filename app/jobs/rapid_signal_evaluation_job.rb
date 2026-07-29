@@ -74,7 +74,7 @@ class RapidSignalEvaluationJob < ApplicationJob
     end
 
     unless target_contract
-      @logger.warn("[RSE] No current month contract found for #{@asset}")
+      @logger.warn("[RSE] No tradeable contract resolved for #{@asset} (tick #{@product_id})")
       @decisions.rejected(:no_contract)
       return
     end
@@ -83,6 +83,19 @@ class RapidSignalEvaluationJob < ApplicationJob
     # exits under position.product_id), so the entry gate needs it too.
     @target_contract = target_contract
     @decisions.contract_id = target_contract
+
+    # The suspension gate above ran on the TICK product. A spot tick names no
+    # contract, so at that point the instrument that would actually receive the
+    # order had not been chosen yet — and BTC-USD now resolves to the BIP perp
+    # (issue #390). Without this, an enablement on the spot feed would carry an
+    # order onto a contract an operator had explicitly suspended. Gate the
+    # instrument that trades, not the one that ticked.
+    if target_contract != @product_id && Trading::SymbolSuspension.suspended?(target_contract)
+      reason = Trading::SymbolSuspension.block_reason(target_contract)
+      @logger.info("[RSE] #{@product_id} resolved to #{target_contract}, which is blocked from new entries — #{reason}")
+      @decisions.rejected(:symbol_suspended, reason: reason)
+      return
+    end
     # Venue-aware, and resolved from the CONTRACT rather than the tick product:
     # a BIP tick and a BIT tick can arrive for the same asset and want opposite
     # answers. A perp has no session to be flat before, and the measured 200/120
@@ -144,7 +157,11 @@ class RapidSignalEvaluationJob < ApplicationJob
   def resolve_target_contract(contract_manager)
     return @product_id if Contract.tradeable_product?(@product_id)
 
-    contract_manager.current_month_contract(@asset)
+    # Venue-aware (issue #390): a spot BTC tick resolves to the BIP perp, not to
+    # the dated BIT month. This called current_month_contract, which is
+    # month-window selection — dated-contract logic that cannot return a perp at
+    # all, since BIP's 2030 expiry is in no calendar month we ever ask about.
+    contract_manager.best_available_contract(@asset)
   end
 
   def should_execute_signal?(signal)

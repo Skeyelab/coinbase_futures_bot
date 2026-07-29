@@ -38,7 +38,7 @@ RSpec.describe RapidSignalEvaluationJob, "live entry path", type: :job do
     allow(Strategy::MultiTimeframeSignal).to receive(:new).and_return(strategy)
     allow(MarketData::FuturesContractManager).to receive(:new).and_return(contract_manager)
     allow(Trading::CoinbasePositions).to receive(:new).and_return(positions)
-    allow(contract_manager).to receive(:current_month_contract).and_return(contract_id)
+    allow(contract_manager).to receive(:best_available_contract).and_return(contract_id)
     allow(strategy).to receive(:signal).and_return(signal)
     allow(Rails.application.config).to receive(:default_day_trading).and_return(true)
     Position.destroy_all
