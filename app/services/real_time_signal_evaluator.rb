@@ -81,11 +81,17 @@ class RealTimeSignalEvaluator
     equity_usd = Trading::SignalEquity.usd
     pair_stats = {signals_created: 0, insufficient_data: 0}
 
-    @strategies.each do |strategy_name, strategy|
-      strategy_result = evaluate_strategy_for_symbol(strategy_name, strategy_for(symbol, strategy), symbol, equity_usd)
-      pair_stats[:signals_created] += strategy_result[:signals_created]
-      pair_stats[:insufficient_data] += strategy_result[:insufficient_data]
-    end
+    # Declarative selection (issue #303): the symbol's strategy comes from
+    # config/strategy_selection.yml, resolved through the shared factory —
+    # the same site the execution jobs use. Unconfigured symbols keep the
+    # cached default MultiTimeframeSignal, exactly as before.
+    selection = Trading::StrategySelection.for_symbol(symbol)
+    strategy_result = evaluate_strategy_for_symbol(
+      selection.strategy_name, strategy_for(symbol, selection), symbol, equity_usd,
+      min_confidence: selection.min_confidence
+    )
+    pair_stats[:signals_created] += strategy_result[:signals_created]
+    pair_stats[:insufficient_data] += strategy_result[:insufficient_data]
 
     @last_evaluation[symbol] = Time.current.utc
     pair_stats
@@ -114,16 +120,19 @@ class RealTimeSignalEvaluator
     end
   end
 
-  # Per-symbol calibrated params (issue #299): when calibration has activated
-  # a TradingProfile for this symbol, evaluate it with a strategy built from
-  # that profile instead of the global one. Cached per profile version.
-  def strategy_for(symbol, global_strategy)
+  # Per-symbol strategy resolution. Two reasons a symbol departs from the
+  # cached global default: an enabled strategy_selection.yml entry (#303), or
+  # a calibrated per-symbol TradingProfile (#299). Both resolve through
+  # StrategyFactory.for_symbol — the single resolution site — cached per
+  # profile version and selection fingerprint.
+  def strategy_for(symbol, selection)
     profile = TradingProfile.active_profile(symbol)
-    return global_strategy unless profile
+    return @strategies["MultiTimeframeSignal"] if !selection.configured? && profile.nil?
 
     @symbol_strategies ||= {}
-    key = [symbol, profile.id, profile.updated_at]
-    @symbol_strategies[key] ||= build_multi_timeframe_strategy(profile)
+    key = [symbol, profile&.id, profile&.updated_at, Trading::StrategySelection.fingerprint]
+    @symbol_strategies[key] ||=
+      Trading::StrategyFactory.for_symbol(symbol, profile: profile || TradingProfile.effective)
   end
 
   def load_strategies(profile = TradingProfile.effective)
@@ -134,15 +143,15 @@ class RealTimeSignalEvaluator
     Trading::StrategyFactory.multi_timeframe(profile: profile)
   end
 
-  def evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd)
-    unless has_sufficient_data?(symbol)
+  def evaluate_strategy_for_symbol(strategy_name, strategy, symbol, equity_usd, min_confidence: nil)
+    unless has_sufficient_data?(symbol, strategy)
       @logger.debug("[RTSE] Skip #{strategy_name} #{symbol}: insufficient recent candles")
       return {signals_created: 0, insufficient_data: 1}
     end
 
     signal = strategy.signal(symbol: symbol, equity_usd: equity_usd)
     return {signals_created: 0, insufficient_data: 0} unless signal
-    return {signals_created: 0, insufficient_data: 0} unless valid_signal?(signal)
+    return {signals_created: 0, insufficient_data: 0} unless valid_signal?(signal, min_confidence || @min_confidence_threshold)
 
     # Protections layer (issue #397, ADR 0003): a symbol/side under an active
     # protection lock (cooldown, stoploss guard, drawdown halt) produces no entry.
@@ -159,17 +168,27 @@ class RealTimeSignalEvaluator
     {signals_created: 0, insufficient_data: 0}
   end
 
-  def valid_signal?(signal)
+  # threshold defaults to the profile's — a strategy_selection.yml entry may
+  # override it (issue #303): a strategy whose confidence scale is not the
+  # MTS scorer's must not be silently re-filtered by an MTS-calibrated bar.
+  def valid_signal?(signal, threshold = @min_confidence_threshold)
     return false unless signal.is_a?(Hash)
     return false unless signal[:side] && signal[:price] && signal[:confidence]
 
     # Check minimum confidence threshold
-    signal[:confidence].to_f >= @min_confidence_threshold
+    signal[:confidence].to_f >= threshold
   end
 
-  def has_sufficient_data?(symbol)
-    # Check if we have recent candle data for all required timeframes
-    required_timeframes = %w[1h 15m 5m 1m]
+  def has_sufficient_data?(symbol, strategy = nil)
+    # Recent candle data for the timeframes THIS strategy consumes. A strategy
+    # that declares its needs (FundingSkewContrarian reads only 1m bars) is
+    # not starved when an unrelated timeframe's sync lags.
+    required_timeframes =
+      if strategy.respond_to?(:required_timeframes)
+        strategy.required_timeframes
+      else
+        %w[1h 15m 5m 1m]
+      end
     required_timeframes.all? do |timeframe|
       Candle.for_symbol(symbol).where(timeframe: timeframe)
         .where("timestamp >= ?", 2.hours.ago).exists?

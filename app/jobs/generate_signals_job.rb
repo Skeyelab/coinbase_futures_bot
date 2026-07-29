@@ -17,11 +17,6 @@ class GenerateSignalsJob < ApplicationJob
   NOTIFY_THROTTLE = 1.hour
 
   def perform(equity_usd: default_equity_usd)
-    # Same profile-aware build as the realtime evaluator, so Slack signal
-    # notifications advertise the tp/sl actually traded (drift audit: this
-    # job hardcoded EMAs and leaked class-DEFAULT tp/sl to Slack).
-    strat = Trading::StrategyFactory.multi_timeframe
-
     Contract.enabled.find_each do |pair|
       # Suspension must gate THIS job too (issue #411). RealTimeSignalEvaluator
       # and RapidSignalEvaluationJob already check it; this one did not, so a
@@ -35,6 +30,12 @@ class GenerateSignalsJob < ApplicationJob
       end
 
       puts "Analyzing #{pair.product_id}..."
+      # Per-pair, profile-aware build through the shared resolution site
+      # (issue #303) so Slack notifications advertise the strategy and tp/sl
+      # actually traded (drift audit: this job hardcoded EMAs and leaked
+      # class-DEFAULT tp/sl to Slack; later it built one global strategy that
+      # could not follow a per-symbol selection).
+      strat = Trading::StrategyFactory.for_symbol(pair.product_id)
       order = strat.signal(symbol: pair.product_id, equity_usd: equity_usd)
       if order
         puts "[Signal] #{pair.product_id} side=#{order[:side]} price=#{order[:price].round(2)} qty=#{order[:quantity]} tp=#{order[:tp].round(2)} sl=#{order[:sl].round(2)} conf=#{order[:confidence]}%"

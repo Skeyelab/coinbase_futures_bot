@@ -299,8 +299,11 @@ RSpec.describe GenerateSignalsJob, type: :job do
         Contract.update_all(enabled: false)
       end
 
-      it "still initializes strategy but processes no pairs" do
-        expect(Strategy::MultiTimeframeSignal).to receive(:new)
+      # Strategy resolution is per-pair since #303 (a symbol's entry in
+      # strategy_selection.yml picks its class), so with no pairs there is
+      # nothing to resolve and no strategy is built at all.
+      it "builds no strategy and consults none" do
+        expect(Strategy::MultiTimeframeSignal).not_to receive(:new)
         expect(mock_strategy).not_to receive(:signal)
 
         job.perform
