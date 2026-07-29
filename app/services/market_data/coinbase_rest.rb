@@ -7,6 +7,9 @@ require "jwt"
 
 module MarketData
   class CoinbaseRest
+    # Keeps the private key out of inspect and interpolation (issue #596).
+    include Coinbase::RedactedInspect
+
     DEFAULT_BASE = "https://api.coinbase.com"
 
     # Granularity strings for Advanced Trade API candle endpoint.
@@ -35,15 +38,29 @@ module MarketData
         f.adapter Faraday.default_adapter
       end
 
-      if ENV["COINBASE_API_KEY"] && ENV["COINBASE_API_SECRET"]
-        @api_key = ENV["COINBASE_API_KEY"]
-        @api_secret = ENV["COINBASE_API_SECRET"]
+      # Empty strings are TRUTHY in Ruby, and .env carries blank
+      # COINBASE_API_KEY= / COINBASE_API_SECRET= entries — so this branch used to
+      # be taken with @api_key = "", reporting authenticated while holding
+      # nothing, and the warning below never fired (issue #597). Blank is absent,
+      # matching Coinbase::CredentialResolver, which resolves the same two vars.
+      key = ENV["COINBASE_API_KEY"].to_s
+      secret = ENV["COINBASE_API_SECRET"].to_s
+
+      if key.strip.present? && secret.strip.present?
+        @api_key = key
+        @api_secret = secret
         @authenticated = true
       else
         @authenticated = false
         Rails.logger.warn("Coinbase API credentials not fully configured. Using public API only.")
       end
     end
+
+    # The other three Coinbase clients expose this; this one only had the ivar,
+    # so nothing could ask it the question — which is part of why #597 went
+    # unnoticed. Reading @authenticated from a spec would have tested the
+    # implementation instead of the behaviour.
+    def authenticated? = @authenticated
 
     def list_products
       all_products = []
