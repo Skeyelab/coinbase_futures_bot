@@ -34,6 +34,11 @@ module Trading
       # IOC that has not filled in this long has not filled.
       TAKER_FILL_TIMEOUT_SECONDS = 15
       RECONCILIATION_TOLERANCE = 0.10
+      # The post-close flat check polls rather than sampling once — the venue's
+      # position view lags the fill by a moment (#579). Five seconds total, well
+      # inside the hold interval, so settling costs the run nothing.
+      SETTLE_ATTEMPTS = 5
+      SETTLE_POLL_SECONDS = 1
 
       def initialize(product_id: nil, round_trips: DEFAULT_ROUND_TRIPS, hold_seconds: DEFAULT_HOLD_SECONDS,
         live: false, confirmation: nil, resume: false,
@@ -297,11 +302,42 @@ module Trading
         Position.open.by_product(@product_id).order(:entry_time).last
       end
 
+      # Fail-closed, but only after the venue has had a chance to catch up.
+      #
+      # The first live run to get past the order enum (#577) placed a real round
+      # trip and then aborted at leg 1 of 20 on "NOT flat after closing leg 1".
+      # It was flat: seconds later the venue reported zero positions and the
+      # local Position was CLOSED. Coinbase's /cfm/positions is eventually
+      # consistent and this read happened microseconds after the close filled.
+      #
+      # So poll instead of taking one sample. Refusing to stack a position on
+      # unaccounted exposure is still the outcome when it is REALLY not flat —
+      # what changed is that "not flat yet" no longer ends a $150 run. See #579.
       def flat?
-        return false if Position.open.by_product(@product_id).exists?
+        SETTLE_ATTEMPTS.times do |attempt|
+          return true if flat_now?
+
+          @sleeper.call(SETTLE_POLL_SECONDS) unless attempt == SETTLE_ATTEMPTS - 1
+        end
+        false
+      end
+
+      # One sample. Records WHICH view disagreed, because the abort reason alone
+      # cannot distinguish a stale local row from a stale venue response, and
+      # that is the first thing anyone debugging this wants to know.
+      def flat_now?
+        if Position.open.by_product(@product_id).exists?
+          @logger.info("[ExecutionCalibration] not flat on #{@product_id}: a local Position is still OPEN")
+          return false
+        end
         return true unless live?
 
-        positions_service.list_open_positions(product_id: @product_id).empty?
+        venue = positions_service.list_open_positions(product_id: @product_id)
+        return true if venue.empty?
+
+        @logger.info("[ExecutionCalibration] not flat on #{@product_id}: the venue still reports " \
+                     "#{venue.size} position(s)")
+        false
       rescue => e
         @logger.error("[ExecutionCalibration] could not confirm flat on #{@product_id}: #{e.class}: #{e.message}")
         false
