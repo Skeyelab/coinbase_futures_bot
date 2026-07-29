@@ -34,6 +34,28 @@ module Sentiment
       scope.presence
     end
 
+    # The symbol a source may tag WITHOUT a keyword match, or nil.
+    #
+    # `symbols:` is a scope — the most a source is ALLOWED to tag — not a claim
+    # about what it publishes. investing_commodities_rss is scoped [OIL-USD] and
+    # still runs gold, palladium, and wheat headlines; tagging those OIL-USD
+    # would feed metals prices into oil's z-score baseline as if they were oil
+    # sentiment. A miss loses signal, but a false tag adds noise that looks like
+    # signal, which is worse.
+    #
+    # `exclusive: true` is therefore a separate, explicit assertion that every
+    # item a feed publishes is about one symbol, set only on feeds verified
+    # single-topic against their real recent output. It requires a scope of
+    # exactly one symbol: on a multi-symbol source there is no way to pick which
+    # symbol a keyword-less item belongs to, and tagging all of them
+    # double-counts one article.
+    def exclusive_symbol_for(source_name)
+      return nil unless sources.dig(source_name, "exclusive")
+
+      scope = symbols_for(source_name)
+      (scope && scope.size == 1) ? scope.first : nil
+    end
+
     # Word-boundary matcher per symbol, built from its configured keywords, for
     # tagging article text. Case-insensitive.
     def symbol_keywords

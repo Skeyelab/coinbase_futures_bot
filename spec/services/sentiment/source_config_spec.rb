@@ -68,5 +68,63 @@ RSpec.describe Sentiment::SourceConfig do
     it "reads a lower weight for the mixed-commodity feed" do
       expect(described_class.default.weight_for("investing_commodities_rss")).to eq(0.7)
     end
+
+    # The trap this guards: `symbols: [OIL-USD]` reads like "this feed only
+    # publishes oil", and it is not. Marking a general feed exclusive would inject
+    # gold, solar, wheat, and electricity headlines into OIL-USD's z-score
+    # baseline as if they were oil sentiment. Each of these was checked against
+    # its real recent output before being left non-exclusive.
+    it "marks only feeds verified single-topic as exclusive" do
+      exclusive = described_class.default.sources.keys
+        .select { |s| described_class.default.exclusive_symbol_for(s) }
+
+      expect(exclusive).to eq(["rigzone_rss"])
+    end
+
+    it "does not treat a single-symbol scope as an exclusivity claim" do
+      %w[oilprice_rss eia_today_in_energy_rss investing_commodities_rss].each do |source|
+        expect(described_class.default.symbols_for(source)).to eq(["OIL-USD"])
+        expect(described_class.default.exclusive_symbol_for(source))
+          .to be_nil, "#{source} publishes more than oil and must not be exclusive"
+      end
+    end
+  end
+
+  describe "#exclusive_symbol_for" do
+    let(:yaml) do
+      <<~YAML
+        symbols:
+          OIL-USD: {keywords: [OIL], lexicon: oil}
+          BTC-USD: {keywords: [BTC], lexicon: crypto}
+          ETH-USD: {keywords: [ETH], lexicon: crypto}
+        sources:
+          rigzone_rss: {client: rss, symbols: [OIL-USD], exclusive: true}
+          oilprice_rss: {client: rss, symbols: [OIL-USD]}
+          coindesk_rss: {client: coindesk, symbols: [BTC-USD, ETH-USD], exclusive: true}
+          unscoped_rss: {client: rss, exclusive: true}
+      YAML
+    end
+
+    it "returns the scoped symbol for an exclusive single-symbol source" do
+      expect(config.exclusive_symbol_for("rigzone_rss")).to eq("OIL-USD")
+    end
+
+    it "returns nil when the source does not declare exclusive" do
+      expect(config.exclusive_symbol_for("oilprice_rss")).to be_nil
+    end
+
+    # There is no way to pick which of two symbols a keyword-less article is
+    # about, and tagging both double-counts one article across two z-scores.
+    it "refuses exclusivity on a multi-symbol source" do
+      expect(config.exclusive_symbol_for("coindesk_rss")).to be_nil
+    end
+
+    it "refuses exclusivity on an unscoped source" do
+      expect(config.exclusive_symbol_for("unscoped_rss")).to be_nil
+    end
+
+    it "returns nil for an unknown source" do
+      expect(config.exclusive_symbol_for("mystery_feed")).to be_nil
+    end
   end
 end

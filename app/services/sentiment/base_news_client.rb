@@ -91,7 +91,17 @@ module Sentiment
         symbol if pattern.match?(text)
       end
 
-      symbols.empty? ? [nil] : symbols.uniq
+      return symbols.uniq if symbols.any?
+
+      # A source declared `exclusive: true` publishes only its one scoped symbol,
+      # so a keyword miss there is a hole in the keyword list, not an off-topic
+      # article. Measured on rigzone_rss: 23 of 76 ingested items carried no
+      # OIL-USD keyword, and 20 of those 23 were plainly oil & gas industry news
+      # ("Eni Greenlights Cyprus' First Hydrocarbon Project", "Matador Buys
+      # Permian Assets", "Chevron Shuts Production in Preparation for Bertha").
+      # Non-exclusive sources keep falling through to nil — see
+      # SourceConfig#exclusive_symbol_for for why that distinction is deliberate.
+      [config.exclusive_symbol_for(source_name)]
     end
   end
 end
