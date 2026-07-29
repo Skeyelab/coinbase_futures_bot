@@ -5,7 +5,7 @@ require "rails_helper"
 # The 15m signal cron resolves each pair through the same
 # Trading::StrategyFactory.for_symbol site as the evaluator and the execution
 # job (#303) — one resolution site, no per-job divergence.
-RSpec.describe GenerateSignalsJob, "declarative selection", type: :job do
+RSpec.describe GenerateSignalsJob, "declarative selection", type: :job, strategy_selection: true do
   let(:job) { described_class.new }
   let!(:contract) { create(:contract, enabled: true, product_id: "BIP-GEN-CDE") }
   let(:fsc) { instance_double(Strategy::FundingSkewContrarian, signal: nil) }

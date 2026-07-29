@@ -7,7 +7,7 @@ require "rails_helper"
 # configured strategy — resolved through Trading::StrategyFactory.for_symbol,
 # the same site the execution jobs use — while every other symbol keeps
 # today's MultiTimeframeSignal behavior byte for byte.
-RSpec.describe RealTimeSignalEvaluator, "declarative selection", type: :service do
+RSpec.describe RealTimeSignalEvaluator, "declarative selection", type: :service, strategy_selection: true do
   let(:evaluator) { described_class.new(logger: Logger.new(IO::NULL)) }
   let(:perp) { "BIP-RTSE-CDE" }
   let(:spot) { "SPOT-RTSE-CDE" }
