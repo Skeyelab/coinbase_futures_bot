@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_28_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_29_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -238,6 +238,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_28_140000) do
     t.index ["contract_id"], name: "index_orders_on_contract_id"
     t.index ["position_id"], name: "index_orders_on_position_id"
     t.index ["status"], name: "index_orders_on_status"
+  end
+
+  create_table "path_dependent_labels", force: :cascade do |t|
+    t.datetime "bar_timestamp", null: false
+    t.datetime "created_at", null: false
+    t.string "direction", null: false
+    t.integer "horizon", null: false
+    t.string "label", null: false
+    t.integer "resolved_at_bars"
+    t.decimal "sl_frac", precision: 10, scale: 6, null: false
+    t.string "symbol", null: false
+    t.string "timeframe", default: "5m", null: false
+    t.decimal "tp_frac", precision: 10, scale: 6, null: false
+    t.datetime "updated_at", null: false
+    t.index ["symbol", "label"], name: "idx_path_dependent_labels_on_symbol_and_label"
+    t.index ["symbol", "timeframe", "bar_timestamp", "tp_frac", "sl_frac", "horizon", "direction"], name: "idx_path_dependent_labels_shape_key", unique: true
   end
 
   create_table "positions", force: :cascade do |t|
