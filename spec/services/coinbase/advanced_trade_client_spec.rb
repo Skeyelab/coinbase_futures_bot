@@ -21,7 +21,7 @@ RSpec.describe Coinbase::AdvancedTradeClient do
   describe "#authenticated?" do
     context "when credentials are loaded" do
       before do
-        allow(client).to receive(:load_credentials_from_file).and_return(
+        allow(Coinbase::CredentialResolver).to receive(:call).and_return(
           {api_key: "key", private_key: "secret"}
         )
         client.instance_variable_set(:@authenticated, true)

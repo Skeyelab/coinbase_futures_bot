@@ -14,7 +14,7 @@ RSpec.describe Trading::CoinbasePositions, "venue routing" do
 
   before do
     allow_any_instance_of(described_class).to receive(:build_jwt_token).and_return("test-jwt-token")
-    allow_any_instance_of(described_class).to receive(:load_credentials_from_file).and_return({
+    allow(Coinbase::CredentialResolver).to receive(:call).and_return({
       api_key: "organizations/test-org/apiKeys/test-key",
       private_key: "test-private-key"
     })

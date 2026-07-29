@@ -275,7 +275,7 @@ RSpec.describe Trading::PositionLifecycle do
       let(:position) { create(:position, status: "OPEN", side: "LONG", size: 5.0, entry_price: 50_000.0) }
 
       before do
-        allow_any_instance_of(Trading::CoinbasePositions).to receive(:load_credentials_from_file)
+        allow(Coinbase::CredentialResolver).to receive(:call)
           .and_return({api_key: "organizations/test/apiKeys/test", private_key: "test-key"})
         allow_any_instance_of(Trading::CoinbasePositions).to receive(:build_jwt_token).and_return("test-jwt")
         allow_any_instance_of(Trading::CoinbasePositions).to receive(:authenticated_get).and_return(

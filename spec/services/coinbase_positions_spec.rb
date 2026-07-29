@@ -6,8 +6,10 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   let(:service) { described_class.new(base_url: "https://example.com") }
 
   before do
-    # Mock the credentials loading to avoid file system dependencies
-    allow(service).to receive(:load_credentials_from_file).and_return({
+    # Stub the shared resolver (issue #591) rather than a private method on the
+    # client — a stub on a private method breaks the moment the loader moves,
+    # which is exactly what happened when three copies became one.
+    allow(Coinbase::CredentialResolver).to receive(:call).and_return({
       api_key: "organizations/test-org/apiKeys/test-key",
       private_key: "-----BEGIN EC PRIVATE KEY-----\nMOCK_KEY\n-----END EC PRIVATE KEY-----"
     })
@@ -50,37 +52,22 @@ RSpec.describe Trading::CoinbasePositions, type: :service do
   end
 
   describe "authentication" do
-    it "loads credentials from cdp_api_key.json" do
-      service = described_class.new
-      allow(service).to receive(:load_credentials_from_file).and_return({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+    # These used to stub load_credentials_from_file and then assert the stub
+    # returned what it had been told to return — a test of RSpec, not of the
+    # client. Issue #591 replaced the loader with a shared resolver, so they now
+    # go through the real construction path and assert observable behaviour.
+    it "authenticates when the resolver supplies credentials" do
+      allow(Coinbase::CredentialResolver).to receive(:call).and_return(
+        {api_key: "organizations/test-org/apiKeys/test-key", private_key: "test-secret"}
+      )
 
-      # Set the instance variables to avoid nil errors
-      service.instance_variable_set(:@api_key, "test-key")
-      service.instance_variable_set(:@api_secret, "test-secret")
-
-      result = service.send(:load_credentials_from_file)
-      expect(result).to eq({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+      expect(described_class.new(base_url: "https://example.com")).to be_authenticated
     end
 
-    it "initializes with authentication when credentials are available" do
-      service = described_class.new
-      allow(service).to receive(:load_credentials_from_file).and_return({
-        api_key: "test-key",
-        private_key: "test-secret"
-      })
+    it "does not authenticate when the resolver finds nothing" do
+      allow(Coinbase::CredentialResolver).to receive(:call).and_return(nil)
 
-      # Set the instance variables to avoid nil errors
-      service.instance_variable_set(:@api_key, "test-key")
-      service.instance_variable_set(:@api_secret, "test-secret")
-
-      service.send(:initialize)
-      expect(service.instance_variable_get(:@authenticated)).to be true
+      expect(described_class.new(base_url: "https://example.com")).not_to be_authenticated
     end
 
     it "raises error when not authenticated" do
