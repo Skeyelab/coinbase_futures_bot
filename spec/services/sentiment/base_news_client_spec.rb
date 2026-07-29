@@ -73,6 +73,46 @@ RSpec.describe Sentiment::BaseNewsClient do
     end
   end
 
+  # A feed marked `exclusive: true` in config/sentiment_sources.yml asserts that
+  # every item it publishes is about its one scoped symbol, so a keyword miss is
+  # a gap in the keyword list rather than an off-topic article.
+  describe "#extract_crypto_symbols on an exclusive source" do
+    def client_named(name)
+      Class.new(described_class) do
+        define_method(:source_name) { name }
+        def enabled? = true
+
+        def symbols_in(text) = extract_crypto_symbols(text)
+      end.new
+    end
+
+    it "tags an exclusive source's article with its scoped symbol even with no keyword hit" do
+      # Real discarded rigzone headline: unmistakably oil & gas industry news,
+      # but it contains none of the OIL-USD keywords.
+      expect(client_named("rigzone_rss").symbols_in("Eni Greenlights Cyprus' First Hydrocarbon Project"))
+        .to eq(["OIL-USD"])
+    end
+
+    it "leaves a NON-exclusive single-symbol source untagged on a keyword miss" do
+      # investing_commodities_rss is scoped [OIL-USD] but is a general commodities
+      # feed. Tagging its misses would inject gold and palladium into the OIL-USD
+      # baseline as if they were oil sentiment.
+      %w[
+        Gold\ prices\ slip\ as\ firm\ dollar\ weighs
+        UBS\ cuts\ palladium\ price\ target\ on\ oversupply\ concerns
+      ].each do |headline|
+        expect(client_named("investing_commodities_rss").symbols_in(headline))
+          .to eq([nil]), "expected #{headline.inspect} to stay untagged"
+      end
+    end
+
+    it "still keyword-routes a multi-symbol source rather than tagging every symbol" do
+      # coindesk_rss is scoped [BTC-USD, ETH-USD]; tagging both would double-count.
+      expect(client_named("coindesk_rss").symbols_in("Ethereum staking yields tick higher"))
+        .to eq(["ETH-USD"])
+    end
+  end
+
   describe "#generate_content_hash" do
     it "differs per symbol so a multi-symbol article does not collide on upsert" do
       btc = client.hash_for("http://x", "title", "BTC-USD")

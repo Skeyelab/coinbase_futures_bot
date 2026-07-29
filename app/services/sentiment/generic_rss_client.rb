@@ -36,6 +36,10 @@ module Sentiment
         normalized = normalize_rss_item(item)
         items.concat(normalized) if normalized.any?
       end
+      doc.elements.each("feed/entry") do |entry|
+        normalized = normalize_atom_entry(entry)
+        items.concat(normalized) if normalized.any?
+      end
 
       @logger.info("#{@source_name}: fetched #{items.size} events")
       items
@@ -74,10 +78,16 @@ module Sentiment
     end
 
     def normalize_rss_item(item)
-      title = item.elements["title"]&.text.to_s
-      url = item.elements["link"]&.text.to_s
-      pub_date = item.elements["pubDate"]&.text.to_s
-      description = item.elements["description"]&.text.to_s
+      normalize_fields(
+        title: item.elements["title"]&.text.to_s,
+        url: item.elements["link"]&.text.to_s,
+        pub_date: item.elements["pubDate"]&.text.to_s,
+        description: item.elements["description"]&.text.to_s
+      )
+    end
+
+    def normalize_fields(title:, url:, pub_date:, description:)
+      return [] if contentless?(title, description)
 
       published_at = parse_timestamp(pub_date)
       content_text = "#{title} #{description}"
@@ -98,6 +108,43 @@ module Sentiment
           }
         }
       end
+    end
+
+    # Atom says the same things as RSS under different names: entry/summary
+    # instead of item/description, updated instead of pubDate, and the URL in a
+    # link element's href attribute rather than its text. Reshaped here so both
+    # feed dialects converge on one normalizer.
+    def normalize_atom_entry(entry)
+      link = entry.elements["link"]
+      normalize_fields(
+        title: entry.elements["title"]&.text.to_s,
+        url: (link&.attributes&.[]("href") || link&.text).to_s,
+        pub_date: (entry.elements["updated"] || entry.elements["published"])&.text.to_s,
+        description: (entry.elements["summary"] || entry.elements["content"])&.text.to_s
+      )
+    end
+
+    # Feeds that synthesize a stand-in title for a body-less post. trumpstruth.org
+    # emits "[No Title] - Post from July 28, 2026" for Trump's image-only and
+    # re-truth posts; the body on those is literally "<p></p>".
+    PLACEHOLDER_TITLE = /\A\s*\[\s*no title\s*\]/i
+
+    # An item with no words of its own has nothing for the lexicon scorer to read
+    # and nothing for the keyword router to match, so storing it can only produce
+    # a permanently untagged row. Worse than useless: the ingest rate is what
+    # OperatorSnapshot checks against SENTIMENT_UNDERSAMPLED_PER_HR, so a feed
+    # that is 60% empty posts reports itself as healthy on volume it cannot score.
+    #
+    # A real headline with an empty body is still ingested — the title alone is
+    # scorable. Only the placeholder-plus-empty-body combination is dropped.
+    def contentless?(title, description)
+      return false if strip_markup(description).present?
+
+      title.blank? || PLACEHOLDER_TITLE.match?(title)
+    end
+
+    def strip_markup(html)
+      html.to_s.gsub(/<[^>]*>/, " ").gsub(/&(?:[a-z]+|#\d+);/i, " ").strip
     end
 
     def handle_error(exception, error_type)

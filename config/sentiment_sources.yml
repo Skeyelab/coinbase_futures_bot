@@ -9,6 +9,14 @@
 #   sources.<name>.url        : feed URL (rss clients)
 #   sources.<name>.symbols    : symbols this source is allowed to tag (scope)
 #   sources.<name>.weight     : relative trust when aggregating (default 1.0)
+#   sources.<name>.exclusive  : every item this feed publishes is about its one
+#                               scoped symbol, so an item matching no keyword is
+#                               still tagged with it (default false). This is NOT
+#                               implied by a single-symbol `symbols:` scope —
+#                               scope is a ceiling on what a source MAY tag, not
+#                               a claim about what it publishes. Set it only on a
+#                               feed verified single-topic against its real
+#                               output, and only with a one-symbol scope.
 
 symbols:
   # Market-wide crypto terms (CRYPTO/DEFI/STABLECOIN/TOKENIZED) are on BOTH
@@ -102,11 +110,28 @@ sources:
     weight: 1.0
   # Additional energy-news source (issue #431) to raise oil inflow beyond the
   # existing feeds. Validated 200/valid-RSS 2026-07-23.
+  #
+  # The ONLY source carrying `exclusive: true`. Rigzone is an oil & gas industry
+  # trade publication, and its real output backs that: of the 23 distinct items
+  # it published that matched no OIL-USD keyword, 20 were unambiguously oil & gas
+  # ("Eni Greenlights Cyprus' First Hydrocarbon Project", "QatarEnergy Prepares
+  # to Extend LNG Force Majeure", "North America Enters Rig Addition Streak") and
+  # 3 were adjacent-energy or macro ("Brookfield to Acquire Blackstone BESS
+  # Portfolio", "Global Inflation Angst Is Back", "Power Blackouts Sweep North
+  # Africa") — a measured 13% off-topic rate against losing 100% of the other 20.
+  #
+  # The other oil-scoped feeds were checked the same way and deliberately left
+  # non-exclusive, because scope is not a claim of single-topic:
+  #   oilprice_rss              — publishes gold, nuclear, solar, rare earths, AI capex
+  #   eia_today_in_energy_rss   — EIA covers ALL energy; its misses were electricity,
+  #                               LNG trade, wind, and EV sales, with zero crude
+  #   investing_commodities_rss — general commodities: gold, silver, wheat, corn, canola
   rigzone_rss:
     client: rss
     url: https://www.rigzone.com/news/rss/rigzone_latest.aspx
     symbols: [OIL-USD]
     weight: 0.8
+    exclusive: true
   investing_commodities_rss:
     client: rss
     url: https://www.investing.com/rss/news_11.rss
