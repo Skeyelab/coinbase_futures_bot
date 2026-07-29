@@ -1,0 +1,38 @@
+# Declarative per-symbol strategy selection (issue #303).
+#
+# Maps symbol -> strategy + FROZEN params. Any symbol without an ENABLED entry
+# runs the default MultiTimeframeSignal exactly as before — this file is zero
+# behavior change until an operator flips an entry on.
+#
+# Resolution happens in ONE place: Trading::StrategyFactory.for_symbol. The
+# realtime evaluator, RapidSignalEvaluationJob and GenerateSignalsJob all go
+# through it; per-job strategy divergence is the #479/#504 bug class.
+#
+# FREEZE DISCIPLINE (#483/#376): CalibrationFreeze.freeze! captures this
+# file's fingerprint. Any later edit while frozen fires a critical Slack
+# alert — a config change mid-sample invalidates the gate-2a evidence window.
+# Flip, deploy, verify, THEN freeze.
+default:
+  strategy: MultiTimeframeSignal
+
+symbols:
+  # Funding-skew contrarian on the BTC perp — #568 rank-3, the first candidate
+  # to pass BOTH gates (ParameterPlateau + PessimisticCost, 2026-07-29).
+  # Params are the gate-passing frozen set. Do NOT tune them here: a change
+  # voids the #376 gate-2a sample (see the shipped-config spec that pins them).
+  #
+  # OPERATOR SWITCH: `enabled: true` on the next line is the flip that puts
+  # FundingSkewContrarian live on BIP in the paper loop.
+  BIP-20DEC30-CDE:
+    strategy: FundingSkewContrarian
+    enabled: false
+    # entry_z ~2 maps to confidence ~20 on this strategy's z*10 scale; the
+    # entry_z threshold IS the filter, so the MTS-calibrated confidence gates
+    # (RSE 30 / profile 60) must not silently re-filter 2 <= z < 3 entries.
+    min_confidence: 0
+    params:
+      entry_z: 2.0
+      exit_z: 0.5
+      window: 168 # hours (7d premium regime)
+      stop: 0.01
+      spot_symbol: BTC-USD

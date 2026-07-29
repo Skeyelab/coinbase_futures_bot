@@ -32,7 +32,11 @@ module Trading
     end
 
     def freeze!(reason: nil, logger: Rails.logger)
-      write(frozen: true, reason: reason.to_s.presence)
+      # The freeze also covers declarative strategy selection (#303): capture
+      # the config fingerprint so a mid-sample edit of strategy_selection.yml
+      # is detectable — StrategyFactory alarms on the drift.
+      write(frozen: true, reason: reason.to_s.presence,
+        strategy_fingerprint: Trading::StrategySelection.fingerprint)
       logger.warn("[CalibrationFreeze] FROZEN — calibration will not activate profiles" \
                   "#{": #{reason}" if reason.present?}")
       status
@@ -49,13 +53,33 @@ module Trading
       (record&.value || {})["reason"].presence
     end
 
-    def status
-      {frozen: frozen?, reason: reason, as_of: Time.current.utc.iso8601}
+    # Non-nil iff frozen AND config/strategy_selection.yml no longer matches
+    # the fingerprint captured at freeze! time. Nil for legacy freezes that
+    # recorded no fingerprint — those predate the guarantee.
+    def strategy_selection_drift
+      record = BotRuntimeStat.find_by(key: STORE_KEY)
+      value = record&.value || {}
+      return nil unless value["frozen"]
+
+      stored = value["strategy_fingerprint"]
+      return nil if stored.blank?
+
+      current = Trading::StrategySelection.fingerprint
+      return nil if stored == current
+
+      {frozen_fingerprint: stored, current_fingerprint: current}
     end
 
-    def write(frozen:, reason:)
+    def status
+      {frozen: frozen?, reason: reason,
+       strategy_selection_drifted: !strategy_selection_drift.nil?,
+       as_of: Time.current.utc.iso8601}
+    end
+
+    def write(frozen:, reason:, strategy_fingerprint: nil)
       record = BotRuntimeStat.find_or_initialize_by(key: STORE_KEY)
-      record.value = {"frozen" => frozen, "reason" => reason}
+      record.value = {"frozen" => frozen, "reason" => reason,
+                      "strategy_fingerprint" => strategy_fingerprint}
       record.recorded_at = Time.current.utc
       record.save!
     rescue ActiveRecord::RecordNotUnique

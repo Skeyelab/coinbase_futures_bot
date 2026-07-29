@@ -48,6 +48,14 @@ Rails.application.configure do
       cron: ENV.fetch("FEE_MEASUREMENT_CRON", "40 3 * * *"),
       class: "FeeMeasurementSnapshotJob"
     },
+    # Funding-proxy fidelity (#568 caveat 1 / #572): FundingSkewContrarian
+    # trades the basis proxy, so its backtest-vs-live parity depends on the
+    # proxy tracking real funding. Daily, after the night's snapshots settle;
+    # no-op unless a funding-skew pairing is declared in strategy_selection.yml.
+    funding_proxy_fidelity: {
+      cron: ENV.fetch("FUNDING_PROXY_FIDELITY_CRON", "20 4 * * *"),
+      class: "FundingProxyFidelityJob"
+    },
     signals_15m: {
       # Run shortly after each 15m boundary to use fresh 15m candles
       # Default: minutes 1,16,31,46 of each hour
