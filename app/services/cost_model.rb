@@ -60,14 +60,37 @@ class CostModel
     # seeded dated fee was measured from oil fills and then applied to every
     # dated contract — right for oil, a guess for a BTC nano on a different
     # schedule, and #459 carried that guess into the live gates.
-    #
-    # Only per_contract_fee is overridden. Commission per contract needs no
-    # contract multiplier and is exact; the effective bps depends on
-    # ContractSizeResolver, which FeeTruth documents as unreliable for some
-    # dated contracts. Measuring the exact number and leaving the approximate
-    # one seeded is the honest split.
     measured = ProductFee.measured_per_contract(symbol)
-    measured ? seeded.merge(per_contract_fee: measured) : seeded
+    return seeded unless measured
+
+    # A measurement REPLACES what it measured. It never stacks on top.
+    #
+    # This merged the measured commission in as per_contract_fee and left
+    # taker_rate seeded, which on a perp adds the proportional part twice:
+    # 643.70 × 0.0003 + 0.6549 = $0.848 against a real $0.65496, 29% over, on
+    # every backtest and cost gate (issue #583).
+    #
+    # The two venues need different treatment because their fees have different
+    # SHAPES, not just different sizes:
+    #
+    #   perp  — mostly proportional. The #486 fills were notional × 0.0008 plus
+    #           a $0.14 flat, so the measurement belongs in the rate, where it
+    #           travels with price. ContractSizeResolver is reliable here (BIP
+    #           is 0.01), which is what makes effective_rate trustworthy.
+    #   dated — genuinely a flat per-contract charge (~$0.85 on NOL). Commission
+    #           per contract needs no multiplier and is exact; the effective bps
+    #           depends on ContractSizeResolver, which FeeTruth documents as
+    #           unreliable for some dated contracts. Measuring the exact number
+    #           and leaving the approximate one seeded is the honest split.
+    return seeded.merge(per_contract_fee: measured) unless perp?(symbol)
+
+    rate = ProductFee.measured_rate(symbol)
+    return seeded.merge(taker_rate: rate, maker_rate: rate, per_contract_fee: 0.0) if rate
+
+    # No usable rate on a perp: keep the flat amount, which is at least exact at
+    # the notional it was measured at, and zero the rate. Reaching for the
+    # seeded rate here would reintroduce the double-count.
+    seeded.merge(taker_rate: 0.0, maker_rate: 0.0, per_contract_fee: measured)
   end
 
   def self.perp?(symbol)
