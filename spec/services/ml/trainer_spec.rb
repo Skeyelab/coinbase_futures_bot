@@ -151,3 +151,20 @@ RSpec.describe Ml::Trainer do
     end
   end
 end
+
+# Appended regression (2026-07-29): the first pooled 4-symbol fit on the box
+# died with SystemStackError because row selection splatted ~300k indices as
+# VM stack arguments (rows.values_at(*indices)). Specs never hit it — their
+# datasets are tiny. This pins selection at real pooled scale.
+RSpec.describe Ml::Trainer, ".select_rows at pooled scale" do
+  it "selects 300k indices without exhausting the VM stack" do
+    rows = Array.new(300_000) { |i| {i: i} }
+    indices = (0...300_000).to_a
+
+    selected = described_class.select_rows(rows, indices)
+
+    expect(selected.size).to eq(300_000)
+    expect(selected.first).to eq({i: 0})
+    expect(selected.last).to eq({i: 299_999})
+  end
+end
