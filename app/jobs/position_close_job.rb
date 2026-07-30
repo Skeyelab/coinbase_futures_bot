@@ -8,7 +8,7 @@ class PositionCloseJob < ApplicationJob
   # failure. Critical => one retry (the _retry suffix is deliberately not in
   # this list, so retries stay bounded).
   CRITICAL_REASONS = %w[stop_loss take_profit time_limit dollar_target dollar_stop_loss
-    emergency_margin_violation].freeze
+    trailing_giveback trailing_hard_stop emergency_margin_violation].freeze
 
   def perform(position_id:, reason:, priority: "normal")
     @reason = reason

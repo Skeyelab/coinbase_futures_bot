@@ -330,6 +330,123 @@ RSpec.describe RealtimeMonitoring::TickHandler do
     end
   end
 
+  # The operator's real exit rule (docs/plans/2026-07-29-trailing-profit-giveback-
+  # exit-design.md). Day-trading only, matching check_dollar_pnl_exit.
+  describe "#check_trailing_giveback_exit" do
+    let(:product_id) { "NOL-19AUG26-CDE" }
+
+    def day_position
+      create(:position, day_trading: true, side: "LONG", entry_price: 100.0, size: 1, product_id: product_id)
+    end
+
+    before do
+      allow(handler).to receive(:trigger_position_close)
+      # contract_size 10 → $10 of PnL per $1 of price move per contract
+      allow(Trading::ContractSizeResolver).to receive(:for_product).with(product_id).and_return(10)
+    end
+
+    def with_trailing_config(cfg)
+      base = Rails.application.config.real_time_signals
+      allow(Rails.application.config).to receive(:real_time_signals)
+        .and_return(base.merge(trailing_giveback: cfg))
+      yield
+    end
+
+    def armed_config
+      {arm_at_per_contract_usd: 25.0, giveback_fraction: 0.30, hard_stop_per_contract_usd: 15.0}
+    end
+
+    it "arms on the peak, then exits once the position gives back its share" do
+      with_trailing_config(armed_config) do
+        position = day_position
+
+        # $104 → +$40 gross, less $1.80 NOL round trip → $38.20 net. Clears the $25
+        # arm, and the floor (38.20 × 0.70 = $26.74) is far below, so it holds.
+        expect(handler.send(:check_trailing_giveback_exit, position, 104.0)).to be(false)
+
+        # $102 → +$20 gross → $18.20 net, now under the $26.74 floor set by the peak.
+        expect(handler).to receive(:trigger_position_close).with(position, "trailing_giveback")
+        expect(handler.send(:check_trailing_giveback_exit, position, 102.0)).to be(true)
+      end
+    end
+
+    it "stops out an unarmed position at the per-contract hard stop" do
+      with_trailing_config(armed_config) do
+        position = day_position
+
+        # $98.60 → -$14.00 gross → -$15.80 net, past the -$15 stop. Peak never armed.
+        expect(handler).to receive(:trigger_position_close).with(position, "trailing_hard_stop")
+        expect(handler.send(:check_trailing_giveback_exit, position, 98.6)).to be(true)
+      end
+    end
+
+    it "ignores swing (non-day-trading) positions" do
+      with_trailing_config(armed_config) do
+        position = create(:position, day_trading: false, side: "LONG", entry_price: 100.0,
+          size: 1, product_id: product_id)
+        expect(handler).not_to receive(:trigger_position_close)
+
+        expect(handler.send(:check_trailing_giveback_exit, position, 90.0)).to be(false)
+      end
+    end
+
+    it "is inert when no trailing thresholds are configured" do
+      with_trailing_config({}) do
+        position = day_position
+        expect(handler).not_to receive(:trigger_position_close)
+
+        expect(handler.send(:check_trailing_giveback_exit, position, 200.0)).to be(false)
+      end
+    end
+
+    # Without this the feature ships inert: the strategy's 60bps tp_target fires at
+    # ~$5.58/contract on NOL, so a $25 arm is never reached and the trail never
+    # fires once. The stop stays live as a second backstop.
+    describe "take-profit suppression" do
+      def targeted_position
+        create(:position, day_trading: true, side: "LONG", entry_price: 100.0, size: 1,
+          product_id: product_id, take_profit: 104.0, stop_loss: 97.0)
+      end
+
+      it "does not take profit when the trail owns upside exits" do
+        with_trailing_config(armed_config) do
+          position = targeted_position
+          expect(handler).not_to receive(:trigger_position_close)
+
+          handler.send(:check_take_profit_stop_loss, position, 104.0)
+        end
+      end
+
+      it "still stops out on the strategy stop while the trail is enabled" do
+        with_trailing_config(armed_config) do
+          position = targeted_position
+          expect(handler).to receive(:trigger_position_close).with(position, "stop_loss")
+
+          handler.send(:check_take_profit_stop_loss, position, 97.0)
+        end
+      end
+
+      it "takes profit normally when the trail is inert" do
+        with_trailing_config({}) do
+          position = targeted_position
+          expect(handler).to receive(:trigger_position_close).with(position, "take_profit")
+
+          handler.send(:check_take_profit_stop_loss, position, 104.0)
+        end
+      end
+
+      it "leaves swing positions their take-profit" do
+        with_trailing_config(armed_config) do
+          position = create(:position, day_trading: false, side: "LONG", entry_price: 100.0,
+            size: 1, product_id: product_id, take_profit: 104.0)
+          expect(handler).to receive(:trigger_position_close).with(position, "take_profit")
+
+          handler.send(:check_take_profit_stop_loss, position, 104.0)
+        end
+      end
+    end
+  end
+
   describe "#extract_asset_from_product_id" do
     it "extracts OIL from NOL futures contracts" do
       expect(handler.send(:extract_asset_from_product_id, "NOL-19JUN26-CDE")).to eq("OIL")

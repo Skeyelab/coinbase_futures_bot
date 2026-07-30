@@ -68,6 +68,10 @@ module RealtimeMonitoring
         # close before the exchange liquidates, ahead of every other policy.
         next if check_liquidation_buffer_exit(position, price)
 
+        # Trailing profit-giveback (the operator's rule): owns all upside exits for
+        # day trades when configured, so it sits ahead of every take-profit below.
+        next if check_trailing_giveback_exit(position, price)
+
         # Dollar-PnL exit ($20-50 target + hard dollar stop) takes precedence for
         # day-trading positions; if it closes, skip the bps threshold checks.
         next if check_dollar_pnl_exit(position, price)
@@ -100,6 +104,83 @@ module RealtimeMonitoring
 
     def dollar_exit_policy
       @dollar_exit_policy ||= Trading::DollarExitPolicy.from_env
+    end
+
+    # Trailing profit-giveback exit: the operator's real rule, ported from the n8n
+    # workflow (docs/plans/2026-07-29-trailing-profit-giveback-exit-design.md).
+    # Arms once net profit per contract clears the threshold, then closes on giving
+    # back a fraction of the peak; unarmed, only the flat per-contract stop applies.
+    #
+    # Day-trading only, matching check_dollar_pnl_exit — swing positions have their
+    # own manager and their own intended stop distances.
+    #
+    # Returns true if it triggered a close. Inert unless configured.
+    def check_trailing_giveback_exit(position, current_price)
+      return false unless position.day_trading?
+      return false unless trailing_giveback_policy.enabled?
+
+      gross = position.unrealized_pnl_at(current_price)
+      return false if gross.nil?
+
+      round_trip = trailing_round_trip_cost(position)
+      return false if round_trip.nil?
+
+      peak_gross = track_giveback_peak!(position, gross)
+      reason = trailing_giveback_policy.exit_reason(
+        net_pnl: gross - round_trip,
+        peak_net_pnl: peak_gross - round_trip,
+        contracts: position.size
+      )
+      return false unless reason
+
+      @logger.info("[RTM] #{reason} for #{position.product_id} at $#{current_price} " \
+        "(net $#{(gross - round_trip).round(2)} of peak $#{(peak_gross - round_trip).round(2)}) — closing")
+      trigger_position_close(position, reason.to_s)
+      true
+    end
+
+    def trailing_giveback_policy
+      @trailing_giveback_policy ||= Trading::TrailingGivebackExit.from_config
+    end
+
+    # Running maximum of GROSS unrealized PnL for the position, returned as dollars.
+    #
+    # Stored in the existing trailing_stop_state jsonb rather than a new column.
+    # TrailingStop::Runner only touches positions with trailing_stop_enabled and
+    # merges over state rather than replacing it, so the two do not collide.
+    #
+    # Gross rather than net because the round-trip cost is constant while a position
+    # is open, so peak_net = peak_gross - cost exactly. Writes only on a new high, so
+    # this is not a DB write per tick.
+    def track_giveback_peak!(position, gross)
+      state = position.trailing_stop_state || {}
+      peak = state["giveback_peak_gross"]
+      return peak.to_f if peak && gross <= peak.to_f
+
+      position.update_column(:trailing_stop_state, state.merge("giveback_peak_gross" => gross))
+      gross
+    end
+
+    # Round-trip fee for the position at its venue's real schedule. Priced at entry
+    # notional on both sides, matching PaperPnlSummary and SymbolCircuitBreakerJob.
+    #
+    # Returns nil on failure, which holds the position rather than exiting it — the
+    # strategy's stop_loss stays live as the backstop in that case.
+    def trailing_round_trip_cost(position)
+      contract_size = Trading::ContractSizeResolver.for_product(position.product_id) || 1
+      notional_price = position.entry_price.to_f * contract_size
+
+      CostModel.round_trip_cost_for(
+        symbol: position.product_id,
+        entry_price: notional_price,
+        exit_price: notional_price,
+        quantity: position.size.to_f,
+        contracts: position.size.to_f
+      )
+    rescue => e
+      @logger.warn("[RTM] Trailing giveback: round-trip cost failed for " \
+        "#{position.product_id}: #{e.message} — holding")
+      nil
     end
 
     # Time-decay take-profit exit (issue #398). Closes when the position's
@@ -166,15 +247,21 @@ module RealtimeMonitoring
     end
 
     def check_take_profit_stop_loss(position, current_price)
-      return unless position.take_profit || position.stop_loss
+      # The trail owns all upside exits when it is running for this position. Without
+      # this the feature would be inert: the strategy's tp_target (60bps) fires at
+      # ~$5.58/contract on NOL against a $25/contract arm, so the peak could never
+      # reach the arm threshold and the trail would never fire once. stop_loss is
+      # deliberately left live as a second backstop alongside the trail's hard stop.
+      take_profit = position.take_profit unless trailing_giveback_policy.enabled? && position.day_trading?
+      return unless take_profit || position.stop_loss
 
-      if position.long? && position.take_profit && current_price >= position.take_profit
+      if position.long? && take_profit && current_price >= take_profit
         @logger.info("[RTM] Take profit hit for LONG position #{position.product_id} at $#{current_price}")
         trigger_position_close(position, "take_profit")
       elsif position.long? && position.stop_loss && current_price <= position.stop_loss
         @logger.info("[RTM] Stop loss hit for LONG position #{position.product_id} at $#{current_price}")
         trigger_position_close(position, "stop_loss")
-      elsif position.short? && position.take_profit && current_price <= position.take_profit
+      elsif position.short? && take_profit && current_price <= take_profit
         @logger.info("[RTM] Take profit hit for SHORT position #{position.product_id} at $#{current_price}")
         trigger_position_close(position, "take_profit")
       elsif position.short? && position.stop_loss && current_price >= position.stop_loss

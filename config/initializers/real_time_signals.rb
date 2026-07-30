@@ -50,6 +50,32 @@ Rails.application.config.real_time_signals = {
     per_symbol: {}
   },
 
+  # Trailing profit-giveback exit — the operator's real rule, ported from the n8n
+  # workflow that had been closing positions outside this bot. See
+  # docs/plans/2026-07-29-trailing-profit-giveback-exit-design.md.
+  #
+  # Arm once net profit per contract clears `arm_at_per_contract_usd`, then exit on
+  # giving back `giveback_fraction` of the peak. Unarmed, `hard_stop_per_contract_usd`
+  # is the only exit. All dollar figures are PER CONTRACT and measured NET of the
+  # round-trip fee: on dated futures the fee is a flat per-contract charge (~$0.85/side
+  # on NOL), so a fixed TOTAL target decays to nothing as size grows.
+  #
+  # Inert by default (nil thresholds), matching DollarExitPolicy and MinimumRoiExit.
+  # Operator values from 2026-07-29: 25.0 / 0.30 / 15.0.
+  #
+  # NOTE: enabling this SUPPRESSES the strategy's take-profit for day trades, because
+  # tp_target (60bps) fires ~5x sooner than the arm threshold and would keep the trail
+  # from ever arming. The strategy's stop_loss stays live.
+  #
+  # One threshold set serves every symbol for now. Per-symbol overrides were deferred
+  # until a backtest shows whether that holds — $25/contract is 2.50% of notional on
+  # BIT and 3.79% on BIP.
+  trailing_giveback: {
+    arm_at_per_contract_usd: ENV["TRAIL_ARM_PROFIT_PER_CONTRACT_USD"]&.to_f,
+    giveback_fraction: ENV["TRAIL_GIVEBACK_FRACTION"]&.to_f,
+    hard_stop_per_contract_usd: ENV["TRAIL_HARD_STOP_PER_CONTRACT_USD"]&.to_f
+  },
+
   # Liquidation buffer (issue #399, ADR 0003). Close a leveraged position before
   # it reaches the exchange's liquidation price. `buffer` is the fraction of the
   # entry→liq distance kept as a safety margin (default 0.05). Set buffer: 0 to
