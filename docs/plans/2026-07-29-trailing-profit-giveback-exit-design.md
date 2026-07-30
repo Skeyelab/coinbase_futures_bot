@@ -1,7 +1,8 @@
 # Trailing profit-giveback exit — design
 
 Date: 2026-07-29
-Status: designed, not implemented
+Status: **implemented and backtested. DO NOT ENABLE — see "Backtest verdict" below.**
+The code ships inert; every config tested loses to the existing fixed take-profit.
 
 ## Why
 
@@ -199,6 +200,87 @@ not; `stop_loss` stays live either way; the fee lookup is hit once across N tick
 **Regression, on real numbers**: NOL at $25 arm / 30% giveback, peak $30 → floor
 $21. And the inertness guard: with the take-profit branch left in,
 `max_favorable_excursion` never passes $5.58 and the trail never arms.
+
+## Backtest verdict (2026-07-30): do not enable
+
+Measured on `BIP-20DEC30-CDE`, 5m step, 2026-02-01 → 2026-07-30, ONE contract at the
+instrument's real per-contract notional ($696.07). Sizing was forced because the
+strategy config disagrees with `asset_sizing.yml` (issue #606). Effective targets are
+**tp 2.0% / sl 1.2%** from `TradingProfile.effective` — NOT the 60bps the initializer
+advertises (issue #605).
+
+| config | arm % | floor % | trades | gross | net | win rate |
+|---|---|---|---|---|---|---|
+| **trail off** | — | — | 323 | **+$413.14** | **+$278.83** | 43.3% |
+| $8 / 0.20 | 1.15% | 0.92% | 521 | −$467.51 | −$686.54 | 53.4% |
+| $12 / 0.20 | 1.72% | 1.38% | 349 | −$131.93 | −$278.39 | 45.6% |
+| $25 / 0.30 | 3.59% | 2.51% | 175 | +$15.95 | −$57.63 | 27.4% |
+
+Every config loses to the baseline. Gross rises monotonically with the arm threshold
+and asymptotes toward, but never reaches, trail-off.
+
+The mechanism is exact rather than inferred. At $25/0.30, `27.4% × 175 = 48` wins —
+identical to the 48 `trailing_giveback` exits, so *every* winner was a giveback exit
+and all 127 `fixed_tp_sl` exits were stop-losses. Trail-off's 140 winners became 48:
+**the trail converted 92 would-be winners into losers.**
+
+### Why no (arm, giveback) can work here
+
+For an armed exit to beat the fixed take-profit, the floor must clear it:
+
+```
+arm x (1 - giveback) > tp   ->   arm > tp / (1 - giveback)
+```
+
+On BIP that is arm > $17.40 (g=0.20) or > $19.89 (g=0.30). But `arm > tp` necessarily
+sacrifices every winner peaking in `[tp, arm)` — with tp suppressed those become
+1.2% stop-losses. So for a position that would have booked at tp:
+
+```
+EV_trail = P x arm(1-g) - (1-P) x sl      P = P(peak >= arm | peak >= tp)
+```
+
+At the measured $25/0.30 config, beating tp requires:
+
+```
+P x 2.51% - (1-P) x 1.2% > 2.0%   ->   P > 86.3%
+```
+
+**86% of positions reaching 2.0% would have to also reach 3.59%.** Observed is roughly
+a third. That is not a tuning gap; it is the wrong shape of winner distribution, and
+raising the floor above tp always raises the arm above tp too, so the squeeze cannot be
+escaped by parameter choice.
+
+There is also no hybrid: "book at tp but let winners run past it" is self-contradictory,
+because the tp closes the position before it can reach the arm. It is either/or per
+position.
+
+**Conclusion.** A trailing giveback exit cannot improve on a fixed take-profit unless
+the winner distribution has a fat tail beyond `tp / (1 - giveback)`. `MultiTimeframeSignal`
+does not have one. The rule is not wrong — it was a complete standalone system where the
+operator chose entries and there was no competing take-profit. Layered on a strategy
+whose 2.0% tp demonstrably works, it replaces a good exit with a worse one.
+
+### Why the code stays
+
+It ships inert (all three thresholds nil), so nothing needs reverting. Worth keeping
+because the machinery is sound and independently useful:
+
+- the backtest ordering fix (a tighter strategy stop must beat the trail's hard stop)
+  is a correctness fix to `Backtest::Engine` regardless of this policy
+- `CostModel.round_trip_cost` netting was validated against measured fills ($1.70/round
+  trip on NOL = 2 x the measured $0.85/side)
+- if a trend-following strategy is ever added, its winner distribution is exactly the
+  fat-tailed shape this rule needs, and the harness now exists to test that in an hour
+
+### Dated contracts, separately
+
+Same sizing method, trail off: NOL-19AUG26-CDE −$52.70 (34 trades, 5wk, gross +$5.09)
+and BIT-31JUL26-CDE −$169.99 (43 trades, 2mo, gross −$96.87). Both below issue #376
+gate 2's >=100 trades/symbol, so treat as indicative. NOL's gross edge was +$0.15/trade
+against $1.70/trade in fees; BIT had no gross edge at all. That is a signal-quality
+problem, not the fee floor — fees are 10-13% of a 2.0% target on dated contracts, not
+the third-to-a-half an earlier reading of the dead 60bps config implied.
 
 ## Appendix — defects found in the n8n workflow
 
