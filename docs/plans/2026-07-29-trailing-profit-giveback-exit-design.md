@@ -19,6 +19,13 @@ it is the *output*. The actual rule is:
 $25 × 0.7 = **$17.50** is the smallest profitable exit that rule can produce, which
 is where the remembered "$10-20" comes from.
 
+**Read the historical results with care.** The workflow's loss path is dead (appendix
+item 1), so it auto-closed winners at the trail and never auto-closed a loser. Every
+losing position was exited by hand. Any win rate, average win, or hold time drawn from
+those executions measures the automation on the upside and the operator on the
+downside — two different systems, and the aggregate is not a strategy result. The
+described "$10-20 target" is simply the only thing the automation was capable of doing.
+
 Two existing pieces of machinery are close but neither fits:
 
 - `Trading::DollarExitPolicy` — a flat dollar target, no peak tracking. Models
@@ -198,7 +205,32 @@ $21. And the inertness guard: with the take-profit branch left in,
 Recorded because they change how the historical results should be read. Sorted by
 consequence.
 
-**1. `contract_multiplier` is always 1.** The expression tests
+**1. The loss path is dead, so losses were never automated.** `Approval Already
+Pending?` carries `"disabled": true`, and its output-0 connection list is empty:
+
+```json
+"Approval Already Pending?": { "main": [ [], [ {"node": "Set Approval Pending"} ] ] }
+```
+
+n8n handles a disabled node in `workflow-execute.ts` via `handleDisabledNode`, which
+returns the first main input. Whether that terminates the branch or routes the
+passed-through data to output index 0, the outcome here is identical, because output 0
+has no connections. Nothing downstream of that node has ever run.
+
+Tracing the two branches out of `Hit Stop Loss?`: profit goes straight to
+`Close Position` with no approval, and loss goes to the disabled node and stops. So the
+workflow books winners automatically and never closes a loser — the −$50 stop has never
+fired once. This is the finding that biases every historical number; see "Why" above.
+
+The fix is one toggle. Re-enabling the node reconnects
+`Set Approval Pending → Alert via Slack → User Confirmed? → Close Position`, and its
+empty true-branch is correct by design (the "do not re-alert" case). Worth establishing
+why it was disabled before flipping it back.
+
+Decisive empirical check: filter the n8n execution list for any run that reached
+`Alert via Slack`. If this is right, there are zero, ever.
+
+**2. `contract_multiplier` is always 1.** The expression tests
 `product_id.includes('BTC')`, but CFM product IDs are `BIT-19AUG26-CDE`,
 `BIP-…`, `NOL-…` (`app/models/contract.rb:38`). `"BIT-19AUG26-CDE".includes('BTC')`
 is false, and `'ET-'` matches only literal `ET-…`. Every BTC contract falls to the
@@ -214,25 +246,33 @@ unreachable. On oil, `current_pnl` was effectively gross. The formula also *divi
 by the multiplier, which cannot express oil at all — NOL is contract_size 10 and
 needs a multiply.
 
-**2. The time-based creep does not creep.** `previousStop` is read from state and
+**3. The time-based creep does not creep.** `previousStop` is read from state and
 never referenced. `stopLoss` is recomputed from `highest_pnl` every run, so the
 10%-of-gap adjustment applies to a fresh base and never accumulates. Because
 `gap = currentPnL − stopLoss` shrinks as P/L falls, the adjustment shrinks with it:
 at highest $100 the stop reads $72 at P/L $90, $70.50 at $75, $70.10 at $71. It
 converges downward to the base rather than ratcheting up.
 
-**3. Account PnL attributed to a single position.** `unrealized_pnl` comes from
+**4. Account PnL attributed to a single position.** `unrealized_pnl` comes from
 `balance_summary` (the whole CFM account) while `product_id` and `contracts` come
 from `positions[0]`. With two positions open it trails the aggregate and closes only
 the first.
 
-**4. The loss path appears dead.** `Approval Already Pending?` is disabled and its
-output-0 connection is empty. A disabled n8n node forwards to output 0, so losing
-positions likely never reach the Slack approval or `Close Position`. Needs
-confirmation against a real run; if correct, the −$50 stop never fired and every
-loss was closed by hand.
+**5. Unexecuted-node references in the close path.** `Close Position`,
+`Clear Position State` and `Clear Approval Pending` all read
 
-**5. `× 4` on `per_trade_fee`** stands in for a round trip, where a true per-side
+```
+$('Calculate Trailing Stop - Update').first().json.product_id
+  || $('Calculate Trailing Stop - New').first().json.product_id
+```
+
+Those two nodes are the branches of `State Exists?`, so exactly one runs per execution.
+Referencing an unexecuted node in n8n **throws** rather than returning undefined, so the
+`||` never falls through — it only works when the left-hand node is the one that ran.
+Masked today because a state row exists by the time any close fires, but it breaks on a
+position that closes on its first evaluation.
+
+**6. `× 4` on `per_trade_fee`** stands in for a round trip, where a true per-side
 rate wants ×2.
 
-**6. The −$50 stop is 5x the Rails live daily loss cap** of $10.
+**7. The −$50 stop is 5x the Rails live daily loss cap** of $10.
