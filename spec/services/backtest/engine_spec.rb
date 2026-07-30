@@ -363,11 +363,11 @@ RSpec.describe Backtest::Engine, type: :service do
   describe "trailing profit-giveback exit" do
     # contract_size_usd 1000 at price 100 -> 10 base units -> $10 of PnL per $1 move.
     # So price 103 is +$30 gross on one contract.
-    def giveback_engine(closes:, policy:, tp: 200.0)
+    def giveback_engine(closes:, policy:, tp: 200.0, sl: 1.0)
       insert_step_candles(closes)
       strategy = scripted_strategy do |as_of|
         if as_of == t0
-          {side: :long, price: 100.0, quantity: 1.0, tp: tp, sl: 1.0, confidence: 50.0}
+          {side: :long, price: 100.0, quantity: 1.0, tp: tp, sl: sl, confidence: 50.0}
         end
       end
       described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
@@ -401,6 +401,22 @@ RSpec.describe Backtest::Engine, type: :service do
         .run(from: t0, to: t0 + 3 * 5.minutes)
 
       expect(result.trade_count).to eq(0)
+    end
+
+    # A candle collapses levels that ticks separate. The strategy's stop (99.0 =
+    # -$10) is tighter than the trail's $15/contract hard stop (98.5), so on a bar
+    # that breaches both, the TIGHTER one must win — otherwise the trail books a
+    # larger loss than the position would really have taken. Live is granular enough
+    # that the nearer level is genuinely reached first.
+    #
+    # 99.0 rather than a true 40bps stop because the entry bar's own low is 99.5: a
+    # 99.6 stop closes on the entry candle and never reaches the ordering question.
+    it "lets a tighter strategy stop win on a candle that breaches both" do
+      result = giveback_engine(closes: [100.0, 98.0], policy: policy, sl: 99.0)
+        .run(from: t0, to: t0 + 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:fixed_tp_sl)
     end
 
     # Same trap as live: the strategy's 60bps tp fires ~5x sooner than the arm

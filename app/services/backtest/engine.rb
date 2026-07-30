@@ -215,13 +215,18 @@ module Backtest
         # Liquidation buffer takes precedence over the sim's TP/SL pass — a candle
         # that would liquidate closes at the buffered price first.
         maybe_liquidation_exit(sim, candle)
-        # Trailing giveback owns upside exits, so it runs ahead of the sim's TP/SL
-        # pass. The strategy's sl still applies below if the trail does not fire.
-        maybe_trailing_giveback_exit(sim, candle, contracts_at, giveback_peaks)
         sim.on_candle(candle)
         # A quote gets exactly one bar to fill, then the band it priced is
         # stale — cancel so the next flat bar re-quotes off fresh data.
         cancel_unfilled_quotes(sim) if through_price?
+        # Trailing giveback runs AFTER the sim's TP/SL pass. A candle collapses
+        # levels that ticks separate: the strategy's stop is far tighter than the
+        # trail's per-contract hard stop, so on a bar breaching both, the tighter
+        # level must get first refusal or the trail books a larger loss than the
+        # position really took. Live needs no such care — it is tick-by-tick, so the
+        # nearer level is genuinely reached first. The trail still owns the UPSIDE,
+        # because the strategy's tp was suppressed at entry.
+        maybe_trailing_giveback_exit(sim, candle, contracts_at, giveback_peaks)
         maybe_min_roi_exit(sim, candle, entered_at)
         stamp_exits(sim, candle, exited_at, protection_store, losing_exits, halts)
         equity_curve << sim.equity_usd
