@@ -15,7 +15,10 @@ namespace :backtest do
     to = Time.parse(args[:to] || ENV.fetch("TO"))
     step = args[:step] || ENV["STEP"] || "5m"
 
-    engine = Backtest::Engine.new(symbol: symbol, step: step)
+    # Trailing profit-giveback parity: inert unless the TRAIL_* thresholds are set,
+    # so an unconfigured run behaves exactly as before.
+    engine = Backtest::Engine.new(symbol: symbol, step: step,
+      trailing_giveback: Trading::TrailingGivebackExit.from_config)
     started_at = Time.current
 
     begin
@@ -48,7 +51,10 @@ namespace :backtest do
 
     # WalkForward builds one Engine per window from these same options, so a
     # matching instance resolves the identical fee/sizing assumptions to record.
-    engine = Backtest::Engine.new(symbol: symbol, step: step)
+    # Trailing profit-giveback parity: inert unless the TRAIL_* thresholds are set,
+    # so an unconfigured run behaves exactly as before.
+    engine = Backtest::Engine.new(symbol: symbol, step: step,
+      trailing_giveback: Trading::TrailingGivebackExit.from_config)
     started_at = Time.current
 
     begin

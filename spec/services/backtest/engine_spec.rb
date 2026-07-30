@@ -357,6 +357,64 @@ RSpec.describe Backtest::Engine, type: :service do
     end
   end
 
+  # Backtest parity for the operator's trailing profit-giveback rule
+  # (docs/plans/2026-07-29-trailing-profit-giveback-exit-design.md). Fees are zeroed
+  # so net == gross and the dollar arithmetic in these tests is exact.
+  describe "trailing profit-giveback exit" do
+    # contract_size_usd 1000 at price 100 -> 10 base units -> $10 of PnL per $1 move.
+    # So price 103 is +$30 gross on one contract.
+    def giveback_engine(closes:, policy:, tp: 200.0)
+      insert_step_candles(closes)
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: tp, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, per_contract_fee: 0.0, slippage: 0.0, contract_size_usd: 1000.0,
+        trailing_giveback: policy)
+    end
+
+    let(:policy) { Trading::TrailingGivebackExit.new(arm_at: 25.0, giveback: 0.30, hard_stop: 15.0) }
+
+    it "arms on the peak, then closes when the position gives back its share" do
+      # 100 entry, rallies to 103 (+$30 peak, arms, floor $21), falls back to 101 (+$10).
+      result = giveback_engine(closes: [100.0, 103.0, 101.0, 101.0], policy: policy)
+        .run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:trailing_giveback)
+    end
+
+    it "does not arm below the threshold, and rides to the hard stop instead" do
+      # Peak is taken from the candle HIGH (close + 0.5), so 101.0 peaks at $15 —
+      # short of the $25 arm. Then the low of 98.5 is -$20, past the -$15 stop.
+      result = giveback_engine(closes: [100.0, 101.0, 98.5, 98.5], policy: policy)
+        .run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:trailing_hard_stop)
+    end
+
+    it "is inert with no policy configured" do
+      result = giveback_engine(closes: [100.0, 103.0, 101.0, 101.0], policy: nil)
+        .run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(0)
+    end
+
+    # Same trap as live: the strategy's 60bps tp fires ~5x sooner than the arm
+    # threshold, so leaving it with the sim means the trail can never arm.
+    it "suppresses the strategy take-profit so the trail can arm" do
+      # tp 100.6 (60bps) is reachable on the very next candle. Without suppression
+      # the sim books a take_profit there and the trail never sees a peak.
+      result = giveback_engine(closes: [100.0, 103.0, 101.0, 101.0], policy: policy, tp: 100.6)
+        .run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trades.first[:exit_reason]).to eq(:trailing_giveback)
+    end
+  end
+
   describe "protections parity (issue #397, ADR 0003)" do
     # A flat series that round-trips repeatedly: enter long, TP hits next candle,
     # re-enter, and so on. With no cooldown this yields many trades; with a

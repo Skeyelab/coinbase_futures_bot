@@ -38,7 +38,10 @@ module Backtest
       preload_candles: true, fill_model: :touch, maker_fee_rate: nil,
       funding_bps_per_interval: nil, funding_interval_seconds: nil,
       min_roi_schedule: nil, liquidation_buffer: nil, stoploss_guard: nil, max_drawdown: nil,
-      min_confidence: nil, logger: Rails.logger)
+      trailing_giveback: nil, min_confidence: nil, logger: Rails.logger)
+      # Trailing profit-giveback parity: an explicit policy instance, like
+      # liquidation_buffer and stoploss_guard. nil leaves it inert.
+      @trailing_giveback = trailing_giveback
       @symbol = symbol
       @strategy = strategy || Trading::StrategyFactory.multi_timeframe(resolve_symbols: false)
       @step = step
@@ -199,16 +202,22 @@ module Backtest
       @rejected_low_confidence = 0
       equity_points = [{at: from, equity: @starting_equity}]
 
+      contracts_at = {}
+      giveback_peaks = {}
+
       prev_candle = nil
       step_candles(from, to).each do |candle|
         # Through-price mode quotes off the last COMPLETED bar: the bar being
         # replayed is what fills the quote, so deriving the quote from it
         # would let the close place a limit its own low then "fills".
         signal_as_of = through_price? ? prev_candle&.timestamp : candle.timestamp
-        maybe_enter(sim, candle, entered_at, protection_store, signal_as_of) if signal_as_of
+        maybe_enter(sim, candle, entered_at, protection_store, signal_as_of, contracts_at) if signal_as_of
         # Liquidation buffer takes precedence over the sim's TP/SL pass — a candle
         # that would liquidate closes at the buffered price first.
         maybe_liquidation_exit(sim, candle)
+        # Trailing giveback owns upside exits, so it runs ahead of the sim's TP/SL
+        # pass. The strategy's sl still applies below if the trail does not fire.
+        maybe_trailing_giveback_exit(sim, candle, contracts_at, giveback_peaks)
         sim.on_candle(candle)
         # A quote gets exactly one bar to fill, then the band it priced is
         # stale — cancel so the next flat bar re-quotes off fresh data.
@@ -248,7 +257,7 @@ module Backtest
     end
 
     # One position at a time: only ask the strategy while flat.
-    def maybe_enter(sim, candle, entered_at, protection_store, signal_as_of)
+    def maybe_enter(sim, candle, entered_at, protection_store, signal_as_of, contracts_at = {})
       return if position_active?(sim)
 
       sig = @strategy.signal(symbol: @symbol, equity_usd: sim.equity_usd, as_of: signal_as_of)
@@ -269,9 +278,17 @@ module Backtest
       base_qty = contracts_to_base_units(sig[:quantity], sig[:price])
       return unless base_qty > 0
 
+      # Same suppression as the live path: the strategy's tp fires ~5x sooner than
+      # the trail's arm threshold, so handing it to the sim means the peak never
+      # reaches the arm and the trail never fires. sl is left in place.
+      tp = sig[:tp] unless @trailing_giveback&.enabled?
+
       id = sim.place_limit(symbol: @symbol, side: SideNormalizer.simulator_fill_side(sig[:side]),
-        price: sig[:price], quantity: base_qty, tp: sig[:tp], sl: sig[:sl])
+        price: sig[:price], quantity: base_qty, tp: tp, sl: sig[:sl])
       entered_at[id] = candle.timestamp
+      # Contracts, not base units: the policy's thresholds are per contract, and
+      # base_qty has already been scaled by contract_size_usd / price.
+      contracts_at[id] = sig[:quantity].to_f
     end
 
     # Inclusive bar: conf >= @min_confidence trades (the incumbent is
@@ -319,6 +336,61 @@ module Backtest
 
         exit_price = @liq_buffer.buffered_exit_price(entry_price: entry, side: side)
         sim.force_close(o.id, price: exit_price, reason: :liquidation_buffer, candle: candle)
+      end
+    end
+
+    # Trailing profit-giveback parity with the live tick path. Arms once net profit
+    # per contract clears the threshold, then closes on giving back a fraction of
+    # the peak; unarmed, only the flat per-contract stop applies.
+    #
+    # A candle is a range, not a point, and which end is used matters:
+    #   peak  <- the FAVORABLE extreme (high for a long). Taking the peak from the
+    #            close would systematically understate the tick-level peak the live
+    #            path sees, arming later and exiting at a lower floor.
+    #   exit  <- the ADVERSE extreme, and the fill is taken there too. A real stop
+    #            would fill nearer the floor than the bar's worst price, so this is
+    #            deliberately pessimistic rather than flattering.
+    def maybe_trailing_giveback_exit(sim, candle, contracts_at, peaks)
+      return unless @trailing_giveback&.enabled?
+
+      sim.orders.values.each do |o|
+        next unless o.status == :filled
+
+        entry = (o.entry_fill || o.price).to_f
+        next unless entry.positive?
+
+        contracts = contracts_at[o.id].to_f
+        next unless contracts.positive?
+
+        long = o.side == :buy
+        direction = long ? 1.0 : -1.0
+        qty = o.quantity.to_f
+        gross_at = ->(price) { (price - entry) * qty * direction }
+
+        favorable = (long ? candle.high : candle.low).to_f
+        adverse = (long ? candle.low : candle.high).to_f
+
+        # Seed from the first favorable extreme rather than 0, so an underwater
+        # position does not get a phantom $0 peak it never actually reached.
+        favorable_gross = gross_at.call(favorable)
+        peak = peaks.key?(o.id) ? [peaks[o.id].to_f, favorable_gross].max : favorable_gross
+        peaks[o.id] = peak
+
+        # An explicit fee_rate override replaces the venue's model wholesale, which
+        # is why the per-contract floor is only applied when one is actually set.
+        round_trip = CostModel.round_trip_cost(
+          entry_price: entry, exit_price: entry, quantity: qty, fee_rate: @fee_rate,
+          contracts: @per_contract_fee ? contracts : nil, per_contract_fee: @per_contract_fee
+        )
+
+        reason = @trailing_giveback.exit_reason(
+          net_pnl: gross_at.call(adverse) - round_trip,
+          peak_net_pnl: peak - round_trip,
+          contracts: contracts
+        )
+        next unless reason
+
+        sim.force_close(o.id, price: adverse, reason: reason, candle: candle)
       end
     end
 
