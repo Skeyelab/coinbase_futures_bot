@@ -48,7 +48,7 @@ class WeatherScan
       resting = row["yes_bid_size_fp"].to_f.floor
       found = Opportunity.find(
         market: market,
-        running_high: high,
+        observed: high,
         bid_cents: (row["yes_bid_dollars"].to_f * 100).round,
         ask_cents: (row["yes_ask_dollars"].to_f * 100).round,
         contracts: [resting, @max_contracts].min

@@ -27,9 +27,13 @@ module Opportunity
     (0.07 * contracts * p * (1 - p) * 100).round(6).ceil
   end
 
-  def self.find(market:, running_high:, bid_cents:, ask_cents:, contracts: 1)
+  # `observed` is whatever running extreme the market ratchets on: a daily
+  # high in degrees for a temperature bucket, a running minimum in dollars for
+  # a one-touch. Opportunity does not need to know which -- both answer
+  # status_given, and that is the entire shared contract.
+  def self.find(market:, observed:, bid_cents:, ask_cents:, contracts: 1)
     side, price, edge =
-      case market.status_given(running_high)
+      case market.status_given(observed)
       when :refuted then [:sell, bid_cents, bid_cents]         # worth 0, someone bids
       when :confirmed then [:buy, ask_cents, 100 - ask_cents]  # worth 100, someone offers
       else return nil
