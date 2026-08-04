@@ -18,6 +18,8 @@ class Collector
     rediscover_every: 3600,
     min_volume_24h: 1000,
     watchlist_size: 150,
+    depth_levels: 10,
+    depth_top_n: 25,
     client: nil,
     news: nil,
     logger: nil
@@ -28,8 +30,13 @@ class Collector
     @rediscover_every = rediscover_every
     @min_volume_24h = min_volume_24h
     @watchlist_size = watchlist_size
+    @depth_levels = depth_levels
+    # Depth is one request per market, so it is sampled only for the busiest
+    # few. Pulling it for all 150 every tick would blow the rate limit and add
+    # nothing -- capacity only matters where a trade could actually happen.
+    @depth_top_n = depth_top_n
     @logger = logger || ->(m) { warn("#{Time.now.utc.iso8601rfc} #{m}") }
-    @client = client || KalshiClient.new(logger: @logger)
+    @client = client || KalshiClient.from_env(logger: @logger)
     @news = news || NewsFeed.new(logger: @logger)
     @running = true
 
@@ -60,10 +67,12 @@ class Collector
           tickers = picked.map { |m| m[:ticker] }
           last_discovery = Time.now.to_i
           write("watchlist", {at: last_discovery, markets: picked})
-          log("watching #{tickers.size} markets")
+          log("watching #{tickers.size} markets" \
+              "#{(@client.respond_to?(:authenticated?) && @client.authenticated?) ? " (authenticated: full depth)" : " (public: top of book only)"}")
         end
 
         sampled_at = Time.now.to_i
+        deep = tickers.first(@depth_top_n)
         @client.quotes(tickers).each do |q|
           next if q[:bid_cents] <= 0 || q[:ask_cents] <= 0
 
@@ -75,6 +84,25 @@ class Collector
             mid: ((q[:bid_cents] + q[:ask_cents]) / 2.0).round(3),
             bid_size: q[:bid_size],
             volume_24h: q[:volume_24h]
+          })
+
+          next unless deep.include?(q[:ticker])
+
+          book = @client.respond_to?(:order_book) ? @client.order_book(q[:ticker], depth: @depth_levels) : nil
+          next unless book
+
+          write("depth", {
+            at: sampled_at,
+            ticker: q[:ticker],
+            bid: book.best_bid_cents,
+            ask: book.best_ask_cents,
+            spread: book.spread_cents,
+            bid_top: book.best_bid_size,
+            ask_top: book.best_ask_size,
+            bid_within_1c: book.bid_depth_within(1),
+            bid_within_5c: book.bid_depth_within(5),
+            ask_within_1c: book.ask_depth_within(1),
+            ask_within_5c: book.ask_depth_within(5)
           })
         end
       rescue => e

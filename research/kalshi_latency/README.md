@@ -56,8 +56,44 @@ the distribution. That is what `bin/collect_weather` is for.
 
 ## Safety
 
-Read-only. No credentials, no order placement, no gems, no shared code with
-the trading bot. It cannot touch a position even if it crashes.
+Read-only and GET-only. There is no order path in this code, so a misused key
+cannot place a trade through it. No gems, no shared code with the trading bot.
+
+Credentials are OPTIONAL. Without them the collector uses public endpoints and
+records top-of-book only. With `KALSHI_KEY_ID` / `KALSHI_KEY` it also records
+full order book depth, which is the difference between guessing at capacity
+and measuring it:
+
+```bash
+doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- bin/collect
+```
+
+## Capacity: measured 2026-08-04
+
+Top-of-book is NOT depth, and the gap is not small:
+
+```
+median top-of-book         420 contracts
+median depth within 5c   31,264 contracts      74x
+```
+
+Dollar depth on the busiest books, bid side within 5c:
+
+```
+KXGOVFLNOMR-26-BD       97.7/97.8    $144,571
+KXSENATEMID-26-AELS     98.2/98.3    $107,113
+GOVPARTYTX-26-D         12.0/13.0     $51,841
+KXFEDDECISION-26SEP-H0  48.0/49.0     $50,522
+```
+
+An earlier read of this repo said capacity was the thing most likely to kill
+the idea. That was measured from the public endpoint's top-of-book and was
+wrong by roughly two orders of magnitude. Capacity is not the binding
+constraint for a small stake. Reaction WINDOW still might be -- that is what
+`bin/analyze_dwell` is for, and it has not been run.
+
+Note these are the busiest markets, which are political. The weather markets
+that carry hourly scheduled information have not had their depth measured yet.
 
 ## Run
 
