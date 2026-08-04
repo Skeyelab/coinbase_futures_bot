@@ -20,6 +20,40 @@ contract, 17x Coinbase). That is the point. A fee that large only matters if
 the edge is small. If news moves a contract 20 cents, fees are noise. This
 experiment tests whether that fat, fee-insensitive edge shape exists here.
 
+## Two experiments in here
+
+**1. Settled-fact scan (the sharp one).** `bin/scan`, `bin/collect_weather`,
+`bin/analyze_dwell`.
+
+Kalshi's daily-high temperature markets resolve on NWS observations, which are
+public and machine-readable. Because a running daily maximum only ever goes up,
+each new observation is a one-way ratchet:
+
+- it **refutes** every bucket below it, permanently, worth 0
+- it **confirms** every floor market at or under it, worth 100
+- it can never confirm a bucket early or refute a floor early
+
+So once Miami hits 90F, the 88-89 bucket is worth exactly zero. Anyone still
+bidding for it is paying for a fact the NWS already published. No forecasting,
+no judgement, no NLP — compare a number to a number.
+
+Seven cities publish hourly at a known minute past the hour (KNYC :51, KMDW
+:25, KMIA/KLAX/KPHL :20). That is roughly 100 scheduled information events per
+day, each with a known timestamp. Beating a scheduled public release is a much
+easier game than finding breaking news.
+
+**2. Generic move-duration scan (the broad one).** `bin/collect`, `bin/analyze`.
+Samples the whole liquid market list plus RSS headlines and measures how long
+any repricing takes. Keep it running as the control.
+
+## Observed once, live
+
+On 2026-08-04 at 15:54Z the scanner flagged `KXHIGHMIA-26AUG04-B88.5` bidding
+5c while Miami's running high was 89.6F (rounds to 90, above the 88-89 bucket).
+By 15:55Z the bid was 0. The market independently converged on the same answer,
+which validates the logic — but a single ~70s observation says nothing about
+the distribution. That is what `bin/collect_weather` is for.
+
 ## Safety
 
 Read-only. No credentials, no order placement, no gems, no shared code with
@@ -28,8 +62,12 @@ the trading bot. It cannot touch a position even if it crashes.
 ## Run
 
 ```bash
-bin/collect                  # samples into ./data, Ctrl-C to stop
-bin/analyze                  # prints the verdict
+bin/scan                     # one-shot: anything mispriced right now?
+bin/collect_weather          # continuous settled-fact logging
+bin/analyze_dwell            # how long do mispricings last?
+
+bin/collect                  # broad control: all liquid markets + RSS
+bin/analyze                  # generic move-duration verdict
 ```
 
 Config via env: `DATA_DIR`, `QUOTE_INTERVAL` (5s), `NEWS_INTERVAL` (30s),
@@ -103,12 +141,38 @@ Public endpoints, no auth needed. An API key would unlock the WebSocket feed,
 which would sample far faster than 5s polling — worth doing if the first pass
 looks promising.
 
+Daily-high markets are **buckets**, not thresholds:
+
+```
+B83.5   strike_type=between   floor=83  cap=84   "83° to 84°"
+T88     strike_type=greater   floor=88           "89° or above"
+T81     strike_type=less                cap=81   "80° or below"
+```
+
+## Settlement risk to respect
+
+- **Whole degrees.** Kalshi settles on the NWS *Climatological Report (Daily)*,
+  which publishes whole degrees. 89.4F is an 89 degree day. `TempMarket`
+  rounds before comparing; doing otherwise invents an edge in every
+  half-degree band. This was a real bug caught by a test, not theory.
+- **CLI vs METAR basis.** We read hourly METAR observations, but settlement is
+  the daily climate report from the local forecast office. They usually agree.
+  Usually is not always, and the gap is unhedged.
+- **Station identity.** Every station in `lib/cities.rb` was read out of the
+  market's own rules text. Chicago is Midway, not O'Hare. Denver's rules say
+  only "Denver, CO"; KDEN is the official climate site but that one is an
+  inference, not a quote.
+
 ## Tests
 
 ```bash
 BUNDLE_GEMFILE=../../Gemfile bundle exec rspec
 ```
 
-`MoveAnalysis` and `Watchlist` are unit tested and mutation tested (13
-mutations, all killed). The HTTP and file plumbing is not — it was smoke
-tested live instead.
+`MoveAnalysis`, `Watchlist`, `TempMarket`, `DailyHigh` and `Opportunity` are
+unit tested (42 examples) and mutation tested — 28 mutations, all killed. Two
+survivors along the way were real spec gaps (a masked one-sided-quote guard, a
+missing nil running high) and one was genuinely dead code that got deleted.
+
+The HTTP and file plumbing is not unit tested; it was smoke tested live against
+the real APIs instead.

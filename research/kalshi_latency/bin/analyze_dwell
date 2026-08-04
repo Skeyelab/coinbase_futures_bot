@@ -1,0 +1,125 @@
+#!/usr/bin/env ruby
+# How long does a contract the weather has already settled stay quotable?
+#
+# That dwell time is the whole business. Long enough to react to and the edge
+# is real; gone in seconds and you are racing bots, not the humans waiting for
+# a headline.
+
+require "json"
+
+DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+MAX_GAP = Integer(ENV["MAX_GAP_SECONDS"] || 120)
+
+files = Dir[File.join(DATA_DIR, "weather-*.jsonl")].sort
+abort "no weather files in #{DATA_DIR} — run bin/collect_weather first" if files.empty?
+
+# ticker -> sorted list of {at, net, price, side, city}
+sightings = Hash.new { |h, k| h[k] = [] }
+cycles = []
+rows = 0
+
+files.each do |path|
+  File.foreach(path) do |line|
+    begin
+      r = JSON.parse(line)
+    rescue JSON::ParserError
+      next
+    end
+    rows += 1
+    cycles << r["at"]
+
+    (r["opportunities"] || []).each do |o|
+      sightings[o["ticker"]] << {
+        at: r["at"], net: o["net_cents"], price: o["price_cents"],
+        side: o["side"], city: r["city"]
+      }
+    end
+  end
+end
+
+cycles.uniq!
+cycles.sort!
+span_hours = cycles.empty? ? 0 : (cycles.max - cycles.min) / 3600.0
+cadence = cycles.each_cons(2).map { |a, b| b - a }.reject(&:zero?).min || 0
+
+# Group each ticker's sightings into episodes separated by a sampling gap.
+episodes = []
+sightings.each do |ticker, seen|
+  seen.sort_by! { |s| s[:at] }
+  run = [seen.first]
+
+  seen.each_cons(2) do |prev, cur|
+    if cur[:at] - prev[:at] > MAX_GAP
+      episodes << {ticker: ticker, sightings: run}
+      run = []
+    end
+    run << cur
+  end
+  episodes << {ticker: ticker, sightings: run} if run.any?
+end
+
+episodes.each do |e|
+  first = e[:sightings].first
+  last = e[:sightings].last
+  e[:city] = first[:city]
+  e[:side] = first[:side]
+  e[:best_net] = e[:sightings].map { |s| s[:net] }.max
+  # One sighting means it was gone by the next poll: dwell is under one cadence.
+  e[:dwell] = last[:at] - first[:at]
+  e[:censored] = e[:sightings].size == 1
+end
+
+puts "=" * 72
+puts "SETTLED-FACT DWELL TIME"
+puts "=" * 72
+puts format("rows=%d  cycles=%d  span=%.1fh  cadence=%ds", rows, cycles.size, span_hours, cadence)
+puts format("episodes=%d across %d tickers", episodes.size, sightings.keys.size)
+
+if episodes.empty?
+  puts "\nNo settled contract was ever mispriced. Either the book is efficient,"
+  puts "or the sample is too short to contain a high landing near a strike."
+  exit 0
+end
+
+dwells = episodes.map { |e| e[:dwell] }.sort
+nets = episodes.map { |e| e[:best_net] }.sort
+censored = episodes.count { |e| e[:censored] }
+
+pct = ->(a, p) { a[[(a.size * p).floor, a.size - 1].min] }
+
+puts
+puts "DWELL (seconds the mispricing stayed on screen)"
+[["median", 0.5], ["p90", 0.9], ["max", 0.999]].each do |label, p|
+  puts format("  %-8s %5ds", label, pct.call(dwells, p))
+end
+puts format("  gone within one poll: %d / %d (%.0f%%)", censored, episodes.size,
+  100.0 * censored / episodes.size)
+
+puts
+puts "EDGE (cents net of Kalshi fees, best moment of each episode)"
+[["median", 0.5], ["p90", 0.9]].each do |label, p|
+  puts format("  %-8s %5dc", label, pct.call(nets, p))
+end
+
+puts
+puts "TOP EPISODES"
+episodes.sort_by { |e| -e[:best_net] }.first(10).each do |e|
+  puts format("  %-11s %-26s %-4s net=%2dc dwell=%4ds%s",
+    e[:city], e[:ticker], e[:side], e[:best_net], e[:dwell], e[:censored] ? " (censored)" : "")
+end
+
+median_dwell = pct.call(dwells, 0.5)
+puts
+puts "-" * 72
+puts(
+  if censored > episodes.size * 0.8
+    "INCONCLUSIVE. Most episodes vanished inside one #{cadence}s poll. Sample faster."
+  elsif median_dwell < 30
+    "TIGHT. #{median_dwell}s median. Racing bots, not humans. Needs colocation-grade speed."
+  else
+    "PROMISING. #{median_dwell}s median window on a public fact. Worth a paper test."
+  end
+)
+puts "-" * 72
+puts "Dwell is a floor: an episode already in progress when collection started,"
+puts "or still open when it stopped, reads shorter than it was."

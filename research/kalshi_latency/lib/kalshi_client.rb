@@ -47,6 +47,16 @@ class KalshiClient
     Watchlist.select_from(markets, min_volume_24h: min_volume_24h, limit: limit)
   end
 
+  # Every open market in a daily-high series for one local date. The date is
+  # encoded in the ticker as e.g. 26AUG04, so filtering on it keeps tomorrow's
+  # contracts out of today's comparison.
+  def temp_markets(series_ticker, local_date)
+    body = get("/markets", series_ticker: series_ticker, status: "open", limit: 200)
+    stamp = local_date.strftime("%y%b%d").upcase
+
+    (body["markets"] || []).select { |m| m["ticker"].to_s.include?("-#{stamp}-") }
+  end
+
   # Current top-of-book for many tickers. Batched to stay inside rate limits.
   def quotes(tickers)
     tickers.each_slice(MAX_TICKERS_PER_REQUEST).flat_map do |batch|

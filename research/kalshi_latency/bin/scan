@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+# One-shot: what has the weather already settled that the Kalshi book has not?
+#
+# Read-only. Reports opportunities; it cannot place an order.
+
+require_relative "../lib/weather_scan"
+
+results = WeatherScan.new.run
+
+puts "=" * 78
+puts "SETTLED-FACT SCAN  #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")}"
+puts "=" * 78
+
+total = 0
+
+results.each do |r|
+  if r.error
+    puts format("%-13s %-6s ERROR %s", r.city, r.station, r.error)
+    next
+  end
+
+  age = r.obs_age_seconds ? "#{r.obs_age_seconds / 60}m ago" : "no obs"
+  high = r.running_high ? format("%.1fF", r.running_high) : "none yet"
+
+  puts format("%-13s %-6s %-10s high=%-9s obs %s  markets=%d",
+    r.city, r.station, r.local_date.to_s, high, age, r.markets)
+
+  r.opportunities.each do |o|
+    total += 1
+    puts format("      >> %-26s %s @ %2dc   gross=%2dc fee=%dc NET=%dc",
+      o[:ticker], o[:side].to_s.upcase, o[:price_cents], o[:gross_cents], o[:fee_cents], o[:net_cents])
+  end
+end
+
+puts "-" * 78
+if total.zero?
+  puts "No settled contract is mispriced right now."
+  puts "Expected most of the day: the edge appears when a new high lands near a strike."
+else
+  puts "#{total} settled contract(s) still quotable. Verify by hand before trusting this."
+end
