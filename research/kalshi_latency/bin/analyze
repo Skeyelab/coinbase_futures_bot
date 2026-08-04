@@ -12,9 +12,12 @@ DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
 THRESHOLD = Float(ENV["THRESHOLD_CENTS"] || 5)
 MAX_GAP = Integer(ENV["MAX_GAP_SECONDS"] || 120) # a longer gap means we stopped sampling
 
-def kalshi_fee_cents(price_cents)
-  p = price_cents / 100.0
-  (0.07 * p * (1 - p) * 100).ceil
+# Kalshi charges the whole order once, not each contract. Shared with
+# Opportunity so the two never drift.
+require_relative "../lib/opportunity"
+
+def kalshi_fee_cents(price_cents, contracts = 1)
+  Opportunity.fee_cents(price_cents, contracts)
 end
 
 def percentile(sorted, pct)

@@ -13,7 +13,8 @@ class WeatherScan
   Result = Struct.new(:city, :station, :local_date, :running_high, :observed_at,
     :obs_age_seconds, :markets, :opportunities, :error)
 
-  def initialize(client: KalshiClient.new, now: nil, observation_ttl: 120)
+  def initialize(client: KalshiClient.new, now: nil, observation_ttl: 120, max_contracts: 25)
+    @max_contracts = max_contracts
     @client = client
     @fixed_now = now
     @observation_ttl = observation_ttl
@@ -39,11 +40,31 @@ class WeatherScan
       market = TempMarket.from_api(row)
       next unless market
 
-      Opportunity.find(
+      # Size from what is actually resting, capped: the fee is charged once per
+      # order, so a 1c edge is only worth taking once it is sized. Reporting a
+      # single contract would hide every thin-but-real opportunity.
+      resting = row["yes_bid_size_fp"].to_f.floor
+      found = Opportunity.find(
         market: market,
         running_high: high,
         bid_cents: (row["yes_bid_dollars"].to_f * 100).round,
-        ask_cents: (row["yes_ask_dollars"].to_f * 100).round
+        ask_cents: (row["yes_ask_dollars"].to_f * 100).round,
+        contracts: [resting, @max_contracts].min
+      )
+      next unless found
+
+      # Two sanity signals, because a settled-fact claim that the market
+      # disputes is far more likely to be my error than free money.
+      #
+      # margin_f: how far the reading clears the rounding boundary. METAR is
+      # whole Celsius, so a single 26.0C tick reads as 78.8F and sits 0.3F over
+      # the 78.5 boundary -- enough for round() to say 79, not enough to trust.
+      #
+      # market_pct: what the book thinks. A contract I call worth zero that
+      # still bids 78c is not an opportunity, it is a disagreement I am losing.
+      found.merge(
+        margin_f: margin_above_boundary(market, high),
+        market_pct: found[:price_cents]
       )
     end
 
@@ -56,6 +77,15 @@ class WeatherScan
   rescue => e
     Result.new(city: city[:label], station: city[:station], markets: 0,
       opportunities: [], error: "#{e.class}: #{e.message}")
+  end
+
+  # Distance past the whole-degree rounding boundary that settles this market
+  # against us. nil when the market is not refuted by a cap.
+  def margin_above_boundary(market, high)
+    return nil if high.nil? || market.cap.nil?
+
+    boundary = market.cap + 0.5
+    (high - boundary).round(2)
   end
 
   def local_date_for(zone_name)

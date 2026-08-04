@@ -35,12 +35,23 @@ class TempMarket
     # observation would invent edges in every half-degree band.
     degrees = settling_degrees(running_high)
 
+    # Kalshi's strike bounds are NOT uniformly inclusive, and the difference is
+    # a whole degree of settlement:
+    #
+    #   between  B89.5  floor=89 cap=90  "89 to 90"      both INCLUSIVE
+    #   greater  T90    floor=90         "91 or above"   floor EXCLUSIVE
+    #   less     T83    cap=83           "82 or below"   cap   EXCLUSIVE
+    #
+    # Reading them all as inclusive confirmed a Philadelphia contract at 90
+    # that actually needs 91, and the scanner reported free money that was an
+    # off-by-one.
     case kind
-    when :between, :less
-      # Overshooting the top of the range settles it against us, permanently.
+    when :between
       (degrees > cap) ? :refuted : :open
+    when :less
+      (degrees >= cap) ? :refuted : :open
     when :greater
-      (degrees >= floor) ? :confirmed : :open
+      (degrees > floor) ? :confirmed : :open
     end
   end
 

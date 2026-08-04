@@ -27,8 +27,13 @@ results.each do |r|
 
   r.opportunities.each do |o|
     total += 1
-    puts format("      >> %-26s %s @ %2dc   gross=%2dc fee=%dc NET=%dc",
-      o[:ticker], o[:side].to_s.upcase, o[:price_cents], o[:gross_cents], o[:fee_cents], o[:net_cents])
+    doubt = []
+    doubt << "MARKET DISAGREES #{o[:market_pct]}%" if o[:market_pct].to_i >= 20
+    doubt << format("thin margin %+.2fF", o[:margin_f]) if o[:margin_f] && o[:margin_f] < 0.5
+
+    puts format("      >> %-26s %s %3d @ %2dc   edge=%2dc NET=%4dc%s",
+      o[:ticker], o[:side].to_s.upcase, o[:contracts], o[:price_cents],
+      o[:edge_cents], o[:net_cents], doubt.empty? ? "" : "   <<< #{doubt.join(", ")}")
   end
 end
 
@@ -38,4 +43,7 @@ if total.zero?
   puts "Expected most of the day: the edge appears when a new high lands near a strike."
 else
   puts "#{total} settled contract(s) still quotable. Verify by hand before trusting this."
+  puts
+  puts "A flagged line is a claim the BOOK disputes. On a liquid market that"
+  puts "almost always means the model is wrong, not that the money is free."
 end
