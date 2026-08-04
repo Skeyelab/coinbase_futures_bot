@@ -88,6 +88,16 @@ class KalshiClient
     (body["markets"] || []).select { |m| m["ticker"].to_s.include?("-#{stamp}-") }
   end
 
+  # Every open market in a series. Unlike temp_markets this does not filter by
+  # date: one-touch windows span weeks and the whole series is in play.
+  def series_markets(series_ticker, limit: 100)
+    body = get("/markets", series_ticker: series_ticker, status: "open", limit: limit)
+    (body["markets"] || []).select { |m| m["yes_ask_dollars"].to_f > 0 }
+  rescue RequestFailed => e
+    log("series_markets #{series_ticker} failed: #{e.message}")
+    []
+  end
+
   # Current top-of-book for many tickers. Batched to stay inside rate limits.
   def quotes(tickers)
     tickers.each_slice(MAX_TICKERS_PER_REQUEST).flat_map do |batch|

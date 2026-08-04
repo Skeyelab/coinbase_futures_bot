@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# Continuous scan across every ratchet family, logging every cycle -- including
+# empty ones, because the funding gate needs a RATE and that needs a denominator.
+#
+#   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
+#     bin/collect_opportunities
+#
+# Read-only. No order path.
+
+require_relative "../lib/opportunity_collector"
+
+OpportunityCollector.new(
+  data_dir: ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__),
+  interval: Integer(ENV.fetch("INTERVAL", "60"))
+).run(seconds: ENV["SECONDS"] && Integer(ENV["SECONDS"]))
