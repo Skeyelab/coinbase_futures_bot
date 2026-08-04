@@ -152,6 +152,7 @@ class FetchCandlesJob < ApplicationJob
       [backfill_days.to_i, @max_1m_days].min
     end
     start_time = fetch_start_time(pair.product_id, "1m", 1.minute, backfill_days_1m.days.ago)
+    return if start_time.nil?
 
     if Time.now.utc - start_time > 5.hours
       rest.upsert_1m_candles_chunked(
@@ -200,6 +201,7 @@ class FetchCandlesJob < ApplicationJob
     # deep backtest history impossible). Single request covers ~24h (288
     # candles); chunk anything longer.
     start_time = fetch_start_time(pair.product_id, "5m", 5.minutes, backfill_days.to_i.days.ago)
+    return if start_time.nil?
 
     if Time.now.utc - start_time > 24.hours
       rest.upsert_5m_candles_chunked(
@@ -236,6 +238,7 @@ class FetchCandlesJob < ApplicationJob
     # 15m: honor the full backfill_days (issue #342 — the old 3-day cap also
     # made the chunked branch below unreachable). Chunk beyond ~3 days.
     start_time = fetch_start_time(pair.product_id, "15m", 15.minutes, backfill_days.to_i.days.ago)
+    return if start_time.nil?
 
     if Time.now.utc - start_time > 3.days
       rest.upsert_15m_candles_chunked(
@@ -275,6 +278,7 @@ class FetchCandlesJob < ApplicationJob
   def fetch_1h_candles(rest, pair, backfill_days)
     # Choose the later of (last known + 1h) and (backfill_days ago)
     start_time = fetch_start_time(pair.product_id, "1h", 1.hour, backfill_days.to_i.days.ago)
+    return if start_time.nil?
 
     # Chunk at 14 days (336 candles) — the API truncates responses over ~350
     # candles, which silently capped 1h history at ~168 candles (issue #368).
@@ -316,6 +320,7 @@ class FetchCandlesJob < ApplicationJob
   def fetch_30m_candles(rest, pair, backfill_days)
     # 30m has no chunked fetcher; cap at 7 days (~336 candles per request)
     start_time = fetch_start_time(pair.product_id, "30m", 30.minutes, [backfill_days.to_i, 7].min.days.ago)
+    return if start_time.nil?
     rest.upsert_30m_candles(product_id: pair.product_id, start_time: start_time, end_time: Time.now.utc)
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 30m candles for #{pair.product_id}: #{e.message}")
@@ -330,6 +335,7 @@ class FetchCandlesJob < ApplicationJob
 
   def fetch_1d_candles(rest, pair, backfill_days)
     start_time = fetch_start_time(pair.product_id, "1d", 1.day, backfill_days.to_i.days.ago)
+    return if start_time.nil?
     rest.upsert_1d_candles(product_id: pair.product_id, start_time: start_time, end_time: Time.now.utc)
   rescue => e
     Rails.logger.error("[Candles] Failed to fetch 1d candles for #{pair.product_id}: #{e.message}")
@@ -352,11 +358,29 @@ class FetchCandlesJob < ApplicationJob
   # candle can never fill backward history (the second half of issue #342;
   # upserts make the overlap refetch idempotent). Self-healing: once the
   # deep window exists, subsequent runs are incremental again.
-  def fetch_start_time(product_id, timeframe, step, cutoff)
+  # Returns nil when there is nothing left to fetch.
+  #
+  # The incremental branch starts just after the newest stored candle, and
+  # nothing used to bound that by the present. For a daily bar that means
+  # newest + 1.day, which is TOMORROW, so the job asked Coinbase for a window
+  # running backwards:
+  #
+  #   GET .../candles?end=1785650723&granularity=ONE_DAY&start=1785715200
+  #                       Aug 1 06:05Z                        Aug 2 00:00Z
+  #
+  # Coinbase 400s that. It fired ~2,000 times in production, and the real cost
+  # was not the noise: the current day's candle stopped refreshing until the
+  # next day rolled over.
+  def fetch_start_time(product_id, timeframe, step, cutoff, now: Time.now.utc)
     scope = Candle.where(symbol: product_id, timeframe: timeframe)
     earliest = scope.minimum(:timestamp)
-    return cutoff if earliest.nil? || earliest > cutoff + step
 
-    [scope.maximum(:timestamp) + step, cutoff].max
+    start_time = if earliest.nil? || earliest > cutoff + step
+      cutoff
+    else
+      [scope.maximum(:timestamp) + step, cutoff].max
+    end
+
+    (start_time >= now) ? nil : start_time
   end
 end
