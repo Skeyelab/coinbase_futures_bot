@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# Samples Kalshi top-of-book and RSS headlines into JSONL. Read-only: it holds
+# no credentials and cannot place an order.
+#
+#   bin/collect                       # defaults, writes to ./data
+#   QUOTE_INTERVAL=3 bin/collect      # sample faster
+#   MIN_VOLUME_24H=5000 bin/collect   # only busier markets
+
+require_relative "../lib/collector"
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+
+collector = Collector.new(
+  data_dir: data_dir,
+  quote_interval: Integer(ENV["QUOTE_INTERVAL"] || 5),
+  news_interval: Integer(ENV["NEWS_INTERVAL"] || 30),
+  rediscover_every: Integer(ENV["REDISCOVER_EVERY"] || 3600),
+  min_volume_24h: Float(ENV["MIN_VOLUME_24H"] || 1000),
+  watchlist_size: Integer(ENV["WATCHLIST_SIZE"] || 150)
+)
+
+warn "collecting into #{data_dir} (Ctrl-C to stop)"
+collector.run
