@@ -13,6 +13,30 @@ require_relative "opportunity"
 # open_time, not from whenever we happen to have data. Using a wider window
 # would confirm markets on touches that happened before they existed.
 class TouchScan
+  # DISABLED 2026-08-04.
+  #
+  # Kalshi settles crypto against CF BENCHMARKS' REAL TIME INDEX, a composite
+  # across venues. PriceExtremes reads Coinbase spot. Those differ, and near a
+  # strike the difference decides the outcome -- the same class of error as
+  # reading METAR when settlement is the NWS climate report.
+  #
+  # There is a second problem the index fix would not solve. Kalshi's
+  # directional crypto markets settle on the AVERAGE OF 60 RTI PRICES in the
+  # final minute before expiry, which is not a one-touch at all and cannot be
+  # answered by a running extreme. So this family contains at least two
+  # settlement models and the scanner modelled neither correctly.
+  #
+  # Off rather than approximated. It currently reports zero opportunities, so
+  # disabling costs nothing today -- but it would confidently report a false
+  # one the moment BTC approached $60,000, and a signal nobody can trust does
+  # not belong in the same output as one they can.
+  #
+  # To re-enable: source RTI itself, confirm which series use touch versus
+  # final-average settlement, and re-verify against a settled market.
+  ENABLED = false
+  DISABLED_REASON = "crypto settles on CF Benchmarks RTI, not Coinbase spot; " \
+                    "directional series settle on a 60-price RTI average"
+
   Result = Struct.new(:series, :product, :window_from, :window_to, :min, :max,
     :bars, :granularity, :markets, :opportunities, :error)
 
@@ -31,6 +55,15 @@ class TouchScan
   end
 
   def run
+    # Guard sits BEFORE any client call: a disabled scanner that still fetches
+    # is still burning rate limit and still depending on the wrong source.
+    unless ENABLED
+      return PRODUCTS.keys.map do |series|
+        Result.new(series: series, markets: 0, opportunities: [],
+          error: "disabled: #{DISABLED_REASON}")
+      end
+    end
+
     PRODUCTS.keys.map { |series| scan(series) }
   end
 
