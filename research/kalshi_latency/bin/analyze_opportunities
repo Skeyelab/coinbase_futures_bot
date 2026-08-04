@@ -8,6 +8,7 @@
 # false positives is measuring its bugs rather than the market.
 
 require "json"
+require_relative "../lib/credibility"
 
 DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
 # Two sightings further apart than this are separate episodes. Without it a
@@ -37,8 +38,10 @@ puts "=" * 74
 puts format("window   %.1f hours", span_h)
 cycles.group_by { |c| c["family"] }.each do |family, rows|
   next unless family
-  puts format("  %-9s %5d scans  %6d market-checks  %d errors",
-    family, rows.size, rows.sum { |r| r["markets"].to_i }, rows.sum { |r| r["errors"].to_i })
+  disabled = rows.sum { |r| r["disabled"].to_i }
+  puts format("  %-9s %5d scans  %6d market-checks  %d errors%s",
+    family, rows.size, rows.sum { |r| r["markets"].to_i }, rows.sum { |r| r["errors"].to_i },
+    disabled.positive? ? "   (#{disabled} scope-scans disabled)" : "")
 end
 
 episodes = sightings.group_by { |s| s["ticker"] }.flat_map do |ticker, seen|
@@ -54,16 +57,17 @@ episodes = sightings.group_by { |s| s["ticker"] }.flat_map do |ticker, seen|
   end
 end
 
-# Doubt signals measured 2026-08-04: a lone-spike peak, or a market that
-# disagrees loudly, is my error far more often than it is free money.
-credible, doubtful = episodes.partition do |e|
-  e[:market_pct] < 20 && (e[:support].nil? || e[:support].to_i > 1)
-end
+episodes.each { |e| e[:doubts] = Credibility.doubts(e) }
+credible, doubtful = episodes.partition { |e| e[:doubts].empty? }
 
 puts
 puts format("episodes           %4d   (from %d raw sightings)", episodes.size, sightings.size)
 puts format("  credible         %4d", credible.size)
-puts format("  doubtful         %4d   market disagrees >=20%%, or lone-spike peak", doubtful.size)
+puts format("  doubtful         %4d", doubtful.size)
+doubtful.flat_map { |e| e[:doubts] }
+  .map { |r| r.sub(/ \d.*/, "").sub(/ \(.*/, "") }
+  .tally.sort_by { |_, n| -n }
+  .each { |reason, n| puts format("      %-20s %d", reason, n) }
 
 if span_h > 0
   puts
@@ -80,7 +84,7 @@ unless episodes.empty?
     puts format("%-26s %-7s %5d %5d %5d%% %6d %8s%s",
       e[:ticker][0, 26], e[:family].to_s[0, 7], e[:net], e[:contracts],
       e[:market_pct], e[:seconds], e[:support] || "-",
-      credible.include?(e) ? "" : "  <doubtful>")
+      e[:doubts].empty? ? "" : "  <#{e[:doubts].join("; ")}>")
   end
 end
 

@@ -28,7 +28,7 @@ module TradeLedger
         side: f["side"],
         # Kalshi fills use *_fp / *_dollars, not the bare names the docs suggest.
         count: f["count_fp"].to_f.round,
-        price_cents: ((f["side"] == "no" ? f["no_price_dollars"] : f["yes_price_dollars"]).to_f * 100).round,
+        price_cents: (((f["side"] == "no") ? f["no_price_dollars"] : f["yes_price_dollars"]).to_f * 100).round,
         fee_cents: (f["fee_cost"].to_f * 100).round(2),
         track: called.include?(ticker) ? :settled_fact : :directional
       }

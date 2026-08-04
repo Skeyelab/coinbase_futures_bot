@@ -71,7 +71,10 @@ class OpportunityCollector
       at: at, cycle: number, family: family,
       scopes: scopes.size,
       markets: scopes.sum { |s| s[:markets].to_i },
-      errors: scopes.count { |s| s[:error] },
+      # A deliberately disabled family is not a failure. Counting it as one
+      # puts "140 errors" in a log someone scans at 6am and reads as broken.
+      errors: scopes.count { |s| s[:error] && !s[:error].to_s.start_with?("disabled") },
+      disabled: scopes.count { |s| s[:error].to_s.start_with?("disabled") },
       opportunities: total
     })
 

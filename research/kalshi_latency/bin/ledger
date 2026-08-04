@@ -19,7 +19,11 @@ def called_tickers
 
   files.flat_map do |path|
     File.readlines(path).filter_map do |line|
-      row = JSON.parse(line) rescue nil
+      row = begin
+        JSON.parse(line)
+      rescue
+        nil
+      end
       next unless row
       # A prediction only counts as a CALL when the model made a definite one.
       next if row.key?("model_says") && row["model_says"] == "open"
