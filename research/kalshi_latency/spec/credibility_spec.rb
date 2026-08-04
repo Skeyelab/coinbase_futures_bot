@@ -42,6 +42,18 @@ RSpec.describe Credibility do
       expect(described_class.doubts(episode(support: nil))).to be_empty
     end
 
+    # A city whose settlement station we inferred rather than read cannot
+    # produce a tradeable signal, however clean it otherwise looks.
+    it "distrusts an unverified settlement station" do
+      expect(described_class.doubts(episode.merge(verified: false)).first)
+        .to match(/station unverified/)
+      expect(described_class.doubts(episode.merge(verified: true))).to be_empty
+    end
+
+    it "treats an absent verified flag as verified, not as a doubt" do
+      expect(described_class.doubts(episode)).to be_empty
+    end
+
     it "answers credible? from the same signals" do
       expect(described_class).to be_credible(episode)
       expect(described_class).not_to be_credible(episode(market_pct: 93))

@@ -4,6 +4,7 @@
 # Read-only. Reports opportunities; it cannot place an order.
 
 require_relative "../lib/weather_scan"
+require_relative "../lib/credibility"
 
 results = WeatherScan.new.run
 
@@ -27,10 +28,13 @@ results.each do |r|
 
   r.opportunities.each do |o|
     total += 1
-    doubt = []
-    doubt << "MARKET DISAGREES #{o[:market_pct]}%" if o[:market_pct].to_i >= 20
-    doubt << format("thin margin %+.2fF", o[:margin_f]) if o[:margin_f] && o[:margin_f] < 0.5
-    doubt << "LONE SPIKE (#{o[:peak_support]} obs)" if o[:peak_support].to_i <= 1
+    # Single source of truth for the doubt signals. This used to reimplement
+    # them and had already drifted -- it never flagged an unverified station.
+    doubt = Credibility.doubts({
+      market_pct: o[:market_pct], support: o[:peak_support],
+      seconds: 0, verified: o[:verified]
+    })
+    doubt += [format("thin margin %+.2fF", o[:margin_f])] if o[:margin_f] && o[:margin_f] < 0.5
 
     puts format("      >> %-26s %s %3d @ %2dc   edge=%2dc NET=%4dc%s",
       o[:ticker], o[:side].to_s.upcase, o[:contracts], o[:price_cents],

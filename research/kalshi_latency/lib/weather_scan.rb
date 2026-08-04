@@ -67,6 +67,7 @@ class WeatherScan
       found.merge(
         margin_f: margin_above_boundary(market, high),
         peak_support: support,
+        verified: city[:verified] != false,
         market_pct: found[:price_cents]
       )
     end

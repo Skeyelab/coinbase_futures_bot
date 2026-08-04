@@ -31,6 +31,11 @@ module Credibility
   def self.doubts(episode, max_persistence: MAX_PERSISTENCE_SECONDS)
     reasons = []
 
+    # An inferred settlement station is a guess, however obvious. Chicago
+    # settles on Midway, not O'Hare, and nothing in the rules text says so for
+    # the cities added 2026-08-04.
+    reasons << "station unverified" if episode[:verified] == false
+
     pct = episode[:market_pct].to_i
     reasons << "market disagrees #{pct}%" if pct >= MAX_MARKET_PCT
 
