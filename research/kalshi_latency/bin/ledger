@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+# Two tracks, never summed.
+#
+#   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- bin/ledger
+#
+# A trade is gate evidence only if the system CALLED IT BEFORE THE FILL, which
+# means its ticker appears in a predictions file or the opportunity log. Trades
+# that merely look like the strategy in hindsight are directional.
+
+require "json"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/trade_ledger"
+
+def called_tickers
+  base = File.expand_path("..", __dir__)
+  files = Dir[File.join(base, "predictions", "*.jsonl")] +
+    Dir[File.join(base, "data", "**", "opportunity-*.jsonl")] +
+    Dir[File.expand_path("~/kalshi-data/opportunity-*.jsonl")]
+
+  files.flat_map do |path|
+    File.readlines(path).filter_map do |line|
+      row = JSON.parse(line) rescue nil
+      next unless row
+      # A prediction only counts as a CALL when the model made a definite one.
+      next if row.key?("model_says") && row["model_says"] == "open"
+      row["ticker"]
+    end
+  end.uniq
+end
+
+client = KalshiClient.from_env
+abort "no Kalshi credentials — run under `doppler run`" unless client.authenticated?
+
+fills = client.portfolio("/portfolio/fills", limit: 100)["fills"] || []
+calls = called_tickers
+classified = TradeLedger.classify(fills, called_tickers: calls)
+
+puts "=" * 74
+puts "TRADE LEDGER"
+puts "=" * 74
+puts format("fills %d   tickers the system called in advance: %d", fills.size, calls.size)
+
+{settled_fact: "SETTLED-FACT  (counts toward the funding gate)",
+ directional: "DIRECTIONAL   (does NOT count -- a view, not arithmetic)"}.each do |track, label|
+  rows = classified.select { |t| t[:track] == track }
+  puts
+  puts label
+  puts "-" * 74
+  if rows.empty?
+    puts "  none"
+    next
+  end
+  rows.each do |t|
+    puts format("  %-30s %-4s %-4s %4d @ %3dc  fee %.2fc   %s",
+      t[:ticker][0, 30], t[:action], t[:side], t[:count], t[:price_cents],
+      t[:fee_cents].to_f, t[:at].to_s[11, 8])
+  end
+end
+
+balance = client.portfolio("/portfolio/balance")
+puts
+puts "-" * 74
+puts format("balance $%s   portfolio value %s", balance["balance_dollars"], balance["portfolio_value"])
+puts "Gate arithmetic reads the settled-fact track only. A run of good"
+puts "directional calls must not make an untested edge look real."

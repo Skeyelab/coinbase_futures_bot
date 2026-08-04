@@ -88,6 +88,17 @@ class KalshiClient
     (body["markets"] || []).select { |m| m["ticker"].to_s.include?("-#{stamp}-") }
   end
 
+  # Authenticated portfolio reads. GET only -- there is still no order path in
+  # this client.
+  def portfolio(path, **params)
+    return {} unless authenticated?
+
+    get(path, **params)
+  rescue RequestFailed => e
+    log("portfolio #{path} failed: #{e.message}")
+    {}
+  end
+
   # Every open market in a series. Unlike temp_markets this does not filter by
   # date: one-touch windows span weeks and the whole series is in play.
   def series_markets(series_ticker, limit: 100)
