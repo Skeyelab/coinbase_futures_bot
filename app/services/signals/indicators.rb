@@ -14,6 +14,46 @@ module Signals
   module Indicators
     module_function
 
+    # Average true range over the last `period` bars.
+    #
+    # Wilder's TRUE RANGE, then a SIMPLE MEAN -- deliberately not Wilder's
+    # smoothing. This mirrors the n8n Market Data Populator, which is what the
+    # live ATR Chandelier stop is measured against. A textbook Wilder EMA here
+    # would produce a different number and quietly compare the backtest to a
+    # rule nobody is running.
+    #
+    # Candles are hashes with :high, :low, :close, oldest first. Returns a
+    # Float, or nil when there are too few bars to form even one range.
+    def atr(candles, period)
+      return nil if period.to_i < 1
+      return nil if candles.nil?
+
+      ranges = true_ranges(candles)
+      return nil if ranges.empty?
+
+      window = ranges.last(period)
+      window.sum / window.size.to_f
+    end
+
+    # One true range per bar after the first. The previous CLOSE is what makes a
+    # gap count: an overnight jump is risk you were exposed to holding through
+    # the close, so it belongs in the volatility measure.
+    def true_ranges(candles)
+      candles.each_cons(2).map do |prev, cur|
+        high = cur[:high].to_f
+        low = cur[:low].to_f
+        prev_close = prev[:close].to_f
+
+        # The .abs on the high term can never change the result -- high >= low,
+        # so on a gap up both differences are positive and on a gap down the low
+        # term is always the larger magnitude. It stays because this is the
+        # canonical true-range formula and is character-for-character what the
+        # n8n populator runs; parity is worth more here than dropping a term a
+        # reader would expect to see.
+        [high - low, (high - prev_close).abs, (low - prev_close).abs].max
+      end
+    end
+
     # Exponential moving average over the full series.
     # Returns a Float, or nil when period is non-positive or the series
     # is shorter than period.
