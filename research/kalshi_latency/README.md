@@ -95,6 +95,39 @@ constraint for a small stake. Reaction WINDOW still might be -- that is what
 Note these are the busiest markets, which are political. The weather markets
 that carry hourly scheduled information have not had their depth measured yet.
 
+## The payrolls experiment (Friday 2026-08-07, 08:30:00 ET)
+
+The sharpest test of the whole thesis, because it has all three properties at
+once: an exact publication time, a machine-readable primary source, and a deep
+book ($22,683 within 5c on the top strike).
+
+```bash
+# start ~5 minutes early; runs 10 minutes by default
+doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
+  bin/record_payrolls
+
+bin/analyze_release
+```
+
+Records the BLS release page and the Kalshi book on ONE clock at 1s
+resolution, because the measurement is a subtraction and two loops with
+independent clocks cannot resolve a gap smaller than their jitter.
+
+Measured round trips on 2026-08-04: BLS 97ms, Kalshi order book 55ms, whole
+tick ~156ms against a 1s budget.
+
+Reading the result:
+
+- **t_90 <= 2s** - no window. The book absorbed it inside one poll. You would
+  be racing machines, and no amount of retail tuning fixes that.
+- **2-15s** - real but tight. Needs a pre-armed order, not a decision.
+- **>15s** - reactable by a script that was already watching.
+
+Two honest limits. Publication detection is a LATE bound: the figure was public
+up to one poll interval before we saw it, so every window is a floor. And BLS
+serves through a CDN, so our observation is when *this client* could see it,
+not when it hit the wire.
+
 ## Run
 
 ```bash
