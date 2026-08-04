@@ -1,0 +1,92 @@
+#!/usr/bin/env ruby
+# The opportunity RATE, which is funding-gate item #2.
+#
+# Rate is hits divided by scans, and both halves matter. A count without a
+# denominator could mean three per hour or three per week.
+#
+# It also splits CREDIBLE from DOUBTFUL, because a scanner that counts its own
+# false positives is measuring its bugs rather than the market.
+
+require "json"
+
+DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+# Two sightings further apart than this are separate episodes. Without it a
+# single mispricing sitting for an hour counts as sixty opportunities.
+GAP = Integer(ENV.fetch("EPISODE_GAP_SECONDS", "300"))
+
+def load_stream(stream)
+  Dir[File.join(DATA_DIR, "#{stream}-*.jsonl")].sort.flat_map do |path|
+    File.readlines(path).filter_map do |line|
+      JSON.parse(line)
+    rescue JSON::ParserError
+      nil
+    end
+  end
+end
+
+cycles = load_stream("cycle")
+sightings = load_stream("opportunity")
+abort "no data in #{DATA_DIR}" if cycles.empty?
+
+stamps = cycles.map { |c| c["at"] }.compact
+span_h = (stamps.max - stamps.min) / 3600.0
+
+puts "=" * 74
+puts "OPPORTUNITY RATE"
+puts "=" * 74
+puts format("window   %.1f hours", span_h)
+cycles.group_by { |c| c["family"] }.each do |family, rows|
+  next unless family
+  puts format("  %-9s %5d scans  %6d market-checks  %d errors",
+    family, rows.size, rows.sum { |r| r["markets"].to_i }, rows.sum { |r| r["errors"].to_i })
+end
+
+episodes = sightings.group_by { |s| s["ticker"] }.flat_map do |ticker, seen|
+  seen.sort_by! { |s| s["at"] }
+  runs = [[seen.first]]
+  seen.each_cons(2) { |a, b| ((b["at"] - a["at"]) > GAP) ? runs << [b] : runs.last << b }
+  runs.map do |run|
+    best = run.max_by { |s| s["net_cents"].to_i }
+    {ticker: ticker, family: run.first["family"], sightings: run.size,
+     seconds: run.last["at"] - run.first["at"], net: best["net_cents"].to_i,
+     contracts: best["contracts"].to_i, market_pct: best["market_pct"].to_i,
+     support: best["peak_support"], margin: best["margin_f"]}
+  end
+end
+
+# Doubt signals measured 2026-08-04: a lone-spike peak, or a market that
+# disagrees loudly, is my error far more often than it is free money.
+credible, doubtful = episodes.partition do |e|
+  e[:market_pct] < 20 && (e[:support].nil? || e[:support].to_i > 1)
+end
+
+puts
+puts format("episodes           %4d   (from %d raw sightings)", episodes.size, sightings.size)
+puts format("  credible         %4d", credible.size)
+puts format("  doubtful         %4d   market disagrees >=20%%, or lone-spike peak", doubtful.size)
+
+if span_h > 0
+  puts
+  puts format("RATE    all %.2f/hr (%.1f/day)      credible %.2f/hr (%.1f/day)",
+    episodes.size / span_h, episodes.size / span_h * 24,
+    credible.size / span_h, credible.size / span_h * 24)
+end
+
+unless episodes.empty?
+  puts
+  puts "ticker                     family   net    ct   mkt%  dwell  support"
+  puts "-" * 74
+  episodes.sort_by { |e| -e[:net] }.first(12).each do |e|
+    puts format("%-26s %-7s %5d %5d %5d%% %6d %8s%s",
+      e[:ticker][0, 26], e[:family].to_s[0, 7], e[:net], e[:contracts],
+      e[:market_pct], e[:seconds], e[:support] || "-",
+      credible.include?(e) ? "" : "  <doubtful>")
+  end
+end
+
+tradeable = credible.select { |e| e[:net] >= 2 && e[:contracts] >= 50 }
+puts
+puts "-" * 74
+puts "GATE #2: >=1 tradeable/day over 7 days (credible, net >=2c, >=50 contracts)"
+puts format("  tradeable so far: %d  ->  %.1f/day at this rate",
+  tradeable.size, (span_h > 0) ? tradeable.size / span_h * 24 : 0)
