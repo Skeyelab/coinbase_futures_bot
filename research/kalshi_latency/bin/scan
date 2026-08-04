@@ -23,8 +23,8 @@ results.each do |r|
   age = r.obs_age_seconds ? "#{r.obs_age_seconds / 60}m ago" : "no obs"
   high = r.running_high ? format("%.1fF", r.running_high) : "none yet"
 
-  puts format("%-13s %-6s %-10s high=%-9s obs %s  markets=%d",
-    r.city, r.station, r.local_date.to_s, high, age, r.markets)
+  puts format("%-13s %-6s %-10s %s=%-9s obs %s  markets=%d",
+    r.city, r.station, r.local_date.to_s, (r.kind == :low) ? "low " : "high", high, age, r.markets)
 
   r.opportunities.each do |o|
     total += 1

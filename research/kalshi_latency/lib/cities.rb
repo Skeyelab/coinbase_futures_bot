@@ -56,6 +56,28 @@ module Cities
     {series: "KXHIGHTSFO", station: "KSFO", time_zone: "America/Los_Angeles", label: "San Francisco", verified: false}
   ].freeze
 
+  # Daily-LOW series. The observable is a running MINIMUM, so these use
+  # LowTempMarket, whose settleable side is mirrored.
+  #
+  # Worth having for TIMING, not just count: lows are set around dawn and highs
+  # mid-afternoon, so together they cover opposite halves of the day. Before
+  # these the scanner had nothing to find before noon.
+  #
+  # All UNVERIFIED. Their rules say only "at Denver", "at Chicago" -- and note
+  # that KXLOWTCHI is a DIFFERENT SERIES from KXHIGHCHI, which does name
+  # Midway. Sharing a city name is not evidence of sharing a station.
+  LOWS = [
+    {series: "KXLOWTDEN", station: "KDEN", time_zone: "America/Denver", label: "Denver LOW", verified: false},
+    {series: "KXLOWTATL", station: "KATL", time_zone: "America/New_York", label: "Atlanta LOW", verified: false},
+    {series: "KXLOWTCHI", station: "KMDW", time_zone: "America/Chicago", label: "Chicago LOW", verified: false},
+    {series: "KXLOWTMIN", station: "KMSP", time_zone: "America/Chicago", label: "Minneapolis LOW", verified: false},
+    {series: "KXLOWTOKC", station: "KOKC", time_zone: "America/Chicago", label: "OKC LOW", verified: false},
+    {series: "KXLOWTSATX", station: "KSAT", time_zone: "America/Chicago", label: "San Antonio LOW", verified: false},
+    {series: "KXLOWTSFO", station: "KSFO", time_zone: "America/Los_Angeles", label: "SF LOW", verified: false},
+    {series: "KXLOWTLV", station: "KLAS", time_zone: "America/Los_Angeles", label: "Las Vegas LOW", verified: false},
+    {series: "KXLOWTPHIL", station: "KPHL", time_zone: "America/New_York", label: "Philadelphia LOW", verified: false}
+  ].freeze
+
   def self.each(&block)
     ALL.each(&block)
   end

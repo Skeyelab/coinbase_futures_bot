@@ -5,13 +5,15 @@ require_relative "cities"
 require_relative "kalshi_client"
 require_relative "nws_station"
 require_relative "temp_market"
+require_relative "low_temp_market"
+require_relative "daily_low"
 require_relative "opportunity"
 
 # Pairs each city's published running high against its live Kalshi book and
 # reports what the weather has already settled that the market has not.
 class WeatherScan
   Result = Struct.new(:city, :station, :local_date, :running_high, :observed_at,
-    :obs_age_seconds, :markets, :opportunities, :error)
+    :obs_age_seconds, :markets, :opportunities, :error, :kind)
 
   def initialize(client: KalshiClient.new, now: nil, observation_ttl: 120, max_contracts: 25)
     @max_contracts = max_contracts
@@ -23,23 +25,25 @@ class WeatherScan
 
   def run
     @now = @fixed_now || Time.now.utc
-    Cities::ALL.map { |city| scan(city) }
+    Cities::ALL.map { |city| scan(city, :high) } +
+      Cities::LOWS.map { |city| scan(city, :low) }
   end
 
   private
 
-  def scan(city)
+  def scan(city, kind = :high)
     local_date = local_date_for(city[:time_zone])
 
     observations = cached_observations(city)
-    daily = DailyHigh.new(observations, time_zone: city[:time_zone])
+    daily = (kind == :low) ? DailyLow.new(observations, time_zone: city[:time_zone])
+                           : DailyHigh.new(observations, time_zone: city[:time_zone])
     high = daily.for_date(local_date)
     support = daily.support_for(local_date)
     latest = observations.reject { |o| o[:temp_f].nil? }.max_by { |o| o[:at] }
 
     markets = @client.temp_markets(city[:series], local_date)
     opportunities = markets.filter_map do |row|
-      market = TempMarket.from_api(row)
+      market = (kind == :low) ? LowTempMarket.from_api(row) : TempMarket.from_api(row)
       next unless market
 
       # Size from what is actually resting, capped: the fee is charged once per
@@ -65,7 +69,7 @@ class WeatherScan
       # market_pct: what the book thinks. A contract I call worth zero that
       # still bids 78c is not an opportunity, it is a disagreement I am losing.
       found.merge(
-        margin_f: margin_above_boundary(market, high),
+        margin_f: margin_above_boundary(market, high, kind),
         peak_support: support,
         verified: city[:verified] != false,
         market_pct: found[:price_cents]
@@ -73,7 +77,7 @@ class WeatherScan
     end
 
     Result.new(
-      city: city[:label], station: city[:station], local_date: local_date,
+      city: city[:label], station: city[:station], local_date: local_date, kind: kind,
       running_high: high, observed_at: latest && latest[:at],
       obs_age_seconds: latest && (@now - latest[:at]).to_i,
       markets: markets.size, opportunities: opportunities
@@ -85,11 +89,21 @@ class WeatherScan
 
   # Distance past the whole-degree rounding boundary that settles this market
   # against us. nil when the market is not refuted by a cap.
-  def margin_above_boundary(market, high)
-    return nil if high.nil? || market.cap.nil?
+  # How far the reading clears the whole-degree rounding boundary that settles
+  # the contract against us. Direction matters: a high has to clear the cap
+  # UPWARD, a low has to clear the floor DOWNWARD. Using the high formula on a
+  # low market reports a comfortable margin on a reading that is nowhere near
+  # settling anything.
+  def margin_above_boundary(market, observed, kind)
+    return nil if observed.nil?
 
-    boundary = market.cap + 0.5
-    (high - boundary).round(2)
+    if kind == :low
+      return nil if market.floor.nil?
+      ((market.floor - 0.5) - observed).round(2)
+    else
+      return nil if market.cap.nil?
+      (observed - (market.cap + 0.5)).round(2)
+    end
   end
 
   def local_date_for(zone_name)

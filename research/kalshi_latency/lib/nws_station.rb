@@ -13,6 +13,17 @@ class NwsStation
   HOST = "api.weather.gov".freeze
   USER_AGENT = ENV.fetch("NWS_USER_AGENT", "kalshi-latency-research (dahl.eric@gmail.com)")
 
+  # A FULL LOCAL DAY, not a fixed count of readings. Station cadence varies:
+  # KNYC reports hourly, KOKC and KAUS every 5 minutes, so a 24-observation
+  # window is 24 hours at one and TWO HOURS at another.
+  #
+  # That was invisible while only daily HIGHS were tracked and only scanned in
+  # the afternoon -- the high sat inside the last two hours by luck. Daily LOWS
+  # are set at dawn and fell straight outside it: OKC reported a "low" of
+  # 100.4F, near its high. 288 five-minute readings is one day; this leaves
+  # room for the local day straddling UTC.
+  DEFAULT_LIMIT = 400
+
   class RequestFailed < StandardError; end
 
   def initialize(station, time_zone:)
@@ -25,7 +36,7 @@ class NwsStation
   # Recent observations, newest first, each with the temperature in F and the
   # time WE fetched it. fetched_at is what makes latency measurable: the gap
   # between an observation's own timestamp and when it became readable.
-  def observations(limit: 24)
+  def observations(limit: DEFAULT_LIMIT)
     fetched_at = Time.now.utc
 
     body = get("/stations/#{@station}/observations?limit=#{limit}")
@@ -41,7 +52,7 @@ class NwsStation
     end
   end
 
-  def running_high(local_date, limit: 24)
+  def running_high(local_date, limit: DEFAULT_LIMIT)
     DailyHigh.new(observations(limit: limit), time_zone: @time_zone).for_date(local_date)
   end
 
