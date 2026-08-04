@@ -32,7 +32,9 @@ class WeatherScan
     local_date = local_date_for(city[:time_zone])
 
     observations = cached_observations(city)
-    high = DailyHigh.new(observations, time_zone: city[:time_zone]).for_date(local_date)
+    daily = DailyHigh.new(observations, time_zone: city[:time_zone])
+    high = daily.for_date(local_date)
+    support = daily.support_for(local_date)
     latest = observations.reject { |o| o[:temp_f].nil? }.max_by { |o| o[:at] }
 
     markets = @client.temp_markets(city[:series], local_date)
@@ -64,6 +66,7 @@ class WeatherScan
       # still bids 78c is not an opportunity, it is a disagreement I am losing.
       found.merge(
         margin_f: margin_above_boundary(market, high),
+        peak_support: support,
         market_pct: found[:price_cents]
       )
     end

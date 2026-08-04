@@ -30,6 +30,7 @@ results.each do |r|
     doubt = []
     doubt << "MARKET DISAGREES #{o[:market_pct]}%" if o[:market_pct].to_i >= 20
     doubt << format("thin margin %+.2fF", o[:margin_f]) if o[:margin_f] && o[:margin_f] < 0.5
+    doubt << "LONE SPIKE (#{o[:peak_support]} obs)" if o[:peak_support].to_i <= 1
 
     puts format("      >> %-26s %s %3d @ %2dc   edge=%2dc NET=%4dc%s",
       o[:ticker], o[:side].to_s.upcase, o[:contracts], o[:price_cents],

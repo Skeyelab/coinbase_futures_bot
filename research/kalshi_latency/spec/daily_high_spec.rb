@@ -9,6 +9,51 @@ RSpec.describe DailyHigh do
     {at: Time.parse(utc), temp_f: temp_f}
   end
 
+  # Measured 2026-08-04: how well-corroborated a peak is predicts whether the
+  # book agrees it is real, and MARGIN does not.
+  #
+  #   KMIA 89.6F, 37 observations at the peak -> market agreed (0%)
+  #   KAUS 98.6F,  4 observations             -> market agreed (0%)
+  #   KLAX 78.8F,  1 observation              -> market disagreed (76%)
+  #
+  # LAX had the WIDEST margin over the rounding boundary of the three and was
+  # the one the market disputed. A lone 5-minute tick is noise; a peak held
+  # across several is a fact.
+  describe "#support_for" do
+    it "counts how many observations stand behind the day's peak" do
+      readings = [obs("2026-08-04T18:00:00Z", 96.8), obs("2026-08-04T18:05:00Z", 98.6),
+        obs("2026-08-04T18:10:00Z", 98.6), obs("2026-08-04T18:15:00Z", 96.8)]
+
+      high = described_class.new(readings, time_zone: "America/Chicago")
+
+      expect(high.support_for(Date.new(2026, 8, 4))).to eq(2)
+    end
+
+    it "reports a lone spike as exactly that" do
+      readings = [obs("2026-08-04T18:00:00Z", 77.0), obs("2026-08-04T18:05:00Z", 78.8),
+        obs("2026-08-04T18:10:00Z", 75.2)]
+
+      high = described_class.new(readings, time_zone: "America/Los_Angeles")
+
+      expect(high.support_for(Date.new(2026, 8, 4))).to eq(1)
+    end
+
+    it "counts only the local day, like the peak itself" do
+      readings = [obs("2026-08-05T02:00:00Z", 90.0), obs("2026-08-04T18:00:00Z", 90.0)]
+
+      high = described_class.new(readings, time_zone: "America/New_York")
+
+      # 02:00Z Aug 5 is 22:00 Aug 4 in New York, so both belong to Aug 4.
+      expect(high.support_for(Date.new(2026, 8, 4))).to eq(2)
+      expect(high.support_for(Date.new(2026, 8, 5))).to eq(0)
+    end
+
+    it "has no support to report on a day with no readings" do
+      expect(described_class.new([], time_zone: "America/New_York")
+        .support_for(Date.new(2026, 8, 4))).to eq(0)
+    end
+  end
+
   describe "#for_date" do
     it "takes the hottest reading of the local day" do
       readings = [

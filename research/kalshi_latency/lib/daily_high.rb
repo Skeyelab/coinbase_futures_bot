@@ -15,15 +15,38 @@ class DailyHigh
   end
 
   def for_date(local_date)
-    temps = @observations
-      .reject { |o| o[:temp_f].nil? }
-      .select { |o| local_date_of(o[:at]) == local_date }
-      .map { |o| o[:temp_f] }
+    temps_on(local_date).max
+  end
 
-    temps.max
+  # How many observations stand behind the day's peak.
+  #
+  # Measured 2026-08-04, this predicts whether the book agrees a peak is real,
+  # and the margin over the rounding boundary does NOT:
+  #
+  #   KMIA 89.6F, 37 observations -> market agreed the bucket was dead
+  #   KAUS 98.6F,  4 observations -> market agreed
+  #   KLAX 78.8F,  1 observation  -> market disagreed at 76%, despite having
+  #                                  the WIDEST margin of the three
+  #
+  # A lone 5-minute tick is noise. A peak held across several is a fact. The
+  # model treats every maximum as definitive, so this is the number that says
+  # how much to trust it.
+  def support_for(local_date)
+    temps = temps_on(local_date)
+    peak = temps.max
+    return 0 if peak.nil?
+
+    temps.count { |t| t >= peak }
   end
 
   private
+
+  def temps_on(local_date)
+    @observations
+      .reject { |o| o[:temp_f].nil? }
+      .select { |o| local_date_of(o[:at]) == local_date }
+      .map { |o| o[:temp_f] }
+  end
 
   def local_date_of(utc_time)
     @zone.to_local(utc_time.getutc).to_date
