@@ -42,6 +42,25 @@ So funding early would fund the unmeasured half.
 5. **No single-event dominance.** Remove the single best trade. Still positive.
    One lucky settlement is not a strategy.
 
+## Amendments — operator-ruled, dated, never retro-fitted
+
+**2026-08-05, gate #1 denominator (issue #628).** First scoring pass: 75/79
+all calls (94.9%), 75/75 on credible-only. Ruling: BOTH are reported, and
+the credible-only number DECIDES — a doubted call can never become an order,
+so it cannot decide whether orders are safe. The all-calls number stays in
+every report so the filtered misses never disappear. The four misses (LAX
+x2, SATX x2) were all doubt-flagged before settlement and none would have
+traded.
+
+**2026-08-05, gate #3 scoring (issue #631).** Ten real probe orders: resting
+(maker) fills 1/7 in 60s windows; every fill that occurred — 1 maker, 1
+taker — executed at exactly the quoted price, zero slippage. The original
+wording imagined slippage risk and instead measured fill-rate risk. Ruling:
+gate #3 scores the TAKER path — the strategy's real order shape is crossing
+a stale quote — on fills executing at-or-better with slippage recorded per
+order. Maker fill-rate remains an informational line, not a pass/fail input.
+As of this ruling: 2/2 at-or-better, 0 slippage, n small.
+
 ## Kill criteria — stop and rework, do not tune
 
 - Model accuracy below 90% on 30+ calls
