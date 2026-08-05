@@ -42,6 +42,20 @@ RSpec.describe OpportunityCollector do
     end
   end
 
+  it "checks exits once per cycle" do
+    Dir.mktmpdir do |dir|
+      execution = Execution::Pipeline.build(data_dir: dir)
+      expect(execution).to receive(:check_exits).at_least(:once).and_return([])
+      collector = described_class.new(
+        data_dir: dir, interval: 0,
+        weather: FakeScan.new([]), touch: FakeScan.new([]), truth: FakeScan.new([]),
+        execution: execution, logger: ->(m) {}
+      )
+
+      collector.run(seconds: 0.05)
+    end
+  end
+
   it "routes each weather sighting through the execution pipeline" do
     Dir.mktmpdir do |dir|
       sighting = {

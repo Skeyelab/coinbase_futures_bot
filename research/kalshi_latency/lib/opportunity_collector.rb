@@ -68,6 +68,13 @@ class OpportunityCollector
        observed_count: r.observed_count}
     })
 
+    # Exit on the market's agreement, not settlement: once a held settled-fact
+    # position has repriced, cross out, recycle the collateral, and never meet
+    # the METAR-vs-CLI basis risk. No-op when nothing is open.
+    @execution&.check_exits&.each do |x|
+      log("EXIT #{x[:mode]} #{x[:ticker]} #{x[:side]} #{x[:count]}@#{x[:price]}")
+    end
+
     hits
   rescue => e
     write("cycle", {at: at, cycle: number, error: "#{e.class}: #{e.message}"})
