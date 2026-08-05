@@ -9,7 +9,9 @@ require "uri"
 # a trade -- survives only while nothing here leaks back into it.
 module Execution
   class HttpTransport
-    BASE = "https://api.elections.kalshi.com/trade-api/v2".freeze
+    # The write path lives on external-api. api.elections.kalshi.com still
+    # answers GETs, which is why the retired order endpoint went unnoticed.
+    BASE = "https://external-api.kalshi.com/trade-api/v2".freeze
 
     class RequestFailed < StandardError; end
 
@@ -29,14 +31,23 @@ module Execution
       request = build(method, uri, headers, body)
       response = @connect.call(uri).request(request)
 
-      # The venue's reply can echo request material, and exception text ends up
-      # in logs. The status is the whole diagnosis a caller needs.
-      raise RequestFailed, "#{method} #{path} -> HTTP #{response.code}" unless response.code.start_with?("2")
+      raise RequestFailed, "#{method} #{path} -> HTTP #{response.code}#{venue_code(response)}" unless response.code.start_with?("2")
 
       JSON.parse(response.body)
     end
 
     private
+
+    # The venue's `code` is a fixed enum -- deprecated_v1_order_endpoint,
+    # missing_parameters -- so it names the fault without echoing anything we
+    # sent. `message` and `details` quote request material back, and exception
+    # text ends up in logs, so they stay out.
+    def venue_code(response)
+      code = JSON.parse(response.body.to_s).dig("error", "code")
+      code ? " (#{code})" : ""
+    rescue JSON::ParserError
+      ""
+    end
 
     def build(method, uri, headers, body)
       klass = VERBS.fetch(method) { raise RequestFailed, "unsupported verb #{method}" }

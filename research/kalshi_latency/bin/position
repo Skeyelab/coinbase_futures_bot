@@ -78,8 +78,14 @@ when "open"
   die "usage: bin/position open TICKER yes|no COUNT PRICE_CENTS" unless price
   die "side must be yes or no" unless %w[yes no].include?(side)
 
-  send_order({ticker: ticker, side: :buy, outcome_side: side.to_sym,
-               contracts: count.to_i, price_cents: price.to_i},
+  # You still say "buy NO at 3c" because that is how the board reads. The wire
+  # cannot say it: v2 quotes every order from the YES leg, so buying NO at 3c
+  # goes out as selling YES at 97c. Same trade, one translation, done here.
+  yes_price = (side == "yes") ? price.to_i : 100 - price.to_i
+  warn "buying NO at #{price}c -> selling YES at #{yes_price}c" if side == "no"
+
+  send_order({ticker: ticker, side: (side == "yes") ? :buy : :sell,
+               contracts: count.to_i, price_cents: yes_price},
     client: client, log: log, timeout: timeout)
 
 when "close"

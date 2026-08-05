@@ -31,8 +31,13 @@ module Execution
       # the same fact -- there is nothing to sell.
       raise Flat, "no position in #{ticker}" if position.nil? || position[:contracts].zero?
 
-      {ticker: ticker, side: :sell, outcome_side: position[:side],
-       contracts: [contracts, position[:contracts]].min, price_cents: price_cents}
+      # v2 quotes every order from the YES leg, so closing is not always a
+      # sell: a NO holding is exited by BUYING yes. Reading the held side as
+      # the order side doubles the position instead of flattening it.
+      {ticker: ticker,
+       side: (position[:side] == :yes) ? :sell : :buy,
+       contracts: [contracts, position[:contracts]].min,
+       price_cents: price_cents}
     end
   end
 end
