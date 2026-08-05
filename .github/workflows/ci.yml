@@ -2,7 +2,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, feat/** ]
+    # research/** was missing, so a PR into a research branch matched no
+    # workflow and sat at a clean status with ZERO checks -- it would merge the
+    # instant auto-merge was requested. That is how an order-placing execution
+    # layer shipped unchecked, on a branch also pinning a Rails with a
+    # published RCE advisory.
+    branches: [ main, feat/**, research/** ]
   push:
     branches: [ main ]
 

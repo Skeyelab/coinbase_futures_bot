@@ -1,0 +1,2 @@
+{"ticker":"KXHIGHNY-26AUG05-B83.5","action":"buy","side":"yes","yes_price":4,"count":3,"type":"limit","client_order_id":"c18d452b-8998-462c-847b-83884a981dbc","mode":"dry_run","ts":"2026-08-05T12:02:49Z"}
+{"action":"cancel","order_id":"abc-123","mode":"dry_run","ts":"2026-08-05T12:02:50Z"}
