@@ -59,6 +59,13 @@ module Ml
       split
     end
 
+    # Index selection at pooled scale. values_at(*indices) would pass every
+    # index as a VM stack argument — fine at spec size, SystemStackError at
+    # the ~300k indices a 4-symbol pooled fit produces.
+    def self.select_rows(rows, indices)
+      indices.map { |i| rows[i] }
+    end
+
     # Fits, evaluates out-of-sample, persists and FREEZES the artifact.
     # Returns {artifact:, report:}.
     def run
@@ -72,8 +79,11 @@ module Ml
         from: @from, to: @to, train_fraction: @train_fraction,
         embargo_seconds: @horizon * STEP_SECONDS.fetch(@timeframe))
 
-      train_rows = rows.values_at(*split[:train])
-      eval_rows = rows.values_at(*split[:eval])
+      # NOT values_at(*indices): splatting ~300k pooled indices as method
+      # arguments blows the VM stack (SystemStackError on the first 4-symbol
+      # fit, 2026-07-29). map is allocation-equivalent and stack-flat.
+      train_rows = self.class.select_rows(rows, split[:train])
+      eval_rows = self.class.select_rows(rows, split[:eval])
       raise ArgumentError, "train side is empty — widen the range" if train_rows.empty?
       raise ArgumentError, "eval side is empty — widen the range" if eval_rows.empty?
 

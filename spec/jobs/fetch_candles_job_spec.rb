@@ -207,4 +207,119 @@ RSpec.describe FetchCandlesJob, type: :job do
       expect(mock_rest).to have_received(:upsert_1d_candles).once
     end
   end
+
+  # Production hit this ~2,000 times: once a timeframe's newest stored candle
+  # exists, the incremental start is newest + step, which for a daily bar is
+  # TOMORROW. Nothing clamped it to now, so the job asked Coinbase for a window
+  # running backwards and got a 400 every run.
+  #
+  #   GET .../candles?end=1785650723&granularity=ONE_DAY&start=1785715200
+  #                       Aug 1 06:05Z                        Aug 2 00:00Z
+  #
+  # The cost was not just noise: the current day's 1d candle stopped refreshing
+  # until the next day rolled over.
+  describe "inverted fetch windows" do
+    let(:now) { Time.utc(2026, 8, 1, 6, 5, 23) }
+
+    before { allow(Time).to receive(:now).and_return(now) }
+
+    def store_candle(timeframe, timestamp)
+      Candle.find_or_create_by!(symbol: btc_pair.product_id, timeframe: timeframe, timestamp: timestamp) do |c|
+        c.open = 100.0
+        c.high = 101.0
+        c.low = 99.0
+        c.close = 100.5
+        c.volume = 1.0
+      end
+    end
+
+    # Deep history matters: with only a recent candle the job takes the
+    # shallow-history branch and refetches from the cutoff, which is a valid
+    # window. The production bug needs history older than the cutoff PLUS a
+    # current bar, so the incremental branch is the one that runs.
+    it "does not ask for daily candles when the newest bar is already today" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      store_candle("1d", Time.utc(2026, 7, 20))
+      store_candle("1d", Time.utc(2026, 8, 1))
+
+      described_class.perform_now(backfill_days: 7)
+
+      expect(mock_rest).not_to have_received(:upsert_1d_candles)
+    end
+
+    it "still fetches daily candles when there is a real window to fetch" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      store_candle("1d", Time.utc(2026, 7, 20))
+      store_candle("1d", Time.utc(2026, 7, 30))
+
+      described_class.perform_now(backfill_days: 7)
+
+      expect(mock_rest).to have_received(:upsert_1d_candles) do |args|
+        expect(args[:start_time]).to be < args[:end_time]
+      end
+    end
+
+    it "never hands the client a window that runs backwards, on any timeframe" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      # 30m is absent on purpose: it is not a valid Candle timeframe
+      # (1m 5m 15m 1h 6h 1d), so it can never hold stored candles and can
+      # never reach the incremental branch.
+      %w[1m 5m 15m 1h 1d].each do |tf|
+        # Old enough to sit behind every timeframe's backfill cutoff,
+        # including the deep 1m window, so each one takes the incremental
+        # branch rather than refetching from its cutoff.
+        store_candle(tf, Time.utc(2020, 1, 1))
+        store_candle(tf, now + 1.day)
+      end
+
+      described_class.perform_now(backfill_days: 7)
+
+      %i[upsert_1m_candles upsert_5m_candles upsert_15m_candles
+        upsert_1h_candles upsert_1d_candles
+        upsert_1m_candles_chunked upsert_5m_candles_chunked
+        upsert_15m_candles_chunked upsert_1h_candles_chunked].each do |call|
+        expect(mock_rest).not_to have_received(call)
+      end
+    end
+
+    # Not calling the client is only half of it. Without the per-timeframe
+    # guard, start_time is nil and `Time.now.utc - nil` raises, which the
+    # rescue swallows into an error log and a Sentry event. That skips the
+    # fetch too, so a call-count assertion alone passes for the wrong reason
+    # and reproduces the very noise this fix removes. A skip must be silent.
+    it "skips quietly instead of raising into the error handler" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      allow(Rails.logger).to receive(:error)
+      allow(Sentry).to receive(:with_scope).and_yield(double("scope").as_null_object)
+      allow(Sentry).to receive(:capture_exception)
+      %w[1m 5m 15m 1h 1d].each do |tf|
+        store_candle(tf, Time.utc(2020, 1, 1))
+        store_candle(tf, now + 1.day)
+      end
+
+      described_class.perform_now(backfill_days: 7)
+
+      expect(Sentry).not_to have_received(:capture_exception)
+      expect(Rails.logger).not_to have_received(:error)
+    end
+
+    # start == now is an empty window, not a fetchable one.
+    it "treats a window that starts exactly now as nothing to fetch" do
+      mock_rest = instance_double(MarketData::CoinbaseRest)
+      stub_rest(mock_rest)
+      allow(Rails.logger).to receive(:error)
+      allow(Sentry).to receive(:capture_exception)
+      store_candle("1d", Time.utc(2020, 1, 1))
+      store_candle("1d", now - 1.day)
+
+      described_class.perform_now(backfill_days: 7)
+
+      expect(mock_rest).not_to have_received(:upsert_1d_candles)
+      expect(Sentry).not_to have_received(:capture_exception)
+    end
+  end
 end
