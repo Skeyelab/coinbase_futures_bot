@@ -79,7 +79,7 @@ RSpec.describe FuturesBotCli, type: :model do
 
       parsed = JSON.parse(out)
       expect(parsed).to include("halted" => true, "reason" => "CPI print")
-      expect(DryRun.active?).to be false # unrelated state untouched
+      expect(DryRun.active?).to be true # unrelated state untouched (fail-closed default)
     end
 
     it "honors FUTURESBOT_JSON=1 without the flag" do
@@ -243,7 +243,8 @@ RSpec.describe FuturesBotCli, type: :model do
         expect { run_cli("status") }.to output(/DRY-RUN/).to_stdout
       end
 
-      it "does not show DRY-RUN when running live" do
+      it "does not show DRY-RUN when running live (explicitly confirmed)" do
+        DryRun.disable!(confirm: "LIVE", reason: "spec setup")
         expect { run_cli("status") }.not_to output(/DRY-RUN/).to_stdout
       end
 
@@ -259,6 +260,7 @@ RSpec.describe FuturesBotCli, type: :model do
       end
 
       it "omits the paper section when live and no paper positions exist" do
+        DryRun.disable!(confirm: "LIVE", reason: "spec setup")
         expect { run_cli("status") }.not_to output(/Paper account/).to_stdout
       end
     end
@@ -270,10 +272,16 @@ RSpec.describe FuturesBotCli, type: :model do
       expect(DryRun.active?).to be true
     end
 
-    it "disables dry-run with dry_run_off" do
+    it "disables dry-run with dry_run_off --confirm LIVE" do
       DryRun.enable!
-      expect { run_cli("dry_run_off") }.to output(/LIVE/).to_stdout
+      expect { run_cli("dry_run_off", "--confirm", "LIVE", "--reason", "spec") }.to output(/LIVE/).to_stdout
       expect(DryRun.active?).to be false
+    end
+
+    it "refuses dry_run_off without --confirm LIVE" do
+      DryRun.enable!
+      expect { run_cli("dry_run_off") }.to output(/Refused/).to_stdout
+      expect(DryRun.active?).to be true
     end
 
     it "reports state with dry_run_status" do

@@ -7,7 +7,7 @@ RSpec.describe Trading::ExecutionSafety, type: :service do
 
   describe ".enforce_paper_default!" do
     it "leaves live execution alone when LIVE_TRADING_CONFIRMED=1" do
-      DryRun.disable!
+      DryRun.disable!(confirm: "LIVE", reason: "spec setup")
       ClimateControl.modify(LIVE_TRADING_CONFIRMED: "1") do
         expect(described_class.enforce_paper_default!(logger: logger)).to eq(:live)
       end
@@ -23,7 +23,7 @@ RSpec.describe Trading::ExecutionSafety, type: :service do
     end
 
     it "forces dry-run ON when live trading is not confirmed" do
-      DryRun.disable!
+      DryRun.disable!(confirm: "LIVE", reason: "spec setup")
       ClimateControl.modify(LIVE_TRADING_CONFIRMED: nil) do
         expect(described_class.enforce_paper_default!(logger: logger)).to eq(:forced_paper)
       end
@@ -32,7 +32,7 @@ RSpec.describe Trading::ExecutionSafety, type: :service do
     end
 
     it "treats any value other than exactly \"1\" as unconfirmed" do
-      DryRun.disable!
+      DryRun.disable!(confirm: "LIVE", reason: "spec setup")
       ClimateControl.modify(LIVE_TRADING_CONFIRMED: "true") do
         expect(described_class.enforce_paper_default!(logger: logger)).to eq(:forced_paper)
       end
