@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+# Freezes what the model believes RIGHT NOW about every open daily-temp market,
+# alongside what the book believes, so settlement can score both.
+#
+# The point is calibration, not record-keeping. A model that only gets checked
+# on the cases someone remembered to look at is never actually tested.
+
+require "json"
+require "date"
+require "tzinfo"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/nws_station"
+require_relative "../lib/daily_high"
+require_relative "../lib/temp_market"
+require_relative "../lib/cities"
+
+client = KalshiClient.from_env
+now = Time.now.utc
+out = []
+
+Cities::ALL.each do |city|
+  local_date = TZInfo::Timezone.get(city[:time_zone]).to_local(now).to_date
+  station = NwsStation.new(city[:station], time_zone: city[:time_zone])
+  observations = station.observations
+  daily = DailyHigh.new(observations, time_zone: city[:time_zone])
+  high = daily.for_date(local_date)
+  support = daily.support_for(local_date)
+  latest = observations.reject { |o| o[:temp_f].nil? }.max_by { |o| o[:at] }
+
+  client.temp_markets(city[:series], local_date).each do |row|
+    market = TempMarket.from_api(row)
+    next unless market
+
+    status = market.status_given(high)
+    bid = (row["yes_bid_dollars"].to_f * 100).round
+    ask = (row["yes_ask_dollars"].to_f * 100).round
+
+    out << {
+      recorded_at: now.iso8601,
+      city: city[:label], station: city[:station], local_date: local_date.to_s,
+      ticker: row["ticker"], sub_title: row["yes_sub_title"],
+      kind: market.kind, floor: market.floor, cap: market.cap,
+      running_high_f: high, settles_as: high&.round, peak_support: support,
+      latest_obs_f: latest&.dig(:temp_f), latest_obs_at: latest&.dig(:at)&.utc&.iso8601,
+      # How far past the rounding boundary. Under ~0.5F the call rests on a
+      # single METAR tick and is not really a settled fact at all.
+      margin_f: (high && market.cap) ? (high - (market.cap + 0.5)).round(2) : nil,
+      model_says: status,
+      # The model is categorical: refuted means 0, confirmed means 100.
+      model_pct: {refuted: 0, confirmed: 100, open: nil}[status],
+      market_pct: bid,
+      market_bid: bid, market_ask: ask,
+      disagreement_pts: {refuted: 0, confirmed: 100, open: nil}[status] && (bid - {refuted: 0, confirmed: 100}[status]).abs
+    }
+  end
+end
+
+path = File.expand_path("../predictions/#{Date.today}.jsonl", __dir__)
+File.open(path, "a") { |f| out.each { |r| f.puts(JSON.generate(r)) } }
+
+called = out.reject { |r| r[:model_says] == :open }
+puts "recorded #{out.size} markets (#{called.size} with a definite call) -> #{path}"
+called.sort_by { |r| -r[:disagreement_pts].to_i }.each do |r|
+  puts format("  %-26s %-12s model=%-9s market=%3d%%  disagree=%3d  margin=%s",
+    r[:ticker][0, 26], r[:sub_title].to_s[0, 12], r[:model_says], r[:market_pct],
+    r[:disagreement_pts], r[:margin_f] ? format("%+.2fF", r[:margin_f]) : "-")
+end

@@ -1,0 +1,68 @@
+#!/usr/bin/env ruby
+# Records the judgment track's daily calls: our NBM-calibrated bucket
+# probability next to the live book, for every open daily-high market on the
+# fitted stations. Scoring happens after settlement (Judgment.scorecard);
+# this only freezes what both we and the market believed.
+#
+#   DATA_DIR=~/kalshi-data ruby bin/record_judgments
+#
+# GET-only. Prediction-only. No order path.
+
+require "json"
+require "date"
+require "fileutils"
+require "tzinfo"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/nbm_source"
+require_relative "../lib/bucket_pricer"
+require_relative "../lib/temp_market"
+require_relative "../lib/cities"
+
+FITTED_STATIONS = %w[KNYC KMIA KDEN KAUS].freeze
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+FileUtils.mkdir_p(data_dir)
+out_path = File.join(data_dir, "judgment-#{Time.now.utc.strftime("%Y-%m-%d")}.jsonl")
+
+client = KalshiClient.new
+nbm = NbmSource.new
+now = Time.now.utc
+recorded = 0
+
+Cities::ALL.select { |c| FITTED_STATIONS.include?(c[:station]) }.each do |city|
+  local_date = TZInfo::Timezone.get(city[:time_zone]).to_local(now).to_date
+
+  # Today's markets while the forecast still leads them, and tomorrow's.
+  [local_date, local_date + 1].each do |date|
+    forecast = nbm.forecast_for(city[:station], date, time_zone: city[:time_zone])
+    next unless forecast
+
+    client.temp_markets(city[:series], date).each do |row|
+      market = TempMarket.from_api(row)
+      next unless market
+
+      prob = BucketPricer.probability(
+        market: market, txn: forecast[:txn], xnd: forecast[:xnd],
+        station: city[:station], lead_hours: forecast[:lead_hours]
+      )
+      next unless prob
+
+      record = {
+        ts: now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        station: city[:station], series: city[:series], local_date: date.to_s,
+        ticker: market.ticker, prob: prob.round(4),
+        yes_bid: (row["yes_bid_dollars"].to_f * 100).round,
+        yes_ask: (row["yes_ask_dollars"].to_f * 100).round,
+        txn: forecast[:txn], xnd: forecast[:xnd],
+        lead_hours: forecast[:lead_hours].round(1), runtime: forecast[:runtime]
+      }
+      File.open(out_path, "a") { |f| f.puts(JSON.generate(record)) }
+      recorded += 1
+      puts format("%-26s ours %5.1f%%  book %2d/%2d  (txn=%s xnd=%s lead=%sh)",
+        market.ticker, prob * 100, record[:yes_bid], record[:yes_ask],
+        forecast[:txn], forecast[:xnd], record[:lead_hours])
+    end
+  end
+end
+
+puts "#{recorded} judgment calls recorded to #{out_path}"

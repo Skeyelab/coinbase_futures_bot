@@ -1,0 +1,132 @@
+#!/usr/bin/env ruby
+# Turns collected quotes into the one number this experiment exists to produce:
+# when a Kalshi market reprices, how long do you have to get in?
+#
+#   bin/analyze                      # all collected data
+#   THRESHOLD_CENTS=3 bin/analyze    # count smaller moves too
+
+require "json"
+require_relative "../lib/move_analysis"
+
+DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+THRESHOLD = Float(ENV["THRESHOLD_CENTS"] || 5)
+MAX_GAP = Integer(ENV["MAX_GAP_SECONDS"] || 120) # a longer gap means we stopped sampling
+
+# Kalshi charges the whole order once, not each contract. Shared with
+# Opportunity so the two never drift.
+require_relative "../lib/opportunity"
+
+def kalshi_fee_cents(price_cents, contracts = 1)
+  Opportunity.fee_cents(price_cents, contracts)
+end
+
+def percentile(sorted, pct)
+  return nil if sorted.empty?
+  sorted[[(sorted.size * pct).floor, sorted.size - 1].min]
+end
+
+quote_files = Dir[File.join(DATA_DIR, "quotes-*.jsonl")].sort
+abort "no quote files in #{DATA_DIR} — run bin/collect first" if quote_files.empty?
+
+by_ticker = Hash.new { |h, k| h[k] = [] }
+rows = 0
+
+quote_files.each do |path|
+  File.foreach(path) do |line|
+    begin
+      r = JSON.parse(line)
+    rescue JSON::ParserError
+      next # a torn last line from a killed collector
+    end
+    rows += 1
+    by_ticker[r["ticker"]] << {at: r["at"], mid: r["mid"].to_f, bid_size: r["bid_size"].to_f}
+  end
+end
+
+moves = []
+by_ticker.each do |ticker, samples|
+  samples.sort_by! { |s| s[:at] }
+
+  # Split on sampling gaps so a collector restart doesn't look like a jump.
+  segment = []
+  segments = []
+  samples.each do |s|
+    if segment.any? && (s[:at] - segment.last[:at]) > MAX_GAP
+      segments << segment
+      segment = []
+    end
+    segment << s
+  end
+  segments << segment if segment.any?
+
+  segments.each do |seg|
+    next if seg.size < 3
+    MoveAnalysis.detect(seg, threshold_cents: THRESHOLD).each do |m|
+      origin = seg.find { |s| s[:at] == m[:started_at] }
+      moves << m.merge(ticker: ticker, depth_at_start: origin ? origin[:bid_size] : 0.0)
+    end
+  end
+end
+
+span_hours = by_ticker.values.flatten.then { |all|
+  all.empty? ? 0 : (all.map { |s| s[:at] }.max - all.map { |s| s[:at] }.min) / 3600.0
+}
+
+puts "=" * 66
+puts "KALSHI REPRICING LATENCY"
+puts "=" * 66
+puts format("samples      %d rows, %d markets, %.1f hours", rows, by_ticker.size, span_hours)
+puts format("moves        %d at >= %.0fc", moves.size, THRESHOLD)
+
+if moves.empty?
+  puts "\nNo moves cleared the threshold. Collect longer or lower THRESHOLD_CENTS."
+  exit 0
+end
+
+half = moves.map { |m| m[:seconds_to_half] }.sort
+ninety = moves.map { |m| m[:seconds_to_ninety] }.sort
+mags = moves.map { |m| m[:magnitude_cents] }.sort
+depths = moves.map { |m| m[:depth_at_start] }.sort
+
+puts
+puts "REACTION WINDOW (seconds until the move was half priced in)"
+[["p10", 0.10], ["median", 0.50], ["p90", 0.90]].each do |label, pct|
+  puts format("  %-8s %6ds   (90%% done: %ds)", label, percentile(half, pct), percentile(ninety, pct))
+end
+
+puts
+puts "MOVE SIZE (cents)"
+[["median", 0.50], ["p90", 0.90]].each do |label, pct|
+  puts format("  %-8s %6.1fc", label, percentile(mags, pct))
+end
+
+puts
+puts "CAPACITY (contracts resting at top of book when the move started)"
+[["median", 0.50], ["p90", 0.90]].each do |label, pct|
+  puts format("  %-8s %6.0f contracts  (~$%.0f at 50c)", label, percentile(depths, pct), percentile(depths, pct) * 0.5)
+end
+
+# A move is only worth taking if it clears the Kalshi fee at that price.
+net = moves.map { |m| m[:magnitude_cents] - kalshi_fee_cents(m[:from_cents]) }
+profitable = net.count(&:positive?)
+
+puts
+puts "AFTER KALSHI FEES (0.07 x P x (1-P) per contract)"
+puts format("  moves clearing fees   %d / %d (%.0f%%)", profitable, moves.size, 100.0 * profitable / moves.size)
+puts format("  median net move       %.1fc", net.sort[net.size / 2])
+
+median_half = percentile(half, 0.50)
+puts
+puts "-" * 66
+verdict =
+  if median_half <= 10
+    "NO EDGE. Half the move lands within #{median_half}s. Nothing to react to."
+  elsif median_half <= 60
+    "MARGINAL. #{median_half}s window needs real low-latency news, not RSS."
+  else
+    "WORTH A LOOK. #{median_half}s median window is reactable by a slow bot."
+  end
+puts verdict
+puts "-" * 66
+puts "Caveat: RSS first-seen is a LATE bound on when news broke, so any"
+puts "news-paired window is a floor, never a ceiling."

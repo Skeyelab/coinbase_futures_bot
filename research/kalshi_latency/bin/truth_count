@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+# Counts Trump posts in the current KXTRUTHSOCIAL market week and prices every
+# contract against that count.
+#
+# Read-only. The count comes from Roll Call's tracker, which is the source the
+# Kalshi rules NAME -- not Truth Social itself.
+
+require "time"
+require_relative "../lib/truth_social_source"
+require_relative "../lib/count_market"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/opportunity"
+
+WEEK_START = ENV.fetch("WEEK_START", "2026-08-02 00:00:00")
+
+source = TruthSocialSource.new(logger: ->(m) { warn(m) })
+result = source.ids_since(WEEK_START)
+abort "could not establish the week boundary — refusing to guess a count" if result.nil?
+
+count = result[:ids].size
+puts "=" * 70
+puts "TRUTH SOCIAL POST COUNT"
+puts "=" * 70
+puts format("week start        %s", WEEK_START)
+puts format("last id before    %d", result[:boundary])
+puts format("newest id         %d", result[:ids].max || result[:boundary])
+puts format("posts this week   %d   (id span suggests %d)",
+  count, (result[:ids].max || result[:boundary]) - result[:boundary])
+gaps = result[:ids].each_cons(2).count { |a, b| b - a > 1 }
+puts format("gaps in ids       %d   (deleted posts, or ids we did not page)", gaps)
+
+client = KalshiClient.from_env
+rows = client.series_markets("KXTRUTHSOCIAL")
+puts
+puts "ticker                         range        status     market"
+puts "-" * 70
+rows.sort_by { |r| r["ticker"] }.each do |row|
+  market = CountMarket.from_api(row)
+  next unless market
+
+  status = market.status_given(count)
+  bid = (row["yes_bid_dollars"].to_f * 100).round
+  ask = (row["yes_ask_dollars"].to_f * 100).round
+  flag = (status != :open && bid.positive?) ? "  <<< SETTLED, still quoted" : ""
+  puts format("%-30s %-12s %-10s %2dc/%2dc%s",
+    row["ticker"][0, 30], row["yes_sub_title"].to_s[0, 12], status, bid, ask, flag)
+end
+puts
+puts "A count below every bucket means nothing is settled yet — that is expected"
+puts "early in the week and is not a failure."

@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+# One-shot: what has the weather already settled that the Kalshi book has not?
+#
+# Read-only. Reports opportunities; it cannot place an order.
+
+require_relative "../lib/weather_scan"
+require_relative "../lib/credibility"
+
+results = WeatherScan.new.run
+
+puts "=" * 78
+puts "SETTLED-FACT SCAN  #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")}"
+puts "=" * 78
+
+total = 0
+
+results.each do |r|
+  if r.error
+    puts format("%-13s %-6s ERROR %s", r.city, r.station, r.error)
+    next
+  end
+
+  age = r.obs_age_seconds ? "#{r.obs_age_seconds / 60}m ago" : "no obs"
+  high = r.running_high ? format("%.1fF", r.running_high) : "none yet"
+
+  puts format("%-13s %-6s %-10s %s=%-9s obs %s  markets=%d",
+    r.city, r.station, r.local_date.to_s, (r.kind == :low) ? "low " : "high", high, age, r.markets)
+
+  r.opportunities.each do |o|
+    total += 1
+    # Single source of truth for the doubt signals. This used to reimplement
+    # them and had already drifted -- it never flagged an unverified station.
+    doubt = Credibility.doubts({
+      market_pct: o[:market_pct], support: o[:peak_support],
+      seconds: 0, verified: o[:verified]
+    })
+    doubt += [format("thin margin %+.2fF", o[:margin_f])] if o[:margin_f] && o[:margin_f] < 0.5
+
+    puts format("      >> %-26s %s %3d @ %2dc   edge=%2dc NET=%4dc%s",
+      o[:ticker], o[:side].to_s.upcase, o[:contracts], o[:price_cents],
+      o[:edge_cents], o[:net_cents], doubt.empty? ? "" : "   <<< #{doubt.join(", ")}")
+  end
+end
+
+puts "-" * 78
+if total.zero?
+  puts "No settled contract is mispriced right now."
+  puts "Expected most of the day: the edge appears when a new high lands near a strike."
+else
+  puts "#{total} settled contract(s) still quotable. Verify by hand before trusting this."
+  puts
+  puts "A flagged line is a claim the BOOK disputes. On a liquid market that"
+  puts "almost always means the model is wrong, not that the money is free."
+end

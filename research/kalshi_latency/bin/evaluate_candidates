@@ -1,0 +1,71 @@
+#!/usr/bin/env ruby
+# What would each RIVAL station have called, and what actually settled?
+#
+#   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
+#     bin/evaluate_candidates 2026-08-04
+#
+# Run AFTER settlement -- an open market has no result to referee with.
+#
+# Appends one record per settled market to candidates-<date>.jsonl. Only days
+# where the rivals DISAGREE carry information; bin/station_report is what reads
+# them back and decides whether anything has earned promotion.
+
+require "date"
+require "json"
+require "fileutils"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/cities"
+require_relative "../lib/station_candidates"
+require_relative "../lib/candidate_evaluation"
+require_relative "../lib/nws_station"
+require_relative "../lib/daily_high"
+require_relative "../lib/daily_low"
+require_relative "../lib/temp_market"
+require_relative "../lib/low_temp_market"
+
+date = Date.parse(ARGV[0] || abort("usage: bin/evaluate_candidates YYYY-MM-DD"))
+stamp = date.strftime("%y%b%d").upcase
+
+client = KalshiClient.from_env
+abort "no Kalshi credentials -- run under `doppler run`" unless client.authenticated?
+
+records = []
+
+StationCandidates::BY_SERIES.each do |series, stations|
+  low = Cities::LOWS.any? { |c| c[:series] == series }
+  entry = (Cities::ALL + Cities::LOWS).find { |c| c[:series] == series }
+  next unless entry
+
+  # Settled markets, not open ones: the whole point is to let settlement referee.
+  body = client.send(:get, "/markets", series_ticker: series, status: "settled", limit: 200)
+  api = (body["markets"] || []).select { |m| m["ticker"].to_s.include?("-#{stamp}-") }
+  next if api.empty?
+
+  models = api.filter_map { |m| low ? LowTempMarket.from_api(m) : TempMarket.from_api(m) }
+  settlements = api.to_h { |m| [m["ticker"], m["result"]] }
+
+  extremes = stations.to_h { |station|
+    obs = NwsStation.new(station, time_zone: entry[:time_zone]).observations
+    reader = (low ? DailyLow : DailyHigh).new(obs, time_zone: entry[:time_zone])
+    [station, reader.for_date(date)]
+  }.reject { |_s, extreme| extreme.nil? }
+
+  day = CandidateEvaluation.day_records(
+    date: date.to_s, markets: models, extremes: extremes, settlements: settlements, final: true
+  )
+  records.concat(day)
+
+  splits = day.count { |r| r[:calls].map { |c| c[:says] }.uniq.size > 1 }
+  puts format("%-14s %2d settled  %2d discriminating  %s", series, day.size, splits,
+    extremes.map { |s, e| "#{s}=#{e&.round(1)}" }.join(" "))
+end
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+FileUtils.mkdir_p(data_dir)
+out = File.join(data_dir, "candidates-#{date}.jsonl")
+File.open(out, "w") { |f| records.each { |r| f.puts JSON.generate(r) } }
+
+total_split = records.count { |r| r[:calls].map { |c| c[:says] }.uniq.size > 1 }
+puts
+puts "#{records.size} settled markets, #{total_split} discriminating -> #{out}"
+puts "A day where every rival agreed proves nothing. Only the split ones count."
