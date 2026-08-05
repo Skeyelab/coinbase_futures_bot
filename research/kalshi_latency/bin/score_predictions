@@ -4,6 +4,7 @@
 #   bin/score_predictions predictions/2026-08-04.jsonl
 
 require "json"
+require "fileutils"
 require "net/http"
 require "uri"
 
@@ -35,8 +36,30 @@ if scored.empty?
   exit 0
 end
 
-right = scored.count { |r| r["model_right"] }
-puts format("MODEL: %d/%d correct (%.0f%%)", right, scored.size, 100.0 * right / scored.size)
+# One row per MARKET, not per recording. The collector writes the same ticker
+# every cycle it still looks callable, so counting rows inflates the sample:
+# 79 rows on 2026-08-04 were 34 markets. Gate item #1 counts scored CALLS, and
+# a 2.3x inflated denominator is the number a funding decision rests on.
+markets = scored.uniq { |r| r["ticker"] }
+
+# Persist, or none of this accumulates. A station can only be promoted on
+# evidence gathered across separate days, and printing to a terminal that then
+# closes is how twelve stations stayed unverified indefinitely.
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+FileUtils.mkdir_p(data_dir)
+out = File.join(data_dir, "scored-#{markets.first["local_date"]}.jsonl")
+File.open(out, "w") do |f|
+  markets.each do |r|
+    f.puts JSON.generate(r.slice("ticker", "city", "station", "local_date", "kind",
+      "model_says", "settled", "model_right", "peak_support", "market_pct"))
+  end
+end
+
+right_rows = scored.count { |r| r["model_right"] }
+right = markets.count { |r| r["model_right"] }
+puts format("MODEL: %d/%d markets correct (%.2f%%)   [%d raw rows, %d correct]",
+  right, markets.size, 100.0 * right / markets.size, scored.size, right_rows)
+puts "scored -> #{out}"
 puts
 
 puts "ticker                     model     settled  ok     support  market"
