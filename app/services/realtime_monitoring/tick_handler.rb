@@ -4,6 +4,10 @@ module RealtimeMonitoring
   class TickHandler
     DEFAULT_BASIS_MONITOR_INTERVAL_SECONDS = 60
     DEFAULT_RAPID_SIGNAL_INTERVAL_SECONDS = 30
+    # Maximum time a symbol may go unevaluated regardless of price movement.
+    # 300s keeps a flat-market funding signal inside one FundingRate snapshot
+    # cycle while adding at most ~12 evaluations/hour/symbol.
+    DEFAULT_SIGNAL_EVAL_STALENESS_SECONDS = 300
     MARKET_DATA_HEARTBEAT_INTERVAL_SECONDS = 5
     CLOSE_TRIGGER_COOLDOWN_SECONDS = 60
 
@@ -261,8 +265,14 @@ module RealtimeMonitoring
         current_price: price,
         asset: asset
       )
+      Rails.cache.write(last_eval_key(product_id), Time.current, expires_in: 1.hour)
     end
 
+    # The movement gate alone starved FundingSkewContrarian (2026-08-03: 20
+    # alerts in a flat market, zero trading-path evaluations in the window) —
+    # a funding z-score builds precisely when price goes nowhere. So: evaluate
+    # on significant movement OR when the symbol has not been evaluated for
+    # the staleness floor. Flat is not idle.
     def should_evaluate_signals?(product_id, price)
       return false unless within_evaluation_hours?
 
@@ -277,7 +287,26 @@ module RealtimeMonitoring
       end
 
       Rails.cache.write(last_price_key, price, expires_in: 5.minutes)
-      significant_movement
+      significant_movement || evaluation_overdue?(product_id)
+    end
+
+    # Never evaluated (nil) counts as overdue: a fresh process must not wait
+    # for a price move before its first look at a symbol.
+    def evaluation_overdue?(product_id)
+      last_eval = Rails.cache.read(last_eval_key(product_id))
+      last_eval.nil? || Time.current - last_eval >= signal_eval_staleness_seconds
+    end
+
+    def last_eval_key(product_id)
+      "last_rapid_eval_#{product_id}"
+    end
+
+    def signal_eval_staleness_seconds
+      seconds = ENV.fetch(
+        "SIGNAL_EVAL_STALENESS_SECONDS",
+        DEFAULT_SIGNAL_EVAL_STALENESS_SECONDS
+      ).to_i
+      seconds.positive? ? seconds : DEFAULT_SIGNAL_EVAL_STALENESS_SECONDS
     end
 
     # Crypto futures trade 24/7, so signals are evaluated around the clock by
