@@ -5,7 +5,11 @@ require "openssl"
 RSpec.describe Execution::OrderClient do
   require "base64"
 
-  let(:rsa) { OpenSSL::PKey::RSA.generate(2048) }
+  # Generated once for the whole file. Per-example generation cost 12 seconds
+  # of suite time; the signature only has to verify against its own key.
+  TEST_RSA = OpenSSL::PKey::RSA.generate(2048)
+
+  let(:rsa) { TEST_RSA }
 
   def test_signer
     KalshiSigner.new(key_id: "test-key", private_key_pem: rsa.to_pem)
@@ -141,6 +145,34 @@ RSpec.describe Execution::OrderClient do
       expect(seen[:body]).to be_nil
       expect(signs?(seen[:headers], "DELETE", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
       expect(intent[:mode]).to eq("live")
+    end
+  end
+
+  describe "reading one order back" do
+    it "GETs the order and hands back the venue's own view of it" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {method: method, path: path, headers: headers}
+        {"order" => {"order_id" => "abc-123", "status" => "resting", "remaining_count_fp" => "5.00"}}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      state = client.order("abc-123")
+
+      expect(seen[:method]).to eq("GET")
+      expect(seen[:path]).to eq("/portfolio/orders/abc-123")
+      expect(signs?(seen[:headers], "GET", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
+      expect(state).to include("status" => "resting", "remaining_count_fp" => "5.00")
+    end
+
+    # There is no order to read in dry-run. Returning an empty state would let
+    # a caller conclude "remaining 0, therefore filled" about an order that was
+    # never placed.
+    it "refuses in dry-run rather than inventing a state" do
+      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
+
+      expect { client.order("abc-123") }.to raise_error(Execution::OrderClient::NotLive)
     end
   end
 

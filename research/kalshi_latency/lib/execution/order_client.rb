@@ -13,6 +13,8 @@ module Execution
 
     class BadOrder < StandardError; end
 
+    class NotLive < StandardError; end
+
     ORDERS_PATH = "/portfolio/orders".freeze
     API_PREFIX = "/trade-api/v2".freeze
     # 25 contracts at worst-case collateral is ~$25 of a $250 account. A cap
@@ -59,6 +61,15 @@ module Execution
 
       response = send_signed("POST", ORDERS_PATH, body: JSON.generate(order))
       order.merge(mode: "live", order_id: response.dig("order", "order_id"))
+    end
+
+    # The venue's own view of one order. Reading order state belongs with
+    # placing and cancelling rather than in the read client: the read client's
+    # guarantee is that it knows nothing about orders at all.
+    def order(order_id)
+      raise NotLive, "no order #{order_id} exists in dry-run" unless live?
+
+      send_signed("GET", "#{ORDERS_PATH}/#{order_id}")["order"]
     end
 
     # Pulling a resting order. Gate item #3 needs this as much as placing does:

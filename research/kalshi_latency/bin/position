@@ -1,0 +1,111 @@
+#!/usr/bin/env ruby
+# Open and close Kalshi positions by hand.
+#
+#   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
+#     bin/position list
+#     bin/position open  KXHIGHNY-26AUG05-B83.5 yes 3 4
+#     bin/position close KXHIGHAUS-26AUG04-B97.5 5 3
+#     bin/position cancel abc-123
+#
+# Dry-run is the default and prints what it WOULD send. Going live takes two
+# switches: --live on the command AND KALSHI_LIVE=1 in the environment.
+#
+# There is no halt switch here on purpose: for a command the operator types,
+# the operator is the halt. One is required before anything places orders
+# unattended.
+
+require "json"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/execution/order_client"
+require_relative "../lib/execution/http_transport"
+require_relative "../lib/execution/order_log"
+require_relative "../lib/execution/position"
+require_relative "../lib/execution/fill_watch"
+
+live = ARGV.delete("--live") ? true : false
+timeout = (ARGV.find { |a| a.start_with?("--timeout=") }&.split("=")&.last || 60).to_i
+ARGV.reject! { |a| a.start_with?("--timeout=") }
+command = ARGV.shift
+
+DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+
+def die(message)
+  warn message
+  exit 1
+end
+
+reader = KalshiClient.from_env
+die "no Kalshi credentials -- run under `doppler run`" unless reader.authenticated?
+
+client = begin
+  Execution::OrderClient.new(
+    transport: Execution::HttpTransport.new,
+    live: live,
+    signer: KalshiSigner.new(key_id: ENV["KALSHI_KEY_ID"], private_key_pem: ENV["KALSHI_KEY"])
+  )
+rescue Execution::OrderClient::LiveRefused
+  # A backtrace here reads as a crash. This is the safety gate working.
+  die "--live given but KALSHI_LIVE is not 1 -- both switches or nothing"
+end
+log = Execution::OrderLog.new(path: File.join(DATA_DIR, "orders.jsonl"))
+
+def held(reader)
+  Execution::Position.from_portfolio(reader.portfolio("/portfolio/positions"))
+end
+
+# Places, then follows the order to a realized price. Dry-run has no order to
+# follow, so it stops at the intent.
+def send_order(intent, client:, log:, timeout:)
+  placed = client.place(intent)
+  log.record(placed)
+  puts JSON.pretty_generate(placed)
+  return placed unless placed[:mode] == "live"
+
+  outcome = Execution::FillWatch.new(client: client).settle(placed, timeout_seconds: timeout)
+  log.record(placed.merge(outcome))
+  puts JSON.pretty_generate(outcome)
+  placed
+end
+
+case command
+when "list"
+  rows = held(reader)
+  die "flat -- no open positions" if rows.empty?
+  rows.each { |r| puts format("%-34s %-3s %4d", r[:ticker], r[:side], r[:contracts]) }
+
+when "open"
+  ticker, side, count, price = ARGV
+  die "usage: bin/position open TICKER yes|no COUNT PRICE_CENTS" unless price
+  die "side must be yes or no" unless %w[yes no].include?(side)
+
+  send_order({ticker: ticker, side: :buy, outcome_side: side.to_sym,
+               contracts: count.to_i, price_cents: price.to_i},
+    client: client, log: log, timeout: timeout)
+
+when "close"
+  ticker, count, price = ARGV
+  die "usage: bin/position close TICKER COUNT PRICE_CENTS" unless price
+
+  begin
+    # Reads the venue every time. The position we hold is a fact at the venue,
+    # not something this process is entitled to remember across a restart.
+    intent = Execution::Position.close_intent(
+      held: held(reader), ticker: ticker, contracts: count.to_i, price_cents: price.to_i
+    )
+  rescue Execution::Position::Flat => e
+    die "refusing: #{e.message}"
+  end
+
+  warn "clamped to #{intent[:contracts]} -- that is the whole holding" if intent[:contracts] < count.to_i
+  send_order(intent, client: client, log: log, timeout: timeout)
+
+when "cancel"
+  order_id = ARGV.shift
+  die "usage: bin/position cancel ORDER_ID" unless order_id
+  intent = client.cancel(order_id)
+  log.record(intent)
+  puts JSON.pretty_generate(intent)
+
+else
+  die "usage: bin/position [list|open|close|cancel] (--live) (--timeout=60)"
+end
