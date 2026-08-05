@@ -2,7 +2,10 @@ name: CI
 
 on:
   pull_request:
-    branches: [ main, feat/** ]
+    # research/** was missing, so every PR into a research branch ran ZERO
+    # checks and merged instantly on a clean status. PR #618 shipped an
+    # execution layer that way.
+    branches: [ main, feat/**, research/** ]
   push:
     branches: [ main ]
 
@@ -85,6 +88,31 @@ jobs:
       - name: Skip lint for docs-only PR
         if: needs.changes.outputs.docs_only == 'true'
         run: echo "Docs-only PR -> skipping StandardRB"
+
+  kalshi:
+    name: Kalshi research specs
+    runs-on: ubuntu-latest
+    needs: [changes]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ruby/setup-ruby@v1
+        if: needs.changes.outputs.docs_only != 'true'
+        with:
+          ruby-version-file: '.ruby-version'
+          bundler-cache: true
+
+      # Its own job rather than a step in `test`: this suite is stdlib-only and
+      # needs no database, no fixtures and no parallel runner. Bolting it onto
+      # the Rails job would make a green Kalshi run depend on Postgres coming up.
+      - name: Run Kalshi specs
+        if: needs.changes.outputs.docs_only != 'true'
+        working-directory: research/kalshi_latency
+        run: bundle exec rspec
+
+      - name: Skip Kalshi specs for docs-only PR
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR -> skipping Kalshi specs"
 
   security:
     name: Security scans
@@ -317,8 +345,8 @@ jobs:
   coverage-badge:
     name: Generate Coverage Badge
     runs-on: ubuntu-latest
-    needs: [changes, lint, security, test]
-    if: always() && needs.lint.result == 'success' && needs.security.result == 'success' && needs.test.result == 'success'
+    needs: [changes, lint, security, test, kalshi]
+    if: always() && needs.lint.result == 'success' && needs.security.result == 'success' && needs.test.result == 'success' && needs.kalshi.result == 'success'
     steps:
       - name: Skip coverage badge for docs-only PR
         if: needs.changes.outputs.docs_only == 'true'
