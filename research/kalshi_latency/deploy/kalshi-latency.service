@@ -1,0 +1,17 @@
+[Unit]
+Description=Kalshi repricing latency collector (read-only research)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/coinbase_futures_bot/research/kalshi_latency
+Environment=DATA_DIR=%h/kalshi-latency-data
+Environment=QUOTE_INTERVAL=5
+Environment=WATCHLIST_SIZE=150
+Environment=MIN_VOLUME_24H=1000
+ExecStart=/bin/bash -lc 'exec ruby bin/collect'
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=default.target

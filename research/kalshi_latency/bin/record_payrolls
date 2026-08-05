@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# Records the BLS Employment Situation release and the Kalshi payrolls book on
+# one clock, at 1s resolution.
+#
+# Nonfarm payrolls prints at 08:30:00 ET. Start a few minutes early:
+#
+#   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
+#     bin/record_payrolls
+#
+# Read-only. GETs only; there is no order path in this code.
+
+require_relative "../lib/release_recorder"
+require_relative "../lib/kalshi_client"
+
+series = ENV.fetch("SERIES", "KXPAYROLLS")
+client = KalshiClient.from_env
+abort "no Kalshi credentials in env — run under `doppler run`" unless client.authenticated?
+
+tickers =
+  if ENV["TICKERS"]
+    ENV["TICKERS"].split(",").map(&:strip)
+  else
+    body = client.send(:get, "/markets", series_ticker: series, status: "open", limit: 100)
+    (body["markets"] || [])
+      .select { |m| m["yes_bid_dollars"].to_f > 0 && m["yes_ask_dollars"].to_f > 0 }
+      .sort_by { |m| -m["volume_24h_fp"].to_f }
+      .first(Integer(ENV.fetch("MAX_TICKERS", "12")))
+      .map { |m| m["ticker"] }
+  end
+
+abort "no open #{series} markets found" if tickers.empty?
+warn "tickers: #{tickers.join(", ")}"
+
+ReleaseRecorder.new(
+  data_dir: ENV["DATA_DIR"] || File.expand_path("../data/payrolls", __dir__),
+  tickers: tickers,
+  interval: Float(ENV.fetch("INTERVAL", "1.0")),
+  depth: Integer(ENV.fetch("DEPTH", "10"))
+).run(seconds: Integer(ENV.fetch("SECONDS", "600")))

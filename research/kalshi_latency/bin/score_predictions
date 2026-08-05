@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+# Scores recorded predictions against Kalshi settlement. Run after markets close.
+#
+#   bin/score_predictions predictions/2026-08-04.jsonl
+
+require "json"
+require "fileutils"
+require "net/http"
+require "uri"
+
+path = ARGV[0] || abort("usage: bin/score_predictions <predictions.jsonl>")
+rows = File.readlines(path).map { |l| JSON.parse(l) }
+called = rows.reject { |r| r["model_says"] == "open" }
+
+def settlement(ticker)
+  uri = URI("https://api.elections.kalshi.com/trade-api/v2/markets/#{ticker}")
+  r = Net::HTTP.get_response(uri)
+  return nil unless r.code == "200"
+
+  m = JSON.parse(r.body)["market"] || {}
+  {status: m["status"], result: m["result"]}
+end
+
+scored = called.filter_map do |r|
+  s = settlement(r["ticker"])
+  next if s.nil? || s[:result].to_s.empty?
+
+  # refuted means the model said this settles NO.
+  model_no = r["model_says"] == "refuted"
+  actual_no = s[:result] == "no"
+  r.merge("settled" => s[:result], "model_right" => (model_no == actual_no))
+end
+
+if scored.empty?
+  puts "nothing settled yet — Kalshi has not published results for these tickers"
+  exit 0
+end
+
+# One row per MARKET, not per recording. The collector writes the same ticker
+# every cycle it still looks callable, so counting rows inflates the sample:
+# 79 rows on 2026-08-04 were 34 markets. Gate item #1 counts scored CALLS, and
+# a 2.3x inflated denominator is the number a funding decision rests on.
+markets = scored.uniq { |r| r["ticker"] }
+
+# Persist, or none of this accumulates. A station can only be promoted on
+# evidence gathered across separate days, and printing to a terminal that then
+# closes is how twelve stations stayed unverified indefinitely.
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data", __dir__)
+FileUtils.mkdir_p(data_dir)
+out = File.join(data_dir, "scored-#{markets.first["local_date"]}.jsonl")
+File.open(out, "w") do |f|
+  markets.each do |r|
+    f.puts JSON.generate(r.slice("ticker", "city", "station", "local_date", "kind",
+      "model_says", "settled", "model_right", "peak_support", "market_pct"))
+  end
+end
+
+right_rows = scored.count { |r| r["model_right"] }
+right = markets.count { |r| r["model_right"] }
+puts format("MODEL: %d/%d markets correct (%.2f%%)   [%d raw rows, %d correct]",
+  right, markets.size, 100.0 * right / markets.size, scored.size, right_rows)
+puts "scored -> #{out}"
+puts
+
+puts "ticker                     model     settled  ok     support  market"
+puts "-" * 78
+scored.sort_by { |r| r["model_right"] ? 1 : 0 }.each do |r|
+  puts format("%-26s %-9s %-8s %-6s %-8s %d%%", r["ticker"][0, 26], r["model_says"],
+    r["settled"], r["model_right"] ? "yes" : "NO", r["peak_support"], r["market_pct"])
+end
+
+wrong = scored.reject { |r| r["model_right"] }
+exit 0 if wrong.empty?
+
+puts
+puts "MISSES by corroboration:"
+wrong.group_by { |r| (r["peak_support"].to_i <= 1) ? "lone spike" : "corroborated" }
+  .each { |k, v| puts format("  %-14s %d", k, v.size) }
