@@ -9,10 +9,22 @@ Map public NWS forecast data to a probability per Kalshi 2-degree bucket, per
 station, so our probabilities can be compared to market prices. Hypothesis
 under test: the market prices off the point forecast and misprices the tails.
 
+> **THE HYPOTHESIS IS FALSIFIED. Scored against 292 station-days of real
+> market prices on 2026-08-05 — see section 10. The market is both better
+> centred and sharper than this model, at every station, on both proper
+> scoring rules. Do not build on section 8.**
+
 The live snapshot in section 6 is consistent with that hypothesis, and the
 held-out calibration check in section 5 says our distribution — not the
 market's concentration — matches how often settled highs actually land in the
 modal bucket. That is *not yet* proof of +EV; see limitations.
+
+Both of those readings turned out to be wrong, for reasons worth keeping: the
+section 5 comparison was invalid (it scored our modal bucket against the
+market's price on a different bucket), and being calibrated was never
+sufficient — a well-calibrated but WIDE distribution loses to a
+well-calibrated sharp one under every proper scoring rule. Limitation 1 said
+exactly this before the evidence arrived.
 
 ## 2. Data source comparison
 
@@ -112,10 +124,29 @@ Full table in the CSV; PIT tail frequencies are mostly near the nominal 10%
 (worst: KNYC 13-24h right tail 17.6% — the model's warm tail is still slightly
 too thin there even after the t).
 
-Read this against section 6: at 24-42h lead the *true* frequency of the modal
-bucket is 25-36% for NYC/Denver/Austin. A market pricing the modal bucket at
-55-60c at that lead would be roughly twice too confident. Miami is the
-exception — a 50c modal bucket there is about right.
+> **CORRECTION 2026-08-05, after scoring against 292 station-days of real
+> market prices. The paragraph below is WRONG and is kept only so the error is
+> legible.**
+>
+> ~~Read this against section 6: at 24-42h lead the *true* frequency of the
+> modal bucket is 25-36% for NYC/Denver/Austin. A market pricing the modal
+> bucket at 55-60c at that lead would be roughly twice too confident. Miami is
+> the exception — a 50c modal bucket there is about right.~~
+>
+> The comparison is invalid. It measures the hit rate of **our** modal bucket
+> and holds it against the market's price on **its own, different** modal
+> bucket. Those are not the same contract. When each side is scored on the
+> bucket it actually names:
+>
+> ```
+>            predicted    actual
+> ours         0.376       0.390     well calibrated, but wide
+> market       0.492       0.497     better calibrated AND far sharper
+> ```
+>
+> The modal buckets agree on only 54% of days. Ours is correct 39% of the time,
+> the market's 50%. The market was not twice too confident; it was right to be
+> confident, and we were mushy. See section 10.
 
 ## 6. Example output vs the live market (real, 2026-08-05)
 
@@ -148,12 +179,13 @@ NBM runs) this 00Z-run model does not have.
 
 ## 7. Honest limitations
 
-1. **We have not scored the model against market prices, only against
-   settlement.** Beating a sigma=3 strawman and being calibrated is necessary,
-   not sufficient. The market could still be better than us at the *times we
-   would actually trade*. Needed: record our probabilities and the book
-   daily (the existing collector infrastructure does the book half already),
-   then score log-loss/Brier vs market-implied probabilities over 30+ days.
+1. ~~**We have not scored the model against market prices, only against
+   settlement.**~~ **CLOSED 2026-08-05, AGAINST US.** Scored over 292
+   station-days / 73 dates: log loss ours 1.4015 vs market 1.1039, Brier
+   0.7032 vs 0.5966, we win 71/292 days. Every station clear of zero; robust
+   to bid/ask/mid, either lead cell, and five sample hours. The worry this
+   limitation raised — "the market could still be better than us at the times
+   we would actually trade" — was exactly right. See section 10.
 2. **Sample sizes:** ~1090 train days and 124-216 test days per cell. Enough
    for mu/sigma/df; not enough to segment by season — and sigma is almost
    certainly seasonal. Pooled year-round fit means summer buckets are probably
@@ -181,9 +213,14 @@ NBM runs) this 00Z-run model does not have.
 8. **Even-floor bucket grid assumed** in the calibration check. Spot-checked
    on live NYC/MIA markets (both even), not proven for all stations/seasons.
    The predictor itself reads the actual tickers, so only section 5 is exposed.
-9. **The strawman comparison is generous to us.** The real market's implied
-   distribution (from the full bucket strip) should be extracted and scored
-   as the proper baseline.
+9. ~~**The strawman comparison is generous to us.**~~ **CLOSED 2026-08-05.**
+   The market's implied distribution was extracted properly from the full
+   6-market strip — verified mutually exclusive and exhaustive on all 292
+   strips — and renormalised; mean overround 1.032, mean per-leg spread 1.45c.
+   The strawman was indeed generous: against the real baseline we lose. The
+   two-bid-ladder trap was checked directly, `yes_ask + no_bid == 1.0000` on
+   every leg, so `yes_ask` is a genuine derived YES offer and not a NO bid
+   misread. See section 10.
 
 ## 8. Porting plan to Ruby (stdlib-only)
 
@@ -228,3 +265,85 @@ data/pairs_*.csv         (station, date, runtime, lead, txn, xnd, cli_high)
 
 Python venv lives in the session scratchpad, not the repo. Deps: numpy,
 scipy, pandas — fitting only; nothing here needs them at trade time.
+
+## 10. Scored against the market — 2026-08-05
+
+Limitation 1 was the gate on everything else, and it closed against us.
+
+**Data.** Our own recorders had zero usable observations: `judgment-2026-08-05.jsonl`
+was ~6 hours old and its only local_date does not settle until 2026-08-06. What made
+the analysis possible instead is that **Kalshi publishes a rolling window of public
+price history**: `GET /markets?series_ticker=..&status=settled` returns ~73
+consecutive event-dates, and `GET /series/{s}/markets/{t}/candlesticks` gives hourly
+`yes_bid`/`yes_ask` over each market's whole life. Both unauthenticated. That yielded
+292 station-days (KAUS/KDEN/KMIA/KNYC, 2026-05-24 to 2026-08-04) — four times what
+30 forward days of recording would have produced, available immediately.
+
+The window rolls forward and older tickers return nothing, so history cannot be
+recovered retroactively. Anything wanting more has to accumulate it going forward.
+
+**Two checks before trusting any of it.** Settlement basis: Kalshi's
+`expiration_value` equals the IEM CLI high on 292/292 events — for a CLI-targeted
+model the METAR-vs-CLI basis risk in HANDOFF section 4 simply does not apply. Read
+path: candlesticks at the live recorder's exact minute matched the Ruby recorder's
+own quotes on 39/48 legs, the rest within 1c of sub-minute drift.
+
+**Result**, sampled at 06:00Z on the event day — the 00Z NBM run is out, the local
+day has barely begun, no intraday ratchet information exists for either side, which
+is the most generous fair timing for a pre-day pricer:
+
+```
+                ours      market
+log loss       1.4015    1.1039     delta +0.2976, 95% CI [+0.2288, +0.3727]
+Brier          0.7032    0.5966     delta +0.1066, 95% CI [+0.0749, +0.1364]
+we win         71/292 days (24%)    sign test p ~ 4e-19
+```
+
+Every station clear of zero. Robust to bid-only / ask-only / mid, to either lead
+cell, and at 02Z / 06Z / 10Z / 14Z / 18Z. CIs are a block bootstrap over whole dates,
+since adjacent days share weather regimes and same-day stations share synoptic error.
+
+**Why.** The market is both better centred and sharper:
+
+```
+              mean abs location error    implied sd
+ours                  1.74 F                2.43
+market                1.29 F                1.83
+```
+
+Our distribution is well calibrated but WIDE, and a mushy calibrated distribution
+loses to a sharp calibrated one under every proper scoring rule. Tails, the direct
+test of the hypothesis: actual 0.168, market 0.141, ours 0.196 — the market
+underprices tails by 2.7pp and we OVERprice them by 2.8pp. The market put 497 legs
+in the 0-2c bin at a mean 0.9c and exactly 1 of 497 settled YES; the cheap tails
+were rich, not cheap.
+
+**The slice that should govern any future attempt.** Sorted by how far we disagree
+with the market: low tercile +0.1303, mid +0.2742, **high +0.4899**. The more we
+disagree, the worse we are. That is HANDOFF section 4's "persistence is a doubt
+signal, read backwards" generalised from the ratchet to the pricer — our
+disagreement measures our error, not the market's slowness.
+
+**Paper PnL** over the window (top-of-book, 100 contracts per signal, correct
+per-order fee, settled against real results): signalled **+$14,794**, realised
+**-$1,908**, 30% win rate. Buy trades at a mean 8.0c — the tail-buying thesis — lost
+$1,400 of it. And that is an upper bound: it assumes a fill at the touch, which is
+the assumption funding-gate item 3 exists to test, and which the 2026-08-05
+fill-quality probes found does not hold.
+
+**Seasonality** (limitation 2) is real but not the story: refitting May-Aug narrows
+the gap from +0.2976 to +0.2559, about 14% of it.
+
+**What would have to change before revisiting.** Neither is tuning; both are a
+different model. (a) Fresher forecast input read straight from NWS rather than the
+IEM archive — at 02Z the freshness gap is ~2h and the market still wins by +0.253,
+so this shrinks the deficit, it does not reverse it. (b) A genuinely sharper
+conditional distribution: season terms at minimum, realistically conditioning on the
+overnight low and the current METAR, which is plainly what the market is already
+doing.
+
+`bin/record_judgments` should keep running — cheap, GET-only, an independent
+forward-looking record.
+
+Scripts: `fetch_market_history.py`, `score_vs_market.py`, `diagnose_vs_market.py`,
+`reliability_and_season.py`. Tables: `MARKET_SCORING*.md`, `market_vs_model_*.csv`.
