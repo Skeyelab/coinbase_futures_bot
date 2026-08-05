@@ -37,11 +37,32 @@ module Sentiment
       return symbol if Candle.where(symbol: symbol, timeframe: timeframe).exists?
 
       underlying = UNDERLYING_TO_SENTIMENT.key(symbol)
-      prefix = PREFIX_TO_UNDERLYING.key(underlying)
-      return nil if prefix.blank?
+      return nil if underlying.blank?
 
-      Candle.where("symbol LIKE ?", "#{prefix}%").where(timeframe: timeframe)
+      candidates = contract_symbols_for(underlying)
+      return nil if candidates.empty?
+
+      Candle.where(symbol: candidates, timeframe: timeframe)
         .group(:symbol).order(Arel.sql("COUNT(*) DESC")).limit(1).count.keys.first
+    end
+
+    # The contracts whose candles can stand in for an underlying's price
+    # series.
+    #
+    # This used to match candles directly with "symbol LIKE 'NOL%'". Postgres
+    # cannot use the (symbol, timeframe, timestamp) index for a prefix LIKE
+    # under the default collation, so it seq-scanned all 3.2M candle rows --
+    # 973ms per call, 1,163 calls a day -- to find four symbols. It was the
+    # largest single consumer of the Sentry quota, and the crash it triggered
+    # in the slow-query monitor was the third largest.
+    #
+    # Reading the contract list instead is a small indexed lookup, and it is
+    # what the method always meant: the comment above says "the contract for
+    # its underlying". Disabled contracts stay eligible, because expiry
+    # disables rather than deletes them and their history is still valid price
+    # data.
+    def self.contract_symbols_for(underlying)
+      Contract.where(base_currency: underlying).pluck(:product_id)
     end
 
     def self.underlying_from_product_id(product_id)

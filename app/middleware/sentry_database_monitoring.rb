@@ -2,6 +2,9 @@
 
 # Custom middleware for enhanced database query monitoring with Sentry
 class SentryDatabaseMonitoring
+  # How many bind values we ship to Sentry per query.
+  BIND_SAMPLE_SIZE = 10
+
   def initialize
     @slow_query_threshold = (ENV["SENTRY_SLOW_QUERY_THRESHOLD"] || 1000).to_f # milliseconds
   end
@@ -53,6 +56,18 @@ class SentryDatabaseMonitoring
     (sql.length > 500) ? "#{sql[0..500]}..." : sql
   end
 
+  # ActiveRecord usually hands us QueryAttribute objects, but not always. A
+  # LIKE built from a raw string arrives as a bare String and some callers pass
+  # a Time straight through, neither of which responds to #value. Assuming they
+  # all do raised inside the notification subscriber on every slow query with a
+  # string bind (4.5k times a day in production before this guard).
+  #
+  # Take the first ten BEFORE unwrapping so a wide query does not map thousands
+  # of binds only to throw all but ten away.
+  def bind_values(binds)
+    binds&.first(BIND_SAMPLE_SIZE)&.map { |bind| bind.respond_to?(:value) ? bind.value : bind }
+  end
+
   def track_slow_query(sql, duration, payload)
     Sentry.with_scope do |scope|
       scope.set_tag("db_performance", "slow_query")
@@ -65,7 +80,7 @@ class SentryDatabaseMonitoring
         threshold_ms: @slow_query_threshold,
         connection_id: payload[:connection_id],
         cached: payload[:cached],
-        binds: payload[:binds]&.map(&:value)&.first(10) # Limit bind values
+        binds: bind_values(payload[:binds])
       })
 
       Sentry.capture_message("Slow database query detected", level: "warning")
@@ -82,7 +97,7 @@ class SentryDatabaseMonitoring
         duration_ms: duration.round(2),
         connection_id: payload[:connection_id],
         exception: payload[:exception]&.to_s,
-        binds: payload[:binds]&.map(&:value)&.first(10)
+        binds: bind_values(payload[:binds])
       })
 
       # Handle both exception objects and exception arrays
