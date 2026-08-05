@@ -130,6 +130,15 @@ RSpec.describe Backtest::Engine, type: :service do
   end
 
   describe "contract-size-aware units (drift audit: PnL was ~1000x inflated)" do
+    # The #606 clamp caps entries at the sizing registry's max_contracts, and
+    # TEST-USD falls to the conservative default (2). This example's arithmetic
+    # needs 5, so give the synthetic symbol an explicit allowance.
+    before do
+      allow(Trading::AssetSizing).to receive(:for_product).and_call_original
+      allow(Trading::AssetSizing).to receive(:for_product).with("TEST-USD")
+        .and_return(Trading::AssetSizing::Params.new(100.0, 10, 1))
+    end
+
     it "converts contract quantity to base units using the strategy's contract_size_usd" do
       insert_step_candles(Array.new(10, 50_000.0) + (1..10).map { |i| 50_000.0 + i * 200 })
       mark_perp("TEST-USD")
