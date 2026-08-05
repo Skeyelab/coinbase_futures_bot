@@ -218,6 +218,36 @@ RSpec.describe Execution::OrderClient do
     end
   end
 
+  describe "reading an order's fills" do
+    # Gate #3 hinges on is_taker (issue #631): a taker fill at the quoted
+    # price is trivially "at or better" and proves nothing about whether a
+    # resting quote gets hit. The fills endpoint is where is_taker lives.
+    it "GETs the fills with the order_id in the QUERY but not in the signature" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {method: method, path: path, headers: headers}
+        {"fills" => [{"is_taker" => true, "count_fp" => "1.00"}]}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      fills = client.fills("ord-9")
+
+      expect(seen[:method]).to eq("GET")
+      expect(seen[:path]).to eq("/portfolio/fills?order_id=ord-9")
+      # Kalshi signs <ts><verb><path> with NO query string. Signing the query
+      # is a bare 401 that names neither half.
+      expect(signs?(seen[:headers], "GET", "/trade-api/v2/portfolio/fills")).to be(true)
+      expect(fills.first["is_taker"]).to be(true)
+    end
+
+    it "has no fills to read in dry-run" do
+      client = described_class.new(transport: ->(*) { raise "no network" })
+
+      expect { client.fills("ord-9") }.to raise_error(Execution::OrderClient::NotLive)
+    end
+  end
+
   describe "validation" do
     def client
       described_class.new(transport: ->(*) { raise "must not reach transport" })

@@ -1,0 +1,96 @@
+#!/usr/bin/env ruby
+# Fill-quality probes (gate item #3, issues #627/#631).
+#
+# Measures FILLABILITY, not edge: 1 contract, limit JOINING the current bid
+# (maker side -- the whole question is whether a resting quote gets hit),
+# liquid verified markets, 60s window, auto-cancel, is_taker recorded per
+# order. Expected cost when filled: ~half-spread + fee, 1-2c per probe.
+#
+# These fills are DIRECTIONAL-track in the ledger: the system did not call
+# them in advance. They are plumbing evidence and never strategy PnL.
+#
+#   ruby bin/probe_fills            # dry-run: shows what it would place
+#   KALSHI_LIVE=1 ruby bin/probe_fills --live --count 3
+#
+# Respects the HALT file like every other order path.
+
+require "json"
+require "date"
+require "fileutils"
+require "tzinfo"
+require_relative "../lib/kalshi_client"
+require_relative "../lib/execution/order_client"
+require_relative "../lib/execution/http_transport"
+require_relative "../lib/execution/fill_watch"
+require_relative "../lib/execution/halt"
+require_relative "../lib/cities"
+
+PROBE_SERIES = %w[KXHIGHNY KXHIGHCHI KXHIGHMIA].freeze
+WINDOW_SECONDS = 60
+# A bid below this is a dead bucket; above it, the book is one tick from
+# settled and a fill proves little. The middle is where resting is a real test.
+BID_RANGE_CENTS = (15..85)
+
+live = ARGV.include?("--live")
+count = ARGV.include?("--count") ? Integer(ARGV[ARGV.index("--count") + 1]) : 1
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+FileUtils.mkdir_p(data_dir)
+out_path = File.join(data_dir, "probe-fills.jsonl")
+
+halt = Execution::Halt.new(data_dir: data_dir)
+abort "HALTED: #{halt.reason} — no probes" if halt.active?
+
+reader = KalshiClient.from_env
+signer = KalshiSigner.new(key_id: ENV["KALSHI_KEY_ID"], private_key_pem: ENV["KALSHI_KEY"]) if live
+orders = Execution::OrderClient.new(
+  transport: Execution::HttpTransport.new, live: live, signer: signer, max_contracts: 1
+)
+watch = Execution::FillWatch.new(client: orders)
+
+# One candidate per series: the most liquid mid-range bucket today.
+candidates = PROBE_SERIES.filter_map do |series|
+  city = Cities::ALL.find { |c| c[:series] == series }
+  local_date = TZInfo::Timezone.get(city[:time_zone]).to_local(Time.now.utc).to_date
+  rows = reader.temp_markets(series, local_date)
+  rows.filter_map { |r|
+    bid = (r["yes_bid_dollars"].to_f * 100).round
+    next unless BID_RANGE_CENTS.cover?(bid)
+    {ticker: r["ticker"], bid: bid, size: r["yes_bid_size_fp"].to_f.floor}
+  }.max_by { |c| c[:size] }
+end
+
+placed = 0
+candidates.take(count).each do |candidate|
+  puts format("probe %-26s join bid at %dc (resting size %d)",
+    candidate[:ticker], candidate[:bid], candidate[:size])
+
+  intent = orders.place(
+    ticker: candidate[:ticker], side: :buy,
+    price_cents: candidate[:bid], contracts: 1
+  )
+
+  if intent[:mode] == "dry_run"
+    puts "  dry-run: would rest 1 contract; pass --live with KALSHI_LIVE=1 to place"
+    next
+  end
+
+  result = watch.settle(intent, timeout_seconds: WINDOW_SECONDS)
+  record = result.merge(
+    probe: true, ticker: candidate[:ticker], order_id: intent[:order_id],
+    ts: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+  )
+  File.open(out_path, "a") { |f| f.puts(JSON.generate(record)) }
+  placed += 1
+  puts format("  %-8s realized=%s maker=%d taker=%d at_or_better=%s",
+    result[:status], result[:realized_price_cents] || "-",
+    result[:maker_filled], result[:taker_filled], result[:at_or_better])
+end
+
+exit 0 unless File.exist?(out_path)
+
+rows = File.readlines(out_path).map { |l| JSON.parse(l) }
+maker = rows.sum { |r| r["maker_filled"].to_i }
+taker = rows.sum { |r| r["taker_filled"].to_i }
+puts
+puts format("PROBE LEDGER  %d probes  maker fills %d  taker fills %d", rows.size, maker, taker)
+puts "gate #3 counts MAKER fills only — taker fills are trivially at-or-better and prove nothing"

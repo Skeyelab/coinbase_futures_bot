@@ -89,6 +89,15 @@ module Execution
       nil
     end
 
+    # The fills behind one order, is_taker included (issue #631). Only maker
+    # fills answer gate #3's question -- a taker fill at the quoted price is
+    # trivially "at or better" -- so the split has to come from the venue.
+    def fills(order_id)
+      raise NotLive, "no fills for #{order_id} exist in dry-run" unless live?
+
+      send_signed("GET", "/portfolio/fills", query: "order_id=#{order_id}")["fills"] || []
+    end
+
     # Pulling a resting order. Gate item #3 needs this as much as placing does:
     # an order left resting forever is neither a fill nor a miss, and it scores
     # as neither.
@@ -104,11 +113,12 @@ module Execution
 
     # One place where a signature is produced. Kalshi signs
     # <timestamp_ms><METHOD><path> and the path carries no query string --
-    # including one gives a bare 401 that names neither half.
-    def send_signed(method, path, body: nil)
+    # including one gives a bare 401 that names neither half. The query
+    # therefore rides only on the request, never into the signature.
+    def send_signed(method, path, body: nil, query: nil)
       @transport.call(
         method: method,
-        path: path,
+        path: query ? "#{path}?#{query}" : path,
         headers: @signer.headers_for(method: method, path: "#{API_PREFIX}#{path}"),
         body: body
       )
