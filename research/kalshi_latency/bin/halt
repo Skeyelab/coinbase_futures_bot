@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# The Kalshi kill switch (issue #625). No deploy, no API, no running process
+# required — a file in the data dir that the executor checks before every
+# order.
+#
+#   ruby bin/halt "reason"    engage
+#   ruby bin/halt --status    show
+#   ruby bin/halt --resume    lift
+#
+# The safe direction has no friction: engaging needs nothing, resuming is the
+# deliberate act.
+
+require_relative "../lib/execution/halt"
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+halt = Execution::Halt.new(data_dir: data_dir)
+
+case ARGV[0]
+when "--status", nil
+  if halt.active?
+    puts "HALTED: #{halt.reason.empty? ? "(no reason recorded)" : halt.reason}"
+  else
+    puts "not halted — execution path open"
+  end
+when "--resume"
+  halt.resume!
+  puts "halt lifted — execution path open"
+else
+  halt.engage!(ARGV.join(" "))
+  puts "HALTED: #{ARGV.join(" ")}"
+end

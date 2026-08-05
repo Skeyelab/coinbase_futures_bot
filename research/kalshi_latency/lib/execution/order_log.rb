@@ -10,6 +10,19 @@ module Execution
       @clock = clock
     end
 
+    # Tickers whose intents were actually PLACED (dry-run or live). This is
+    # the executor's memory across restarts (issue #626): the in-memory hash
+    # forgets, the venue's position does not, so the log arbitrates. Refusal
+    # and halt lines are not placements and do not count.
+    def placed_tickers
+      return [] unless File.exist?(@path)
+
+      File.readlines(@path).filter_map { |line|
+        record = JSON.parse(line)
+        record["ticker"] if %w[dry_run live].include?(record["mode"])
+      }
+    end
+
     def record(intent)
       # The order is already at the venue by the time we get here. A missing
       # directory must not be what loses the only record of it.
