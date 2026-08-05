@@ -69,6 +69,15 @@ RSpec.describe Execution::Pipeline do
     end
   end
 
+  it "honors a HALT file in the data directory" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "HALT"), "ops")
+      pipeline = described_class.build(data_dir: dir)
+
+      expect(pipeline.sight(sighting, at: 1000)).to be_nil
+    end
+  end
+
   it "refuses unverified stations even when everything else looks right" do
     Dir.mktmpdir do |dir|
       pipeline = described_class.build(data_dir: dir)

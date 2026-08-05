@@ -3,6 +3,7 @@ require "json"
 require_relative "../../lib/execution/executor"
 require_relative "../../lib/execution/order_client"
 require_relative "../../lib/execution/order_log"
+require_relative "../../lib/execution/halt"
 
 RSpec.describe Execution::Executor do
   def opportunity(over = {})
@@ -19,6 +20,72 @@ RSpec.describe Execution::Executor do
     client = Execution::OrderClient.new(transport: ->(*) { raise "no network" })
     log = Execution::OrderLog.new(path: File.join(dir, "orders.jsonl"))
     described_class.new(client: client, log: log)
+  end
+
+  it "places nothing while the halt file is engaged, and says so once" do
+    Dir.mktmpdir do |dir|
+      halt = Execution::Halt.new(data_dir: dir)
+      halt.engage!("operator says stop")
+      client = Execution::OrderClient.new(transport: ->(*) { raise "halted run must not place" })
+      log = Execution::OrderLog.new(path: File.join(dir, "orders.jsonl"))
+      executor = described_class.new(client: client, log: log, halt: halt)
+      episode = {market_pct: 2, support: 5, seconds: 30}
+
+      first = executor.consider(opportunity, episode: episode)
+      second = executor.consider(opportunity, episode: episode)
+
+      expect(first).to be_nil
+      expect(second).to be_nil
+      lines = File.readlines(File.join(dir, "orders.jsonl")).map { |l| JSON.parse(l) }
+      expect(lines.size).to eq(1)
+      expect(lines.first).to include("mode" => "halted", "reason" => "operator says stop")
+    end
+  end
+
+  it "trades again once the halt is lifted" do
+    Dir.mktmpdir do |dir|
+      halt = Execution::Halt.new(data_dir: dir)
+      client = Execution::OrderClient.new(transport: ->(*) { raise "no network" })
+      log = Execution::OrderLog.new(path: File.join(dir, "orders.jsonl"))
+      executor = described_class.new(client: client, log: log, halt: halt)
+      episode = {market_pct: 2, support: 5, seconds: 30}
+
+      halt.engage!("pause")
+      expect(executor.consider(opportunity, episode: episode)).to be_nil
+
+      halt.resume!
+      expect(executor.consider(opportunity, episode: episode)[:mode]).to eq("dry_run")
+    end
+  end
+
+  it "does not re-place after a restart — the order log is the memory (issue #626)" do
+    Dir.mktmpdir do |dir|
+      episode = {market_pct: 2, support: 5, seconds: 30}
+      before_restart = build(dir)
+      expect(before_restart.consider(opportunity, episode: episode)).not_to be_nil
+
+      # A brand-new executor over the same log: this is the restart. The
+      # in-memory hash is gone; the position at the venue is not.
+      after_restart = build(dir)
+      expect(after_restart.consider(opportunity, episode: episode)).to be_nil
+      lines = File.readlines(File.join(dir, "orders.jsonl"))
+      expect(lines.size).to eq(1)
+    end
+  end
+
+  it "does not let refusals or halts in the log block a later placement" do
+    Dir.mktmpdir do |dir|
+      first = build(dir)
+      # A refusal line lands in the log...
+      first.consider(opportunity, episode: {market_pct: 99, support: 1, seconds: 30})
+
+      # ...and a restarted executor must still be able to place the ticker
+      # once the doubts clear. Only PLACED intents are memory.
+      restarted = build(dir)
+      placed = restarted.consider(opportunity, episode: {market_pct: 2, support: 5, seconds: 30})
+
+      expect(placed[:mode]).to eq("dry_run")
+    end
   end
 
   it "places once per ticker however long the episode persists" do
