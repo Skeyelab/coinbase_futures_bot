@@ -69,6 +69,29 @@ RSpec.describe Execution::Pipeline do
     end
   end
 
+  it "exits a repriced position through check_exits" do
+    Dir.mktmpdir do |dir|
+      reader = double("reader", quotes: [{ticker: "KXHIGHNY-26AUG04-B83.5", bid_cents: 1, ask_cents: 2}])
+      pipeline = described_class.build(data_dir: dir, reader: reader)
+
+      pipeline.sight(sighting, at: 1000) # places the entry (sell at 3c... entry recorded)
+      exits = pipeline.check_exits
+
+      expect(exits.size).to eq(1)
+      refreshed = File.readlines(File.join(dir, "orders.jsonl")).map { |l| JSON.parse(l) }
+      expect(refreshed.last["exit"]).to be(true)
+    end
+  end
+
+  it "check_exits is a no-op without a reader (pure dry-run pipelines)" do
+    Dir.mktmpdir do |dir|
+      pipeline = described_class.build(data_dir: dir)
+      pipeline.sight(sighting, at: 1000)
+
+      expect(pipeline.check_exits).to eq([])
+    end
+  end
+
   it "honors a HALT file in the data directory" do
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, "HALT"), "ops")

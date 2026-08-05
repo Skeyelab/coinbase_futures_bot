@@ -17,10 +17,25 @@ module Execution
     def placed_tickers
       return [] unless File.exist?(@path)
 
-      File.readlines(@path).filter_map { |line|
-        record = JSON.parse(line)
+      read_entries.filter_map { |record|
         record["ticker"] if %w[dry_run live].include?(record["mode"])
       }
+    end
+
+    def read_entries
+      return [] unless File.exist?(@path)
+
+      File.readlines(@path).map { |line| JSON.parse(line) }
+    end
+
+    # Placed intents whose ticker has no exit record yet: the positions we
+    # still hold. The exit-on-repricing rule (settled facts are exited on the
+    # market's agreement, not held to settlement) reads its worklist here.
+    def open_positions
+      entries = read_entries
+      exited = entries.select { |r| r["exit"] }.map { |r| r["ticker"] }.to_a
+      entries.select { |r| %w[dry_run live].include?(r["mode"]) && !r["exit"] }
+        .reject { |r| exited.include?(r["ticker"]) }
     end
 
     def record(intent)

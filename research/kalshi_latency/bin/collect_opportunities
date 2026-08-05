@@ -11,11 +11,14 @@
 
 require_relative "../lib/opportunity_collector"
 require_relative "../lib/execution/pipeline"
+require_relative "../lib/kalshi_client"
 
 data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
 
 OpportunityCollector.new(
   data_dir: data_dir,
   interval: Integer(ENV.fetch("INTERVAL", "60")),
-  execution: Execution::Pipeline.build(data_dir: data_dir)
+  # The reader is GET-only market data for exit-on-repricing quote checks;
+  # the order path stays dry-run with a transport that refuses the network.
+  execution: Execution::Pipeline.build(data_dir: data_dir, reader: KalshiClient.new)
 ).run(seconds: ENV["SECONDS"] && Integer(ENV["SECONDS"]))
