@@ -213,7 +213,9 @@ class OperatorSnapshot
   end
 
   def drawdown_info
-    peak = BotRuntimeStat.find_by(key: Trading::Protections::MaxDrawdownMonitor::PEAK_KEY)&.value&.dig("peak")
+    # In-window, same-regime peak only (#608): a stale or cross-regime peak is
+    # exactly the number that produced the 92.5% phantom drawdown.
+    peak = Trading::Protections::MaxDrawdownMonitor.current_peak
     # Same actual-equity source the guard tracks its peak against (issue #451),
     # or the % is meaningless: paper equity in dry-run, live balance when live.
     current = Trading::CurrentEquity.usd

@@ -174,8 +174,9 @@ RSpec.describe OperatorSnapshot do
                 "symbols" => [{"sentiment_symbol" => "OIL-USD", "price_symbol" => "NOL-19AUG26-CDE", "maturity" => "low"}]})
       Trading::ProtectionLock.add(scope: "symbol", source: "cooldown", symbol: "NOL-19AUG26-CDE",
         side: "both", reason: "post-exit cooldown", expires_at: 1.hour.from_now)
-      BotRuntimeStat.create!(key: "protection:max_drawdown_peak", recorded_at: Time.current,
-        value: {"peak" => 10_000.0})
+      # Seeded through the monitor (#608): the snapshot only shows a peak from
+      # the current regime's in-window samples.
+      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: 10_000.0)
 
       ind = OperatorSnapshot.new.indicators
 
@@ -188,8 +189,7 @@ RSpec.describe OperatorSnapshot do
     it "computes drawdown from the guard's actual-equity source (Trading::CurrentEquity)" do
       # The % must use the same equity the guard tracks its peak against, or it is
       # meaningless (issues #436/#451).
-      BotRuntimeStat.create!(key: "protection:max_drawdown_peak", recorded_at: Time.current,
-        value: {"peak" => 25_000.0})
+      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: 25_000.0)
       allow(Trading::CurrentEquity).to receive(:usd).and_return(20_000.0)
 
       dd = OperatorSnapshot.new.indicators[:protections][:drawdown]
