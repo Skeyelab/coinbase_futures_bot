@@ -5,13 +5,18 @@ require_relative "../../lib/execution/fill_watch"
 class FakeOrderClient
   attr_reader :cancelled
 
-  def initialize(states)
+  def initialize(states, fills: [])
     @states = states
+    @fills = fills
     @cancelled = []
   end
 
   def order(_id)
     (@states.size > 1) ? @states.shift : @states.first
+  end
+
+  def fills(_id)
+    @fills
   end
 
   def cancel(id)
@@ -45,6 +50,62 @@ RSpec.describe Execution::FillWatch do
     expect(result[:intended_price_cents]).to eq(3)
     expect(result[:at_or_better]).to be(true)
     expect(client.cancelled).to be_empty
+  end
+
+  # Issue #631: a taker fill at the quoted price is trivially at-or-better and
+  # proves nothing about whether a RESTING quote gets hit. The report has to
+  # carry the split or ten crossed orders pass gate #3 while answering nothing.
+  it "splits the fill into maker and taker contracts" do
+    client = FakeOrderClient.new([executed],
+      fills: [
+        {"is_taker" => true, "count_fp" => "3.00"},
+        {"is_taker" => false, "count_fp" => "2.00"}
+      ])
+    watch = described_class.new(client: client, sleeper: ->(_) {}, now: -> { 0 })
+
+    result = watch.settle(intent, timeout_seconds: 60)
+
+    expect(result[:taker_filled]).to eq(3)
+    expect(result[:maker_filled]).to eq(2)
+  end
+
+  it "reports zero maker and taker contracts on an unfilled order" do
+    client = FakeOrderClient.new(
+      [{"status" => "canceled", "fill_count_fp" => "0.00", "remaining_count_fp" => "0.00",
+        "taker_fill_cost_dollars" => "0", "maker_fill_cost_dollars" => "0"}],
+      fills: []
+    )
+    watch = described_class.new(client: client, sleeper: ->(_) {}, now: -> { 0 })
+
+    result = watch.settle(intent, timeout_seconds: 60)
+
+    expect(result[:taker_filled]).to eq(0)
+    expect(result[:maker_filled]).to eq(0)
+  end
+
+  # The v2-deleted `action` field scored every order with the sell rule. A BID
+  # filled cheaper than its limit is at-or-better; the sell rule calls that
+  # worse. Issue #631's probe protocol rests bids, so this is the exact case
+  # gate #3 would have mis-scored.
+  it "scores a bid filled cheaper than its limit as at-or-better" do
+    bid = intent(price: "0.3000").merge(side: "bid")
+    client = FakeOrderClient.new([executed(filled: "5.00", cost: "0.145000")]) # 2.9c each
+
+    result = described_class.new(client: client, sleeper: ->(_) {}, now: -> { 0 })
+      .settle(bid, timeout_seconds: 60)
+
+    expect(result[:realized_price_cents]).to eq(2.9)
+    expect(result[:at_or_better]).to be(true)
+  end
+
+  it "scores a bid filled dearer than its limit as worse" do
+    bid = intent(price: "0.0300").merge(side: "bid")
+    client = FakeOrderClient.new([executed(filled: "5.00", cost: "0.160000")]) # 3.2c each
+
+    result = described_class.new(client: client, sleeper: ->(_) {}, now: -> { 0 })
+      .settle(bid, timeout_seconds: 60)
+
+    expect(result[:at_or_better]).to be(false)
   end
 
   def resting(filled: "0.00", remaining: "5.00", cost: "0.000000")

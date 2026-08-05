@@ -70,6 +70,7 @@ module Execution
       {status: status_for(filled, resting?(state)), filled: filled.floor,
        realized_price_cents: realized, intended_price_cents: intended,
        at_or_better: !realized.nil? && at_or_better?(intent, realized, intended)}
+        .merge(maker_taker_split(intent))
     end
 
     # The venue reports what the fill COST in collateral. For a bid that is the
@@ -86,6 +87,17 @@ module Execution
     # included -- was scored with the sell rule.
     def buy?(intent)
       intent[:side].to_s == "bid"
+    end
+
+    # From the fills endpoint, because is_taker lives nowhere else (#631).
+    # Only maker contracts answer gate #3's actual question -- did a RESTING
+    # quote get hit -- so the two are never summed back together here.
+    def maker_taker_split(intent)
+      taker, maker = @client.fills(intent[:order_id])
+        .partition { |f| f["is_taker"] }
+        .map { |fills| fills.sum { |f| f["count_fp"].to_f }.floor }
+
+      {taker_filled: taker, maker_filled: maker}
     end
 
     # A buy is better cheaper; a sell is better dearer. Comparing them the same
