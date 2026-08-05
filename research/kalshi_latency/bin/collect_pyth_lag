@@ -1,0 +1,61 @@
+#!/usr/bin/env ruby
+# Issue #629: does the Kalshi book lag the Pyth oracle it settles on?
+#
+# Samples both sides every few seconds for the front 15-minute gold/silver/WTI
+# market: the oracle price Kalshi will settle against, and the book's quotes,
+# fetched together so each row is one moment. Analysis happens later, offline:
+# when the oracle moved decisively across the strike, how long did the book
+# take to reprice — and in the terminal minute, do quotes ever contradict an
+# oracle that has already decided the outcome?
+#
+# GET-only, no credentials, no order path. Kill on evidence, per section 5.
+
+require "json"
+require "time"
+require "fileutils"
+require_relative "../lib/pyth_source"
+require_relative "../lib/kalshi_client"
+
+SERIES = {"KXGOLD15M" => "GOLD", "KXSILVER15M" => "SILVER", "KXWTI15M" => "WTI"}.freeze
+INTERVAL = Float(ENV.fetch("INTERVAL", "3"))
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+FileUtils.mkdir_p(data_dir)
+
+pyth = PythSource.new
+client = KalshiClient.new
+running = true
+trap("INT") { running = false }
+trap("TERM") { running = false }
+
+warn "#{Time.now.utc.strftime("%H:%M:%S")} sampling Pyth vs Kalshi every #{INTERVAL}s"
+cycles = 0
+
+while running
+  began = Time.now.to_f
+  now = Time.now.utc
+  prices = pyth.latest
+
+  SERIES.each do |series, symbol|
+    # The front market, quoted fresh in the same beat as the oracle read.
+    market = client.series_markets(series, limit: 5).min_by { |m| m["close_time"].to_s }
+    next unless market
+
+    oracle = prices[symbol]
+    record = {
+      at_ms: (began * 1000).round, series: series, ticker: market["ticker"],
+      strike: (market["floor_strike"] || market["cap_strike"]).to_f,
+      close_time: market["close_time"],
+      pyth: oracle && oracle[:price]&.round(5),
+      pyth_pub: oracle && oracle[:publish_time],
+      bid: (market["yes_bid_dollars"].to_f * 100).round,
+      ask: (market["yes_ask_dollars"].to_f * 100).round
+    }
+    path = File.join(data_dir, "pyth-lag-#{now.strftime("%Y-%m-%d")}.jsonl")
+    File.open(path, "a") { |f| f.puts(JSON.generate(record)) }
+  end
+
+  cycles += 1
+  warn "#{now.strftime("%H:%M:%S")} #{cycles} cycles" if (cycles % 100).zero?
+  sleep([INTERVAL - (Time.now.to_f - began), 0.2].max)
+end
