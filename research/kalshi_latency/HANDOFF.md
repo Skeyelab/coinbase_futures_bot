@@ -378,3 +378,216 @@ it was found.
   flag the expiry." Auto-roll is opt-in and not guaranteed.
 - **`posthog-setup-report.md`** and **`.claude/worktrees/`** are untracked in the
   working tree.
+
+---
+
+# Handoff — 2026-08-05
+
+Everything above was written 2026-08-04 and is still broadly right about the
+*thesis*. Sections 2 (current state), 7 (gate status) and 8 (next actions) are
+superseded by this. Read this part second, not instead.
+
+## The one-line summary
+
+The track now lives on main with CI, the write path is proven live against
+real money, and three separate edge claims were killed by measurement. Nothing
+was promoted. That is a good day by this project's own standard.
+
+## What changed
+
+**The track is on main.** `research/kalshi_latency/` merged in #634, with a CI
+job running its 271 specs on every PR. Until today it lived only on
+`research/kalshi-repricing-latency`, which had never had a PR to main.
+
+**`research/**` PRs had been running ZERO CI.** The workflow filter was
+`[main, feat/**]`, so a PR into a research branch matched no workflow, sat at a
+clean status and merged the instant automerge was requested. That is how an
+order-placing execution layer shipped unchecked (#618), on a branch also
+pinning a Rails with a published RCE advisory. Fixed on main in #621 and on the
+branch in #619.
+
+**The write path was aimed at a retired endpoint.** `POST /portfolio/orders`
+returns `410 deprecated_v1_order_endpoint`. Ported in #622:
+
+```
+api.elections.kalshi.com  ->  external-api.kalshi.com
+/portfolio/orders         ->  /portfolio/events/orders   (create + cancel)
+                          ->  /portfolio/orders/{id}     (read -- no "events")
+action + side: yes|no     ->  side: bid|ask
+yes_price: 12             ->  price: "0.1200"  (fixed-point dollars, STRING)
+count: 25                 ->  count: "25.00"   (STRING)
+                          ->  time_in_force, self_trade_prevention_type required
+{"order":{...}}           ->  flat 201 body, order_id at top level
+```
+
+**v2 quotes every order from the YES leg.** There is no yes/no field any more,
+so exiting a NO holding is a BID, not a sell. Getting that backwards doubles a
+position instead of closing it.
+
+Every dry-run test passed through all of this, because dry-run never touches
+the network. The fakes faithfully reproduced an API that no longer existed.
+
+## Live execution now works, and cost about 1c to prove
+
+Open, watch, cancel and close all verified against the real venue. Three
+fill-quality probes (1 contract, limit at the bid, 60s window):
+
+```
+NY  B82.5 @ 57c   unfilled, cancelled
+CHI B83.5 @ 27c   FILLED at 27c -- is_taker: true, we CROSSED
+MIA B90.5 @ 43c   unfilled, cancelled
+close: sold 1 @ 26c. Round trip -1c + fees. Flat.
+```
+
+**Nothing rested and got hit inside 60 seconds** on 1c-spread books. The one
+fill was us taking an offer. That is the distinction gate item 3 exists to
+make and no amount of polling would have shown it. See #631 — `is_taker` must
+be recorded or ten crossed orders would satisfy the gate's wording while
+answering none of its question.
+
+Two defects in the gate-3 metric, both found only by trading: the venue
+reports fill cost in COLLATERAL, so a sale at 26c was logged as 74c and
+`at_or_better` compared `74 >= 26` and passed trivially; and `at_or_better`
+keyed off `intent[:action]`, which the v2 port deleted, so nil never equalled
+"buy" and every order was scored with the sell rule.
+
+## Station verification: built, day 1 of 3 done
+
+21 stations could never have been promoted, for two independent reasons.
+Scoring persisted nothing, and the stated test could not discriminate — nearly
+every bucket settles NO, so every candidate agrees and none is distinguished.
+2026-08-04 reproduced that exactly: 34 scored markets, all refutations.
+
+`StationEvidence` now counts only days where rivals DISAGREE, settlement
+referees, and promotion needs **zero misses across >= 3 separate such days** —
+stated before the evidence, funding-gate style. `StationCandidates` supplies 3
+rivals per series, all 45 ids verified live against api.weather.gov.
+
+First real day, after fixing a mapping bug that had scored half the board
+backwards (#632):
+
+```
+8 discriminating markets on 2026-08-04
+incumbents: 8 wins, 0 losses     promotable: []  (correctly -- needs 3 days)
+KMSP over KFCM   KMSY over KHUM   KSFO over KHWD   KATL over KFTY+KPDK
+KMDW over KPWK   KOKC over KPWA+KTIK   KLAS over KVGT   KPHL over KPNE+KILG
+```
+
+Every station cities.rb guessed has been right every time a rival disagreed.
+
+**A daily cron now runs this on exo-mini at 13:00 UTC for the previous day**,
+writing to `~/kalshi-data/`. Day 2 lands 2026-08-06, day 3 on the 7th.
+
+## Gate status — item 1 FAILS, and the old number was a rounding artifact
+
+```
+1 model accuracy    FAILS    32/34 = 94.12% vs a >=95% bar
+2 opportunity rate  FAILS    0.00 credible/hr
+3 fill quality      PARTIAL  3 orders live, 1 fill, is_taker gap (#631)
+4 net positive      BLOCKED on 3
+5 no single-event dominance   BLOCKED on 3
+```
+
+The collector rewrites a ticker every cycle it still looks callable, so
+2026-08-04's "79 calls" were **34 distinct markets** — a 2.3x inflated
+denominator. `bin/score_predictions` now counts markets and persists them.
+
+Accuracy split perfectly by whether the book agreed: **32/32 correct where it
+agreed, 0/2 where it disagreed.** The model is wrong exactly where it already
+refuses to trade. Whether gate 1 should therefore score tradeable calls only is
+#628 — and per the gate's own rules that must be declared prospectively, never
+applied backwards.
+
+## The ensemble pricer lost. Hypothesis falsified, not merely unproven
+
+The NBM ensemble model was scored against real market prices over 292
+station-days / 73 dates (#639):
+
+```
+                ours      market
+log loss       1.4015    1.1039     delta +0.2976, CI [+0.2288, +0.3727]
+Brier          0.7032    0.5966
+we win         71/292 days (24%)
+```
+
+The thesis was "the market prices off the point forecast and misprices the
+tails". It does not: the market is better centred (1.29F vs 1.74F) AND sharper
+(implied sd 1.83 vs 2.43). Our distribution is calibrated but WIDE, and mushy
+loses to sharp under every proper scoring rule. We *overprice* tails by more
+than the market underprices them.
+
+**The line to remember:** sorted by how far we disagree with the market, our
+deficit GROWS — +0.13 low tercile, +0.27 mid, +0.49 high. Our disagreement
+measures our error, not the market's slowness. That is section 4's doubt signal
+generalised from the ratchet to the pricer.
+
+Do not build section 8 of that report. REPORT.md is corrected in place with the
+error left legible.
+
+## New capabilities and facts found today
+
+- **Kalshi publishes a rolling ~73 days of public price history**:
+  `GET /markets?status=settled` plus
+  `GET /series/{s}/markets/{t}/candlesticks` (hourly yes_bid/yes_ask),
+  unauthenticated. That answered in a day what 30 days of forward recording
+  would have, with 4x the sample. General backtesting capability; bears on
+  gate 2. The window rolls and cannot be recovered retroactively.
+- **Settlement basis verified 292/292 exact** — `expiration_value` equals the
+  IEM CLI high on every event. For a CLI-targeted model the METAR-vs-CLI basis
+  risk in section 4 does NOT apply. (It still applies to METAR-driven models.)
+- **Kalshi perps are live on this account** — 16 crypto perps, 2-6x leverage,
+  funding rates, separate margin wallet (currently $0). Promo fees taker
+  0.040% / maker 0.020%; launch rate taker 0.120%, which is WORSE than
+  Coinbase's observed ~0.102%. See #630.
+- **15-minute commodities settle on Pyth** 1-minute candle closes — a public,
+  readable feed, so the CF-Benchmarks trap that disabled the touch family does
+  not apply. But the shape is wrong: close-at-T+15 vs close-at-T is terminal
+  value, not monotone, so nothing is ever already-determined. See #629.
+
+## Traps learned today, in addition to section 4
+
+- **`strike_type` lies, and so does the ticker prefix.** `T84` on KXHIGHTSEA is
+  a CAP ("83 or below"), not a floor. Misreading it made a correct METAR
+  observation look like a 4-5F basis divergence. The series is the authority.
+- **`:open` at end of day is not one answer.** It depends on the market: a high
+  that never got there refutes "reach this level" and CONFIRMS "stay below it".
+  A blanket rule scores half the board backwards.
+- **exo-mini's scanner runs from `~/kalshi-scan/`, NOT
+  `~/coinbase_futures_bot/`.** The unit in `deploy/` is wrong about both the
+  path and DATA_DIR. That checkout is 15 commits behind with 41 uncommitted
+  files, so nothing describes what runs there. See #642.
+
+## Open issues
+
+```
+#624  write promoted stations back into cities.rb   <- next, after day 3
+#625  halt switch (before anything trades unattended)
+#626  Executor dedup must survive a restart
+#627  fill-quality probe protocol
+#628  gate 1 denominator + tradeable-only question   <- operator decision
+#629  does the book lag Pyth on 15-min commodities?
+#630  Kalshi perps vs Coinbase venue comparison
+#631  record is_taker per fill                       <- gate 3 unmeasurable without
+#637  ensemble pricer (closed against us, kept for the record)
+#638  lead-bin boundary off-by-one, Ruby vs Python
+#642  exo-mini unreproducible checkout
+```
+
+## What to do next
+
+**Friday 2026-08-07** is the decision point. Three days of evidence either
+promotes stations or does not. If it does, the `station unverified` doubt
+disappears from 7 of every 11 daily refusals — and that is the first time this
+system would have something credible to trade. The cron runs itself; just read
+`~/kalshi-data/candidates-*.jsonl` and run the tally.
+
+Do NOT trade the flagged candidates in the meantime. Both current ones carry
+`market disagrees` — the exact shape the model went 0/2 on.
+
+## Standing instructions unchanged
+
+Section 9 above still holds: caveman style, strict TDD with vertical slices,
+mutation-test every fix, PR per fix, `/browse` for web, RVM 3.2.4 gemset,
+`gh auth switch --user Skeyelab`. Section 10's security constraints still hold
+— note the read/write split survived the v2 port: `KalshiClient` is still
+GET-only and all ordering lives in `Execution::OrderClient`.
