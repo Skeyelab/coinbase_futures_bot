@@ -509,4 +509,147 @@ RSpec.describe Backtest::Engine, type: :service do
       expect(result.trades).to all(include(side: :long))
     end
   end
+
+  # Backtest parity for the operator's CURRENT n8n rule, the ATR Chandelier
+  # (CB Watcher - Multi Position). Fees are zeroed so net == gross and the
+  # dollar arithmetic below is exact.
+  describe "ATR chandelier exit" do
+    # contract_size_usd 1000 at price 100 -> 10 base units -> $10 of PnL per $1
+    # move, on one contract.
+    def chandelier_engine(closes:, policy:, hourly: nil, tp: 200.0, sl: 1.0)
+      insert_step_candles(closes)
+      insert_hourly_candles(hourly) if hourly
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: tp, sl: sl, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, per_contract_fee: 0.0, slippage: 0.0, contract_size_usd: 1000.0,
+        atr_chandelier: policy, atr_period: 2)
+    end
+
+    # Hourly bars reaching back before t0 so an ATR is already readable at entry.
+    def insert_hourly_candles(range)
+      Candle.insert_all!(range.map do |i, high, low, close|
+        {symbol: "TEST-USD", timeframe: "1h", timestamp: t0 + i * 1.hour,
+         open: close, high: high, low: low, close: close, volume: 10,
+         created_at: Time.current, updated_at: Time.current}
+      end)
+    end
+
+    let(:policy) { Trading::AtrChandelierExit.new(trail_atr: 2.5, fixed_stop: -75.0) }
+
+    # ATR 1.0 -> atr_pnl = 1.0 * 10 base units = $10 -> trail is $25 below peak.
+    let(:calm_hours) { (-4..0).map { |i| [i, 101.0, 100.0, 100.5] } }
+
+    it "trails the peak and closes when price gives back more than 2.5 ATR" do
+      # Peak from the 104.0 candle HIGH (104.5) = +$45. Stop = 45 - 25 = $20.
+      # The 101.0 candle LOW is 100.5 = +$5, below the stop.
+      result = chandelier_engine(closes: [100.0, 104.0, 101.0, 101.0],
+        policy: policy, hourly: calm_hours).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:atr_trail)
+    end
+
+    it "holds while the giveback stays inside the ATR band" do
+      # Peak 104.5 -> +$45, stop $20. Low of 103.5 is +$35, still above.
+      result = chandelier_engine(closes: [100.0, 104.0, 104.0, 104.0],
+        policy: policy, hourly: calm_hours).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trades.first&.dig(:exit_reason)).not_to eq(:atr_trail)
+    end
+
+    # Without an hourly series there is no ATR at all, and the rule must fall back
+    # to the absolute floor rather than inventing a tight stop from nothing.
+    it "falls back to the fixed stop when no ATR is readable" do
+      result = chandelier_engine(closes: [100.0, 100.0, 91.0, 91.0],
+        policy: policy).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:atr_floor)
+    end
+
+    it "is inert with no policy configured" do
+      result = chandelier_engine(closes: [100.0, 104.0, 101.0, 101.0],
+        policy: nil, hourly: calm_hours).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trades.map { |t| t[:exit_reason] }).not_to include(:atr_trail, :atr_floor)
+    end
+
+    # Explicit OHLC so a bar can carry a wick far from its close. The default
+    # helper uses close +/- 0.5, which is too gentle to tell these apart.
+    def insert_wicked_candles(rows, step: 5.minutes)
+      Candle.insert_all!(rows.each_with_index.map do |(high, low, close), i|
+        {symbol: "TEST-USD", timeframe: "5m", timestamp: t0 + i * step,
+         open: close, high: high, low: low, close: close, volume: 10,
+         created_at: Time.current, updated_at: Time.current}
+      end)
+    end
+
+    def wicked_engine(rows:, policy:, hourly:, step: 5.minutes)
+      insert_wicked_candles(rows, step: step)
+      insert_hourly_candles(hourly)
+      strategy = scripted_strategy do |as_of|
+        if as_of == t0
+          {side: :long, price: 100.0, quantity: 1.0, tp: 200.0, sl: 1.0, confidence: 50.0}
+        end
+      end
+      described_class.new(symbol: "TEST-USD", strategy: strategy, starting_equity: 10_000.0,
+        fee_rate: 0.0, per_contract_fee: 0.0, slippage: 0.0, contract_size_usd: 1000.0,
+        atr_chandelier: policy, atr_period: 2)
+    end
+
+    # The peak must come from the bar's FAVORABLE extreme. A tall wick to 110 is
+    # +$100 of peak even though the bar closes flat at 100; taking the peak from
+    # the close would see +$0, leave the stop at -$25, and never exit.
+    it "takes the peak from the bar's high, not its close" do
+      result = wicked_engine(
+        rows: [[100.5, 99.5, 100.0], [110.0, 100.0, 100.0], [100.0, 99.0, 99.0], [100.0, 99.0, 99.0]],
+        policy: policy, hourly: calm_hours
+      ).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:atr_trail)
+    end
+
+    # The fill is taken at the ADVERSE extreme. Filling at the favorable one
+    # would flatter every trailed exit in the whole run.
+    #
+    # Note the exit lands on the WICK BAR itself: that bar's high sets the peak
+    # (+$100, stop $75) and its own low is already back to $0, so a single wide
+    # bar can both arm and trigger. Deliberately pessimistic, and the same
+    # within-bar ordering the giveback port used.
+    it "fills the exit at the bar's adverse extreme" do
+      result = wicked_engine(
+        rows: [[100.5, 99.5, 100.0], [110.0, 100.0, 100.0], [104.0, 99.0, 99.0], [104.0, 99.0, 99.0]],
+        policy: policy, hourly: calm_hours
+      ).run(from: t0, to: t0 + 3 * 5.minutes)
+
+      # The wick bar's LOW. The favorable-extreme mutation fills at 110 instead.
+      expect(result.trades.first[:exit_price]).to be_within(1e-6).of(100.0)
+    end
+
+    # ATR widens from 1.0 to 4.0, so the freshly computed trail (peak - $100)
+    # drops BELOW the stop already banked at the tighter ATR (peak - $25).
+    # Without persistence the stop loosens and the exit never fires.
+    it "ratchets the stop and never lets a widening ATR loosen it" do
+      widening = (-4..0).map { |i| [i, 101.0, 100.0, 100.5] } +
+        (1..3).map { |i| [i, 108.0, 100.0, 104.0] }
+
+      # Bar 1 peaks at 110 (+$100, stop $75) but its low of 108 is +$80, so it
+      # HOLDS -- the position has to survive into the wider ATR for the ratchet
+      # to matter at all. By bar 2 the ATR has widened to ~4.5, which would put
+      # a freshly computed trail at -$12.5; the banked $75 must win, and the
+      # bar's low of 105 (+$50) is below it.
+      result = wicked_engine(
+        rows: [[100.5, 99.5, 100.0], [110.0, 108.0, 109.0], [106.0, 105.0, 105.0], [106.0, 105.0, 105.0]],
+        policy: policy, hourly: widening, step: 1.hour
+      ).run(from: t0, to: t0 + 3 * 1.hour)
+
+      expect(result.trade_count).to eq(1)
+      expect(result.trades.first[:exit_reason]).to eq(:atr_trail)
+    end
+  end
 end
