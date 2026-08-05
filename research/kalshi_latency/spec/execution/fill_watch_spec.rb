@@ -1,26 +1,26 @@
 require_relative "../../lib/execution/fill_watch"
 
-RSpec.describe Execution::FillWatch do
-  # A fake order client. Each call to #order pops the next venue state, so a
-  # test says "resting, then executed" by listing two states.
-  class FakeOrderClient
-    attr_reader :cancelled
+# A fake order client. Each call to #order pops the next venue state, so a
+# test says "resting, then executed" by listing two states.
+class FakeOrderClient
+  attr_reader :cancelled
 
-    def initialize(states)
-      @states = states
-      @cancelled = []
-    end
-
-    def order(_id)
-      @states.size > 1 ? @states.shift : @states.first
-    end
-
-    def cancel(id)
-      @cancelled << id
-      {action: "cancel", order_id: id, mode: "live"}
-    end
+  def initialize(states)
+    @states = states
+    @cancelled = []
   end
 
+  def order(_id)
+    (@states.size > 1) ? @states.shift : @states.first
+  end
+
+  def cancel(id)
+    @cancelled << id
+    {action: "cancel", order_id: id, mode: "live"}
+  end
+end
+
+RSpec.describe Execution::FillWatch do
   def intent(count: 5, price: 3)
     {ticker: "KXHIGHAUS-26AUG04-B97.5", order_id: "abc-123", mode: "live",
      count: count, no_price: price, side: "no", action: "sell"}
@@ -58,7 +58,7 @@ RSpec.describe Execution::FillWatch do
     client = FakeOrderClient.new([resting])
     ticks = [0, 20, 40, 61]
     watch = described_class.new(client: client, sleeper: ->(_) {},
-      now: -> { ticks.size > 1 ? ticks.shift : ticks.first })
+      now: -> { (ticks.size > 1) ? ticks.shift : ticks.first })
 
     result = watch.settle(intent, timeout_seconds: 60)
 
@@ -73,7 +73,7 @@ RSpec.describe Execution::FillWatch do
     client = FakeOrderClient.new([resting, resting, executed])
     ticks = [0, 2, 4, 6]
     watch = described_class.new(client: client, sleeper: ->(_) {},
-      now: -> { ticks.size > 1 ? ticks.shift : ticks.first })
+      now: -> { (ticks.size > 1) ? ticks.shift : ticks.first })
 
     result = watch.settle(intent, timeout_seconds: 60)
 
@@ -87,7 +87,7 @@ RSpec.describe Execution::FillWatch do
     client = FakeOrderClient.new([resting(filled: "2.00", remaining: "3.00", cost: "0.060000")])
     ticks = [0, 61]
     watch = described_class.new(client: client, sleeper: ->(_) {},
-      now: -> { ticks.size > 1 ? ticks.shift : ticks.first })
+      now: -> { (ticks.size > 1) ? ticks.shift : ticks.first })
 
     result = watch.settle(intent, timeout_seconds: 60)
 

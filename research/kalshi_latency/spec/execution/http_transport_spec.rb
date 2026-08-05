@@ -1,23 +1,23 @@
 require "json"
 require_relative "../../lib/execution/http_transport"
 
-RSpec.describe Execution::HttpTransport do
-  # Stands in for Net::HTTP. Captures the request object the transport built so
-  # the test can assert on the verb, URI and headers that would go out.
-  class FakeHttp
-    attr_reader :sent
+# Stands in for Net::HTTP. Captures the request object the transport built so
+# the test can assert on the verb, URI and headers that would go out.
+class FakeHttp
+  attr_reader :sent
 
-    def initialize(code: "200", body: '{"order":{"order_id":"abc-123"}}')
-      @code = code
-      @body = body
-    end
-
-    def request(req)
-      @sent = req
-      Struct.new(:code, :body).new(@code, @body)
-    end
+  def initialize(code: "200", body: '{"order":{"order_id":"abc-123"}}')
+    @code = code
+    @body = body
   end
 
+  def request(req)
+    @sent = req
+    Struct.new(:code, :body).new(@code, @body)
+  end
+end
+
+RSpec.describe Execution::HttpTransport do
   it "sends the verb, the signed headers and the body, and parses the reply" do
     http = FakeHttp.new
     transport = described_class.new(connect: ->(_uri) { http })

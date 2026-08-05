@@ -63,7 +63,7 @@ module Execution
     # A buy is better cheaper; a sell is better dearer. Comparing them the same
     # way scores every sell backwards.
     def at_or_better?(intent, realized, intended)
-      intent[:action] == "buy" ? realized <= intended : realized >= intended
+      (intent[:action] == "buy") ? realized <= intended : realized >= intended
     end
   end
 end

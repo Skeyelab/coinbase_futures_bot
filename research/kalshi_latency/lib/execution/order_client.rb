@@ -36,11 +36,12 @@ module Execution
       @live
     end
 
-    # Takes an Opportunity.find hash and returns the order intent.
-    # Kalshi's order API wants action (buy/sell) + side (yes/no) + a price for
-    # that side. We always quote in YES terms, so side is always "yes":
-    # selling a refuted contract is action=sell, buying a confirmed one is
-    # action=buy.
+    # Takes an Opportunity.find hash -- or a Position.close_intent -- and
+    # returns the order intent. Kalshi's order API wants action (buy/sell) +
+    # side (yes/no) + a price for THAT side. Scanning quotes in YES terms, so
+    # side is "yes" unless the caller names outcome_side: selling a refuted
+    # contract is action=sell, buying a confirmed one is action=buy, and
+    # closing a NO holding is action=sell with outcome_side: :no.
     def place(opportunity)
       validate!(opportunity)
       # Scanning quotes everything in YES terms, so YES is the default. Closing
@@ -51,7 +52,7 @@ module Execution
         ticker: opportunity[:ticker],
         action: opportunity[:side].to_s,
         side: outcome,
-        :"#{outcome}_price" => opportunity[:price_cents],
+        "#{outcome}_price": opportunity[:price_cents],
         count: opportunity[:contracts],
         type: "limit",
         client_order_id: SecureRandom.uuid

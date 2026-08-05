@@ -2,12 +2,12 @@ require_relative "../../lib/execution/order_client"
 require "json"
 require "openssl"
 
+# Generated once for the whole file. Per-example generation cost 12 seconds
+# of suite time; the signature only has to verify against its own key.
+TEST_RSA = OpenSSL::PKey::RSA.generate(2048)
+
 RSpec.describe Execution::OrderClient do
   require "base64"
-
-  # Generated once for the whole file. Per-example generation cost 12 seconds
-  # of suite time; the signature only has to verify against its own key.
-  TEST_RSA = OpenSSL::PKey::RSA.generate(2048)
 
   let(:rsa) { TEST_RSA }
 
