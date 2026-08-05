@@ -3,6 +3,7 @@ require "fileutils"
 
 require_relative "weather_scan"
 require_relative "touch_scan"
+require_relative "truth_scan"
 
 # Logs every scan cycle across every ratchet family, whether or not it found
 # anything.
@@ -13,12 +14,15 @@ require_relative "touch_scan"
 # per hour or three per week. A scanner that records only its successes is how
 # a strategy looks better than it is.
 class OpportunityCollector
-  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, logger: nil, execution: nil)
+  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, truth: nil, logger: nil, execution: nil)
     @data_dir = data_dir
     @interval = interval
     @logger = logger || ->(m) { warn("#{Time.now.utc.strftime("%H:%M:%S")} #{m}") }
     @weather = weather || WeatherScan.new
     @touch = touch || TouchScan.new
+    # Roll Call is paged at most once an hour inside the scan; the collector
+    # cycles it like any other family and the cache does the throttling.
+    @truth = truth || TruthScan.new
     # Optional dry-run execution pipeline. nil means what it always meant:
     # observe and record, place nothing anywhere.
     @execution = execution
@@ -58,6 +62,10 @@ class OpportunityCollector
     hits += record("touch", at, number, @touch.run.map { |r|
       {scope: r.series, markets: r.markets, error: r.error, opportunities: r.opportunities,
        observed_min: r.min, observed_max: r.max}
+    })
+    hits += record("truth", at, number, @truth.run.map { |r|
+      {scope: r.series, markets: r.markets, error: r.error, opportunities: r.opportunities,
+       observed_count: r.observed_count}
     })
 
     hits
