@@ -24,7 +24,10 @@ module CandidateEvaluation
       # manufacture evidence out of one station's silence.
       calls = extremes.filter_map { |station, extreme|
         says = market.status_given(extreme)
-        says = :refuted if says == :open && final
+        # What :open settles as depends on the market, not on us: a high that
+        # never got there refutes "reach this level" and CONFIRMS "stay below
+        # it". A blanket :refuted scores every less market backwards.
+        says = market.settles_open_as if says == :open && final
         next if says == :open
 
         {station: station, says: says.to_s}

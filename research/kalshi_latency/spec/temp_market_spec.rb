@@ -105,4 +105,27 @@ RSpec.describe TempMarket do
       expect(bucket.settled_value_cents(79)).to be_nil
     end
   end
+  # What an :open contract settles as once the day is OVER. A daily high can
+  # only rise, so :open means it never got there -- which resolves a "reach
+  # this level" contract NO and a "stay below this level" contract YES. One
+  # blanket answer is wrong for half the board.
+  describe "#settles_open_as" do
+    it "confirms a less market, because the high never exceeded the cap" do
+      market = described_class.new(ticker: "KXHIGHTSEA-26AUG04-T84", kind: :less, floor: nil, cap: 84)
+
+      expect(market.settles_open_as).to eq(:confirmed)
+    end
+
+    it "refutes a greater market, because the high never reached the floor" do
+      market = described_class.new(ticker: "KXHIGHTSEA-26AUG04-T91", kind: :greater, floor: 91, cap: nil)
+
+      expect(market.settles_open_as).to eq(:refuted)
+    end
+
+    it "refutes a between market, because the high never reached the band" do
+      market = described_class.new(ticker: "KXHIGHTSEA-26AUG04-B84.5", kind: :between, floor: 84, cap: 85)
+
+      expect(market.settles_open_as).to eq(:refuted)
+    end
+  end
 end
