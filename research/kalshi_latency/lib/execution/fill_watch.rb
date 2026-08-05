@@ -22,11 +22,21 @@ module Execution
       state = nil
 
       loop do
-        state = @client.order(intent[:order_id])
-        break if resting?(state).zero?
+        # nil is "the venue cannot see it yet", not "no such order". Keeping
+        # the last state we did see means a blip cannot erase what we learned.
+        state = @client.order(intent[:order_id]) || state
+        break if state && resting?(state).zero?
         break if @now.call >= deadline
 
         @sleeper.call(@poll_seconds)
+      end
+
+      # Never visible, but the order is real -- it was accepted. Cancel it and
+      # say so, rather than reporting an unfilled order we never actually saw.
+      if state.nil?
+        @client.cancel(intent[:order_id])
+        return {status: "unknown", filled: 0, realized_price_cents: nil,
+                intended_price_cents: (intent[:price].to_f * 100).round(2), at_or_better: false}
       end
 
       @client.cancel(intent[:order_id]) if resting?(state).positive?
@@ -53,7 +63,9 @@ module Execution
       # Nothing filled means there is no price to report. Dividing anyway gives
       # NaN, and NaN compares false against every threshold without saying why.
       realized = filled.zero? ? nil : (cost / filled * 100).round(2)
-      intended = intent[:no_price] || intent[:yes_price]
+      # v2 carries one price, a fixed-point dollar STRING. The rest of this
+      # project reasons in cents, so the boundary converts once, here.
+      intended = (intent[:price].to_f * 100).round(2)
 
       {status: status_for(filled, resting?(state)), filled: filled.floor,
        realized_price_cents: realized, intended_price_cents: intended,

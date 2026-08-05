@@ -17,4 +17,17 @@ RSpec.describe Execution::OrderLog do
       expect(lines[1]["ticker"]).to eq("KXHIGHTSATX-26AUG04-B97.5")
     end
   end
+
+  # DATA_DIR is configurable and points somewhere else on exo-mini. Losing the
+  # record of an order because its directory did not exist yet is the worst
+  # possible moment to fail -- the order is already at the venue.
+  it "creates the directory rather than losing the record" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "nested", "orders.jsonl")
+
+      described_class.new(path: path).record(ticker: "KXHIGHNY-26AUG05-B82.5")
+
+      expect(File.readlines(path).size).to eq(1)
+    end
+  end
 end

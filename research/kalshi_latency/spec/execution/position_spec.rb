@@ -61,9 +61,11 @@ RSpec.describe Execution::Position do
       expect(intent[:contracts]).to eq(2)
     end
 
-    # Closing is always a SELL of the side held. Selling YES to close a NO
-    # position is not a close -- it doubles the bet.
-    it "sells the side that is held, never the other one" do
+    # v2 quotes everything from the YES leg, so there is no "sell NO".
+    # Exiting a NO holding means BUYING yes; exiting a YES holding means
+    # selling it. Getting this backwards doubles the position instead of
+    # closing it.
+    it "exits a YES holding by selling and a NO holding by buying" do
       held = [
         {ticker: "KXHIGHAUS-26AUG04-B97.5", contracts: 5, side: :no},
         {ticker: "KXHIGHNY-26AUG04-B83.5", contracts: 3, side: :yes}
@@ -72,10 +74,8 @@ RSpec.describe Execution::Position do
       short = described_class.close_intent(held: held, ticker: "KXHIGHAUS-26AUG04-B97.5", contracts: 5, price_cents: 3)
       long = described_class.close_intent(held: held, ticker: "KXHIGHNY-26AUG04-B83.5", contracts: 3, price_cents: 97)
 
-      expect(short).to eq(ticker: "KXHIGHAUS-26AUG04-B97.5", side: :sell, outcome_side: :no,
-        contracts: 5, price_cents: 3)
-      expect(long).to eq(ticker: "KXHIGHNY-26AUG04-B83.5", side: :sell, outcome_side: :yes,
-        contracts: 3, price_cents: 97)
+      expect(short).to eq(ticker: "KXHIGHAUS-26AUG04-B97.5", side: :buy, contracts: 5, price_cents: 3)
+      expect(long).to eq(ticker: "KXHIGHNY-26AUG04-B83.5", side: :sell, contracts: 3, price_cents: 97)
     end
 
     # A settled or fully-closed market can still appear in the portfolio at

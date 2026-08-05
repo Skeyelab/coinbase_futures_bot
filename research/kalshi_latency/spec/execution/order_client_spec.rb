@@ -53,25 +53,67 @@ RSpec.describe Execution::OrderClient do
       expect(client.place(opportunity)[:mode]).to eq("dry_run")
     end
 
+    # The v2 event-order shape. The old body -- action + yes/no side + integer
+    # cent prices -- now returns HTTP 410 deprecated_v1_order_endpoint, and no
+    # dry-run test could ever have caught that.
+    it "POSTs a v2 event order: bid/ask side, string count, dollar price" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {path: path, body: body}
+        {"order_id" => "abc-123"}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      client.place(opportunity)
+
+      expect(seen[:path]).to eq("/portfolio/events/orders")
+      order = JSON.parse(seen[:body])
+      expect(order).to include(
+        "ticker" => "KXHIGHNY-26AUG04-B83.5",
+        "side" => "ask",              # selling YES
+        "count" => "25.00",
+        "price" => "0.1200",          # 12c in fixed-point dollars
+        "time_in_force" => "good_till_canceled",
+        # Required. Omitting it is a 400 missing_parameters, which no fake
+        # could have told us: the venue is the only source for this list.
+        "self_trade_prevention_type" => "taker_at_cross"
+      )
+      expect(order).not_to have_key("action")
+      expect(order).not_to have_key("yes_price")
+    end
+
+    it "quotes a buy as a bid" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = JSON.parse(body)
+        {"order_id" => "x"}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      client.place(opportunity.merge(side: :buy))
+
+      expect(seen["side"]).to eq("bid")
+    end
+
     it "POSTs a signed order through the transport" do
       seen = nil
       transport = ->(method:, path:, headers:, body: nil) {
         seen = {method: method, path: path, headers: headers, body: body}
-        {"order" => {"order_id" => "abc-123", "status" => "resting"}}
+        # v2 create returns a FLAT 201 body -- no "order" wrapper. Digging for
+        # one yields nil, and a nil order_id means nothing can be watched or
+        # cancelled afterwards.
+        {"order_id" => "abc-123", "client_order_id" => "x", "remaining_count" => "1.00"}
       }
       client = described_class.new(transport: transport, live: true,
         env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
 
       intent = client.place(opportunity)
 
-      expect(seen[:path]).to eq("/portfolio/orders")
+      expect(seen[:path]).to eq("/portfolio/events/orders")
       expect(seen[:headers]).to include("KALSHI-ACCESS-KEY" => "test-key")
-      order = JSON.parse(seen[:body])
-      expect(order).to include(
-        "ticker" => "KXHIGHNY-26AUG04-B83.5",
-        "action" => "sell", "side" => "yes", "yes_price" => 12,
-        "count" => 25, "type" => "limit"
-      )
+      expect(signs?(seen[:headers], "POST", "/trade-api/v2/portfolio/events/orders")).to be(true)
       expect(intent[:mode]).to eq("live")
       expect(intent[:order_id]).to eq("abc-123")
     end
@@ -80,7 +122,7 @@ RSpec.describe Execution::OrderClient do
       bodies = []
       transport = ->(method:, path:, headers:, body: nil) {
         bodies << JSON.parse(body)
-        {"order" => {"order_id" => "x"}}
+        {"order_id" => "x"}
       }
       client = described_class.new(transport: transport, live: true,
         env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
@@ -92,31 +134,6 @@ RSpec.describe Execution::OrderClient do
       expect(bodies[1]["client_order_id"]).to eq(second[:client_order_id])
       expect(first[:client_order_id]).not_to eq(second[:client_order_id])
       expect(first[:client_order_id]).to match(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/)
-    end
-  end
-
-  describe "the NO side" do
-    # Closing a NO position means selling NO, and Kalshi prices that leg in
-    # no_price. Sending yes_price with side "no" prices the wrong leg: 3c
-    # becomes 97c and the close crosses the whole book.
-    it "prices a NO order in no_price, not yes_price" do
-      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
-
-      intent = client.place(opportunity.merge(outcome_side: :no, price_cents: 3))
-
-      expect(intent[:side]).to eq("no")
-      expect(intent[:no_price]).to eq(3)
-      expect(intent).not_to have_key(:yes_price)
-    end
-
-    it "still quotes in YES terms when no side is named" do
-      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
-
-      intent = client.place(opportunity)
-
-      expect(intent[:side]).to eq("yes")
-      expect(intent[:yes_price]).to eq(12)
-      expect(intent).not_to have_key(:no_price)
     end
   end
 
@@ -141,9 +158,9 @@ RSpec.describe Execution::OrderClient do
       intent = client.cancel("abc-123")
 
       expect(seen[:method]).to eq("DELETE")
-      expect(seen[:path]).to eq("/portfolio/orders/abc-123")
+      expect(seen[:path]).to eq("/portfolio/events/orders/abc-123")
       expect(seen[:body]).to be_nil
-      expect(signs?(seen[:headers], "DELETE", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
+      expect(signs?(seen[:headers], "DELETE", "/trade-api/v2/portfolio/events/orders/abc-123")).to be(true)
       expect(intent[:mode]).to eq("live")
     end
   end
@@ -164,6 +181,31 @@ RSpec.describe Execution::OrderClient do
       expect(seen[:path]).to eq("/portfolio/orders/abc-123")
       expect(signs?(seen[:headers], "GET", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
       expect(state).to include("status" => "resting", "remaining_count_fp" => "5.00")
+    end
+
+    # A freshly created order 404s for a moment before the venue will serve it
+    # back. That is not "no such order", it is "not yet" -- and treating it as
+    # an error aborts the watch on an order that is already live at the venue.
+    it "returns nil while the venue cannot see the order yet" do
+      transport = ->(method:, path:, headers:, body: nil) {
+        raise Execution::HttpTransport::RequestFailed, "GET x -> HTTP 404 (not_found)"
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      expect(client.order("abc-123")).to be_nil
+    end
+
+    # A 401 or a 500 is not "not yet" and must not be swallowed into a nil
+    # that reads as a resting order.
+    it "still raises on any other failure" do
+      transport = ->(method:, path:, headers:, body: nil) {
+        raise Execution::HttpTransport::RequestFailed, "GET x -> HTTP 401"
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      expect { client.order("abc-123") }.to raise_error(Execution::HttpTransport::RequestFailed)
     end
 
     # There is no order to read in dry-run. Returning an empty state would let
@@ -215,10 +257,9 @@ RSpec.describe Execution::OrderClient do
 
       expect(intent[:mode]).to eq("dry_run")
       expect(intent[:ticker]).to eq("KXHIGHNY-26AUG04-B83.5")
-      expect(intent[:action]).to eq("sell")
-      expect(intent[:side]).to eq("yes")
-      expect(intent[:yes_price]).to eq(12)
-      expect(intent[:count]).to eq(25)
+      expect(intent[:side]).to eq("ask")
+      expect(intent[:price]).to eq("0.1200")
+      expect(intent[:count]).to eq("25.00")
     end
   end
 end
