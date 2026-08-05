@@ -68,3 +68,6 @@ debug_*.rb
 check_*.rb
 .env
 .gstack/
+
+# Agent worktrees
+.claude/worktrees/

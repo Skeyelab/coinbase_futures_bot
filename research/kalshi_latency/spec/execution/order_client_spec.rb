@@ -2,9 +2,26 @@ require_relative "../../lib/execution/order_client"
 require "json"
 require "openssl"
 
+# Generated once for the whole file. Per-example generation cost 12 seconds
+# of suite time; the signature only has to verify against its own key.
+TEST_RSA = OpenSSL::PKey::RSA.generate(2048)
+
 RSpec.describe Execution::OrderClient do
+  require "base64"
+
+  let(:rsa) { TEST_RSA }
+
   def test_signer
-    KalshiSigner.new(key_id: "test-key", private_key_pem: OpenSSL::PKey::RSA.new(2048).to_pem)
+    KalshiSigner.new(key_id: "test-key", private_key_pem: rsa.to_pem)
+  end
+
+  # The venue is the only other party that checks this. Asserting a key header
+  # exists proves nothing -- a signature over the wrong verb carries the same
+  # header and fails live as a bare 401 that names neither half.
+  def signs?(headers, verb, path)
+    message = headers["KALSHI-ACCESS-TIMESTAMP"] + verb + path
+    rsa.verify_pss("SHA256", Base64.strict_decode64(headers["KALSHI-ACCESS-SIGNATURE"]),
+      message, salt_length: :auto, mgf1_hash: "SHA256")
   end
 
   def opportunity
@@ -38,8 +55,8 @@ RSpec.describe Execution::OrderClient do
 
     it "POSTs a signed order through the transport" do
       seen = nil
-      transport = ->(path:, headers:, body:) {
-        seen = {path: path, headers: headers, body: body}
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {method: method, path: path, headers: headers, body: body}
         {"order" => {"order_id" => "abc-123", "status" => "resting"}}
       }
       client = described_class.new(transport: transport, live: true,
@@ -61,7 +78,7 @@ RSpec.describe Execution::OrderClient do
 
     it "tags every order with a fresh client_order_id so a retry cannot double-fill" do
       bodies = []
-      transport = ->(path:, headers:, body:) {
+      transport = ->(method:, path:, headers:, body: nil) {
         bodies << JSON.parse(body)
         {"order" => {"order_id" => "x"}}
       }
@@ -75,6 +92,87 @@ RSpec.describe Execution::OrderClient do
       expect(bodies[1]["client_order_id"]).to eq(second[:client_order_id])
       expect(first[:client_order_id]).not_to eq(second[:client_order_id])
       expect(first[:client_order_id]).to match(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/)
+    end
+  end
+
+  describe "the NO side" do
+    # Closing a NO position means selling NO, and Kalshi prices that leg in
+    # no_price. Sending yes_price with side "no" prices the wrong leg: 3c
+    # becomes 97c and the close crosses the whole book.
+    it "prices a NO order in no_price, not yes_price" do
+      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
+
+      intent = client.place(opportunity.merge(outcome_side: :no, price_cents: 3))
+
+      expect(intent[:side]).to eq("no")
+      expect(intent[:no_price]).to eq(3)
+      expect(intent).not_to have_key(:yes_price)
+    end
+
+    it "still quotes in YES terms when no side is named" do
+      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
+
+      intent = client.place(opportunity)
+
+      expect(intent[:side]).to eq("yes")
+      expect(intent[:yes_price]).to eq(12)
+      expect(intent).not_to have_key(:no_price)
+    end
+  end
+
+  describe "cancel" do
+    it "reports what it would cancel without touching the network in dry-run" do
+      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
+
+      intent = client.cancel("abc-123")
+
+      expect(intent).to include(action: "cancel", order_id: "abc-123", mode: "dry_run")
+    end
+
+    it "DELETEs the order and signs the bare path" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {method: method, path: path, headers: headers, body: body}
+        {"order" => {"order_id" => "abc-123", "status" => "canceled"}}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      intent = client.cancel("abc-123")
+
+      expect(seen[:method]).to eq("DELETE")
+      expect(seen[:path]).to eq("/portfolio/orders/abc-123")
+      expect(seen[:body]).to be_nil
+      expect(signs?(seen[:headers], "DELETE", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
+      expect(intent[:mode]).to eq("live")
+    end
+  end
+
+  describe "reading one order back" do
+    it "GETs the order and hands back the venue's own view of it" do
+      seen = nil
+      transport = ->(method:, path:, headers:, body: nil) {
+        seen = {method: method, path: path, headers: headers}
+        {"order" => {"order_id" => "abc-123", "status" => "resting", "remaining_count_fp" => "5.00"}}
+      }
+      client = described_class.new(transport: transport, live: true,
+        env: {"KALSHI_LIVE" => "1"}, signer: test_signer)
+
+      state = client.order("abc-123")
+
+      expect(seen[:method]).to eq("GET")
+      expect(seen[:path]).to eq("/portfolio/orders/abc-123")
+      expect(signs?(seen[:headers], "GET", "/trade-api/v2/portfolio/orders/abc-123")).to be(true)
+      expect(state).to include("status" => "resting", "remaining_count_fp" => "5.00")
+    end
+
+    # There is no order to read in dry-run. Returning an empty state would let
+    # a caller conclude "remaining 0, therefore filled" about an order that was
+    # never placed.
+    it "refuses in dry-run rather than inventing a state" do
+      client = described_class.new(transport: ->(*) { raise "dry run must not reach transport" })
+
+      expect { client.order("abc-123") }.to raise_error(Execution::OrderClient::NotLive)
     end
   end
 
