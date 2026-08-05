@@ -34,6 +34,62 @@ RSpec.describe RealtimeMonitoring::TickHandler do
       handler.process("product_id" => "BTC-USD", "price" => "0", "time" => "2024-01-01T12:00:00Z")
     end
 
+    # 2026-08-03: FundingSkewContrarian emitted 20 alerts in a flat market and
+    # the trading path evaluated BIP zero times in that window — the >0.1%
+    # price-move gate never fired, because a funding z-score builds exactly
+    # when price goes nowhere. Flat is not idle: every symbol must still be
+    # evaluated at least once per staleness floor.
+    describe "signal staleness floor" do
+      let(:flat_tick) do
+        {"product_id" => "BIP-20DEC30-CDE", "price" => "64000.0", "time" => "2026-08-03T12:15:00Z"}
+      end
+
+      before do
+        allow(Tick).to receive(:create!)
+        allow(handler).to receive(:check_position_alerts)
+        allow(handler).to receive(:spot_relevant?).and_return(false)
+        # Flat market: last seen price identical, so the movement gate says no.
+        allow(Rails.cache).to receive(:read).with("last_price_BIP-20DEC30-CDE").and_return(64000.0)
+      end
+
+      it "evaluates a flat-price symbol once the floor has lapsed" do
+        allow(Rails.cache).to receive(:read)
+          .with("last_rapid_eval_BIP-20DEC30-CDE").and_return(10.minutes.ago)
+
+        expect(handler).to receive(:evaluate_rapid_signals).with("BIP-20DEC30-CDE", 64000.0)
+
+        handler.process(flat_tick)
+      end
+
+      it "still suppresses flat-price ticks inside the floor" do
+        allow(Rails.cache).to receive(:read)
+          .with("last_rapid_eval_BIP-20DEC30-CDE").and_return(30.seconds.ago)
+
+        expect(handler).not_to receive(:evaluate_rapid_signals)
+
+        handler.process(flat_tick)
+      end
+
+      it "treats a never-evaluated symbol as overdue" do
+        allow(Rails.cache).to receive(:read)
+          .with("last_rapid_eval_BIP-20DEC30-CDE").and_return(nil)
+
+        expect(handler).to receive(:evaluate_rapid_signals)
+
+        handler.process(flat_tick)
+      end
+
+      it "records the evaluation time so the floor measures from the last enqueue" do
+        allow(handler).to receive(:spot_relevant?).and_return(false)
+        allow(RapidSignalEvaluationJob).to receive(:perform_later)
+
+        expect(Rails.cache).to receive(:write)
+          .with("last_rapid_eval_BIP-20DEC30-CDE", anything, expires_in: anything)
+
+        handler.send(:evaluate_rapid_signals, "BIP-20DEC30-CDE", 64_000.0)
+      end
+    end
+
     describe "market-data liveness heartbeat" do
       before do
         allow(handler).to receive(:check_position_alerts)
