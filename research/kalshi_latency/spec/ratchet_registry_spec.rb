@@ -60,6 +60,19 @@ RSpec.describe RatchetRegistry do
       expect(described_class.build({"ticker" => "KXBTCMINMON-BTC-26AUG31-6000000",
         "strike_type" => "less", "floor_strike" => nil, "cap_strike" => nil})).to be_nil
     end
+
+    # A cumulative count is the same ratchet as a daily maximum, and the
+    # registry has to know that BEFORE strike_type is consulted -- KXTRUTHSOCIAL
+    # uses "between" and "greater" exactly like a temperature series, but the
+    # observable is a post count that must not be rounded.
+    it "reads a post-count market as a count market" do
+      market = described_class.build({"ticker" => "KXTRUTHSOCIAL-26AUG08-B189",
+        "strike_type" => "between", "floor_strike" => 180, "cap_strike" => 199})
+
+      expect(market).to be_a(CountMarket)
+      expect(market.status_given(200)).to eq(:refuted)
+      expect(market.status_given(199)).to eq(:open)
+    end
   end
 
   describe ".observable_for" do
@@ -67,6 +80,7 @@ RSpec.describe RatchetRegistry do
       expect(described_class.observable_for("KXHIGHAUS-26AUG04-B97.5")).to eq(:daily_high_f)
       expect(described_class.observable_for("KXBTCMINMON-BTC-26AUG31-6000000")).to eq(:window_min_usd)
       expect(described_class.observable_for("KXBTCMAXY-26DEC31-99999.99")).to eq(:window_max_usd)
+      expect(described_class.observable_for("KXTRUTHSOCIAL-26AUG08-B189")).to eq(:week_post_count)
     end
 
     # Prefix, not substring. A series that merely CONTAINS a registered name

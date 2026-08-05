@@ -1,5 +1,6 @@
 require_relative "temp_market"
 require_relative "touch_market"
+require_relative "count_market"
 
 # Decides what a Kalshi market actually ratchets on.
 #
@@ -23,12 +24,16 @@ module RatchetRegistry
   #   :daily_high_f      the local day's maximum temperature, whole degrees
   #   :window_min_usd    the running minimum price since issuance
   #   :window_max_usd    the running maximum price since issuance
+  #   :week_post_count   cumulative Trump posts in the market week
   SERIES = {
     "KXHIGH" => {kind: :temperature, observable: :daily_high_f},
     "KXBTCMINMON" => {kind: :touch_below, observable: :window_min_usd},
     "KXBTCMAXY" => {kind: :touch_above, observable: :window_max_usd},
     "KXETHMINMON" => {kind: :touch_below, observable: :window_min_usd},
-    "KXETHMAXY" => {kind: :touch_above, observable: :window_max_usd}
+    "KXETHMAXY" => {kind: :touch_above, observable: :window_max_usd},
+    # Cumulative post count, Roll Call's tracker at trumpstruth.org -- which is
+    # the source the rules NAME, not a proxy for it.
+    "KXTRUTHSOCIAL" => {kind: :count, observable: :week_post_count}
   }.freeze
 
   def self.entry_for(ticker)
@@ -47,6 +52,7 @@ module RatchetRegistry
 
     case entry[:kind]
     when :temperature then TempMarket.from_api(row)
+    when :count then CountMarket.from_api(row)
     when :touch_below then touch(ticker, :below, row["cap_strike"])
     when :touch_above then touch(ticker, :above, row["floor_strike"])
     end
