@@ -35,8 +35,9 @@ RSpec.describe Trading::CurrentEquity do
     before do
       DryRun.enable!
       Trading::ProtectionLock.clear!
-      BotRuntimeStat.create!(key: Trading::Protections::MaxDrawdownMonitor::PEAK_KEY,
-        recorded_at: Time.current, value: {"peak" => 10_000.0})
+      # Seed the peak the way production does — through the monitor — so the
+      # sample carries the regime and timestamp the #608 fix requires.
+      Trading::Protections::MaxDrawdownMonitor.evaluate(current_equity: 10_000.0)
     end
 
     it "breaches when actual paper equity falls past the drawdown ceiling" do
