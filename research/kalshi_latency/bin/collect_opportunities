@@ -5,11 +5,17 @@
 #   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
 #     bin/collect_opportunities
 #
-# Read-only. No order path.
+# Read-only against the venue. The execution pipeline below is DRY-RUN: it
+# writes intents to orders.jsonl and its transport raises if anything ever
+# tries to reach the network. Gate item #3 is scored off that file.
 
 require_relative "../lib/opportunity_collector"
+require_relative "../lib/execution/pipeline"
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
 
 OpportunityCollector.new(
-  data_dir: ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__),
-  interval: Integer(ENV.fetch("INTERVAL", "60"))
+  data_dir: data_dir,
+  interval: Integer(ENV.fetch("INTERVAL", "60")),
+  execution: Execution::Pipeline.build(data_dir: data_dir)
 ).run(seconds: ENV["SECONDS"] && Integer(ENV["SECONDS"]))

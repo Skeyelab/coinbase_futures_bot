@@ -13,12 +13,15 @@ require_relative "touch_scan"
 # per hour or three per week. A scanner that records only its successes is how
 # a strategy looks better than it is.
 class OpportunityCollector
-  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, logger: nil)
+  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, logger: nil, execution: nil)
     @data_dir = data_dir
     @interval = interval
     @logger = logger || ->(m) { warn("#{Time.now.utc.strftime("%H:%M:%S")} #{m}") }
     @weather = weather || WeatherScan.new
     @touch = touch || TouchScan.new
+    # Optional dry-run execution pipeline. nil means what it always meant:
+    # observe and record, place nothing anywhere.
+    @execution = execution
     @running = true
 
     FileUtils.mkdir_p(@data_dir)
@@ -82,6 +85,8 @@ class OpportunityCollector
       s[:opportunities].to_a.each do |o|
         write("opportunity", o.merge(at: at, cycle: number, family: family, scope: s[:scope]))
         log("OPPORTUNITY #{s[:scope]} #{o[:ticker]} #{o[:side]} #{o[:contracts]}@#{o[:price_cents]}c net=#{o[:net_cents]}c")
+        intent = @execution&.sight(o, at: at)
+        log("INTENT #{intent[:mode]} #{intent[:ticker]} #{intent[:action]} #{intent[:count]}@#{intent[:yes_price]}c") if intent
       end
     end
 
