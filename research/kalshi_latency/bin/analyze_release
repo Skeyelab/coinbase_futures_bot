@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+# The number the whole experiment exists to produce: how long after a scheduled
+# release did the Kalshi book take to absorb it?
+
+require "json"
+require_relative "../lib/convergence"
+
+DATA_DIR = ENV["DATA_DIR"] || File.expand_path("../data/payrolls", __dir__)
+THRESHOLD = Float(ENV.fetch("MOVE_THRESHOLD", "3.0"))
+
+def load(stream)
+  Dir[File.join(DATA_DIR, "#{stream}-*.jsonl")].sort.flat_map do |path|
+    File.readlines(path).filter_map do |line|
+      JSON.parse(line)
+    rescue JSON::ParserError
+      nil
+    end
+  end
+end
+
+releases = load("release")
+books = load("book")
+abort "no data in #{DATA_DIR} — run bin/record_payrolls first" if releases.empty? || books.empty?
+
+published = releases.find { |r| r["changed"] }
+span = releases.map { |r| r["at"] }.compact
+
+puts "=" * 74
+puts "SCHEDULED RELEASE ABSORPTION"
+puts "=" * 74
+puts format("release polls  %d over %.1f minutes", releases.size, span.empty? ? 0 : (span.max - span.min) / 60.0)
+puts format("book samples   %d across %d tickers", books.size, books.map { |b| b["ticker"] }.compact.uniq.size)
+
+unless published
+  puts "\nThe release never changed during the recording window."
+  puts "Either it was not published in that window, or the page was cached."
+  latest = releases.last
+  puts format("last seen: payrolls=%s unemployment=%s", latest&.dig("payrolls"), latest&.dig("unemployment"))
+  exit 0
+end
+
+t_pub = published["received_at"]
+puts format("\nPUBLISHED  payrolls=%s  unemployment=%s", published["payrolls"], published["unemployment"])
+puts format("detected at %s (poll round trip %.0fms)",
+  Time.at(t_pub).utc.strftime("%H:%M:%S.%L"), (t_pub - published["sent_at"]) * 1000)
+puts "detection is a LATE bound: the figure was public up to one poll interval earlier"
+
+rows = books.group_by { |b| b["ticker"] }.filter_map do |ticker, samples|
+  mids = samples.filter_map do |s|
+    bid = s["bid"]
+    ask = s["ask"]
+    next if bid.nil? || ask.nil?
+    {at: s["at"], mid: (bid + ask) / 2.0}
+  end.sort_by { |m| m[:at] }
+  next if mids.empty?
+
+  [ticker, Convergence.measure(mids, published_at: t_pub, move_threshold: THRESHOLD)]
+end
+
+puts
+puts "ticker                             pre settled   move(c)      t_50      t_90"
+puts "-" * 74
+rows.sort_by { |_, m| -(m[:move_cents] || 0) }.each do |ticker, m|
+  puts format("%-30s %7s %7s %9s %9s %9s", ticker[0, 30],
+    m[:pre_mid]&.round(1) || "-", m[:settled_mid]&.round(1) || "-",
+    m[:move_cents]&.round(1) || "-",
+    m[:seconds_to_half] || "-", m[:seconds_to_ninety] || "-")
+end
+
+moved = rows.map { |_, m| m }.select { |m| m[:seconds_to_ninety] }
+puts "-" * 74
+if moved.empty?
+  puts "No market moved more than #{THRESHOLD}c. Nothing to time."
+  exit 0
+end
+
+t90 = moved.map { |m| m[:seconds_to_ninety] }.sort
+median = t90[t90.size / 2]
+puts format("markets that reacted: %d   median t_90: %.1fs   fastest: %.1fs", moved.size, median, t90.first)
+puts
+puts(
+  if median <= 2
+    "NO WINDOW. The book absorbed it inside the poll interval. Racing machines, not people."
+  elsif median <= 15
+    "TIGHT. #{median}s. Needs colocation-grade speed and a pre-armed order."
+  else
+    "WORTH PURSUING. #{median}s is reactable by a script that was already watching."
+  end
+)
+puts "Sampling at 1s: any window under ~2s is indistinguishable from instant."

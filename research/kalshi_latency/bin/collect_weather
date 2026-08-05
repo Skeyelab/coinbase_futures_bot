@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# Continuously logs what the weather has settled vs what the Kalshi book shows.
+# Read-only: no credentials, no order path.
+#
+#   bin/collect_weather                    # 15s cadence into ./data
+#   QUOTE_INTERVAL=10 bin/collect_weather
+
+require_relative "../lib/weather_collector"
+
+WeatherCollector.new(
+  data_dir: ENV["DATA_DIR"] || File.expand_path("../data", __dir__),
+  quote_interval: Integer(ENV["QUOTE_INTERVAL"] || 15),
+  observation_ttl: Integer(ENV["OBSERVATION_TTL"] || 120)
+).run
