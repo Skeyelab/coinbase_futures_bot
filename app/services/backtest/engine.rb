@@ -110,7 +110,13 @@ module Backtest
       # Signals size in CONTRACTS; the simulator prices in base units. Convert
       # via the strategy's own $-per-contract model or the PnL/fees are
       # inflated ~(price / contract_size_usd)x — ~1000x for BTC.
-      @contract_size_usd = (contract_size_usd || strategy_contract_size_usd || 100.0).to_f
+      #
+      # The default comes from the same per-contract registry live sizing uses
+      # (issue #606): a BIP backtest at the old hardcoded $100 modeled $1,500
+      # of exposure as $100x15, so per-contract exit policies tested against
+      # 15x looser thresholds than the bot would ever trade.
+      @contract_size_usd = (contract_size_usd || strategy_contract_size_usd ||
+        registry_sizing.contract_size_usd.nonzero? || 100.0).to_f
       # Min-ROI time-decay exit (issue #398), evaluated per candle on the simulated
       # clock so backtest exit mix reflects live behavior. Explicit schedule for
       # tests; otherwise resolved from config (inert by default).
@@ -277,7 +283,10 @@ module Backtest
       return if Trading::Protections.blocked?(symbol: @symbol, side: sig[:side].to_s,
         now: candle.timestamp, store: protection_store)
 
-      base_qty = contracts_to_base_units(sig[:quantity], sig[:price])
+      # Live sizing caps signals at the registry's max_contracts; the backtest
+      # must too (issue #606) or it simulates positions the bot cannot take.
+      contracts = capped_contracts(sig[:quantity])
+      base_qty = contracts_to_base_units(contracts, sig[:price])
       return unless base_qty > 0
 
       # Same suppression the giveback port needed: the strategy's tp fires long
@@ -291,7 +300,16 @@ module Backtest
       # Contracts, not base units: the policy's ATR term is converted from price
       # units by contract_size x contracts, and base_qty has already been scaled
       # by contract_size_usd / price.
-      contracts_at[id] = sig[:quantity].to_f
+      contracts_at[id] = contracts
+    end
+
+    def capped_contracts(quantity)
+      cap = registry_sizing.max_contracts.to_i
+      cap.positive? ? [quantity.to_f, cap].min : quantity.to_f
+    end
+
+    def registry_sizing
+      @registry_sizing ||= Trading::AssetSizing.for_product(@symbol)
     end
 
     # Inclusive bar: conf >= @min_confidence trades (the incumbent is
