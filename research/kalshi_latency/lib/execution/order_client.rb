@@ -41,11 +41,15 @@ module Execution
     # action=buy.
     def place(opportunity)
       validate!(opportunity)
+      # Scanning quotes everything in YES terms, so YES is the default. Closing
+      # a NO holding is the exception, and it must be priced in no_price:
+      # sending 3c as yes_price on a NO order asks for 97c and crosses the book.
+      outcome = (opportunity[:outcome_side] || :yes).to_s
       order = {
         ticker: opportunity[:ticker],
         action: opportunity[:side].to_s,
-        side: "yes",
-        yes_price: opportunity[:price_cents],
+        side: outcome,
+        :"#{outcome}_price" => opportunity[:price_cents],
         count: opportunity[:contracts],
         type: "limit",
         client_order_id: SecureRandom.uuid
@@ -53,15 +57,34 @@ module Execution
 
       return order.merge(mode: "dry_run") unless live?
 
-      response = @transport.call(
-        path: ORDERS_PATH,
-        headers: @signer.headers_for(method: "POST", path: "#{API_PREFIX}#{ORDERS_PATH}"),
-        body: JSON.generate(order)
-      )
+      response = send_signed("POST", ORDERS_PATH, body: JSON.generate(order))
       order.merge(mode: "live", order_id: response.dig("order", "order_id"))
     end
 
+    # Pulling a resting order. Gate item #3 needs this as much as placing does:
+    # an order left resting forever is neither a fill nor a miss, and it scores
+    # as neither.
+    def cancel(order_id)
+      intent = {action: "cancel", order_id: order_id}
+      return intent.merge(mode: "dry_run") unless live?
+
+      send_signed("DELETE", "#{ORDERS_PATH}/#{order_id}")
+      intent.merge(mode: "live")
+    end
+
     private
+
+    # One place where a signature is produced. Kalshi signs
+    # <timestamp_ms><METHOD><path> and the path carries no query string --
+    # including one gives a bare 401 that names neither half.
+    def send_signed(method, path, body: nil)
+      @transport.call(
+        method: method,
+        path: path,
+        headers: @signer.headers_for(method: method, path: "#{API_PREFIX}#{path}"),
+        body: body
+      )
+    end
 
     def validate!(opportunity)
       price = opportunity[:price_cents]
