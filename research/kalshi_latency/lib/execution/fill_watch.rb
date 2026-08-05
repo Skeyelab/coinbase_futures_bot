@@ -62,7 +62,7 @@ module Execution
       cost = state["taker_fill_cost_dollars"].to_f + state["maker_fill_cost_dollars"].to_f
       # Nothing filled means there is no price to report. Dividing anyway gives
       # NaN, and NaN compares false against every threshold without saying why.
-      realized = filled.zero? ? nil : (cost / filled * 100).round(2)
+      realized = filled.zero? ? nil : realized_yes_cents(intent, cost, filled)
       # v2 carries one price, a fixed-point dollar STRING. The rest of this
       # project reasons in cents, so the boundary converts once, here.
       intended = (intent[:price].to_f * 100).round(2)
@@ -72,10 +72,26 @@ module Execution
        at_or_better: !realized.nil? && at_or_better?(intent, realized, intended)}
     end
 
+    # The venue reports what the fill COST in collateral. For a bid that is the
+    # YES price we paid. For an ask it is the NO side -- selling YES at 26c
+    # costs 74c of collateral -- so reporting it raw says 74 for a sale made at
+    # 26, and then at_or_better compares 74 >= 26 and passes trivially.
+    def realized_yes_cents(intent, cost, filled)
+      per_contract = (cost / filled * 100).round(2)
+      buy?(intent) ? per_contract : (100 - per_contract).round(2)
+    end
+
+    # v2 names the leg bid/ask; there is no :action key any more. Reading the
+    # old one gave nil, nil never equalled "buy", and so every order -- buys
+    # included -- was scored with the sell rule.
+    def buy?(intent)
+      intent[:side].to_s == "bid"
+    end
+
     # A buy is better cheaper; a sell is better dearer. Comparing them the same
     # way scores every sell backwards.
     def at_or_better?(intent, realized, intended)
-      (intent[:action] == "buy") ? realized <= intended : realized >= intended
+      buy?(intent) ? realized <= intended : realized >= intended
     end
   end
 end

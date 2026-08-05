@@ -70,6 +70,16 @@ class TempMarket
 
   # Builds from the Kalshi markets payload. floor_strike/cap_strike arrive as
   # whole degrees; strike_type names the shape.
+  # What an :open contract settles as once the day is OVER.
+  #
+  # A daily maximum can only rise, so :open means it never got there. That
+  # resolves a "reach this level" contract NO and a "stay below this level"
+  # contract YES. Answering :refuted for both -- the obvious blanket rule --
+  # scores every less market backwards, which is half the board.
+  def settles_open_as
+    (kind == :less) ? :confirmed : :refuted
+  end
+
   def self.from_api(market)
     kind = market["strike_type"].to_s.to_sym
     return nil unless KINDS.include?(kind)

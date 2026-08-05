@@ -54,6 +54,14 @@ class LowTempMarket
     end
   end
 
+  # Mirror of TempMarket, inverted. A daily MINIMUM can only fall, so :open at
+  # end of day means it never fell that far: that confirms a "stay above"
+  # contract and refutes everything else. Copying the high rule across without
+  # inverting produces a model that is confidently backwards.
+  def settles_open_as
+    (kind == :greater) ? :confirmed : :refuted
+  end
+
   def self.from_api(market)
     kind = market["strike_type"].to_s.to_sym
     return nil unless KINDS.include?(kind)

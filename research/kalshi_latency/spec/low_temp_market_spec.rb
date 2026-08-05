@@ -62,4 +62,27 @@ RSpec.describe LowTempMarket do
       expect(bucket.settled_value_cents(70)).to be_nil
     end
   end
+  # The mirror of TempMarket, and the side that flips. A daily MINIMUM can only
+  # fall, so :open at end of day means it never fell that far -- which confirms
+  # a "stay above this level" contract and refutes the rest. Copying the high
+  # rule across without inverting produces a model that is confidently backwards.
+  describe "#settles_open_as" do
+    it "confirms a greater market, because the min never fell to the floor" do
+      market = described_class.new(ticker: "KXLOWTDEN-26AUG04-T52", kind: :greater, floor: 52, cap: nil)
+
+      expect(market.settles_open_as).to eq(:confirmed)
+    end
+
+    it "refutes a less market, because the min never fell to the cap" do
+      market = described_class.new(ticker: "KXLOWTDEN-26AUG04-T48", kind: :less, floor: nil, cap: 48)
+
+      expect(market.settles_open_as).to eq(:refuted)
+    end
+
+    it "refutes a between market, because the min never reached the band" do
+      market = described_class.new(ticker: "KXLOWTDEN-26AUG04-B50.5", kind: :between, floor: 50, cap: 51)
+
+      expect(market.settles_open_as).to eq(:refuted)
+    end
+  end
 end
