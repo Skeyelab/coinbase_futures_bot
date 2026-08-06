@@ -5,20 +5,53 @@
 #   doppler run --only-secrets KALSHI_KEY_ID,KALSHI_KEY -p ericdahl-dev -c prd -- \
 #     bin/collect_opportunities
 #
-# Read-only against the venue. The execution pipeline below is DRY-RUN: it
-# writes intents to orders.jsonl and its transport raises if anything ever
-# tries to reach the network. Gate item #3 is scored off that file.
+# DRY-RUN unless BOTH switches are thrown: KALSHI_LIVE=1 in the environment and
+# LIVE=1 as this script's own flag. Live mode is capped at MAX_CONTRACTS (1 by
+# default) and REQUIRES the daily loss stop; there is no live path without it.
+# Gate item #3 is scored off orders.jsonl and the fills behind it.
 
 require_relative "../lib/opportunity_collector"
 require_relative "../lib/execution/pipeline"
+require_relative "../lib/execution/order_client"
+require_relative "../lib/execution/http_transport"
+require_relative "../lib/execution/halt"
+require_relative "../lib/execution/loss_stop"
 require_relative "../lib/kalshi_client"
+require_relative "../lib/kalshi_signer"
 
 data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+live = ENV["LIVE"] == "1" && ENV["KALSHI_LIVE"] == "1"
+max_contracts = Integer(ENV.fetch("MAX_CONTRACTS", "1"))
+budget_cents = Integer(ENV.fetch("DAILY_LOSS_BUDGET_CENTS", "1000"))
+
+reader = KalshiClient.from_env
+halt = Execution::Halt.new(data_dir: data_dir)
+
+order_client =
+  if live
+    signer = KalshiSigner.new(key_id: ENV.fetch("KALSHI_KEY_ID"), private_key_pem: ENV.fetch("KALSHI_KEY"))
+    Execution::OrderClient.new(
+      transport: Execution::HttpTransport.new, live: true, signer: signer,
+      max_contracts: max_contracts
+    )
+  end
+
+# The stop reads the balance itself and engages the HALT file the executor
+# already refuses to trade through. Live without it is not a mode we offer.
+loss_stop = Execution::LossStop.new(
+  client: reader, halt: halt, data_dir: data_dir, budget_cents: budget_cents
+)
+opening = reader.portfolio("/portfolio/balance")["balance"]
+loss_stop.mark_open(opening) if opening
+
+warn format("mode=%s max_contracts=%d loss_budget=$%.2f open_balance=%s halt=%s",
+  live ? "LIVE" : "dry-run", max_contracts, budget_cents / 100.0,
+  opening ? format("$%.2f", opening / 100.0) : "unknown",
+  halt.active? ? "ENGAGED (#{halt.reason})" : "clear")
 
 OpportunityCollector.new(
   data_dir: data_dir,
   interval: Integer(ENV.fetch("INTERVAL", "60")),
-  # The reader is GET-only market data for exit-on-repricing quote checks;
-  # the order path stays dry-run with a transport that refuses the network.
-  execution: Execution::Pipeline.build(data_dir: data_dir, reader: KalshiClient.new)
+  execution: Execution::Pipeline.build(data_dir: data_dir, client: order_client, reader: reader),
+  loss_stop: loss_stop
 ).run(seconds: ENV["SECONDS"] && Integer(ENV["SECONDS"]))
