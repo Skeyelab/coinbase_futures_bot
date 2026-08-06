@@ -42,6 +42,20 @@ RSpec.describe OpportunityCollector do
     end
   end
 
+  it "checks the daily loss stop once per cycle" do
+    Dir.mktmpdir do |dir|
+      loss_stop = double("loss_stop", mark_open: 25_000)
+      expect(loss_stop).to receive(:check).at_least(:once).and_return(false)
+      collector = described_class.new(
+        data_dir: dir, interval: 0,
+        weather: FakeScan.new([]), touch: FakeScan.new([]), truth: FakeScan.new([]),
+        loss_stop: loss_stop, logger: ->(m) {}
+      )
+
+      collector.run(seconds: 0.05)
+    end
+  end
+
   it "checks exits once per cycle" do
     Dir.mktmpdir do |dir|
       execution = Execution::Pipeline.build(data_dir: dir)

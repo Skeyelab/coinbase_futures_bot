@@ -14,7 +14,8 @@ require_relative "truth_scan"
 # per hour or three per week. A scanner that records only its successes is how
 # a strategy looks better than it is.
 class OpportunityCollector
-  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, truth: nil, logger: nil, execution: nil)
+  def initialize(data_dir:, interval: 60, weather: nil, touch: nil, truth: nil, logger: nil, execution: nil,
+    loss_stop: nil)
     @data_dir = data_dir
     @interval = interval
     @logger = logger || ->(m) { warn("#{Time.now.utc.strftime("%H:%M:%S")} #{m}") }
@@ -26,6 +27,9 @@ class OpportunityCollector
     # Optional dry-run execution pipeline. nil means what it always meant:
     # observe and record, place nothing anywhere.
     @execution = execution
+    # Daily loss stop (operator-set): engages the HALT file, which the executor
+    # already refuses to trade through. nil = not enforced (dry-run tests).
+    @loss_stop = loss_stop
     @running = true
 
     FileUtils.mkdir_p(@data_dir)
@@ -67,6 +71,12 @@ class OpportunityCollector
       {scope: r.series, markets: r.markets, error: r.error, opportunities: r.opportunities,
        observed_count: r.observed_count}
     })
+
+    # The money question first: a day that has lost its budget places nothing
+    # further, whatever the scanner finds next.
+    if @loss_stop&.check
+      log("LOSS STOP engaged — no further entries today")
+    end
 
     # Exit on the market's agreement, not settlement: once a held settled-fact
     # position has repriced, cross out, recycle the collateral, and never meet

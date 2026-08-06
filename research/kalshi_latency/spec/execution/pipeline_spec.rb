@@ -1,6 +1,8 @@
 require "tmpdir"
 require "json"
 require_relative "../../lib/execution/pipeline"
+require_relative "../../lib/execution/loss_stop"
+require_relative "../../lib/execution/halt"
 
 RSpec.describe Execution::Pipeline do
   def sighting(over = {})
@@ -89,6 +91,19 @@ RSpec.describe Execution::Pipeline do
       pipeline.sight(sighting, at: 1000)
 
       expect(pipeline.check_exits).to eq([])
+    end
+  end
+
+  it "places nothing once the daily loss stop has engaged" do
+    Dir.mktmpdir do |dir|
+      halt = Execution::Halt.new(data_dir: dir)
+      stop = Execution::LossStop.new(client: double("client"), halt: halt,
+        data_dir: dir, budget_cents: 1000)
+      stop.mark_open(25_000)
+      stop.check(balance_cents: 23_000) # -$20: breached, halt engaged
+      pipeline = described_class.build(data_dir: dir)
+
+      expect(pipeline.sight(sighting, at: 1000)).to be_nil
     end
   end
 
