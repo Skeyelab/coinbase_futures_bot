@@ -66,6 +66,7 @@ RSpec.describe PositionsController, type: :controller do
   describe "GET #index" do
     before do
       request.env["HTTP_AUTHORIZATION"] = "Basic " + Base64.strict_encode64("admin:password123")
+      DryRun.disable!(confirm: "LIVE", reason: "spec setup")
     end
 
     it "lists all open positions successfully" do

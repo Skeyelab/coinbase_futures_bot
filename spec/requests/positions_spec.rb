@@ -26,6 +26,10 @@ RSpec.describe "Positions", type: :request do
 
     # Mock the positions service
     allow_any_instance_of(PositionsController).to receive(:positions_service).and_return(positions_service)
+
+    # These specs assert the LIVE positions view. Dry-run now fails closed
+    # (missing record = paper), so live must be opted into explicitly.
+    DryRun.disable!(confirm: "LIVE", reason: "spec setup")
   end
 
   after do

@@ -87,6 +87,7 @@ RSpec.describe GenerateSignalsJob, type: :job do
         allow(Execution::FuturesExecutor).to receive(:new).and_return(mock_executor)
         allow(mock_executor).to receive(:consider_entry)
         allow(ENV).to receive(:[]).with("PAPER_TRADING_MODE").and_return("false")
+        DryRun.disable!(confirm: "LIVE", reason: "spec setup")
       end
 
       it "calls executor with signal price and product_id" do

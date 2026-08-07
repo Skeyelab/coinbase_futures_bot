@@ -344,10 +344,14 @@ module Cli
     end
 
     # ─── dry_run_off ────────────────────────────────────────────────────────────
-    desc "dry_run_off", "Disable dry-run mode (restore live execution)"
+    desc "dry_run_off --confirm LIVE [--reason WHY]", "Disable dry-run mode (restore live execution; requires --confirm LIVE)"
+    option :confirm, type: :string
+    option :reason, type: :string
     def dry_run_off
-      DryRun.disable!
+      DryRun.disable!(confirm: options[:confirm], reason: options[:reason])
       puts "#{GREEN}#{BOLD}🟢 DRY-RUN disabled#{RESET} — LIVE execution restored."
+    rescue DryRun::UnconfirmedDisable
+      puts "#{YELLOW}Refused.#{RESET} Restoring live execution requires #{BOLD}--confirm LIVE#{RESET} (and ideally --reason)."
     end
 
     # ─── dry_run_status ─────────────────────────────────────────────────────────
