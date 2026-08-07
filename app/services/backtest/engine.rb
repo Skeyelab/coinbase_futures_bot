@@ -115,8 +115,18 @@ module Backtest
       # (issue #606): a BIP backtest at the old hardcoded $100 modeled $1,500
       # of exposure as $100x15, so per-contract exit policies tested against
       # 15x looser thresholds than the bot would ever trade.
-      @contract_size_usd = (contract_size_usd || strategy_contract_size_usd ||
-        registry_sizing.contract_size_usd.nonzero? || 100.0).to_f
+      # Precedence, most authoritative first: an explicit argument, then the
+      # per-contract registry (#606 Q1 -- asset_sizing.yml is the operational
+      # truth live), then the strategy's own figure, then 100.
+      #
+      # The registry MUST outrank the strategy's value. MultiTimeframeSignal
+      # carries contract_size_usd: 100 from the initializer -- the dead-config
+      # class of #605 -- and with it winning, BIP priced at $100 instead of
+      # $659. At that notional the $0.15 per-contract floor dominates the fee
+      # and a year-long walk-forward read -17bps/trade against -2.7bps at true
+      # notional: the difference between "hopeless" and "close".
+      @contract_size_usd = (contract_size_usd || registry_sizing.contract_size_usd.nonzero? ||
+        strategy_contract_size_usd || 100.0).to_f
       # Min-ROI time-decay exit (issue #398), evaluated per candle on the simulated
       # clock so backtest exit mix reflects live behavior. Explicit schedule for
       # tests; otherwise resolved from config (inert by default).
