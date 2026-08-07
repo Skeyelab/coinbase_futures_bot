@@ -42,6 +42,24 @@ RSpec.describe OpportunityCollector do
     end
   end
 
+  it "records the counterparty census on every weather cycle" do
+    Dir.mktmpdir do |dir|
+      result = WeatherScan::Result.new(city: "NYC", markets: 6, opportunities: [],
+        dead_buckets: 3, dead_with_bid: 0)
+      collector = described_class.new(
+        data_dir: dir, interval: 0,
+        weather: FakeScan.new([result]), touch: FakeScan.new([]), truth: FakeScan.new([]),
+        logger: ->(m) {}
+      )
+
+      collector.run(seconds: 0.05)
+
+      weather_cycles = File.readlines(Dir[File.join(dir, "cycle-*.jsonl")].first)
+        .map { |l| JSON.parse(l) }.select { |c| c["family"] == "weather" }
+      expect(weather_cycles.first).to include("dead_buckets" => 3, "dead_with_bid" => 0)
+    end
+  end
+
   it "checks the daily loss stop once per cycle" do
     Dir.mktmpdir do |dir|
       loss_stop = double("loss_stop", mark_open: 25_000)
