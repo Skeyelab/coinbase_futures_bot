@@ -23,9 +23,13 @@ RSpec.describe Credibility do
     # THE INVERTED ONE. For a news-latency trade a long window is the edge. For
     # a settled fact it is the tell: the real one observed vanished in 70
     # seconds, and the false one sat for 2,205.
-    it "distrusts a settled fact nobody has taken" do
-      expect(described_class.doubts(episode(seconds: 300)).first).to match(/persisted/)
-      expect(described_class.doubts(episode(seconds: 299))).to be_empty
+    # Since 2026-08-07 this doubt applies only where it was earned: an episode
+    # the market DISPUTES. Agreement excuses it (see the conditioned describe
+    # block below for the measurement).
+    it "distrusts a disputed settled fact nobody has taken" do
+      disputed = {market_pct: 93, support: 5}
+      expect(described_class.doubts(disputed.merge(seconds: 300))).to include(a_string_matching(/persisted/))
+      expect(described_class.doubts(disputed.merge(seconds: 299))).not_to include(a_string_matching(/persisted/))
     end
 
     it "reports every reason, not just the first" do
@@ -60,9 +64,44 @@ RSpec.describe Credibility do
     end
 
     it "lets the persistence threshold be tuned as evidence accumulates" do
-      expect(described_class.doubts(episode(seconds: 400), max_persistence: 600)).to be_empty
-      expect(described_class.doubts(episode(seconds: 400), max_persistence: 300).first)
-        .to match(/persisted/)
+      disputed = {market_pct: 93, support: 5, seconds: 400}
+      expect(described_class.doubts(disputed, max_persistence: 600))
+        .not_to include(a_string_matching(/persisted/))
+      expect(described_class.doubts(disputed, max_persistence: 300))
+        .to include(a_string_matching(/persisted/))
+    end
+  end
+
+  # Measured 2026-08-07 over 25 scored episodes (Aug 4-6). Market agreement
+  # is a perfect separator on that sample: 11/11 correct when the book agreed
+  # (<20%), 4/14 when it disputed. Conditioned on agreement, PERSISTENCE adds
+  # nothing -- 10/10 slow-but-agreeing episodes settled our way, several
+  # sitting 45-75 minutes. The rule's premise ("a real fact gets taken fast")
+  # assumed a counterparty; the measured counterparty rate on dead buckets is
+  # 5.9%, so slowness measures an empty book, not our error.
+  describe "persistence, conditioned on market agreement" do
+    it "does not doubt a long-lived episode the market agrees with" do
+      episode = {market_pct: 7, support: 3, seconds: 1081, verified: true}
+
+      expect(described_class.doubts(episode)).to be_empty
+    end
+
+    it "still doubts a long-lived episode the market disputes" do
+      # KXHIGHLAX-26AUG04-B77.5: 19,041s at 99% disagreement. It settled YES.
+      # This is the episode persistence was created for and it must stay caught.
+      episode = {market_pct: 99, support: 1, seconds: 19_041, verified: true}
+      doubts = described_class.doubts(episode)
+
+      expect(doubts).to include("market disagrees 99%")
+      expect(doubts).to include(a_string_matching(/persisted/))
+    end
+
+    it "doubts a long-lived episode when agreement is unknown" do
+      # No market_pct recorded reads as 0, which would silently mean "agrees".
+      # Absent evidence of agreement, persistence keeps its say.
+      episode = {support: 3, seconds: 4000, verified: true}
+
+      expect(described_class.doubts(episode)).to include(a_string_matching(/persisted/))
     end
   end
 end
