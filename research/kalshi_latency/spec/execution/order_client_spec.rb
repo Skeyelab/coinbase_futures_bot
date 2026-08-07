@@ -265,10 +265,31 @@ RSpec.describe Execution::OrderClient do
         .to raise_error(Execution::OrderClient::BadOrder, /count/)
     end
 
-    it "caps order size so one bad episode cannot empty the account" do
-      capped = described_class.new(transport: ->(*) {}, max_contracts: 10)
+    # 2026-08-07: with MAX_CONTRACTS=1 live, every approved candidate died here.
+    # The scanner sizes from resting depth (25 contracts on LAX) and raising
+    # turned a legitimate depth reading into a swallowed cycle error, so the
+    # bot found trades all afternoon and placed none. max_contracts is a RISK
+    # BUDGET, not a claim that the order is malformed: clamp to it, the same
+    # thing Backtest::Engine#capped_contracts does live.
+    it "clamps an oversized order down to the cap instead of refusing it" do
+      capped = described_class.new(transport: ->(*) { raise "dry-run" }, max_contracts: 10)
 
-      expect { capped.place(opportunity.merge(contracts: 11)) }
+      intent = capped.place(opportunity.merge(contracts: 25))
+
+      expect(intent[:count]).to eq("10.00")
+      expect(intent[:mode]).to eq("dry_run")
+    end
+
+    it "leaves an order inside the cap alone" do
+      capped = described_class.new(transport: ->(*) { raise "dry-run" }, max_contracts: 10)
+
+      expect(capped.place(opportunity.merge(contracts: 4))[:count]).to eq("4.00")
+    end
+
+    it "still refuses a non-positive count -- that is malformed, not oversized" do
+      client = described_class.new(transport: ->(*) { raise "dry-run" }, max_contracts: 10)
+
+      expect { client.place(opportunity.merge(contracts: 0)) }
         .to raise_error(Execution::OrderClient::BadOrder, /count/)
     end
 
