@@ -51,12 +51,19 @@ module Execution
     # field, so exiting a NO holding is a BID, not a sell.
     def place(opportunity)
       validate!(opportunity)
+      # max_contracts is a RISK BUDGET, not a claim about validity, so an
+      # oversized order is clamped rather than refused. Raising here meant the
+      # scanner's honest depth reading (25 resting on LAX) became a swallowed
+      # cycle error: 2026-08-07, every approved candidate died on
+      # "count 25 outside 1..1" and the bot placed nothing all afternoon.
+      # Backtest::Engine#capped_contracts already clamps; these now agree.
+      contracts = [opportunity[:contracts].to_i, @max_contracts].min
       order = {
         ticker: opportunity[:ticker],
         side: BOOK_SIDE.fetch(opportunity[:side]),
         # Both are STRINGS on v2, and price is fixed-point dollars rather than
         # integer cents. 12 sent as a number is not 12c, it is rejected.
-        count: format("%.2f", opportunity[:contracts]),
+        count: format("%.2f", contracts),
         price: format("%.4f", opportunity[:price_cents] / 100.0),
         time_in_force: "good_till_canceled",
         # Required by v2 -- omitting it is a 400 missing_parameters.
@@ -130,7 +137,8 @@ module Execution
       side = opportunity[:side]
 
       raise BadOrder, "price #{price} off the 1-99 board" unless (1..99).cover?(price)
-      raise BadOrder, "count #{count} outside 1..#{@max_contracts}" unless (1..@max_contracts).cover?(count)
+      # Oversized is clamped in place; only a non-positive count is malformed.
+      raise BadOrder, "count #{count} must be positive" unless count.to_i.positive?
       raise BadOrder, "side #{side} is not buy or sell" unless [:buy, :sell].include?(side)
     end
   end
