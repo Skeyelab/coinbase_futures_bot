@@ -37,9 +37,12 @@ RSpec.describe Execution::Pipeline do
       # An unverified-station sighting is refused but keeps its episode clock
       # running. By the time it looks credible it has persisted past the
       # threshold -- the pipeline must know that and refuse.
-      pipeline.sight(sighting(verified: false), at: 1000)
-      pipeline.sight(sighting(verified: false), at: 1200)
-      late = pipeline.sight(sighting, at: 1400)
+      # market_pct 40 == the book disputes us, which is where persistence
+      # still applies after the 2026-08-07 conditioning.
+      disputed = sighting(market_pct: 40)
+      pipeline.sight(disputed.merge(verified: false), at: 1000)
+      pipeline.sight(disputed.merge(verified: false), at: 1200)
+      late = pipeline.sight(disputed, at: 1400)
 
       expect(late).to be_nil
       refusals = File.readlines(File.join(dir, "orders.jsonl")).map { |l| JSON.parse(l) }

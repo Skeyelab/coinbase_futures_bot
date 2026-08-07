@@ -24,8 +24,15 @@ module Credibility
   # For a NEWS-latency trade long dwell is the edge. For a settled fact it is
   # the tell. Do not carry the intuition across.
   #
-  # PROVISIONAL: this threshold rests on a single observed genuine episode.
-  # Revisit once the scanner has produced more than one.
+  # CONDITIONED ON MARKET DISAGREEMENT since 2026-08-07. Measured over 25
+  # scored episodes (Aug 4-6): market agreement separates perfectly (11/11
+  # correct when the book agreed, 4/14 when it disputed), and within agreeing
+  # episodes persistence adds nothing -- 10/10 settled our way, several after
+  # 45-75 minutes. The premise "a real fact gets taken fast" assumed a
+  # counterparty; the measured rate of dead buckets with ANY bid is 5.9%, so
+  # a long life measures an empty book rather than our error. Persistence
+  # keeps its say exactly where it earned it: when the market disputes us
+  # (KXHIGHLAX-26AUG04-B77.5 sat 19,041s at 99% and settled against us).
   MAX_PERSISTENCE_SECONDS = 300
 
   def self.doubts(episode, max_persistence: MAX_PERSISTENCE_SECONDS)
@@ -42,8 +49,11 @@ module Credibility
     support = episode[:support]
     reasons << "lone spike (#{support} obs)" if !support.nil? && support.to_i < MIN_SUPPORT
 
+    # Absent a recorded market_pct, agreement is UNKNOWN, not agreement: nil
+    # reads as 0 through to_i, which would silently excuse every long episode.
+    agreed = !episode[:market_pct].nil? && pct < MAX_MARKET_PCT
     seconds = episode[:seconds].to_i
-    reasons << "persisted #{seconds}s" if seconds >= max_persistence
+    reasons << "persisted #{seconds}s" if seconds >= max_persistence && !agreed
 
     reasons
   end
