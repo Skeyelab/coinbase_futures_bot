@@ -13,10 +13,18 @@ require_relative "opportunity"
 # reports what the weather has already settled that the market has not.
 class WeatherScan
   Result = Struct.new(:city, :station, :local_date, :running_high, :observed_at,
-    :obs_age_seconds, :markets, :opportunities, :error, :kind)
+    :obs_age_seconds, :markets, :opportunities, :error, :kind,
+    # The counterparty census. Opportunity.find returns nil when nothing rests
+    # on the other side, so a bucket the arithmetic has KILLED but nobody bids
+    # on never reaches the opportunity stream. Without these two counts, "zero
+    # opportunities" cannot be told apart from "zero settled facts" -- and on
+    # 2026-08-06 that difference was 12 dead buckets and no bidders.
+    :dead_buckets, :dead_with_bid)
 
-  def initialize(client: KalshiClient.new, now: nil, observation_ttl: 120, max_contracts: 25)
+  def initialize(client: KalshiClient.new, now: nil, observation_ttl: 120, max_contracts: 25,
+    station_source: nil)
     @max_contracts = max_contracts
+    @station_source = station_source
     @client = client
     @fixed_now = now
     @observation_ttl = observation_ttl
@@ -42,6 +50,9 @@ class WeatherScan
     latest = observations.reject { |o| o[:temp_f].nil? }.max_by { |o| o[:at] }
 
     markets = @client.temp_markets(city[:series], local_date)
+    dead = 0
+    dead_bid = 0
+
     opportunities = markets.filter_map do |row|
       market = (kind == :low) ? LowTempMarket.from_api(row) : TempMarket.from_api(row)
       next unless market
@@ -50,10 +61,15 @@ class WeatherScan
       # order, so a 1c edge is only worth taking once it is sized. Reporting a
       # single contract would hide every thin-but-real opportunity.
       resting = row["yes_bid_size_fp"].to_f.floor
+      bid_cents = (row["yes_bid_dollars"].to_f * 100).round
+      if market.status_given(high) == :refuted
+        dead += 1
+        dead_bid += 1 if bid_cents.positive?
+      end
       found = Opportunity.find(
         market: market,
         observed: high,
-        bid_cents: (row["yes_bid_dollars"].to_f * 100).round,
+        bid_cents: bid_cents,
         ask_cents: (row["yes_ask_dollars"].to_f * 100).round,
         contracts: [resting, @max_contracts].min
       )
@@ -72,7 +88,10 @@ class WeatherScan
         margin_f: margin_above_boundary(market, high, kind),
         peak_support: support,
         verified: city[:verified] != false,
-        market_pct: found[:price_cents]
+        market_pct: found[:price_cents],
+        # What was actually resting when we looked: the difference between an
+        # opportunity and a rumour of one.
+        bid_size: resting
       )
     end
 
@@ -80,7 +99,8 @@ class WeatherScan
       city: city[:label], station: city[:station], local_date: local_date, kind: kind,
       running_high: high, observed_at: latest && latest[:at],
       obs_age_seconds: latest && (@now - latest[:at]).to_i,
-      markets: markets.size, opportunities: opportunities
+      markets: markets.size, opportunities: opportunities,
+      dead_buckets: dead, dead_with_bid: dead_bid
     )
   rescue => e
     Result.new(city: city[:label], station: city[:station], markets: 0,
@@ -116,7 +136,8 @@ class WeatherScan
     entry = @observation_cache[city[:station]]
     return entry[:observations] if entry && (@now - entry[:at]) < @observation_ttl
 
-    station = NwsStation.new(city[:station], time_zone: city[:time_zone])
+    station = @station_source ? @station_source.call(city)
+      : NwsStation.new(city[:station], time_zone: city[:time_zone])
     observations = station.observations
     @observation_cache[city[:station]] = {at: @now, observations: observations}
     observations

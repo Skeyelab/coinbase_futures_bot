@@ -61,7 +61,10 @@ class OpportunityCollector
     hits = 0
 
     hits += record("weather", at, number, @weather.run.map { |r|
-      {scope: r.city, markets: r.markets, error: r.error, opportunities: r.opportunities}
+      {scope: r.city, markets: r.markets, error: r.error, opportunities: r.opportunities,
+       # The counterparty census: dead buckets vs dead buckets anyone bids on.
+       # "Zero opportunities" means nothing without it.
+       dead_buckets: r.dead_buckets, dead_with_bid: r.dead_with_bid}
     })
     hits += record("touch", at, number, @touch.run.map { |r|
       {scope: r.series, markets: r.markets, error: r.error, opportunities: r.opportunities,
@@ -103,7 +106,9 @@ class OpportunityCollector
       # puts "140 errors" in a log someone scans at 6am and reads as broken.
       errors: scopes.count { |s| s[:error] && !s[:error].to_s.start_with?("disabled") },
       disabled: scopes.count { |s| s[:error].to_s.start_with?("disabled") },
-      opportunities: total
+      opportunities: total,
+      dead_buckets: scopes.sum { |s| s[:dead_buckets].to_i },
+      dead_with_bid: scopes.sum { |s| s[:dead_with_bid].to_i }
     })
 
     scopes.each do |s|
