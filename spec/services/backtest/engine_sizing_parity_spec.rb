@@ -35,6 +35,37 @@ RSpec.describe Backtest::Engine, "sizing parity with asset_sizing.yml (#606)" do
     expect(e.contract_size_usd).to eq(Trading::AssetSizing.for_product("BIT-28AUG26-CDE").contract_size_usd)
   end
 
+  # The bug this file's first version shipped: the registry sat LAST in the
+  # precedence chain, behind the strategy's stale contract_size_usd: 100 (the
+  # dead-config class of #605). So BIP still priced at $100 instead of $659,
+  # the $0.15 per-contract floor dominated the fee, and a year-long
+  # walk-forward measured -17bps/trade when the true-notional figure is
+  # -2.7bps. The registry is authoritative (#606 Q1); only an explicit
+  # argument outranks it.
+  it "prefers the registry over a strategy's own stale contract_size_usd" do
+    strategy = Class.new do
+      def initialize = @config = {contract_size_usd: 100.0}
+      def signal(symbol:, equity_usd:, as_of: nil) = nil
+    end.new
+
+    e = described_class.new(symbol: "BIP-20DEC30-CDE", strategy: strategy, step: "5m")
+
+    expect(e.contract_size_usd).to eq(659.0)
+  end
+
+  it "falls back to the strategy's value when the registry has no entry for the product" do
+    strategy = Class.new do
+      def initialize = @config = {contract_size_usd: 42.0}
+      def signal(symbol:, equity_usd:, as_of: nil) = nil
+    end.new
+    allow(Trading::AssetSizing).to receive(:for_product).with("MADE-UP-CDE")
+      .and_return(Trading::AssetSizing::Params.new(0.0, 2, 1))
+
+    e = described_class.new(symbol: "MADE-UP-CDE", strategy: strategy, step: "5m")
+
+    expect(e.contract_size_usd).to eq(42.0)
+  end
+
   it "an explicit override still wins" do
     e = described_class.new(symbol: "BIP-20DEC30-CDE", strategy: silent_strategy,
       step: "5m", contract_size_usd: 42.0)
