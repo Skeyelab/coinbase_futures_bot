@@ -96,4 +96,42 @@ RSpec.describe RatchetRegistry do
       expect(described_class.observable_for("KXNBAMVP-27-AEDWARDS5")).to be_nil
     end
   end
+
+  # Built 2026-08-07, BEFORE the snow markets list (August). KXNAMEDSTORM and
+  # KXHURRICANE are already open; snow appears in season. Registering them now
+  # means the scan picks each up the day it lists rather than after.
+  describe "cumulative-count families beyond Truth Social" do
+    it "reads a named-storm season total as a count ratchet" do
+      row = {"ticker" => "KXNAMEDSTORM-26DEC01EPACTOT-26", "strike_type" => "greater",
+             "floor_strike" => 26, "cap_strike" => nil}
+
+      market = described_class.build(row)
+
+      expect(market).to be_a(CountMarket)
+      expect(described_class.observable_for(row["ticker"])).to eq(:season_named_storms)
+      # A season total can only rise, so exceeding the floor CONFIRMS.
+      expect(market.status_given(27)).to eq(:confirmed)
+      expect(market.status_given(20)).to eq(:open)
+    end
+
+    it "reads a hurricane count the same way" do
+      row = {"ticker" => "KXHURRICANE-26JUN30CPACMAJ-9", "strike_type" => "greater",
+             "floor_strike" => 9, "cap_strike" => nil}
+
+      expect(described_class.build(row)).to be_a(CountMarket)
+      expect(described_class.observable_for(row["ticker"])).to eq(:season_hurricanes)
+    end
+
+    it "reads a seasonal snowfall total as a count ratchet" do
+      row = {"ticker" => "KXSNOWBOS-27JUN30-T40", "strike_type" => "greater",
+             "floor_strike" => 40, "cap_strike" => nil}
+
+      expect(described_class.build(row)).to be_a(CountMarket)
+      expect(described_class.observable_for(row["ticker"])).to eq(:season_snow_inches)
+    end
+
+    it "still refuses a series whose rules nobody has read" do
+      expect(described_class.build({"ticker" => "KXMYSTERY-26DEC01-5"})).to be_nil
+    end
+  end
 end

@@ -25,6 +25,9 @@ module RatchetRegistry
   #   :window_min_usd    the running minimum price since issuance
   #   :window_max_usd    the running maximum price since issuance
   #   :week_post_count   cumulative Trump posts in the market week
+  #   :season_named_storms  named storms per basin this season (NHC)
+  #   :season_hurricanes    hurricanes per basin this season (NHC)
+  #   :season_snow_inches   snowfall since Jul 1 at a station (NWS CLI)
   SERIES = {
     "KXHIGH" => {kind: :temperature, observable: :daily_high_f},
     "KXBTCMINMON" => {kind: :touch_below, observable: :window_min_usd},
@@ -33,7 +36,19 @@ module RatchetRegistry
     "KXETHMAXY" => {kind: :touch_above, observable: :window_max_usd},
     # Cumulative post count, Roll Call's tracker at trumpstruth.org -- which is
     # the source the rules NAME, not a proxy for it.
-    "KXTRUTHSOCIAL" => {kind: :count, observable: :week_post_count}
+    "KXTRUTHSOCIAL" => {kind: :count, observable: :week_post_count},
+    # Registered 2026-08-07, ahead of listing. Every one of these is a
+    # cumulative total that can only RISE, so a `greater` strike CONFIRMS on
+    # being exceeded and never un-confirms -- the cleanest ratchet shape we
+    # have, cleaner than a daily high, which resets at midnight.
+    #
+    # KXNAMEDSTORM / KXHURRICANE are already open (basin season totals, NHC is
+    # the source their rules name). Snow lists in season; the season total is
+    # the snow_jul1 field of the same NWS Climatological Report that settles
+    # the temperature markets, so it introduces no new settlement basis.
+    "KXNAMEDSTORM" => {kind: :count, observable: :season_named_storms},
+    "KXHURRICANE" => {kind: :count, observable: :season_hurricanes},
+    "KXSNOW" => {kind: :count, observable: :season_snow_inches}
   }.freeze
 
   def self.entry_for(ticker)
