@@ -36,15 +36,24 @@ module Execution
     end
 
     # true when the stop engaged (or was already engaged) on today's drop.
+    #
+    # Rolls its own baseline. Observed live 2026-08-08: the collector had run
+    # since the previous day, so the recorded day was stale and this returned
+    # false on every cycle -- the $10 stop was INERT for a whole live trading
+    # day. A stop that only baselines at process start protects nothing on a
+    # process that does not restart, and failing quiet is still failing.
     def check(balance_cents: nil)
+      current = balance_cents || fetch_balance_cents
+      return false if current.nil?
+
       state = read_state
-      return false unless same_day?(state)
+      unless same_day?(state)
+        mark_open(current)
+        return false
+      end
 
       open_cents = state["open_cents"]
       return false if open_cents.nil?
-
-      current = balance_cents || fetch_balance_cents
-      return false if current.nil?
 
       drop = open_cents - current
       return false if drop <= @budget_cents

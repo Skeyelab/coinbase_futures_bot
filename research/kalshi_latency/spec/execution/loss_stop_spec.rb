@@ -137,4 +137,63 @@ RSpec.describe Execution::LossStop do
       expect(tomorrow.check(balance_cents: 23_500)).to be false # -$4 on the new day
     end
   end
+
+  # Observed live 2026-08-08: the scanner had run since the previous day, so
+  # loss-stop.json still carried {"day":"2026-08-07"}. check() sees a stale day
+  # and returns false, which meant the $10 stop was INERT for the whole of a
+  # live trading day. Failing quiet is still failing: a long-running process
+  # must be able to roll its own baseline at midnight.
+  describe "rolling into a new day without a restart" do
+    it "adopts today's balance as the baseline when the recorded day is stale" do
+      Dir.mktmpdir do |dir|
+        halt = Execution::Halt.new(data_dir: dir)
+        day = "2026-08-07"
+        stop = described_class.new(client: fills_client([]), halt: halt, data_dir: dir,
+          budget_cents: 1000, clock: -> { Time.utc(2026, 8, 7, 12) })
+        stop.mark_open(25_058)
+
+        # Same file, next UTC day, no restart.
+        rolled = described_class.new(client: fills_client([]), halt: halt, data_dir: dir,
+          budget_cents: 1000, clock: -> { Time.utc(2026, 8, 8, 12) })
+        rolled.mark_open(25_066)
+
+        expect(JSON.parse(File.read(File.join(dir, described_class::STATE_FILE))))
+          .to include("day" => "2026-08-08", "open_cents" => 25_066)
+        expect(day).to eq("2026-08-07") # the stale day is gone, not merged
+      end
+    end
+
+    it "protects the new day against the new baseline" do
+      Dir.mktmpdir do |dir|
+        halt = Execution::Halt.new(data_dir: dir)
+        stop = described_class.new(client: fills_client([]), halt: halt, data_dir: dir,
+          budget_cents: 1000, clock: -> { Time.utc(2026, 8, 8, 12) })
+        stop.mark_open(25_066)
+
+        expect(stop.check(balance_cents: 24_000)).to be true # -$10.66
+        expect(halt.active?).to be true
+      end
+    end
+
+    # The real defect: a long-running collector calls check() every cycle and
+    # never calls mark_open again. check() must therefore roll the baseline
+    # itself rather than returning false because the recorded day is stale.
+    it "self-baselines on the first check of a new day" do
+      Dir.mktmpdir do |dir|
+        halt = Execution::Halt.new(data_dir: dir)
+        described_class.new(client: fills_client([]), halt: halt, data_dir: dir,
+          budget_cents: 1000, clock: -> { Time.utc(2026, 8, 7, 12) }).mark_open(25_058)
+
+        client = double("client", portfolio: {"balance" => 25_066})
+        rolled = described_class.new(client: client, halt: halt, data_dir: dir,
+          budget_cents: 1000, clock: -> { Time.utc(2026, 8, 8, 12) })
+
+        expect(rolled.check).to be false # first look of the new day: baseline set
+        expect(JSON.parse(File.read(File.join(dir, described_class::STATE_FILE))))
+          .to include("day" => "2026-08-08", "open_cents" => 25_066)
+        # and it protects immediately, without waiting for a restart
+        expect(rolled.check(balance_cents: 24_000)).to be true
+      end
+    end
+  end
 end
