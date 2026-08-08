@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# Season named-storm / hurricane counts against their Kalshi books (NHC source).
+#
+#   DATA_DIR=~/kalshi-data ruby bin/storm_count
+#
+# GET-only. The count is persisted because NHC publishes only ACTIVE storms:
+# the feed is not monotone, the season total is, and the difference is memory.
+
+require_relative "../lib/storm_scan"
+require_relative "../lib/storm_count_source"
+
+data_dir = ENV["DATA_DIR"] || File.expand_path("../data/opportunities", __dir__)
+source = StormCountSource.new(state_path: File.join(data_dir, "storm-counts.json"))
+scan = StormScan.new(source: source)
+
+puts "=" * 74
+puts "SEASON STORM COUNTS  #{Time.now.utc.strftime("%Y-%m-%d %H:%M:%SZ")}"
+puts "=" * 74
+
+scan.run.each do |r|
+  if r.error
+    puts format("%-14s ERROR %s", r.series, r.error)
+    next
+  end
+
+  puts format("%-14s %-5s count=%-3d markets=%d", r.series, r.basin, r.observed_count.to_i, r.markets)
+  r.opportunities.each do |o|
+    puts format("      >> %-32s %s %d @ %2dc  net=%dc",
+      o[:ticker], o[:side].to_s.upcase, o[:contracts], o[:price_cents], o[:net_cents])
+  end
+end
+
+puts
+puts "A count of 0 early in a season is expected, not a failure. NHC lists only"
+puts "ACTIVE storms, so the running total lives in storm-counts.json."
